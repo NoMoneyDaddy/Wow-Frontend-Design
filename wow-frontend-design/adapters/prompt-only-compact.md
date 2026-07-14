@@ -54,6 +54,7 @@ If changing the product name leaves evidence, grammar, composition, interaction,
 - SVG/icons need accessible names or correct decorative hiding, consistent stroke/optical weight, bounded parsing, and license/source provenance. Never invent icon licenses.
 - WebGL/Three/Lottie is progressive enhancement: stable poster/static fallback first, exact dependency/runtime version, bounded assets, context-loss/reduced-motion handling, cleanup, and device performance budget. Canvas cannot be the only copy or control surface.
 - Public discovery uses stable crawlable URLs/links and truthful visible content. Structured data must match the page and only targets a currently supported feature. Never promise SEO/AEO/GEO rank, citation, traffic, or AI inclusion; never add `llms.txt`, FAQ markup, or artificial chunking as universal hacks.
+- For multi-route or structurally uncertain work, separate the IA sitemap, wireflow, and XML sitemap. Record route audience/permissions/task/lifecycle, representative and extreme content, required states, interaction feedback/recovery, and one explicit mobile transformation per region. A wireframe is a planning hypothesis, never self-certified usability or production proof; skip it when a focused change has no structural uncertainty.
 - Preserve the detected stack. Add a dependency only when its measurable value exceeds bundle, security, license, maintenance, and compatibility cost. Never expose secrets or weaken CSP/auth/sanitization to make an effect work.
 
 ## Four checkpoints

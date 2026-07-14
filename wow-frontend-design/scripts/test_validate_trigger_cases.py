@@ -21,7 +21,7 @@ class TriggerCaseTests(unittest.TestCase):
             root / "evals" / "trigger_cases.json",
             root / "wow-frontend-design" / "references",
         )
-        self.assertEqual(count, 27)
+        self.assertEqual(count, 28)
 
     def test_negative_case_cannot_route_skill_references(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

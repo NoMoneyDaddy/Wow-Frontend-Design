@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>典藏書局 — 每一本書都是一段旅程</title>
+<meta name="description" content="典藏書局精選文學、歷史、科學、藝術與兒童讀物，為愛書人提供最豐富的閱讀收藏。">
+<style>
+/* === DESIGN TOKENS === */
+:root {
+  --color-canvas: #F5F1EA;
+  --color-surface: #FEFCF8;
+  --color-surface-raised: #FAF7F2;
+  --color-ink: #1A1714;
+  --color-ink-muted: #6B6358;
+  --color-ink-faint: #9C9287;
+  --color-border-subtle: #DDD5C8;
+  --color-border-strong: #A8988A;
+  --color-action: #C0392B;
+  --color-action-hover: #A93226;
+  --color-on-primary: #FEFCF8;
+  --color-accent-literature: #5B4A8A;
+  --color-accent-history: #2E6B5E;
+  --color-accent-science: #1A5276;
+  --color-accent-art: #7D6608;
+  --color-accent-children: #E07B1A;
+
+  --font-serif: Georgia, "Noto Serif TC", "Source Han Serif TC", "Times New Roman", serif;
+  --font-sans: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-xxl: 64px;
+
+  --page-pad: clamp(1.25rem, 4vw, 3.5rem);
+  --max-width: 1200px;
+  --measure: 68ch;
+
+  --dur-fast: 140ms;
+  --dur-base: 260ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* === RESET === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.75;
+  min-height: 100vh;
+}
+:lang(zh-Hant) { line-break: strict; word-break: normal; }
+img { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font: inherit; border: none; background: none; }
+ul, ol { list-style: none; }
+
+/* === FOCUS === */
+:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 3px;
+}
+
+/* === SKIP LINK === */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-md);
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  z-index: 9999;
+  transition: top var(--dur-fast);
+}
+.skip-link:focus { top: var(--space-sm); }
+
+/* === LAYOUT UTILITIES === */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+}
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* === HEADER / NAV === */
+.site-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding-block: var(--space-md);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+}
+.site-logo {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.site-logo-main {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+}
+.site-logo-sub {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-ink-faint);
+  text-transform: uppercase;
+}
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+.site-nav-list {
+  display: flex;
+  gap: var(--space-xl);
+}
+.site-nav-list a {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-muted);
+  transition: color var(--dur-fast);
+  padding-block: var(--space-xs);
+}
+.site-nav-list a:hover { color: var(--color-action); }
+.site-nav-list a[aria-current="page"] { color: var(--color-ink); }
+.nav-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.nav-search-input {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 2px;
+  padding: 6px var(--space-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-ink);
+  width: 200px;
+  transition: border-color var(--dur-fast);
+}
+.nav-search-input::placeholder { color: var(--color-ink-faint); }
+.nav-search-input:focus { outline: none; border-color: var(--color-action); }
+.nav-search-btn {
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: 6px var(--space-md);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: background var(--dur-fast);
+  white-space: nowrap;
+}
+.nav-search-btn:hover { background: var(--color-action-hover); }
+
+/* Hamburger */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-sm);
+  background: none;
+  border: none;
+}
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--color-ink);
+  transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-fast);
+}
+
+/* Mobile drawer */
+.mobile-drawer {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+.mobile-drawer.is-open { display: block; }
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(26,23,20,0.48);
+}
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(80vw, 320px);
+  background: var(--color-surface);
+  padding: var(--space-xxl) var(--space-xl) var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.mobile-drawer.is-open .drawer-panel { transform: translateX(0); }
+.drawer-close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  padding: var(--space-sm);
+  line-height: 1;
+}
+.drawer-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.drawer-nav-list a {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+  transition: color var(--dur-fast);
+}
+.drawer-nav-list a:hover { color: var(--color-action); }
+.drawer-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.drawer-search-input {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 2px;
+  padding: 10px var(--space-md);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-ink);
+  width: 100%;
+}
+.drawer-search-input::placeholder { color: var(--color-ink-faint); }
+.drawer-search-btn {
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: 10px var(--space-md);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  width: 100%;
+}
+
+/* === HERO === */
+.hero {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-block: var(--space-xxl);
+}
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xxl);
+  align-items: center;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+}
+.hero-text {}
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-action);
+  margin-bottom: var(--space-md);
+}
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  margin-bottom: var(--space-lg);
+}
+.hero-desc {
+  font-size: 17px;
+  color: var(--color-ink-muted);
+  line-height: 1.75;
+  max-width: var(--measure);
+  margin-bottom: var(--space-xl);
+}
+.hero-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.btn-primary {
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: 12px var(--space-xl);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: inline-block;
+  transition: background var(--dur-fast);
+  white-space: nowrap;
+}
+.btn-primary:hover { background: var(--color-action-hover); }
+.btn-secondary {
+  background: transparent;
+  color: var(--color-ink);
+  padding: 11px var(--space-xl);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--color-border-strong);
+  display: inline-block;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+  white-space: nowrap;
+}
+.btn-secondary:hover { border-color: var(--color-action); color: var(--color-action); }
+
+/* Hero featured book illustration */
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--space-md);
+  height: 340px;
+}
+.book-spine {
+  width: 60px;
+  height: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-on-primary);
+  letter-spacing: 0.06em;
+  transition: transform var(--dur-base) var(--ease-out), height var(--dur-base) var(--ease-out);
+  cursor: default;
+}
+.book-spine:hover { transform: translateY(-12px); }
+.book-spine::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.15;
+}
+.book-spine-cover {
+  position: absolute;
+  inset: 0;
+}
+.book-spine--lit { background: var(--color-accent-literature); height: 280px; }
+.book-spine--hist { background: var(--color-accent-history); height: 240px; }
+.book-spine--sci { background: var(--color-accent-science); height: 260px; }
+.book-spine--art { background: var(--color-accent-art); height: 220px; }
+.book-spine--child { background: var(--color-accent-children); height: 200px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .book-spine { transition: none; }
+  .book-spine:hover { transform: none; }
+}
+
+/* === SECTION HEADER === */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+.section-link {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-action);
+  transition: color var(--dur-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.section-link:hover { color: var(--color-action-hover); }
+
+/* === FEATURED BOOKS === */
+.section-featured {
+  padding-block: var(--space-xxl);
+}
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-lg);
+}
+
+/* Book card */
+.book-card {
+  background: var(--color-surface);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow var(--dur-fast);
+}
+.book-card:hover {
+  box-shadow: 0 4px 16px rgba(26,23,20,0.10);
+}
+.book-card-spine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  bottom: 0;
+}
+.book-card-spine--lit { background: var(--color-accent-literature); }
+.book-card-spine--hist { background: var(--color-accent-history); }
+.book-card-spine--sci { background: var(--color-accent-science); }
+.book-card-spine--art { background: var(--color-accent-art); }
+.book-card-spine--child { background: var(--color-accent-children); }
+
+.book-card-cover {
+  aspect-ratio: 3/4;
+  background: var(--color-canvas);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-left: 4px;
+}
+.book-cover-art {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  text-align: center;
+}
+.book-cover-title-art {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-surface);
+}
+.book-cover-art--lit { background: var(--color-accent-literature); }
+.book-cover-art--hist { background: var(--color-accent-history); }
+.book-cover-art--sci { background: var(--color-accent-science); }
+.book-cover-art--art { background: var(--color-accent-art); }
+.book-cover-art--child { background: var(--color-accent-children); }
+
+.book-card-body {
+  padding: var(--space-md) var(--space-md) var(--space-md) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+}
+.book-card-tag {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  margin-bottom: var(--space-xs);
+}
+.book-card-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-ink);
+}
+.book-card-author {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+.book-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-subtle);
+}
+.book-card-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.book-card-btn {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-action);
+  transition: color var(--dur-fast);
+}
+.book-card-btn:hover { color: var(--color-action-hover); }
+
+/* === CATEGORIES === */
+.section-categories {
+  padding-block: var(--space-xxl);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-md);
+}
+.category-card {
+  background: var(--color-canvas);
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  border-top: 4px solid currentColor;
+  transition: background var(--dur-fast), transform var(--dur-fast);
+  cursor: pointer;
+}
+.category-card:hover { background: var(--color-surface-raised); transform: translateY(-2px); }
+.category-card--lit { color: var(--color-accent-literature); }
+.category-card--hist { color: var(--color-accent-history); }
+.category-card--sci { color: var(--color-accent-science); }
+.category-card--art { color: var(--color-accent-art); }
+.category-card--child { color: var(--color-accent-children); }
+.category-name {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.category-count {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  letter-spacing: 0.03em;
+}
+.category-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-card { transition: none; }
+  .category-card:hover { transform: none; }
+}
+
+/* === NEW ARRIVALS === */
+.section-arrivals {
+  padding-block: var(--space-xxl);
+}
+.arrivals-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--color-border-subtle);
+}
+.arrival-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  transition: background var(--dur-fast);
+  position: relative;
+}
+.arrival-item:hover { background: var(--color-surface-raised); }
+.arrival-item:nth-child(odd) { border-right: 1px solid var(--color-border-subtle); }
+.arrival-spine {
+  width: 4px;
+  height: 60px;
+  flex-shrink: 0;
+}
+.arrival-spine--lit { background: var(--color-accent-literature); }
+.arrival-spine--hist { background: var(--color-accent-history); }
+.arrival-spine--sci { background: var(--color-accent-science); }
+.arrival-spine--art { background: var(--color-accent-art); }
+.arrival-spine--child { background: var(--color-accent-children); }
+.arrival-info { flex: 1; min-width: 0; }
+.arrival-title {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arrival-author {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  margin-top: 2px;
+}
+.arrival-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.arrival-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.arrival-new {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: 2px 6px;
+}
+
+/* === EDITORIAL FEATURE === */
+.section-editorial {
+  padding-block: var(--space-xxl);
+  background: var(--color-ink);
+  border-top: 4px solid var(--color-action);
+}
+.editorial-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xxl);
+  align-items: center;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+}
+.editorial-quote {
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 2.5vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-surface);
+  quotes: "「" "」";
+}
+.editorial-quote::before { content: open-quote; color: var(--color-action); }
+.editorial-quote::after { content: close-quote; color: var(--color-action); }
+.editorial-body { color: var(--color-canvas); }
+.editorial-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-action);
+  margin-bottom: var(--space-md);
+}
+.editorial-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-surface);
+  margin-bottom: var(--space-md);
+}
+.editorial-desc {
+  font-size: 15px;
+  color: var(--color-ink-faint);
+  line-height: 1.75;
+  margin-bottom: var(--space-xl);
+}
+.btn-editorial {
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: 11px var(--space-xl);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  display: inline-block;
+  transition: background var(--dur-fast);
+}
+.btn-editorial:hover { background: var(--color-action-hover); }
+
+/* === NEWSLETTER === */
+.section-newsletter {
+  padding-block: var(--space-xxl);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border-subtle);
+  text-align: center;
+}
+.newsletter-inner {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.newsletter-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-bottom: var(--space-sm);
+}
+.newsletter-desc {
+  font-size: 15px;
+  color: var(--color-ink-muted);
+  margin-bottom: var(--space-xl);
+}
+.newsletter-form {
+  display: flex;
+  gap: 0;
+  max-width: 440px;
+  margin: 0 auto;
+}
+.newsletter-input {
+  flex: 1;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-strong);
+  border-right: none;
+  padding: 12px var(--space-md);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-ink);
+  min-width: 0;
+}
+.newsletter-input::placeholder { color: var(--color-ink-faint); }
+.newsletter-submit {
+  background: var(--color-action);
+  color: var(--color-on-primary);
+  padding: 12px var(--space-xl);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--color-action);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast);
+}
+.newsletter-submit:hover { background: var(--color-action-hover); }
+.newsletter-privacy {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin-top: var(--space-md);
+}
+
+/* === FOOTER === */
+.site-footer {
+  background: var(--color-ink);
+  color: var(--color-ink-faint);
+  padding-block: var(--space-xxl) var(--space-xl);
+}
+.footer-inner {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: var(--space-xxl);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+  margin-bottom: var(--space-xl);
+}
+.footer-brand {}
+.footer-logo {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-surface);
+  margin-bottom: var(--space-md);
+  display: block;
+}
+.footer-tagline {
+  font-size: 14px;
+  color: var(--color-ink-faint);
+  line-height: 1.6;
+  max-width: 28ch;
+}
+.footer-col-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  margin-bottom: var(--space-lg);
+}
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.footer-links a {
+  font-size: 14px;
+  color: var(--color-ink-faint);
+  transition: color var(--dur-fast);
+}
+.footer-links a:hover { color: var(--color-surface); }
+.footer-bottom {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: var(--page-pad);
+  padding-top: var(--space-xl);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.footer-copyright {
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 1024px) {
+  .book-grid { grid-template-columns: repeat(3, 1fr); }
+  .category-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .site-nav { display: none; }
+  .nav-toggle { display: flex; }
+  .hero-inner { grid-template-columns: 1fr; gap: var(--space-xl); }
+  .hero-visual { height: 200px; }
+  .book-spine { width: 44px; }
+  .book-spine--lit { height: 190px; }
+  .book-spine--hist { height: 160px; }
+  .book-spine--sci { height: 175px; }
+  .book-spine--art { height: 150px; }
+  .book-spine--child { height: 135px; }
+  .book-grid { grid-template-columns: repeat(2, 1fr); }
+  .category-grid { grid-template-columns: repeat(2, 1fr); }
+  .arrivals-list { grid-template-columns: 1fr; }
+  .arrival-item:nth-child(odd) { border-right: none; }
+  .editorial-inner { grid-template-columns: 1fr; }
+  .footer-inner { grid-template-columns: 1fr 1fr; gap: var(--space-xl); }
+  .newsletter-form { flex-direction: column; }
+  .newsletter-input { border-right: 1px solid var(--color-border-strong); border-bottom: none; }
+  .newsletter-submit { width: 100%; }
+}
+@media (max-width: 480px) {
+  .book-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
+  .category-grid { grid-template-columns: repeat(2, 1fr); }
+  .hero-actions { flex-direction: column; }
+  .btn-primary, .btn-secondary { text-align: center; }
+  .footer-inner { grid-template-columns: 1fr; }
+  .footer-bottom { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">跳至主要內容</a>
+
+<!-- Mobile Drawer -->
+<div class="mobile-drawer" id="mobileDrawer" role="dialog" aria-modal="true" aria-label="主選單">
+  <div class="drawer-scrim" id="drawerScrim"></div>
+  <div class="drawer-panel">
+    <button class="drawer-close" id="drawerClose" aria-label="關閉選單">✕</button>
+    <nav aria-label="行動版主選單">
+      <ul class="drawer-nav-list">
+        <li><a href="index.html" aria-current="page">首頁</a></li>
+        <li><a href="catalog.html">書目總覽</a></li>
+        <li><a href="catalog.html?cat=literature">文學</a></li>
+        <li><a href="catalog.html?cat=history">歷史</a></li>
+        <li><a href="catalog.html?cat=science">科學</a></li>
+        <li><a href="catalog.html?cat=art">藝術</a></li>
+        <li><a href="catalog.html?cat=children">兒童</a></li>
+      </ul>
+    </nav>
+    <form class="drawer-search" role="search" aria-label="搜尋書目" onsubmit="return false;">
+      <input class="drawer-search-input" type="search" placeholder="搜尋書名、作者…" aria-label="搜尋書目">
+      <button class="drawer-search-btn" type="submit">搜尋</button>
+    </form>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="site-header" role="banner">
+  <div class="site-header-inner">
+    <a href="index.html" class="site-logo" aria-label="典藏書局首頁">
+      <span class="site-logo-main">典藏書局</span>
+      <span class="site-logo-sub">Curated Books Since 1985</span>
+    </a>
+    <nav class="site-nav" aria-label="主選單">
+      <ul class="site-nav-list">
+        <li><a href="index.html" aria-current="page">首頁</a></li>
+        <li><a href="catalog.html">書目總覽</a></li>
+        <li><a href="catalog.html?cat=literature">文學</a></li>
+        <li><a href="catalog.html?cat=history">歷史</a></li>
+        <li><a href="catalog.html?cat=science">科學</a></li>
+        <li><a href="catalog.html?cat=art">藝術</a></li>
+        <li><a href="catalog.html?cat=children">兒童</a></li>
+      </ul>
+      <form class="nav-search" role="search" aria-label="搜尋書目" onsubmit="return false;">
+        <label class="sr-only" for="siteSearch">搜尋書目</label>
+        <input class="nav-search-input" type="search" id="siteSearch" placeholder="搜尋書名、作者…">
+        <button class="nav-search-btn" type="submit">搜尋</button>
+      </form>
+    </nav>
+    <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mobileDrawer" aria-label="開啟選單">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- Main -->
+<main id="main">
+  <!-- Hero -->
+  <section class="hero" aria-labelledby="heroTitle">
+    <div class="hero-inner">
+      <div class="hero-text">
+        <p class="hero-eyebrow">典藏書局精選推薦</p>
+        <h1 class="hero-title" id="heroTitle">每一本書<br>都是一段旅程</h1>
+        <p class="hero-desc">橫跨文學、歷史、科學、藝術與兒童讀物，超過一萬五千種藏書，為每一位讀者找到下一本改變視野的好書。</p>
+        <div class="hero-actions">
+          <a href="catalog.html" class="btn-primary">瀏覽書目</a>
+          <a href="catalog.html?tag=recommended" class="btn-secondary">本月選書</a>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="book-spine book-spine--child">兒<br>童<br>樂<br>園</div>
+        <div class="book-spine book-spine--art">美<br>學<br>視<br>界</div>
+        <div class="book-spine book-spine--sci">科<br>學<br>新<br>知</div>
+        <div class="book-spine book-spine--lit">文<br>學<br>精<br>選</div>
+        <div class="book-spine book-spine--hist">歷<br>史<br>長<br>河</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Books -->
+  <section class="section-featured" aria-labelledby="featuredTitle">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title" id="featuredTitle">本週精選</h2>
+        <a href="catalog.html" class="section-link">查看全部 →</a>
+      </div>
+      <ul class="book-grid" aria-label="精選書目">
+        <li>
+          <article class="book-card">
+            <div class="book-card-spine book-card-spine--lit" aria-hidden="true"></div>
+            <div class="book-card-cover">
+              <div class="book-cover-art book-cover-art--lit">
+                <span class="book-cover-title-art">人間失格</span>
+              </div>
+            </div>
+            <div class="book-card-body">
+              <p class="book-card-tag">文學</p>
+              <h3 class="book-card-title"><a href="book.html">人間失格</a></h3>
+              <p class="book-card-author">太宰治 著　葉雨南 譯</p>
+              <div class="book-card-footer">
+                <span class="book-card-price">NT$280</span>
+                <a href="book.html" class="book-card-btn">查看詳情</a>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="book-card">
+            <div class="book-card-spine book-card-spine--hist" aria-hidden="true"></div>
+            <div class="book-card-cover">
+              <div class="book-cover-art book-cover-art--hist">
+                <span class="book-cover-title-art">人類大歷史</span>
+              </div>
+            </div>
+            <div class="book-card-body">
+              <p class="book-card-tag">歷史</p>
+              <h3 class="book-card-title"><a href="book.html">人類大歷史</a></h3>
+              <p class="book-card-author">尤瓦爾・哈拉瑞 著　林俊宏 譯</p>
+              <div class="book-card-footer">
+                <span class="book-card-price">NT$499</span>
+                <a href="book.html" class="book-card-btn">查看詳情</a>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="book-card">
+            <div class="book-card-spine book-card-spine--sci" aria-hidden="true"></div>
+            <div class="book-card-cover">
+              <div class="book-cover-art book-cover-art--sci">
+                <span class="book-cover-title-art">萬物論</span>
+              </div>
+            </div>
+            <div class="book-card-body">
+              <p class="book-card-tag">科學</p>
+              <h3 class="book-card-title"><a href="book.html">萬物論：宇宙的起源</a></h3>
+              <p class="book-card-author">史蒂芬・霍金 著　葛明 譯</p>
+              <div class="book-card-footer">
+                <span class="book-card-price">NT$350</span>
+                <a href="book.html" class="book-card-btn">查看詳情</a>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li>
+          <article class="book-card">
+            <div class="book-card-spine book-card-spine--art" aria-hidden="true"></div>
+            <div class="book-card-cover">
+              <div class="book-cover-art book-cover-art--art">
+                <span class="book-cover-title-art">包浩斯的理念</span>
+              </div>
+            </div>
+            <div class="book-card-body">
+              <p class="book-card-tag">藝術</p>
+              <h3 class="book-card-title"><a href="book.html">包浩斯的理念</a></h3>
+              <p class="book-card-author">法蘭克・惠特福特 著　林鶴 譯</p>
+              <div class="book-card-footer">
+                <span class="book-card-price">NT$480</span>
+                <a href="book.html" class="book-card-btn">查看詳情</a>
+              </div>
+            </div>
+          </article>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Categories -->
+  <section class="section-categories" aria-labelledby="catsTitle">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title" id="catsTitle">依分類探索</h2>
+        <a href="catalog.html" class="section-link">全部分類 →</a>
+      </div>
+      <ul class="category-grid" aria-label="書目分類">
+        <li>
+          <a href="catalog.html?cat=literature" class="category-card category-card--lit">
+            <span class="category-icon" aria-hidden="true">📖</span>
+            <span class="category-name">文學</span>
+            <span class="category-count">4,218 本</span>
+          </a>
+        </li>
+        <li>
+          <a href="catalog.html?cat=history" class="category-card category-card--hist">
+            <span class="category-icon" aria-hidden="true">🏛</span>
+            <span class="category-name">歷史</span>
+            <span class="category-count">2,876 本</span>
+          </a>
+        </li>
+        <li>
+          <a href="catalog.html?cat=science" class="category-card category-card--sci">
+            <span class="category-icon" aria-hidden="true">🔬</span>
+            <span class="category-name">科學</span>
+            <span class="category-count">3,150 本</span>
+          </a>
+        </li>
+        <li>
+          <a href="catalog.html?cat=art" class="category-card category-card--art">
+            <span class="category-icon" aria-hidden="true">🎨</span>
+            <span class="category-name">藝術</span>
+            <span class="category-count">1,942 本</span>
+          </a>
+        </li>
+        <li>
+          <a href="catalog.html?cat=children" class="category-card category-card--child">
+            <span class="category-icon" aria-hidden="true">🌟</span>
+            <span class="category-name">兒童</span>
+            <span class="category-count">2,607 本</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- New Arrivals -->
+  <section class="section-arrivals" aria-labelledby="arrivalsTitle">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title" id="arrivalsTitle">最新到貨</h2>
+        <a href="catalog.html?sort=new" class="section-link">更多新書 →</a>
+      </div>
+      <ul class="arrivals-list" aria-label="最新到貨書目">
+        <li class="arrival-item">
+          <div class="arrival-spine arrival-spine--lit" aria-hidden="true"></div>
+          <div class="arrival-info">
+            <p class="arrival-title"><a href="book.html">雪國</a></p>
+            <p class="arrival-author">川端康成 著</p>
+          </div>
+          <div class="arrival-meta">
+            <span class="arrival-new">新書</span>
+            <span class="arrival-price">NT$260</span>
+          </div>
+        </li>
+        <li class="arrival-item">
+          <div class="arrival-spine arrival-spine--sci" aria-hidden="true"></div>
+          <div class="arrival-info">
+            <p class="arrival-title"><a href="book.html">量子糾纏</a></p>
+            <p class="arrival-author">安東・蔡林格 著</p>
+          </div>
+          <div class="arrival-meta">
+            <span class="arrival-new">新書</span>
+            <span class="arrival-price">NT$420</span>
+          </div>
+        </li>
+        <li class="arrival-item">
+          <div class="arrival-spine arrival-spine--hist" aria-hidden="true"></div>
+          <div class="arrival-info">
+            <p class="arrival-title"><a href="book.html">台灣史一百件大事</a></p>
+            <p class="arrival-author">戴寶村 著</p>
+          </div>
+          <div class="arrival-meta">
+            <span class="arrival-new">新書</span>
+            <span class="arrival-price">NT$380</span>
+          </div>
+        </li>
+        <li class="arrival-item">
+          <div class="arrival-spine arrival-spine--art" aria-hidden="true"></div>
+          <div class="arrival-info">
+            <p class="arrival-title"><a href="book.html">設計的法則</a></p>
+            <p class="arrival-author">威廉・立德威爾 著</p>
+          </div>
+          <div class="arrival-meta">
+            <span class="arrival-new">新書</span>
+            <span class="arrival-price">NT$550</span>
+          </div>
+        </li>
+        <li class="arrival-item">
+          <div class="arrival-spine arrival-spine--child" aria-hidden="true"></div>
+          <div class="arrival-info">
+            <p class="arrival-title"><a href="book.html">小王子（插畫珍藏版）</a></p>
+            <p class="arrival-author">聖修伯里 著</p>
+          </div>
+          <div class="arrival-meta">
+            <span class="arrival-new">新書</span>
+            <span class="arrival-price">NT$320</span>
+          </div>
+        </li>
+        <li class="arrival-item">
+          <div class="arrival-spine arrival-spine--lit" aria-hidden="true"></div>
+          <div class="arrival-info">
+            <p class="arrival-title"><a href="book.html">百年孤獨</a></p>
+            <p class="arrival-author">加西亞・馬奎斯 著</p>
+          </div>
+          <div class="arrival-meta">
+            <span class="arrival-new">新書</span>
+            <span class="arrival-price">NT$440</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Editorial Feature -->
+  <section class="section-editorial" aria-labelledby="editorialTitle">
+    <div class="editorial-inner">
+      <blockquote class="editorial-quote">
+        閱讀是最安靜的冒險，也是最廉價的遠行。
+      </blockquote>
+      <div class="editorial-body">
+        <p class="editorial-eyebrow">書店主人的話</p>
+        <h2 class="editorial-title" id="editorialTitle">三十九年的書香歲月</h2>
+        <p class="editorial-desc">自1985年創立以來，典藏書局始終相信一件事：每一本好書都值得被找到合適的讀者。我們的選書不追逐排行榜，只追求真正值得讀一遍的書。</p>
+        <a href="catalog.html" class="btn-editorial">開始探索藏書</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Newsletter -->
+  <section class="section-newsletter" aria-labelledby="newsletterTitle">
+    <div class="container">
+      <div class="newsletter-inner">
+        <h2 class="newsletter-title" id="newsletterTitle">每月選書通知</h2>
+        <p class="newsletter-desc">訂閱電子報，每月優先收到書店主人精選推薦，以及新書到貨訊息。</p>
+        <form class="newsletter-form" onsubmit="handleNewsletter(event)" aria-label="訂閱電子報">
+          <label class="sr-only" for="newsletterEmail">電子郵件地址</label>
+          <input class="newsletter-input" type="email" id="newsletterEmail" placeholder="請輸入您的電子郵件" required autocomplete="email">
+          <button class="newsletter-submit" type="submit">訂閱</button>
+        </form>
+        <p class="newsletter-privacy" role="note">我們尊重您的隱私，不會分享您的個人資料。</p>
+        <div id="newsletterMsg" role="status" aria-live="polite" style="margin-top: 12px; font-size: 14px; color: var(--color-action);"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Footer -->
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="footer-logo">典藏書局</span>
+      <p class="footer-tagline">1985年創立於台北，致力為每一位讀者找到改變視野的好書。</p>
+    </div>
+    <div>
+      <p class="footer-col-title">探索書目</p>
+      <ul class="footer-links">
+        <li><a href="catalog.html?cat=literature">文學</a></li>
+        <li><a href="catalog.html?cat=history">歷史</a></li>
+        <li><a href="catalog.html?cat=science">科學</a></li>
+        <li><a href="catalog.html?cat=art">藝術</a></li>
+        <li><a href="catalog.html?cat=children">兒童</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="footer-col-title">關於書局</p>
+      <ul class="footer-links">
+        <li><a href="#">書店介紹</a></li>
+        <li><a href="#">選書理念</a></li>
+        <li><a href="#">門市資訊</a></li>
+        <li><a href="#">活動消息</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="footer-col-title">服務支援</p>
+      <ul class="footer-links">
+        <li><a href="#">訂購說明</a></li>
+        <li><a href="#">退換書政策</a></li>
+        <li><a href="#">聯絡我們</a></li>
+        <li><a href="#">隱私政策</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-copyright">© 2026 典藏書局。保留所有權利。</p>
+    <p class="footer-copyright">台北市大安區敦化南路一段233號</p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  var toggle = document.getElementById('navToggle');
+  var drawer = document.getElementById('mobileDrawer');
+  var scrim = document.getElementById('drawerScrim');
+  var closeBtn = document.getElementById('drawerClose');
+  var lastFocus = null;
+
+  function openDrawer() {
+    lastFocus = document.activeElement;
+    drawer.classList.add('is-open');
+    toggle.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function() { closeBtn.focus(); }, 50);
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    if (lastFocus) lastFocus.focus();
+  }
+
+  toggle.addEventListener('click', openDrawer);
+  closeBtn.addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+  drawer.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeDrawer();
+    if (e.key === 'Tab') {
+      var focusable = drawer.querySelectorAll('a, button, input, [tabindex]:not([tabindex="-1"])');
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+})();
+
+function handleNewsletter(e) {
+  e.preventDefault();
+  var msg = document.getElementById('newsletterMsg');
+  var input = document.getElementById('newsletterEmail');
+  msg.textContent = '感謝訂閱！我們將於下個月起寄送選書通知。';
+  input.value = '';
+}
+</script>
+</body>
+</html>

@@ -78,6 +78,13 @@ jobs:
       - name: Validate product fixtures
         run: python3 wow-frontend-design/scripts/validate_product_cases.py evals/product_cases.json
 
+      - name: Validate site planning examples
+        run: |
+          python3 wow-frontend-design/scripts/validate_site_plan.py \
+            wow-frontend-design/scripts/site_manifest.example.json \
+            wow-frontend-design/scripts/wireframe_plan.example.json \
+            --sitemap wow-frontend-design/scripts/sitemap.example.xml
+
       - name: Validate bounded capability claims
         run: python3 wow-frontend-design/scripts/validate_capability_status.py evals/capability-status.json --repository-root .
 
@@ -87,12 +94,17 @@ jobs:
       - name: Validate dashboard failure evidence
         run: python3 wow-frontend-design/scripts/validate_dashboard_evidence.py evals/dashboard-browser-results.json --repository-root .
 
+      - name: Validate product-flow cohort evidence
+        run: python3 wow-frontend-design/scripts/validate_product_flow_evidence.py evals/product-flow-v3-visual-results.json --repository-root .
+
       - name: Check showcase JavaScript
         run: |
           node --check evals/weak-model-showcase/app.js
           node --check evals/weak-model-showcase/theme-init.js
           node --check evals/capture_showcase.cjs
           node --check evals/playwright_dashboard_audit.cjs
+          node --check evals/playwright_visual_v3_audit.cjs
+          node --check evals/finalize_visual_v3_report.cjs
 
       - name: Check showcase source signals
         run: python3 evals/weak-model-showcase/verify.py
@@ -107,4 +119,8 @@ jobs:
         run: python3 wow-frontend-design/scripts/search_discovery_audit.py evals/weak-model-showcase
 
       - name: Check Claude runner syntax
-        run: bash -n evals/run_claude_case.sh
+        run: |
+          bash -n evals/run_claude_case.sh
+          bash -n evals/run_codex_case.sh
+          python3 -m py_compile evals/validate_isolated_web_output.py
+          python3 -m py_compile evals/run_product_flow_matrix.py

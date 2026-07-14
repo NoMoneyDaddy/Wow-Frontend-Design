@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>城市詩祭探索｜示意節目</title>
+  <meta name="description" content="繁體中文的城市詩祭探索網站示意，提供活動索引、詩人、場地、日期與名額狀態。">
+  <style>
+    :root {
+      --canvas: #f4ede4;
+      --surface: #fff8f1;
+      --surface-strong: #efe1d3;
+      --ink: #201713;
+      --muted: #6f6258;
+      --primary: #8a412a;
+      --primary-ink: #fff7ef;
+      --success: #21664d;
+      --warning: #8d6218;
+      --danger: #a04242;
+      --rule: rgba(32, 23, 19, 0.12);
+      --shadow: 0 18px 48px rgba(32, 23, 19, 0.08);
+      --page: clamp(1rem, 3vw, 1.75rem);
+      --section: clamp(1.25rem, 3.2vw, 2.25rem);
+      --cluster: clamp(0.875rem, 2vw, 1.25rem);
+      --tight: 0.625rem;
+      --medium: 1rem;
+      --loose: 1.5rem;
+      --radius-sm: 0.5rem;
+      --radius-md: 0.875rem;
+      --radius-lg: 1.375rem;
+      --measure: 72rem;
+      --font-display: "Noto Serif TC", "Source Han Serif TC", "Songti TC", serif;
+      --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 18%),
+        var(--canvas);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.75;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    img, svg, video {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 1rem;
+      inset-block-start: 0.75rem;
+      z-index: 20;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-ink);
+      transform: translateY(-160%);
+      transition: transform 160ms ease;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .shell {
+      width: min(100%, var(--measure));
+      margin: 0 auto;
+      padding: var(--page);
+    }
+
+    .masthead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      margin-inline: calc(var(--page) * -1);
+      padding: 0.85rem var(--page);
+      border-bottom: 1px solid var(--rule);
+      background: rgba(244, 237, 228, 0.92);
+    }
+
+    .masthead-inner {
+      width: min(100%, var(--measure));
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--cluster);
+      align-items: center;
+    }
+
+    .brand {
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    .brand-mark {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    .brand-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.875rem;
+      line-height: 1.35;
+    }
+
+    .global-nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 2.5rem;
+      padding: 0.55rem 0.85rem;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.875rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .nav-link[aria-current="page"],
+    .nav-link:hover {
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+
+    .nav-link:hover {
+      transform: translateY(-1px);
+    }
+
+    main {
+      display: grid;
+      gap: var(--section);
+      padding-block: var(--section) 2.5rem;
+    }
+
+    .intro {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(16rem, 0.75fr);
+      gap: var(--section);
+      align-items: stretch;
+    }
+
+    .lead-panel,
+    .support-panel,
+    .vertical-panel,
+    .section-panel,
+    .record,
+    .notice {
+      border: 1px solid var(--rule);
+      box-shadow: var(--shadow);
+    }
+
+    .lead-panel {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.5rem, 4vw, 2.5rem);
+      display: grid;
+      gap: 1.25rem;
+      align-content: start;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
+
+    .lede {
+      max-width: 62ch;
+      font-size: clamp(1.02rem, 1.5vw, 1.15rem);
+      color: rgba(32, 23, 19, 0.82);
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 2.75rem;
+      padding: 0.7rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      transition: transform 160ms ease, background-color 160ms ease, color 160ms ease;
+    }
+
+    .action:hover {
+      transform: translateY(-1px);
+    }
+
+    .action-primary {
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+
+    .action-secondary {
+      background: var(--surface-strong);
+      color: var(--ink);
+    }
+
+    .facts {
+      display: grid;
+      gap: 0.75rem;
+      padding: 0;
+      list-style: none;
+      margin: 0;
+      max-width: 28rem;
+    }
+
+    .facts li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 0.95rem;
+      border-radius: var(--radius-md);
+      background: rgba(32, 23, 19, 0.04);
+    }
+
+    .facts strong {
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+
+    .facts span {
+      color: var(--muted);
+      font-size: 0.875rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .section-panel {
+      background: rgba(255, 248, 241, 0.7);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.25rem, 3vw, 2rem);
+      display: grid;
+      gap: 1rem;
+    }
+
+    .section-kicker {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .section-kicker .line {
+      flex: 1;
+      height: 1px;
+      background: var(--rule);
+    }
+
+    .section-panel > h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      text-transform: none;
+    }
+
+    .index-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.7fr);
+      gap: var(--section);
+      align-items: stretch;
+    }
+
+    .records {
+      display: grid;
+      gap: 0.9rem;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .record {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 1rem 1rem 1.1rem;
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .record--featured {
+      padding: clamp(1.25rem, 3vw, 1.6rem);
+      gap: 1rem;
+    }
+
+    .record-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .record-top .eyebrow {
+      flex: 0 0 auto;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 2.1rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: 999px;
+      color: var(--primary-ink);
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-open { background: var(--success); }
+    .status-limited { background: var(--warning); }
+    .status-full { background: var(--danger); }
+
+    .record h3 {
+      font-family: var(--font-display);
+      font-size: clamp(1.45rem, 2.4vw, 2rem);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+    }
+
+    .record p {
+      color: rgba(32, 23, 19, 0.82);
+    }
+
+    .record-summary {
+      max-width: 62ch;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem 1rem;
+      margin: 0;
+    }
+
+    .meta-grid div {
+      display: grid;
+      gap: 0.1rem;
+      min-width: 0;
+    }
+
+    .meta-grid dt {
+      color: var(--muted);
+      font-size: 0.77rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .meta-grid dd {
+      margin: 0;
+      font-size: 0.98rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .support-panel {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.2rem, 3vw, 1.7rem);
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+    }
+
+    .support-panel p {
+      color: rgba(32, 23, 19, 0.82);
+    }
+
+    .vertical-panel {
+      min-height: 31rem;
+      border-radius: var(--radius-lg);
+      background:
+        linear-gradient(180deg, rgba(138, 65, 42, 0.08), transparent 24%),
+        var(--surface);
+      padding: clamp(1rem, 2.8vw, 1.35rem);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1rem;
+      align-items: stretch;
+      overflow: hidden;
+    }
+
+    .vertical-rail {
+      width: 100%;
+      min-width: 0;
+      padding-block: 0.25rem;
+      border-inline-end: 1px solid var(--rule);
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      font-family: var(--font-display);
+      font-size: clamp(1.5rem, 2.7vw, 2.4rem);
+      line-height: 1.1;
+      letter-spacing: 0.18em;
+      white-space: nowrap;
+    }
+
+    .vertical-copy {
+      display: grid;
+      gap: 1rem;
+      align-content: center;
+      padding: 0.35rem 0.2rem 0.35rem 0;
+    }
+
+    .vertical-copy p {
+      max-width: 22ch;
+      font-size: clamp(1rem, 1.35vw, 1.08rem);
+      line-height: 1.8;
+    }
+
+    .notice {
+      background: rgba(255, 248, 241, 0.78);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.15rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .notice strong {
+      font-size: 0.98rem;
+    }
+
+    .notice p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .fine-print {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    footer {
+      padding-block: 0 2rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 980px) {
+      .intro,
+      .index-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .vertical-panel {
+        min-height: 0;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .masthead-inner {
+        grid-template-columns: 1fr;
+        justify-items: start;
+      }
+
+      .global-nav {
+        justify-content: flex-start;
+      }
+
+      .facts li {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .facts span {
+        text-align: left;
+      }
+
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .record-top {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .vertical-panel {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+
+      .vertical-rail {
+        writing-mode: horizontal-tb;
+        text-orientation: mixed;
+        border-inline-end: 0;
+        border-block-end: 1px solid var(--rule);
+        padding-block-end: 0.45rem;
+        letter-spacing: 0.12em;
+      }
+
+      .vertical-copy p {
+        max-width: 38ch;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand">
+        <div class="brand-mark">城市詩祭探索</div>
+        <p class="brand-note">繁體中文示意頁 · 活動索引、詩人、場地與名額狀態一次看清</p>
+      </div>
+      <nav class="global-nav" data-eval="global-nav" aria-label="全站導覽">
+        <a class="nav-link" aria-current="page" href="#overview">總覽</a>
+        <a class="nav-link" href="#program-index">節目索引</a>
+        <a class="nav-link" href="#vertical-sample">直排樣區</a>
+        <a class="nav-link" href="#notes">補充說明</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="shell">
+    <main id="main">
+      <section id="overview" class="intro" aria-labelledby="overview-title">
+        <article class="lead-panel">
+          <p class="eyebrow">城市詩刊 · 夏季特刊</p>
+          <h1 id="overview-title">城市詩祭探索</h1>
+          <p class="lede">這是一份給一般讀者的節目索引：先看詩人與場地，再按日期比較席次與狀態。所有資料都是靜態示意，不連接報名、收藏或即時更新。</p>
+          <div class="action-row">
+            <a class="action action-primary" href="#program-index">看節目索引</a>
+            <a class="action action-secondary" href="#vertical-sample">看直排樣區</a>
+          </div>
+        </article>
+
+        <aside class="support-panel" aria-label="導讀摘要">
+          <p class="eyebrow">快速導讀</p>
+          <ul class="facts" aria-label="節目概覽">
+            <li><strong>8 場活動</strong><span>不同詩人、主題與場地</span></li>
+            <li><strong>4 個場地</strong><span>以城市步行節奏串起路線</span></li>
+            <li><strong>3 種狀態</strong><span>尚有名額、候補與已額滿</span></li>
+            <li><strong>靜態示意</strong><span>不含外部資源與網路請求</span></li>
+          </ul>
+        </aside>
+      </section>
+
+      <section id="program-index" class="section-panel" aria-labelledby="program-title">
+        <div class="section-kicker">
+          <span>編輯式活動索引</span>
+          <span class="line" aria-hidden="true"></span>
+          <span>可比較、可掃讀、可直達</span>
+        </div>
+        <h2 id="program-title" class="eyebrow">節目索引</h2>
+
+        <ol class="records">
+          <li>
+            <article class="record record--featured" data-eval="record" data-record-id="event-01">
+              <div class="record-top">
+                <p class="eyebrow">編輯精選</p>
+                <span class="status status-open">尚有名額</span>
+              </div>
+              <h3>潮汐句法</h3>
+              <p class="record-summary">林靜宜以河岸的潮聲與慢速口語為骨架，帶觀眾沿著節奏進入一段更安靜的城市朗讀。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>林靜宜</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>潮汐句法</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>河岸書廊</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-20</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>40 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>尚有名額</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-02">
+              <div class="record-top">
+                <p class="eyebrow">夜間路線</p>
+                <span class="status status-limited">剩餘少量</span>
+              </div>
+              <h3>夜行字母</h3>
+              <p class="record-summary">陳以衡把路燈、霧氣與紙張邊緣收進一句句短詩，讓夜裡的字母有了行走的重量。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>陳以衡</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>夜行字母</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>舊城碼頭</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-20</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>30 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>剩餘少量</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-03">
+              <div class="record-top">
+                <p class="eyebrow">編輯節點</p>
+                <span class="status status-full">已額滿</span>
+              </div>
+              <h3>雨後標點</h3>
+              <p class="record-summary">吳子雲從雨後街道的反光與停頓出發，把標點拆成呼吸，讓句子留下可散步的空白。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>吳子雲</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>雨後標點</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>北門倉庫</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-21</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>25 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>已額滿</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-04">
+              <div class="record-top">
+                <p class="eyebrow">廣場時段</p>
+                <span class="status status-open">開放報名</span>
+              </div>
+              <h3>廣場回聲</h3>
+              <p class="record-summary">黃若寧在開放前廳讀城市聲場，讓回音、腳步與即興停頓同時成為朗讀的一部分。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>黃若寧</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>廣場回聲</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>中庭劇場</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-21</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>50 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>開放報名</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-05">
+              <div class="record-top">
+                <p class="eyebrow">紙頁聲響</p>
+                <span class="status status-limited">候補中</span>
+              </div>
+              <h3>紙頁的呼吸</h3>
+              <p class="record-summary">許亭恩把翻頁聲、鉛字邊緣與小劇場的暗場連成一線，讓文字像剛換氣的舞台。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>許亭恩</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>紙頁的呼吸</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>小劇場</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-22</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>36 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>候補中</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-06">
+              <div class="record-top">
+                <p class="eyebrow">港口節奏</p>
+                <span class="status status-limited">僅剩 6 席</span>
+              </div>
+              <h3>港口低音</h3>
+              <p class="record-summary">趙景然從貨流、風向與低頻鼓點中取材，讓港口的遲滯感變成一場清楚的朗讀節拍。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>趙景然</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>港口低音</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>觀景平台</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-22</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>24 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>僅剩 6 席</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-07">
+              <div class="record-top">
+                <p class="eyebrow">河岸散步</p>
+                <span class="status status-limited">剩餘少量</span>
+              </div>
+              <h3>暮色朗讀</h3>
+              <p class="record-summary">宋玟妤沿著河岸步道安排分段朗讀，讓晚霞、句尾與腳步一起落在同一個節點。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>宋玟妤</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>暮色朗讀</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>溪岸步道</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-23</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>28 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>剩餘少量</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+
+          <li>
+            <article class="record" data-eval="record" data-record-id="event-08">
+              <div class="record-top">
+                <p class="eyebrow">夜場收束</p>
+                <span class="status status-open">已開放入場</span>
+              </div>
+              <h3>夜航抄本</h3>
+              <p class="record-summary">羅言序以收束夜色的朗讀作結，把抄本、庭院與末班車的距離一併留在終章裡。</p>
+              <dl class="meta-grid">
+                <div>
+                  <dt>詩人</dt>
+                  <dd>羅言序</dd>
+                </div>
+                <div>
+                  <dt>主題</dt>
+                  <dd>夜航抄本</dd>
+                </div>
+                <div>
+                  <dt>場地</dt>
+                  <dd>書院庭院</dd>
+                </div>
+                <div>
+                  <dt>日期</dt>
+                  <dd>2026-07-24</dd>
+                </div>
+                <div>
+                  <dt>名額</dt>
+                  <dd>32 席</dd>
+                </div>
+                <div>
+                  <dt>狀態</dt>
+                  <dd>已開放入場</dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+        </ol>
+      </section>
+
+      <section id="vertical-sample" class="section-panel" aria-labelledby="vertical-title">
+        <div class="section-kicker">
+          <span>直排樣區</span>
+          <span class="line" aria-hidden="true"></span>
+          <span>桌機直排，手機短版橫排</span>
+        </div>
+        <div class="index-layout">
+          <aside class="vertical-panel" data-eval="vertical-type" aria-labelledby="vertical-title">
+            <div class="vertical-rail" id="vertical-title">城　市　詩　祭</div>
+            <div class="vertical-copy">
+              <p>沿著河岸，把城市讀成一首詩。</p>
+              <p class="fine-print">桌機保留直排對照；手機轉為短版橫向節目條，避免把長直排硬塞進窄螢幕。</p>
+            </div>
+          </aside>
+
+          <aside class="notice" id="notes">
+            <strong>補充說明</strong>
+            <p>這個頁面只示範編輯式探索、活動索引與場地比較。沒有報名後端、收藏同步、票務支付或外部資源請求。</p>
+            <p>若要快速瀏覽，先看「節目索引」的狀態與日期，再進入直排樣區看桌機與手機的構圖差異。</p>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>示意內容，僅供版面與互動測試。未使用外部套件、網路資產或遠端請求。</p>
+    </footer>
+  </div>
+</body>
+</html>

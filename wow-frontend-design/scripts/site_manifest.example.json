@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "manifest_id": "harbor-operations-v1",
+  "default_locale": "zh-Hant",
+  "supported_locales": ["zh-Hant"],
+  "approved_origins": ["https://example.test"],
+  "routes": [
+    {
+      "id": "home-zh-hant",
+      "path": "/",
+      "parent_id": null,
+      "page_type": "product",
+      "locale": "zh-Hant",
+      "visibility": "public",
+      "roles": ["訪客"],
+      "primary_task": "理解港區維運服務並前往登入",
+      "lifecycle": "active",
+      "navigation": {"surfaces": ["primary"], "label": "總覽", "publicly_linked": true},
+      "discovery": {
+        "indexing": "index",
+        "canonical_url": "https://example.test/",
+        "include_in_sitemap": true,
+        "lastmod": "2026-07-14",
+        "alternate_route_ids": []
+      },
+      "state_triggers": ["static"],
+      "redirect_to": null,
+      "evidence": {"status": "hypothesis", "sources": ["fixture:site-planning-brief"]}
+    },
+    {
+      "id": "work-orders-zh-hant",
+      "path": "/work-orders",
+      "parent_id": "home-zh-hant",
+      "page_type": "dashboard",
+      "locale": "zh-Hant",
+      "visibility": "role_restricted",
+      "roles": ["維運主管", "現場工程師"],
+      "primary_task": "搜尋工單並處理同步異常",
+      "lifecycle": "active",
+      "navigation": {"surfaces": ["primary"], "label": "工單", "publicly_linked": false},
+      "discovery": {
+        "indexing": "noindex",
+        "canonical_url": "https://example.test/work-orders",
+        "include_in_sitemap": false,
+        "lastmod": null,
+        "alternate_route_ids": []
+      },
+      "state_triggers": ["remote_data", "auth_guard", "mutation", "overlay"],
+      "redirect_to": null,
+      "evidence": {"status": "provided", "sources": ["fixture:product-dashboard-brief"]}
+    }
+  ]
+}

@@ -119,6 +119,9 @@ class ProjectScanTests(unittest.TestCase):
             app = root / "apps" / "web"
             app.mkdir(parents=True)
             (root / "pnpm-workspace.yaml").write_text("packages:\n  - apps/*\n", encoding="utf-8")
+            (root / "site-manifest.json").write_text("{}\n", encoding="utf-8")
+            (root / "wireframe-plan.json").write_text("{}\n", encoding="utf-8")
+            (root / "DESIGN.md").write_text("# Design system\n", encoding="utf-8")
             (app / "package.json").write_text(
                 json.dumps(
                     {
@@ -138,6 +141,9 @@ class ProjectScanTests(unittest.TestCase):
             self.assertIn("Vue I18n", report["localization_tools"])
             self.assertIn("apps/web: build", report["package_scripts"])
             self.assertIn("pnpm-workspace.yaml", report["manifests"])
+            self.assertIn("site-manifest.json", report["manifests"])
+            self.assertIn("wireframe-plan.json", report["manifests"])
+            self.assertIn("DESIGN.md", report["manifests"])
 
 
 if __name__ == "__main__":

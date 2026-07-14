@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>折角書局 | 海風中的字</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --color-primary: #A0432D;
+      --color-on-primary: #FFF8F0;
+      --color-surface: #F4E7D6;
+      --color-on-surface: #241B17;
+      --color-muted-surface: #E8D7C3;
+      --color-muted-ink: #6C5A51;
+      --shadow-soft: 0 16px 36px rgba(36, 27, 23, 0.08);
+      --shadow-strong: 0 24px 52px rgba(36, 27, 23, 0.12);
+      --border-strong: 2px solid rgba(36, 27, 23, 0.92);
+      --border-soft: 1px solid rgba(36, 27, 23, 0.18);
+      --page-pad: clamp(1rem, 2.6vw, 2rem);
+      --content-max: 76rem;
+      --measure: 64ch;
+      --radius-sm: 0.45rem;
+      --radius-md: 0.9rem;
+      --radius-lg: 1.6rem;
+      --font-display: "Iowan Old Style", Baskerville, "Times New Roman", serif;
+      --font-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --ease: cubic-bezier(.2, .8, .2, 1);
+      --duration: 180ms;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--color-on-surface);
+      background:
+        radial-gradient(circle at top right, rgba(160, 67, 45, 0.08), transparent 32%),
+        linear-gradient(180deg, rgba(244, 231, 214, 0.98), rgba(244, 231, 214, 0.94));
+      line-height: 1.75;
+    }
+
+    a { color: inherit; }
+    button, input { font: inherit; }
+    :focus-visible {
+      outline: 3px solid var(--color-primary);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -3rem;
+      padding: .7rem 1rem;
+      background: var(--color-on-surface);
+      color: var(--color-surface);
+      border-radius: var(--radius-sm);
+      z-index: 100;
+    }
+
+    .skip-link:focus { top: 1rem; }
+
+    .site-header,
+    .site-footer,
+    main {
+      width: min(100%, calc(var(--content-max) + var(--page-pad) * 2));
+      margin: 0 auto;
+      padding-inline: var(--page-pad);
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      padding-block: 1rem;
+      background: linear-gradient(180deg, rgba(244, 231, 214, 0.96), rgba(244, 231, 214, 0.84));
+      backdrop-filter: blur(10px);
+    }
+
+    .brand {
+      display: inline-flex;
+      gap: .8rem;
+      align-items: center;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .brand-mark {
+      inline-size: 2.6rem;
+      block-size: 2.6rem;
+      border-radius: var(--radius-sm);
+      border: var(--border-strong);
+      background:
+        linear-gradient(135deg, var(--color-primary) 0 48%, transparent 48% 100%),
+        linear-gradient(180deg, #fef6ec, #ebdac6);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .brand-text strong { display: block; }
+    .brand-text span { display: block; font-size: .78rem; color: var(--color-muted-ink); }
+
+    .nav-toggle {
+      display: none;
+      border: var(--border-strong);
+      border-radius: 999px;
+      background: transparent;
+      padding: .65rem 1rem;
+    }
+
+    .site-nav {
+      justify-self: end;
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+    }
+
+    .site-nav a {
+      text-decoration: none;
+      padding: .45rem .8rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+    }
+
+    .site-nav a[aria-current="page"],
+    .site-nav a:hover {
+      border-color: rgba(36, 27, 23, 0.18);
+      background: rgba(255, 248, 240, 0.6);
+    }
+
+    .book-hero {
+      display: grid;
+      grid-template-columns: minmax(16rem, .8fr) minmax(0, 1.2fr) minmax(16rem, .72fr);
+      gap: 1.2rem;
+      align-items: start;
+      padding-block: 1.4rem 2rem;
+    }
+
+    .cover-card,
+    .summary-card,
+    .action-card,
+    .content-card,
+    .quote-card {
+      border-radius: var(--radius-lg);
+      border: var(--border-soft);
+      background: rgba(255, 248, 240, 0.74);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .cover-card,
+    .summary-card,
+    .action-card {
+      position: relative;
+    }
+
+    .cover-card::before,
+    .summary-card::before,
+    .action-card::before,
+    .content-card::before,
+    .quote-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      block-size: .65rem;
+      background: linear-gradient(90deg, var(--color-primary), rgba(160, 67, 45, 0.1));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      padding: .35rem .7rem;
+      border-radius: var(--radius-sm);
+      background: var(--color-on-surface);
+      color: var(--color-surface);
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+    }
+
+    .cover-card {
+      padding: 1.2rem;
+    }
+
+    .cover-face {
+      min-height: 28rem;
+      border: var(--border-strong);
+      border-radius: 1rem;
+      background:
+        linear-gradient(160deg, rgba(255, 248, 240, 0.96), rgba(232, 215, 195, 0.75)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(160, 67, 45, 0.08) 0,
+          rgba(160, 67, 45, 0.08) 1px,
+          transparent 1px,
+          transparent 16px
+        );
+      display: grid;
+      align-content: space-between;
+      padding: 1.1rem;
+      box-shadow: var(--shadow-strong);
+    }
+
+    .cover-face span {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .cover-face strong {
+      display: block;
+      max-width: 6ch;
+      margin-top: auto;
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .summary-card {
+      padding: 1.25rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .summary-card h1 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(2.6rem, 6vw, 4.4rem);
+      line-height: 1.03;
+      letter-spacing: -0.04em;
+      max-width: 8ch;
+    }
+
+    .meta-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem .8rem;
+      color: var(--color-muted-ink);
+      font-size: .95rem;
+    }
+
+    .meta-list span {
+      padding-bottom: .15rem;
+      border-bottom: 1px solid rgba(36, 27, 23, 0.18);
+    }
+
+    .summary-card p {
+      margin: 0;
+      max-width: var(--measure);
+      color: var(--color-muted-ink);
+    }
+
+    .reading-note {
+      padding: 1rem;
+      border-left: 4px solid var(--color-primary);
+      background: rgba(244, 231, 214, 0.88);
+    }
+
+    .action-card {
+      padding: 1.2rem;
+      display: grid;
+      gap: .95rem;
+      position: sticky;
+      top: 5.8rem;
+    }
+
+    .action-card strong {
+      font-size: 1.4rem;
+    }
+
+    .format-list {
+      display: grid;
+      gap: .7rem;
+    }
+
+    .format-option {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: .8rem;
+      align-items: start;
+      padding: .85rem;
+      border-radius: var(--radius-md);
+      border: var(--border-soft);
+      background: rgba(244, 231, 214, 0.74);
+    }
+
+    .format-option input {
+      margin-top: .25rem;
+      accent-color: var(--color-primary);
+    }
+
+    .format-option small { color: var(--color-muted-ink); }
+
+    .qty {
+      display: inline-grid;
+      grid-template-columns: 2.8rem minmax(4rem, auto) 2.8rem;
+      align-items: center;
+      border: var(--border-strong);
+      border-radius: 999px;
+      overflow: hidden;
+      width: fit-content;
+      background: rgba(255, 248, 240, 0.88);
+    }
+
+    .qty button,
+    .qty input {
+      border: 0;
+      background: transparent;
+      text-align: center;
+      min-height: 2.8rem;
+    }
+
+    .qty button { cursor: pointer; }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.95rem;
+      padding: .9rem 1.1rem;
+      border-radius: var(--radius-md);
+      border: 0;
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      text-decoration: none;
+      font-weight: 700;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .note-text,
+    .status-line {
+      color: var(--color-muted-ink);
+      font-size: .94rem;
+    }
+
+    .status-line {
+      min-height: 1.6rem;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(16rem, .9fr);
+      gap: 1.2rem;
+      padding-bottom: 3rem;
+    }
+
+    .content-card,
+    .quote-card {
+      position: relative;
+      padding: 1.3rem;
+    }
+
+    h2 {
+      margin: 0 0 1rem;
+      font-family: var(--font-display);
+      font-size: clamp(1.9rem, 4vw, 2.7rem);
+      letter-spacing: -0.03em;
+    }
+
+    .content-card p,
+    .content-card li,
+    .quote-card p,
+    .quote-card li {
+      color: var(--color-muted-ink);
+    }
+
+    .chapter-list,
+    .related-list {
+      display: grid;
+      gap: .85rem;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .chapter-list li,
+    .related-list li {
+      padding: .9rem 0;
+      border-top: var(--border-soft);
+    }
+
+    .chapter-list li:first-child,
+    .related-list li:first-child { border-top: 0; }
+
+    .related-list a {
+      display: inline-flex;
+      margin-top: .45rem;
+      text-decoration: none;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(36, 27, 23, 0.35);
+    }
+
+    .sticky-mobile {
+      display: none;
+      position: sticky;
+      bottom: 0;
+      z-index: 20;
+      margin-inline: calc(var(--page-pad) * -1);
+      padding: .85rem var(--page-pad) calc(.85rem + env(safe-area-inset-bottom, 0px));
+      background: linear-gradient(180deg, rgba(244, 231, 214, 0.82), rgba(244, 231, 214, 0.98));
+    }
+
+    .sticky-mobile .button {
+      width: 100%;
+    }
+
+    .site-footer {
+      padding-block: 1rem 3rem;
+      color: var(--color-muted-ink);
+      font-size: .92rem;
+    }
+
+    @media (max-width: 980px) {
+      .site-header {
+        grid-template-columns: auto auto;
+        align-items: start;
+      }
+
+      .nav-toggle { display: inline-flex; justify-self: end; }
+
+      .site-nav {
+        display: none;
+        grid-column: 1 / -1;
+        justify-self: stretch;
+        flex-direction: column;
+        align-items: stretch;
+        padding: .75rem;
+        border-radius: var(--radius-lg);
+        border: var(--border-soft);
+        background: rgba(255, 248, 240, 0.92);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .site-nav[data-open="true"] { display: flex; }
+      .book-hero,
+      .content-grid { grid-template-columns: 1fr; }
+      .action-card { position: static; }
+    }
+
+    @media (max-width: 620px) {
+      .book-hero {
+        gap: 1rem;
+      }
+
+      .cover-face {
+        min-height: 22rem;
+      }
+
+      .sticky-mobile { display: block; }
+
+      .action-card .button {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>折角書局</strong>
+        <span>把書感擺回桌面</span>
+      </span>
+    </a>
+    <div></div>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">選單</button>
+    <nav id="site-nav" class="site-nav" aria-label="主要導覽">
+      <a href="index.html">首頁</a>
+      <a href="catalog.html">書目總覽</a>
+      <a href="book.html" aria-current="page">本週主書</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="book-hero" aria-labelledby="book-title">
+      <article class="cover-card" aria-label="書封示意">
+        <div class="cover-face">
+          <span>本週主書</span>
+          <strong>海風中的字</strong>
+        </div>
+      </article>
+
+      <article class="summary-card">
+        <span class="eyebrow">主書細讀</span>
+        <h1 id="book-title">海風中的字</h1>
+        <div class="meta-list">
+          <span>陳岸舟</span>
+          <span>城市散文</span>
+          <span>320 頁</span>
+          <span>平裝</span>
+        </div>
+        <p>這本書把港口、步行、書店與潮汐寫在同一個呼吸裡。適合想慢慢認識一座城市的人，也適合第一次來折角書局、想從一本主書進入整排題材的人。</p>
+        <div class="reading-note">
+          <strong>適讀線索</strong>
+          <p>如果你喜歡不是旅遊指南、也不是學術論文的地方書寫，這本會是最穩的入口。</p>
+        </div>
+      </article>
+
+      <aside class="action-card" aria-labelledby="action-title">
+        <span class="eyebrow">選書備忘</span>
+        <strong id="action-title">先決定你要怎麼讀</strong>
+        <div class="format-list">
+          <label class="format-option">
+            <input type="radio" name="format" value="420" checked>
+            <span>
+              <strong>平裝版本</strong>
+              <small>適合帶著走，價格較輕。</small>
+            </span>
+            <span>$420</span>
+          </label>
+          <label class="format-option">
+            <input type="radio" name="format" value="560">
+            <span>
+              <strong>布面典藏</strong>
+              <small>頁邊較厚，適合收藏。</small>
+            </span>
+            <span>$560</span>
+          </label>
+        </div>
+        <label for="quantity"><strong>想先記幾本</strong></label>
+        <div class="qty" aria-label="數量調整">
+          <button type="button" id="decrease" aria-label="減少數量">-</button>
+          <input id="quantity" type="number" min="1" value="1" inputmode="numeric">
+          <button type="button" id="increase" aria-label="增加數量">+</button>
+        </div>
+        <div>
+          <strong id="total-price">$420</strong>
+          <div class="note-text">僅本頁試算，不代表結帳或保留成功。</div>
+        </div>
+        <button class="button" id="save-note" type="button">加入本頁閱讀清單</button>
+        <div class="status-line" id="status-line" aria-live="polite"></div>
+      </aside>
+    </section>
+
+    <div class="sticky-mobile">
+      <button class="button" id="save-note-mobile" type="button">加入本頁閱讀清單</button>
+    </div>
+
+    <div class="content-grid">
+      <article class="content-card" id="inside">
+        <span class="eyebrow">內頁節錄</span>
+        <h2>你不必先知道路名，先記住風就好。</h2>
+        <p>港口邊的書店通常不大，門也不厚。真正把人留住的，不是櫥窗，而是走進去之後，書架把風聲接住的方式。你會先看見封面，再看見那本書旁邊站著哪幾本；然後你突然理解，原來一間書店替一座城市保留的，不只是商品，而是比對的關係。</p>
+        <p>這個單書頁也照這個想法做：先給主書，再給章節，再給同架書，不把單本介紹切成一塊塊促銷資訊。</p>
+      </article>
+
+      <aside class="quote-card">
+        <span class="eyebrow">章節路標</span>
+        <h2>先翻哪裡</h2>
+        <ol class="chapter-list">
+          <li><strong>第一章</strong><br>港邊早市與慢速步行</li>
+          <li><strong>第三章</strong><br>消失前的舊書攤筆記</li>
+          <li><strong>第五章</strong><br>風向改變時，誰還在原地賣書</li>
+        </ol>
+      </aside>
+
+      <article class="content-card">
+        <span class="eyebrow">閱讀方式</span>
+        <h2>桌面與手機怎麼不同</h2>
+        <ul>
+          <li>桌面把封面、摘要、行動區並列，方便你一次比對版本、價格與書感。</li>
+          <li>手機把主動作拉到底部，避免側欄過長，也讓你看完摘要再決定要不要記進清單。</li>
+          <li>這頁沒有假裝完成下單；按鈕只會回報本頁已暫存的閱讀清單狀態。</li>
+        </ul>
+      </article>
+
+      <aside class="quote-card" id="related">
+        <span class="eyebrow">同架延伸</span>
+        <h2>讀完後可接這幾本</h2>
+        <ul class="related-list">
+          <li>
+            <strong>港邊書店學</strong>
+            <p>偏研究，適合把散文中的地方感再往結構讀深一點。</p>
+            <a href="catalog.html#urban">回書目架位</a>
+          </li>
+          <li>
+            <strong>頁角備忘錄</strong>
+            <p>更像編輯小冊，適合喜歡獨立出版形式的人。</p>
+            <a href="catalog.html">看全部書目</a>
+          </li>
+        </ul>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    本頁的價格與數量互動僅做本機試算與狀態示意。
+  </footer>
+
+  <script>
+    const navButton = document.querySelector('.nav-toggle');
+    const nav = document.querySelector('#site-nav');
+    if (navButton && nav) {
+      const closeNav = () => {
+        nav.dataset.open = 'false';
+        navButton.setAttribute('aria-expanded', 'false');
+      };
+      navButton.addEventListener('click', () => {
+        const open = nav.dataset.open === 'true';
+        nav.dataset.open = String(!open);
+        navButton.setAttribute('aria-expanded', String(!open));
+      });
+      nav.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeNav();
+          navButton.focus();
+        }
+      });
+    }
+
+    const quantityInput = document.querySelector('#quantity');
+    const totalPrice = document.querySelector('#total-price');
+    const formatInputs = Array.from(document.querySelectorAll('input[name="format"]'));
+    const statusLine = document.querySelector('#status-line');
+    const saveButton = document.querySelector('#save-note');
+    const saveButtonMobile = document.querySelector('#save-note-mobile');
+    const decrease = document.querySelector('#decrease');
+    const increase = document.querySelector('#increase');
+
+    const readUnitPrice = () => {
+      const active = formatInputs.find((input) => input.checked);
+      return Number(active ? active.value : 420);
+    };
+
+    const readQuantity = () => {
+      const raw = Number(quantityInput.value);
+      if (!Number.isFinite(raw) || raw < 1) return 1;
+      return Math.floor(raw);
+    };
+
+    const updateTotal = () => {
+      const qty = readQuantity();
+      quantityInput.value = String(qty);
+      totalPrice.textContent = `$${readUnitPrice() * qty}`;
+    };
+
+    const saveList = () => {
+      const qty = readQuantity();
+      statusLine.textContent = `已在本頁暫存 ${qty} 本，重新整理後會清空。`;
+    };
+
+    formatInputs.forEach((input) => input.addEventListener('change', updateTotal));
+    quantityInput.addEventListener('input', () => {
+      updateTotal();
+      statusLine.textContent = '';
+    });
+    decrease.addEventListener('click', () => {
+      quantityInput.value = String(Math.max(1, readQuantity() - 1));
+      updateTotal();
+      statusLine.textContent = '';
+    });
+    increase.addEventListener('click', () => {
+      quantityInput.value = String(readQuantity() + 1);
+      updateTotal();
+      statusLine.textContent = '';
+    });
+    saveButton.addEventListener('click', saveList);
+    if (saveButtonMobile) {
+      saveButtonMobile.addEventListener('click', saveList);
+    }
+    updateTotal();
+  </script>
+</body>
+</html>

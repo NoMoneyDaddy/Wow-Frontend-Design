@@ -149,6 +149,7 @@ Do not call the work complete with any of these:
 - inaccessible primary action or keyboard trap;
 - any applicable WCAG 2.2 A/AA failure when AA is required, including contrast below the exact applicable threshold, missing labels, or essential content hidden behind motion/JavaScript;
 - accidental horizontal scroll or clipped core content at a required viewport;
+- unintentionally wrapped or clipped short action labels, or hidden responsive DOM copies that duplicate IDs, state, focus targets, or evaluator identities;
 - mobile navigation or form blocked by fixed UI or virtual keyboard;
 - modal/menu background scrolling, stale open state after navigation, lost focus on close, or contradictory form success/error announcements;
 - unintentional Simplified Chinese in product-owned `zh-Hant` UI copy or assets; preserve legitimate quotations, names, source data, and user content, marking `zh-Hans` parts when needed;

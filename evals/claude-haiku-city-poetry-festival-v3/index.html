@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>城市詩祭探索 — 2024年詩人與場景</title>
+  <meta name="description" content="探索2024年城市詩祭：詩人檔案、場地信息、活動日期與報名狀態。">
+  <style>
+    :root {
+      --color-canvas: #FEFDFB;
+      --color-surface: #F5F3EF;
+      --color-ink: #2A2622;
+      --color-ink-muted: #6B6560;
+      --color-action: #8B4513;
+      --color-action-muted: #D4A574;
+      --color-focus: #2A2622;
+      --color-selection: #E8E0D8;
+
+      --font-display: Georgia, 'Times New Roman', serif;
+      --font-reading: system-ui, -apple-system, 'Segoe UI', 'PingFang TC', 'Noto Sans TC', sans-serif;
+      --font-label: system-ui, -apple-system, 'Segoe UI', 'PingFang TC', 'Noto Sans TC', sans-serif;
+
+      --space-xs: 8px;
+      --space-sm: 16px;
+      --space-md: 24px;
+      --space-lg: 32px;
+      --space-xl: 48px;
+
+      --radius-sm: 2px;
+      --radius-md: 4px;
+
+      --measure-reading: 65ch;
+      --duration-base: 260ms;
+      --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-reading);
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.7;
+      color: var(--color-ink);
+      background-color: var(--color-canvas);
+      overflow-x: hidden;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Global Navigation */
+    [data-eval="global-nav"] {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background-color: var(--color-canvas);
+      border-bottom: 1px solid var(--color-surface);
+      padding: var(--space-sm) var(--space-md);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+
+    .nav-title {
+      font-family: var(--font-display);
+      font-size: clamp(20px, 4vw, 28px);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      flex: 1;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: var(--space-md);
+      align-items: center;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-family: var(--font-label);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-ink);
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      transition: background-color var(--duration-base) var(--ease-out),
+                  color var(--duration-base) var(--ease-out);
+    }
+
+    .nav-links a:hover {
+      background-color: var(--color-selection);
+    }
+
+    .nav-links a:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    .nav-links a[aria-current="page"] {
+      color: var(--color-action);
+      background-color: var(--color-selection);
+    }
+
+    [data-eval="mobile-nav-toggle"] {
+      display: none;
+      background: none;
+      border: none;
+      font-family: var(--font-label);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-ink);
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+    }
+
+    [data-eval="mobile-nav-toggle"]:hover {
+      background-color: var(--color-selection);
+    }
+
+    [data-eval="mobile-nav-toggle"]:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    .mobile-nav-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.3);
+      z-index: 99;
+    }
+
+    .mobile-nav-overlay.open {
+      display: block;
+    }
+
+    .mobile-nav-sheet {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: var(--color-canvas);
+      border-bottom: 1px solid var(--color-surface);
+      padding: var(--space-md);
+      z-index: 101;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .mobile-nav-sheet.open {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .mobile-nav-sheet a {
+      font-family: var(--font-label);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-ink);
+      text-decoration: none;
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      transition: background-color var(--duration-base) var(--ease-out);
+      display: block;
+    }
+
+    .mobile-nav-sheet a:hover {
+      background-color: var(--color-selection);
+    }
+
+    .mobile-nav-sheet a:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    .mobile-nav-sheet a[aria-current="page"] {
+      color: var(--color-action);
+      background-color: var(--color-selection);
+    }
+
+    @media (max-width: 768px) {
+      [data-eval="global-nav"] {
+        padding: var(--space-sm);
+      }
+
+      .nav-title {
+        font-size: clamp(18px, 5vw, 24px);
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      [data-eval="mobile-nav-toggle"] {
+        display: block;
+      }
+    }
+
+    /* Main Content */
+    main {
+      padding: var(--space-lg) var(--space-md);
+    }
+
+    section {
+      margin-bottom: var(--space-xl);
+    }
+
+    h1, h2 {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 6vw, 48px);
+      font-weight: 400;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: var(--space-md);
+      color: var(--color-ink);
+    }
+
+    h2 {
+      font-size: clamp(24px, 5vw, 36px);
+      margin-top: var(--space-lg);
+    }
+
+    p {
+      max-width: var(--measure-reading);
+      margin-bottom: var(--space-md);
+      line-break: strict;
+      word-break: normal;
+    }
+
+    .intro {
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--color-ink);
+      max-width: var(--measure-reading);
+      margin-bottom: var(--space-lg);
+    }
+
+    /* Vertical Type Showcase */
+    [data-eval="vertical-type"] {
+      background-color: var(--color-surface);
+      padding: var(--space-lg);
+      border-radius: var(--radius-md);
+      margin: var(--space-lg) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      overflow-x: auto;
+    }
+
+    .vertical-text-container {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-family: var(--font-reading);
+      font-size: 20px;
+      line-height: 2;
+      letter-spacing: 0;
+      color: var(--color-ink);
+      white-space: normal;
+      display: inline-block;
+      padding: var(--space-md);
+    }
+
+    @media (max-width: 768px) {
+      [data-eval="vertical-type"] {
+        min-height: 180px;
+        padding: var(--space-md);
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: flex-start;
+      }
+
+      .vertical-text-container {
+        writing-mode: horizontal-tb;
+        text-orientation: mixed;
+        font-size: 16px;
+        line-height: 1.6;
+        white-space: normal;
+        word-break: break-word;
+        padding: var(--space-sm);
+      }
+
+      [data-eval="vertical-type"]::after {
+        content: " →";
+        margin-left: var(--space-sm);
+        color: var(--color-ink-muted);
+      }
+    }
+
+    /* Events Grid */
+    .events-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    @media (max-width: 768px) {
+      .events-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Event Record */
+    [data-eval="record"] {
+      background-color: var(--color-surface);
+      border: 1px solid rgba(42, 38, 34, 0.1);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      transition: background-color var(--duration-base) var(--ease-out),
+                  border-color var(--duration-base) var(--ease-out);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    [data-eval="record"]:hover {
+      background-color: #F9F7F4;
+    }
+
+    [data-eval="record"]:focus-within {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    .record-title {
+      font-family: var(--font-display);
+      font-size: clamp(18px, 3vw, 22px);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--color-ink);
+      margin-bottom: var(--space-xs);
+    }
+
+    .record-poet {
+      font-family: var(--font-label);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-action);
+      margin-bottom: var(--space-xs);
+    }
+
+    .record-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      font-family: var(--font-label);
+      font-size: 13px;
+      color: var(--color-ink-muted);
+      margin-bottom: var(--space-sm);
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .record-description {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--color-ink);
+      margin-bottom: var(--space-sm);
+    }
+
+    .record-status {
+      display: inline-block;
+      font-family: var(--font-label);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-open {
+      background-color: #E8F5E9;
+      color: #1B5E20;
+    }
+
+    .status-limited {
+      background-color: #FFF3E0;
+      color: #E65100;
+    }
+
+    .status-full {
+      background-color: #FFEBEE;
+      color: #C62828;
+    }
+
+    /* Buttons */
+    button, .btn {
+      font-family: var(--font-label);
+      font-size: 14px;
+      font-weight: 500;
+      background-color: var(--color-action);
+      color: var(--color-canvas);
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background-color var(--duration-base) var(--ease-out),
+                  transform var(--duration-base) var(--ease-out);
+      text-decoration: none;
+      display: inline-block;
+      letter-spacing: 0.02em;
+    }
+
+    button:hover, .btn:hover {
+      background-color: #A0522D;
+    }
+
+    button:focus-visible, .btn:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    button:active, .btn:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      background-color: var(--color-ink-muted);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* Index/Summary */
+    .poet-index {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    .poet-card {
+      background-color: var(--color-surface);
+      border: 1px solid rgba(42, 38, 34, 0.1);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      transition: background-color var(--duration-base) var(--ease-out);
+    }
+
+    .poet-card:hover {
+      background-color: #F9F7F4;
+    }
+
+    .poet-card h3 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 400;
+      margin-bottom: var(--space-xs);
+      color: var(--color-ink);
+    }
+
+    .poet-card p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--color-ink-muted);
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+      .poet-index {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--color-surface);
+      padding: var(--space-lg) var(--space-md);
+      margin-top: var(--space-xl);
+      text-align: center;
+      color: var(--color-ink-muted);
+      font-size: 14px;
+    }
+
+    footer p {
+      margin-bottom: var(--space-xs);
+      max-width: none;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      main {
+        padding: var(--space-md) var(--space-sm);
+      }
+
+      h1, h2 {
+        font-size: clamp(24px, 5vw, 32px);
+      }
+
+      .intro {
+        font-size: 16px;
+      }
+
+      .events-grid {
+        gap: var(--space-sm);
+      }
+
+      [data-eval="record"] {
+        padding: var(--space-sm);
+      }
+
+      .record-meta {
+        gap: var(--space-sm);
+        font-size: 12px;
+      }
+
+      .meta-item {
+        min-width: 100%;
+      }
+
+      section {
+        margin-bottom: var(--space-lg);
+      }
+    }
+
+    /* Focus visible for keyboard navigation */
+    *:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    /* High contrast support */
+    @media (prefers-contrast: more) {
+      [data-eval="record"] {
+        border-color: var(--color-ink);
+        border-width: 2px;
+      }
+
+      .record-status {
+        border: 1px solid currentColor;
+      }
+    }
+
+    /* Forced colors support */
+    @media (forced-colors: active) {
+      [data-eval="record"] {
+        border: 1px solid CanvasText;
+      }
+
+      button, .btn {
+        border: 2px solid ButtonText;
+      }
+
+      .record-status {
+        border: 1px solid CanvasText;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav data-eval="global-nav">
+    <h1 class="nav-title">城市詩祭</h1>
+    <ul class="nav-links">
+      <li><a href="#events" aria-current="page">活動</a></li>
+      <li><a href="#poets">詩人</a></li>
+      <li><a href="#venues">場地</a></li>
+    </ul>
+    <button data-eval="mobile-nav-toggle" aria-label="打開菜單" aria-expanded="false">菜單</button>
+  </nav>
+
+  <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
+  <div class="mobile-nav-sheet" id="mobileNavSheet">
+    <a href="#events" aria-current="page">活動</a>
+    <a href="#poets">詩人</a>
+    <a href="#venues">場地</a>
+  </div>
+
+  <main>
+    <section>
+      <h1>2024年城市詩祭探索</h1>
+      <p class="intro">在這個季節，我們邀請八位詩人以城市為舞台，在不同的場地分享他們對光、時間與人心的理解。每場活動都是一場獨特的文學對話。</p>
+    </section>
+
+    <section data-eval="vertical-type">
+      <div class="vertical-text-container">詩在城市的巷弄裡流動　字字句句都是呼吸　讓我們一起聆聽夜的低語　與晨光的對答</div>
+    </section>
+
+    <section id="events">
+      <h2>活動日程</h2>
+      <div class="events-grid">
+        <article data-eval="record" data-record-id="event-001">
+          <h3 class="record-title">光的對話</h3>
+          <p class="record-poet">詩人：林思雲</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年10月15日</span>
+            <span class="meta-item">🕖 19:00–20:30</span>
+            <span class="meta-item">📍 城市文化中心</span>
+          </div>
+          <p class="record-description">詩人林思雲將分享她如何用詩歌捕捉城市黃昏時光的變化。這場工作坊邀請觀眾一起感受光影與語言的對話。</p>
+          <span class="record-status status-open">名額充足</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-002">
+          <h3 class="record-title">尋找失落的字</h3>
+          <p class="record-poet">詩人：陳懷恩</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年10月18日</span>
+            <span class="meta-item">🕖 14:00–15:30</span>
+            <span class="meta-item">📍 城南書店</span>
+          </div>
+          <p class="record-description">古籍中的字彙在現代生活裡漸漸消失。陳懷恩詩人將帶領參與者尋找那些被遺忘的詞彙，與它們重新相逢。</p>
+          <span class="record-status status-limited">剩餘名額有限</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-003">
+          <h3 class="record-title">午夜的私語</h3>
+          <p class="record-poet">詩人：葉孟夏</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年10月21日</span>
+            <span class="meta-item">🕖 20:00–21:45</span>
+            <span class="meta-item">📍 藝術走廊</span>
+          </div>
+          <p class="record-description">在城市沉睡的時刻，詩聲依然清晰。葉孟夏將以獨特的吟詩方式呈現夜晚的思緒與城市的夢境。</p>
+          <span class="record-status status-full">已滿額</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-004">
+          <h3 class="record-title">四季更迭的聲音</h3>
+          <p class="record-poet">詩人：周思語</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年10月24日</span>
+            <span class="meta-item">🕖 15:00–16:30</span>
+            <span class="meta-item">📍 公園露天舞台</span>
+          </div>
+          <p class="record-description">周思語詩人用四首新作品詮釋四季在都市中的悄然變化。觀眾將在戶外的自然聲響中聆聽詩歌的共鳴。</p>
+          <span class="record-status status-open">名額充足</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-005">
+          <h3 class="record-title">城市與我的對白</h3>
+          <p class="record-poet">詩人：黃海波</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年10月27日</span>
+            <span class="meta-item">🕖 18:30–20:00</span>
+            <span class="meta-item">📍 舊城區畫廊</span>
+          </div>
+          <p class="record-description">黃海波將帶領參與者以詩人的眼光重新觀看城市中的每一個角落，發現那些常被忽視的美好。</p>
+          <span class="record-status status-limited">剩餘名額有限</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-006">
+          <h3 class="record-title">夢與現實的邊界</h3>
+          <p class="record-poet">詩人：范思敏</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年10月30日</span>
+            <span class="meta-item">🕖 19:30–21:00</span>
+            <span class="meta-item">📍 現代美術館</span>
+          </div>
+          <p class="record-description">詩歌最強大的力量在於它的隱喻。范思敏詩人將探討詩歌如何模糊現實與夢想的邊界。</p>
+          <span class="record-status status-open">名額充足</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-007">
+          <h3 class="record-title">聆聽無聲之物</h3>
+          <p class="record-poet">詩人：王承宸</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年11月02日</span>
+            <span class="meta-item">🕖 16:00–17:30</span>
+            <span class="meta-item">📍 靜寂空間</span>
+          </div>
+          <p class="record-description">一場關於傾聽的工作坊。王承宸詩人將指導參與者如何從靜寂中發現詩意，讓無聲之物開口說話。</p>
+          <span class="record-status status-limited">剩餘名額有限</span>
+        </article>
+
+        <article data-eval="record" data-record-id="event-008">
+          <h3 class="record-title">詩的終章與始章</h3>
+          <p class="record-poet">詩人：劉語晴</p>
+          <div class="record-meta">
+            <span class="meta-item">📅 2024年11月05日</span>
+            <span class="meta-item">🕖 20:00–21:45</span>
+            <span class="meta-item">📍 城市文化中心</span>
+          </div>
+          <p class="record-description">詩祭的收尾之作。劉語晴將以她的新詩集作為終章，卻也預示著下一季詩祭的新開始。</p>
+          <span class="record-status status-open">名額充足</span>
+        </article>
+      </div>
+    </section>
+
+    <section id="poets">
+      <h2>參展詩人</h2>
+      <div class="poet-index">
+        <div class="poet-card">
+          <h3>林思雲</h3>
+          <p>獲多項文學獎。創作風格融合現代與古典，關注光影與人性的交界。</p>
+        </div>
+        <div class="poet-card">
+          <h3>陳懷恩</h3>
+          <p>古籍研究與當代詩創的實踐者。她的詩集以失落的詞彙尋找方式聞名。</p>
+        </div>
+        <div class="poet-card">
+          <h3>葉孟夏</h3>
+          <p>因獨特的吟詩方式獲得關注。她的作品充滿夜間的私密感與城市的脈動。</p>
+        </div>
+        <div class="poet-card">
+          <h3>周思語</h3>
+          <p>擅長以自然意象詮釋都市生活。她的詩歌溫暖而思辨性強。</p>
+        </div>
+        <div class="poet-card">
+          <h3>黃海波</h3>
+          <p>都市詩人代表。他通過詩歌重新定義我們對城市空間的理解。</p>
+        </div>
+        <div class="poet-card">
+          <h3>范思敏</h3>
+          <p>隱喻大師。她的詩集數次入選年度好書，以深邃的意象著稱。</p>
+        </div>
+        <div class="poet-card">
+          <h3>王承宸</h3>
+          <p>沉默詩人與傾聽者。他的工作坊著重於詩創與冥想的結合。</p>
+        </div>
+        <div class="poet-card">
+          <h3>劉語晴</h3>
+          <p>新銳詩人。她的作品在社群引起廣泛討論，代表新世代詩歌的可能性。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="venues">
+      <h2>場地介紹</h2>
+      <div class="poet-index">
+        <div class="poet-card">
+          <h3>城市文化中心</h3>
+          <p>市中心現代建築，擁有400座的多功能廳。適合大型文化活動與講座。</p>
+        </div>
+        <div class="poet-card">
+          <h3>城南書店</h3>
+          <p>獨立書店，保留老建築風格。親密的工作坊與讀書會首選。</p>
+        </div>
+        <div class="poet-card">
+          <h3>藝術走廊</h3>
+          <p>展覽與表演空間。牆上的光影與室內建築本身就是詩歌的場景。</p>
+        </div>
+        <div class="poet-card">
+          <h3>公園露天舞台</h3>
+          <p>季節性戶外場地。自然聲響與詩歌共鳴，提供沉浸式體驗。</p>
+        </div>
+        <div class="poet-card">
+          <h3>舊城區畫廊</h3>
+          <p>在城市記憶中進行詩歌朗誦。斑駁的牆面見證過無數文化瞬間。</p>
+        </div>
+        <div class="poet-card">
+          <h3>現代美術館</h3>
+          <p>藝術與文學對話的空間。展覽與詩歌聯動，創造跨域體驗。</p>
+        </div>
+        <div class="poet-card">
+          <h3>靜寂空間</h3>
+          <p>冥想與創意工作坊專屬場地。極簡設計幫助參與者聚焦內心。</p>
+        </div>
+        <div class="poet-card">
+          <h3>文化園區戶外場地</h3>
+          <p>城市詩祭收尾場地。寬闊戶外空間承載對這季詩歌的致敬。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>城市詩祭 2024 — 探索、聆聽、詩寫城市的故事</p>
+    <p style="font-size: 12px; color: var(--color-ink-muted); margin-top: var(--space-sm);">所有活動資訊為示範內容。具體日期與報名方式請參考官方公告。</p>
+  </footer>
+
+  <script>
+    // Mobile navigation toggle
+    const navToggle = document.querySelector('[data-eval="mobile-nav-toggle"]');
+    const navOverlay = document.getElementById('mobileNavOverlay');
+    const navSheet = document.getElementById('mobileNavSheet');
+
+    function closeNav() {
+      navToggle.setAttribute('aria-expanded', 'false');
+      navSheet.classList.remove('open');
+      navOverlay.classList.remove('open');
+      navToggle.focus();
+    }
+
+    function openNav() {
+      navToggle.setAttribute('aria-expanded', 'true');
+      navSheet.classList.add('open');
+      navOverlay.classList.add('open');
+      const firstLink = navSheet.querySelector('a');
+      if (firstLink) firstLink.focus();
+    }
+
+    navToggle.addEventListener('click', () => {
+      if (navToggle.getAttribute('aria-expanded') === 'false') {
+        openNav();
+      } else {
+        closeNav();
+      }
+    });
+
+    navOverlay.addEventListener('click', closeNav);
+
+    // Close menu on link click
+    navSheet.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', closeNav);
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navToggle.getAttribute('aria-expanded') === 'true') {
+        closeNav();
+      }
+    });
+
+    // Prevent body scroll when menu is open
+    const observer = new MutationObserver(() => {
+      if (navSheet.classList.contains('open')) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    });
+
+    observer.observe(navSheet, { attributes: true, attributeFilter: ['class'] });
+
+    // Smooth focus management
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && navSheet.classList.contains('open')) {
+        const focusableElements = navSheet.querySelectorAll('a');
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

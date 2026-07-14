@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "status": "partial",
+  "started_at": "2026-07-14T17:26:16Z",
+  "finished_at": "2026-07-14T19:05:29Z",
+  "contract": {
+    "briefs": {
+      "mountain-rescue-flow-v3": {
+        "path": "evals/briefs/mountain-rescue-flow-v3.md",
+        "sha256": "037e87c11783567be105b2f5e0fb8a1f27eed7179d23b4bd1eb4ec6c17e51682"
+      },
+      "city-poetry-festival-v3": {
+        "path": "evals/briefs/city-poetry-festival-v3.md",
+        "sha256": "dbea967292f763752e3024f3e1608d88afb0cbaf174653f35fd5f565a0a5c5c0"
+      },
+      "bookstore-one-line-v3": {
+        "path": "evals/briefs/bookstore-one-line-v3.md",
+        "sha256": "239612705a7c99e6eac5bd5a4d9e91359f69b4209ae0bd3f4219aa084321a796"
+      }
+    },
+    "skill": {
+      "path": "wow-frontend-design/SKILL.md",
+      "sha256": "902ec429ac7343e533c6f8cb845457348829e11999431ab905f7e64d8e2b0008"
+    },
+    "trusted_context": [
+      {
+        "path": "wow-frontend-design/SKILL.md",
+        "sha256": "902ec429ac7343e533c6f8cb845457348829e11999431ab905f7e64d8e2b0008"
+      },
+      {
+        "path": "wow-frontend-design/references/creative-direction.md",
+        "sha256": "b168c4e8b3e1ed50237687fc22a827946c025b0bc8660c290da04954a80322b3"
+      },
+      {
+        "path": "wow-frontend-design/references/anti-ai-slop.md",
+        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+      },
+      {
+        "path": "wow-frontend-design/references/mobile-responsive.md",
+        "sha256": "fc142e97fb7f4c409cf33be766981357e630d0419b0fa384e1d336c37137ca5f"
+      },
+      {
+        "path": "wow-frontend-design/references/localization.md",
+        "sha256": "fcc29117f6fba05d3f84eb52acb3d4e763ad00f12b7e040302f60de1d3dd5ec0"
+      },
+      {
+        "path": "wow-frontend-design/references/typography-webfonts.md",
+        "sha256": "a59a7a5493fe64c7bb11a1e691d56e5ebcfa86e2f7e7949d3262739c556d182e"
+      },
+      {
+        "path": "wow-frontend-design/references/implementation.md",
+        "sha256": "4474d1fbde8666c1342861b1b260e948d977eed018417c2873295739e09c22be"
+      },
+      {
+        "path": "wow-frontend-design/references/component-composition.md",
+        "sha256": "ebe4ca4e71d4b118baf8b86963a6106e28ba6fa7fc74fd94536dbe507f302373"
+      },
+      {
+        "path": "wow-frontend-design/references/quality-gates.md",
+        "sha256": "4980e9622226324e2e04ae83784030f83d5ce19788c580150fcdfb08045d1cef"
+      },
+      {
+        "path": "wow-frontend-design/references/weak-model-playbook.md",
+        "sha256": "14ebaeb9c0097a9438d9d2c3da15565981bfe4f7f95d07ce120645d82982e285"
+      },
+      {
+        "path": "wow-frontend-design/references/color-system-psychology.md",
+        "sha256": "7c98dffb7bd1f952952cc6f4ffda0e9d6e3f985397d3930c1184e7d5849196ed"
+      },
+      {
+        "path": "wow-frontend-design/references/design-md-contract.md",
+        "sha256": "1f40525890d9846a041126fa2f20f090376798387cd83896f407b65b60c5b69d"
+      },
+      {
+        "path": "wow-frontend-design/assets/DESIGN.template.md",
+        "sha256": "b0151780e69ca8dcd2b83b8b2bbd265646d31c139ae9b9e54abc30f49ad7028d"
+      }
+    ],
+    "outputs_by_case": {
+      "mountain-rescue-flow-v3": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "city-poetry-festival-v3": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "bookstore-one-line-v3": [
+        "DESIGN.md",
+        "index.html",
+        "catalog.html",
+        "book.html"
+      ]
+    },
+    "providers_are_separate_cohorts": true,
+    "resolved_backend_snapshots_may_be_unreported": true,
+    "generation_settings": {
+      "effort": "model_default",
+      "claude_extended_thinking": false,
+      "codex_reasoning_summary": "none",
+      "codex_internal_reasoning_disable_supported": false
+    }
+  },
+  "selection": {
+    "provider": "all",
+    "theme": "all",
+    "count": 18
+  },
+  "results": [
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "case_id": "mountain-rescue-flow-v3",
+      "target": "evals/claude-haiku-mountain-rescue-flow-v3",
+      "started_at": "2026-07-14T17:26:16Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-haiku-mountain-rescue-flow-v3/run-manifest.json",
+      "finished_at": "2026-07-14T17:27:49Z",
+      "duration_seconds": 93.185
+    },
+    {
+      "provider": "claude",
+      "model": "sonnet",
+      "case_id": "mountain-rescue-flow-v3",
+      "target": "evals/claude-sonnet-mountain-rescue-flow-v3",
+      "started_at": "2026-07-14T17:27:49Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-sonnet-mountain-rescue-flow-v3/run-manifest.json",
+      "finished_at": "2026-07-14T17:31:50Z",
+      "duration_seconds": 240.611
+    },
+    {
+      "provider": "claude",
+      "model": "opus",
+      "case_id": "mountain-rescue-flow-v3",
+      "target": "evals/claude-opus-mountain-rescue-flow-v3",
+      "started_at": "2026-07-14T17:31:50Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-opus-mountain-rescue-flow-v3/run-manifest.json",
+      "finished_at": "2026-07-14T17:35:40Z",
+      "duration_seconds": 230.947
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "mountain-rescue-flow-v3",
+      "target": "evals/codex-gpt-5.4-mini-mountain-rescue-flow-v3",
+      "started_at": "2026-07-14T17:35:40Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.4-mini-mountain-rescue-flow-v3/run-manifest.json",
+      "finished_at": "2026-07-14T17:48:18Z",
+      "duration_seconds": 757.81
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4",
+      "case_id": "mountain-rescue-flow-v3",
+      "target": "evals/codex-gpt-5.4-mountain-rescue-flow-v3",
+      "started_at": "2026-07-14T17:48:18Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.4-mountain-rescue-flow-v3/run-manifest.json",
+      "finished_at": "2026-07-14T17:53:59Z",
+      "duration_seconds": 340.898
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.5",
+      "case_id": "mountain-rescue-flow-v3",
+      "target": "evals/codex-gpt-5.5-mountain-rescue-flow-v3",
+      "started_at": "2026-07-14T17:53:59Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.5-mountain-rescue-flow-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:02:24Z",
+      "duration_seconds": 505.183
+    },
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "case_id": "city-poetry-festival-v3",
+      "target": "evals/claude-haiku-city-poetry-festival-v3",
+      "started_at": "2026-07-14T18:02:24Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-haiku-city-poetry-festival-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:05:06Z",
+      "duration_seconds": 162.106
+    },
+    {
+      "provider": "claude",
+      "model": "sonnet",
+      "case_id": "city-poetry-festival-v3",
+      "target": "evals/claude-sonnet-city-poetry-festival-v3",
+      "started_at": "2026-07-14T18:05:06Z",
+      "status": "generation_failed",
+      "exit_code": 1,
+      "error_summary": "API Error: Connection closed mid-response. The response above may be incomplete.",
+      "finished_at": "2026-07-14T18:08:22Z",
+      "duration_seconds": 195.646
+    },
+    {
+      "provider": "claude",
+      "model": "opus",
+      "case_id": "city-poetry-festival-v3",
+      "target": "evals/claude-opus-city-poetry-festival-v3",
+      "started_at": "2026-07-14T18:08:22Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-opus-city-poetry-festival-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:11:32Z",
+      "duration_seconds": 190.366
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "city-poetry-festival-v3",
+      "target": "evals/codex-gpt-5.4-mini-city-poetry-festival-v3",
+      "started_at": "2026-07-14T18:11:32Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.4-mini-city-poetry-festival-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:19:30Z",
+      "duration_seconds": 477.332
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4",
+      "case_id": "city-poetry-festival-v3",
+      "target": "evals/codex-gpt-5.4-city-poetry-festival-v3",
+      "started_at": "2026-07-14T18:19:30Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.4-city-poetry-festival-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:23:18Z",
+      "duration_seconds": 228.376
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.5",
+      "case_id": "city-poetry-festival-v3",
+      "target": "evals/codex-gpt-5.5-city-poetry-festival-v3",
+      "started_at": "2026-07-14T18:23:18Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.5-city-poetry-festival-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:28:37Z",
+      "duration_seconds": 320.811
+    },
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "case_id": "bookstore-one-line-v3",
+      "target": "evals/claude-haiku-bookstore-one-line-v3",
+      "started_at": "2026-07-14T18:28:37Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-haiku-bookstore-one-line-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:31:18Z",
+      "duration_seconds": 160.662
+    },
+    {
+      "provider": "claude",
+      "model": "sonnet",
+      "case_id": "bookstore-one-line-v3",
+      "target": "evals/claude-sonnet-bookstore-one-line-v3",
+      "started_at": "2026-07-14T18:31:18Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-sonnet-bookstore-one-line-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:40:11Z",
+      "duration_seconds": 533.636
+    },
+    {
+      "provider": "claude",
+      "model": "opus",
+      "case_id": "bookstore-one-line-v3",
+      "target": "evals/claude-opus-bookstore-one-line-v3",
+      "started_at": "2026-07-14T18:40:11Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/claude-opus-bookstore-one-line-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:45:44Z",
+      "duration_seconds": 332.166
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "bookstore-one-line-v3",
+      "target": "evals/codex-gpt-5.4-mini-bookstore-one-line-v3",
+      "started_at": "2026-07-14T18:45:44Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.4-mini-bookstore-one-line-v3/run-manifest.json",
+      "finished_at": "2026-07-14T18:52:41Z",
+      "duration_seconds": 417.447
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4",
+      "case_id": "bookstore-one-line-v3",
+      "target": "evals/codex-gpt-5.4-bookstore-one-line-v3",
+      "started_at": "2026-07-14T18:52:41Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.4-bookstore-one-line-v3/run-manifest.json",
+      "finished_at": "2026-07-14T19:00:57Z",
+      "duration_seconds": 495.971
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.5",
+      "case_id": "bookstore-one-line-v3",
+      "target": "evals/codex-gpt-5.5-bookstore-one-line-v3",
+      "started_at": "2026-07-14T19:00:57Z",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/codex-gpt-5.5-bookstore-one-line-v3/run-manifest.json",
+      "finished_at": "2026-07-14T19:05:29Z",
+      "duration_seconds": 272.171
+    }
+  ],
+  "summary": {
+    "requested": 18,
+    "completed": 17,
+    "failed": 1,
+    "statuses": {
+      "completed": 17,
+      "generation_failed": 1
+    }
+  }
+}

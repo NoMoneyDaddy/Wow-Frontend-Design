@@ -11,6 +11,14 @@
 - 真正要引入上游程式、字體、圖片、SVG、Lottie、影片或文案時，必須重新檢查精確版本、檔案層級授權、notice、商標與再散布條件，並新增對應 provenance。
 - 論文、標準與官方技術文件的連結是引用依據，不是把其全文納入 MIT 授權。
 
+本輪 Sitemap／Wireframe 規則另外參考下列網路來源；只採用可交叉驗證的方法與邊界，沒有重製其文章文字或圖像：
+
+- [W3C WAI Page Structure](https://www.w3.org/WAI/tutorials/page-structure/) 與 [Information Design curriculum](https://www.w3.org/WAI/curricula/designer-modules/information-design/)：頁面區域、標題、命名、分組與替代表現。
+- [GOV.UK Making prototypes](https://www.gov.uk/service-manual/design/making-prototypes)：原型保真度、測試與可丟棄邊界。
+- [Nielsen Norman Group Wireflows](https://www.nngroup.com/articles/wireflows/)、[Card sorting](https://www.nngroup.com/articles/card-sorting-definition/) 與 [Tree testing](https://www.nngroup.com/articles/tree-testing/)：流程表示與資訊架構研究選型。
+- [Google Search Central Build and submit a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) 與 [sitemaps.org protocol](https://www.sitemaps.org/protocol.html)：XML Sitemap 語法、數量／大小與 crawl hint 邊界。
+- [DayDayDing Wireframe 技巧](https://daydayding.com/wireframe-skills-tools-for-new-uiuxdesigners/#Wireframe_%E6%8A%80%E5%B7%A7_4%E7%95%99%E6%84%8F%E8%B3%87%E8%A8%8A%E5%B1%A4%E7%B4%9A)：實務提示來源。未採用缺少可靠依據的「負向流程出現頻率為正向流程三至十倍」數字，也不把其工具盤點視為現行官方比較。
+
 ## Evaluator 開發依賴
 
 根目錄 `package-lock.json` 固定瀏覽器 evaluator 的開發依賴；它們不會被 `gh skill install` 複製進 `wow-frontend-design/`：

@@ -111,6 +111,8 @@ For every composite region record:
 desktop role → mobile equivalent → preserved task/data → changed order/control/density → focus/history behavior → removed/deferred reason
 ```
 
+The visual representation may change without duplicating product truth. Keep one logical record key, state owner, accessible identity, and interaction path across modes; hidden desktop/mobile copies with repeated IDs, hooks, or independently mutable controls are a release defect.
+
 Component responsiveness is container-driven when possible. Page breakpoints do not guarantee a component fits a sidebar, modal, embedded card, or translated label.
 
 ## 8. Weak-model assembly rules

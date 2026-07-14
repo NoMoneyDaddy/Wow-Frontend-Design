@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "plan_id": "harbor-operations-wireframe-v1",
+  "manifest_id": "harbor-operations-v1",
+  "manifest_sha256": "c74d6076a55778ac3108229d83bd4ec3d29de707fc304086158eb68c69039771",
+  "readiness": "implementation_ready",
+  "fidelity": "wireflow",
+  "evidence_boundary": {"status": "planning_only", "self_certified": false},
+  "evidence_refs": ["fixture:site-planning-brief", "fixture:product-dashboard-brief"],
+  "flows": [
+    {
+      "id": "discover-service-and-enter",
+      "audience_role": "訪客",
+      "goal": "理解港區維運服務並前往登入",
+      "entry_page_id": "home-zh-hant",
+      "start_step_id": "read-service-summary",
+      "success_criteria": "訪客能說明服務範圍並啟用明確的登入入口。",
+      "steps": [
+        {"id": "read-service-summary", "page_id": "home-zh-hant", "trigger": "閱讀服務摘要與能力邊界", "result": "看見產品處理巡檢、工單與同步異常的範圍", "next_step_id": "open-login", "required_state": "default", "risk": "未提供正式品牌與能力證據", "recovery": "把無法證實的內容標為假說並保留來源"},
+        {"id": "open-login", "page_id": "home-zh-hant", "trigger": "啟用登入連結", "result": "離開公開總覽並前往尚待定義的登入流程", "next_step_id": null, "required_state": "default", "risk": "登入 route 與驗證方式未知", "recovery": "可返回公開總覽，不虛構登入完成"}
+      ],
+      "alternate_paths": [
+        {"condition": "訪客尚未準備登入或需要再次確認能力邊界", "from_step_id": "open-login", "to_step_id": "read-service-summary", "recovery": "保留目前閱讀位置並返回服務摘要"}
+      ],
+      "exit_states": [
+        {"id": "login-entry-activated", "status": "success", "description": "已啟用登入入口；此原型不宣稱登入完成。", "recovery": "可返回公開總覽"},
+        {"id": "login-contract-missing", "status": "blocked", "description": "正式登入 route、權限與驗證契約尚未提供。", "recovery": "停止推定並向產品負責人取得契約"}
+      ],
+      "unknowns": ["正式登入流程與品牌證據尚未提供"]
+    },
+    {
+      "id": "triage-and-update-work-order",
+      "audience_role": "維運主管",
+      "goal": "找到高風險工單、理解同步異常並完成本機狀態更新",
+      "entry_page_id": "work-orders-zh-hant",
+      "start_step_id": "search-work-orders",
+      "success_criteria": "主管可找出目標工單、開啟詳情、保留錯誤脈絡並得到誠實的本機更新回饋。",
+      "steps": [
+        {"id": "search-work-orders", "page_id": "work-orders-zh-hant", "trigger": "輸入搜尋或篩選條件", "result": "清單與結果數量同步更新", "next_step_id": "open-work-order", "required_state": "default", "risk": "條件可能產生零結果", "recovery": "顯示零結果原因並提供清除條件"},
+        {"id": "open-work-order", "page_id": "work-orders-zh-hant", "trigger": "啟用目標工單詳情", "result": "顯示工單內容、同步狀態與可用動作", "next_step_id": "inspect-sync-error", "required_state": "default", "risk": "詳情可能缺附件或權限", "recovery": "保留原清單焦點並提供返回路徑"},
+        {"id": "inspect-sync-error", "page_id": "work-orders-zh-hant", "trigger": "查看同步失敗原因與離線草稿", "result": "錯誤靠近來源並提供可執行的恢復選項", "next_step_id": "confirm-local-update", "required_state": "error", "risk": "不可把本機結果宣稱為伺服器同步", "recovery": "保留草稿，允許重試或稍後處理"},
+        {"id": "confirm-local-update", "page_id": "work-orders-zh-hant", "trigger": "更新負責人或處理狀態", "result": "本機 demo 狀態更新並明示尚未同步", "next_step_id": null, "required_state": "success", "risk": "使用者可能誤解為遠端完成", "recovery": "回饋明示本機狀態並保留可重試入口"}
+      ],
+      "alternate_paths": [
+        {"condition": "搜尋沒有結果", "from_step_id": "search-work-orders", "to_step_id": "search-work-orders", "recovery": "清除條件並恢復全部工單"},
+        {"condition": "沒有更新權限", "from_step_id": "open-work-order", "to_step_id": "open-work-order", "recovery": "保持唯讀詳情並顯示聯絡管理員方式"},
+        {"condition": "同步重試再次失敗", "from_step_id": "confirm-local-update", "to_step_id": "inspect-sync-error", "recovery": "保留使用者輸入與離線草稿，不要求重做"}
+      ],
+      "exit_states": [
+        {"id": "local-update-recorded", "status": "success", "description": "本機 demo 已記錄負責人或狀態變更，未宣稱遠端同步。", "recovery": "可重新開啟同一工單檢查狀態"},
+        {"id": "sync-still-failed", "status": "recoverable_error", "description": "同步仍失敗，但草稿與工作脈絡保留。", "recovery": "稍後重試或交由有權限角色處理"},
+        {"id": "permission-denied", "status": "blocked", "description": "目前角色不能更新此工單。", "recovery": "保持唯讀並聯絡管理員"}
+      ],
+      "unknowns": ["正式權限矩陣、同步 API 與衝突解決規則尚未提供"]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home-screen",
+      "page_id": "home-zh-hant",
+      "locale": "zh-Hant",
+      "audience_roles": ["訪客"],
+      "entry_context": "從品牌搜尋或直接網址進入",
+      "primary_task": "理解港區維運服務並前往登入",
+      "primary_action": "前往登入",
+      "regions": [
+        {"id": "home-summary", "purpose": "說明服務範圍", "priority": 1, "essential": true, "content_fixture": "把巡檢、工單與同步異常收斂成一個維運工作區。", "extreme_cases": ["兩行繁體中文標題", "品牌圖像未提供時保留來源標記"], "source_status": "hypothesis"},
+        {"id": "home-proof", "purpose": "呈現產品能力邊界", "priority": 2, "essential": true, "content_fixture": "離線時保留工單草稿；恢復連線後顯示逐筆同步結果。", "extreme_cases": ["無客戶標誌", "能力仍待驗證"], "source_status": "hypothesis"},
+        {"id": "home-access", "purpose": "提供登入入口", "priority": 3, "essential": true, "content_fixture": "登入維運工作區", "extreme_cases": ["未授權使用者", "工作階段逾時"], "source_status": "hypothesis"}
+      ],
+      "state_coverage": {
+        "default": {"status": "designed", "reason": "公開內容頁", "recovery": "不需要恢復"},
+        "loading": {"status": "not_applicable", "reason": "首屏無遠端資料依賴", "recovery": "不需要恢復"},
+        "empty": {"status": "not_applicable", "reason": "使用固定內容", "recovery": "不需要恢復"},
+        "error": {"status": "not_applicable", "reason": "沒有可失敗的資料操作", "recovery": "不需要恢復"},
+        "success": {"status": "not_applicable", "reason": "沒有提交操作", "recovery": "不需要恢復"},
+        "permission": {"status": "not_applicable", "reason": "此頁公開", "recovery": "登入頁另行處理"}
+      },
+      "interactions": [
+        {"id": "open-login", "trigger": "啟用登入連結", "target_region": "home-access", "result": "前往登入流程", "feedback": "連結具明確焦點與啟用狀態", "recovery": "返回公開總覽", "keyboard": "Tab 聚焦後按 Enter", "touch": "點按至少 44×44 CSS px 的目標"}
+      ],
+      "desktop": {"region_order": ["home-summary", "home-proof", "home-access"], "layout_mode": "主敘事與能力證據雙欄，入口留在閱讀終點"},
+      "mobile": {
+        "region_order": ["home-summary", "home-access", "home-proof"],
+        "layout_mode": "優先呈現任務與登入入口，再展開證據",
+        "transformations": [
+          {"region_id": "home-summary", "action": "condense", "equivalent": "保留主張與範圍，縮短補充文", "reason": "首屏聚焦"},
+          {"region_id": "home-proof", "action": "reorder", "equivalent": "完整能力說明移到入口之後", "reason": "降低前往登入前的長捲動"},
+          {"region_id": "home-access", "action": "move_to_thumb_reach", "equivalent": "同一登入目的地與文字", "reason": "主要任務更易觸及"}
+        ],
+        "equivalence_reason": "內容與登入任務不變，只改優先順序。"
+      },
+      "navigation_targets": ["work-orders-zh-hant"],
+      "unknowns": ["正式品牌資產與登入機制尚未提供"],
+      "claims": [{"claim": "先呈現登入入口能減少任務摩擦", "status": "HYPOTHESIS", "evidence_ref": "fixture:site-planning-brief"}]
+    },
+    {
+      "id": "work-orders-screen",
+      "page_id": "work-orders-zh-hant",
+      "locale": "zh-Hant",
+      "audience_roles": ["維運主管", "現場工程師"],
+      "entry_context": "已登入角色從主要導覽進入",
+      "primary_task": "搜尋工單並處理同步異常",
+      "primary_action": "查看異常工單詳情",
+      "regions": [
+        {"id": "work-orders-toolbar", "purpose": "搜尋與篩選工單", "priority": 1, "essential": true, "content_fixture": "搜尋工單編號、區域或負責人", "extreme_cases": ["四十個混合中英文字元的查詢", "零筆結果"], "source_status": "provided"},
+        {"id": "work-orders-list", "purpose": "比較工單優先級與同步狀態", "priority": 2, "essential": true, "content_fixture": "WO-2427｜油品儲區｜高優先｜同步失敗｜黃建宏", "extreme_cases": ["一百筆工單", "負責人名稱換行", "同步錯誤原因超過兩行"], "source_status": "provided"},
+        {"id": "work-orders-detail", "purpose": "查看工單詳情與恢復動作", "priority": 3, "essential": true, "content_fixture": "最後同步 14:32；可重新同步或保留離線草稿。", "extreme_cases": ["缺少附件", "沒有重試權限"], "source_status": "provided"},
+        {"id": "work-orders-status", "purpose": "回報載入、錯誤與完成結果", "priority": 4, "essential": true, "content_fixture": "3 筆工單尚未同步；資料仍保留在此裝置。", "extreme_cases": ["網路持續離線", "部分成功部分失敗"], "source_status": "hypothesis"}
+      ],
+      "state_coverage": {
+        "default": {"status": "designed", "reason": "顯示可操作工單", "recovery": "保留目前搜尋與焦點"},
+        "loading": {"status": "designed", "reason": "遠端工單與權限檢查", "recovery": "逾時後提供重試與離線資料"},
+        "empty": {"status": "designed", "reason": "搜尋可能沒有結果", "recovery": "清除條件並回到全部工單"},
+        "error": {"status": "designed", "reason": "讀取或同步可能失敗", "recovery": "重試並保留離線草稿"},
+        "success": {"status": "designed", "reason": "本機負責人或狀態更新完成", "recovery": "明示尚未同步並保留再次編輯入口"},
+        "permission": {"status": "designed", "reason": "頁面有角色限制", "recovery": "返回可存取頁面並聯絡管理員"}
+      },
+      "interactions": [
+        {"id": "filter-work-orders", "trigger": "輸入搜尋條件", "target_region": "work-orders-list", "result": "即時篩選結果並更新筆數", "feedback": "宣布結果數與零結果原因", "recovery": "清除搜尋恢復全部項目", "keyboard": "搜尋欄可聚焦，Escape 清除", "touch": "搜尋與清除都有獨立觸控目標"},
+        {"id": "open-work-order-detail", "trigger": "啟用工單詳情按鈕", "target_region": "work-orders-detail", "result": "開啟詳情並顯示同步錯誤與恢復選項", "feedback": "焦點移入詳情標題並標示目前工單", "recovery": "關閉後焦點返回原工單", "keyboard": "Enter 開啟、Escape 關閉、焦點受控", "touch": "點按整列內的明確詳情按鈕，不依賴 hover"}
+      ],
+      "desktop": {"region_order": ["work-orders-toolbar", "work-orders-list", "work-orders-status", "work-orders-detail"], "layout_mode": "工具列、資料表與右側詳情面板"},
+      "mobile": {
+        "region_order": ["work-orders-toolbar", "work-orders-status", "work-orders-list", "work-orders-detail"],
+        "layout_mode": "固定搜尋、摘要狀態、工單卡片與全螢幕詳情",
+        "transformations": [
+          {"region_id": "work-orders-toolbar", "action": "condense", "equivalent": "搜尋保留，次要篩選收進可展開面板", "reason": "維持單手輸入空間"},
+          {"region_id": "work-orders-list", "action": "replace", "equivalent": "每張卡片保留編號、區域、優先級、狀態與負責人", "reason": "表格橫向比較不適合窄螢幕"},
+          {"region_id": "work-orders-detail", "action": "replace", "equivalent": "右側面板改為全螢幕詳情，關閉後返回原卡片", "reason": "保留閱讀寬度與焦點路徑"},
+          {"region_id": "work-orders-status", "action": "reorder", "equivalent": "同步摘要移到清單前", "reason": "先暴露離線與錯誤影響"}
+        ],
+        "equivalence_reason": "搜尋、比較、查看詳情與錯誤恢復皆可完成。"
+      },
+      "navigation_targets": ["home-zh-hant"],
+      "unknowns": ["正式權限矩陣與同步 API 契約尚未提供"],
+      "claims": [{"claim": "手機卡片比壓縮資料表更易掃描", "status": "UNVERIFIED", "evidence_ref": "fixture:product-dashboard-brief"}]
+    }
+  ]
+}

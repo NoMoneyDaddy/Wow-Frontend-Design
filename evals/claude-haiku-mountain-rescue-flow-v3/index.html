@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>山域救援任務協調台</title>
+  <style>
+    :root {
+      --color-canvas: #FAFBF9;
+      --color-surface-1: #FFFFFF;
+      --color-surface-2: #F0F1EF;
+      --color-text-primary: #1A1C1E;
+      --color-text-secondary: #6B7077;
+      --color-text-muted: #9BA0A6;
+      --color-border-subtle: #D8D9D7;
+      --color-border-strong: #C4C5C2;
+      --color-focus: #1A7EC7;
+      --color-success: #1B6E3A;
+      --color-warning: #B8860B;
+      --color-danger: #A61C2E;
+      --color-info: #0055B8;
+      --color-stage-received: #E8EAED;
+      --color-stage-dispatched: #B4D4FF;
+      --color-stage-active: #66BB6A;
+      --color-stage-complete: #9BA0A6;
+
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 12px;
+      --spacing-lg: 16px;
+      --spacing-xl: 24px;
+      --spacing-2xl: 32px;
+
+      --rounded-sm: 4px;
+      --rounded-md: 8px;
+
+      --duration-fast: 140ms;
+      --duration-base: 260ms;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    body {
+      background-color: var(--color-canvas);
+      color: var(--color-text-primary);
+      line-height: 1.5;
+    }
+
+    /* Global layout */
+    .shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .header {
+      background-color: var(--color-surface-1);
+      border-bottom: 1px solid var(--color-border-subtle);
+      padding: var(--spacing-lg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-lg);
+    }
+
+    .header-title {
+      font-size: 28px;
+      font-weight: 600;
+      line-height: 1.2;
+      flex: 1;
+    }
+
+    .mobile-nav-toggle {
+      display: none;
+      background: none;
+      border: 1px solid var(--color-border-subtle);
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-radius: var(--rounded-sm);
+      cursor: pointer;
+      color: var(--color-text-primary);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .mobile-nav-toggle:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    .main-wrapper {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    nav[data-eval="global-nav"] {
+      background-color: var(--color-surface-1);
+      border-right: 1px solid var(--color-border-subtle);
+      width: 200px;
+      padding: var(--spacing-lg);
+      overflow-y: auto;
+    }
+
+    nav[data-eval="global-nav"] .nav-item {
+      display: block;
+      padding: var(--spacing-sm) var(--spacing-md);
+      margin-bottom: var(--spacing-sm);
+      background-color: var(--color-surface-2);
+      border-radius: var(--rounded-sm);
+      color: var(--color-text-primary);
+      text-decoration: none;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: background-color var(--duration-fast);
+    }
+
+    nav[data-eval="global-nav"] .nav-item:hover {
+      background-color: var(--color-border-subtle);
+    }
+
+    nav[data-eval="global-nav"] .nav-item:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: -2px;
+    }
+
+    nav[data-eval="global-nav"] .nav-item.active {
+      background-color: var(--color-focus);
+      color: var(--color-canvas);
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .page-header {
+      background-color: var(--color-surface-1);
+      border-bottom: 1px solid var(--color-border-subtle);
+      padding: var(--spacing-lg);
+    }
+
+    .page-title {
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.3;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: var(--spacing-md);
+      padding: var(--spacing-lg);
+      background-color: var(--color-surface-2);
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+
+    .summary-card {
+      background-color: var(--color-surface-1);
+      padding: var(--spacing-md);
+      border-radius: var(--rounded-md);
+      border: 1px solid var(--color-border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    .summary-card-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      line-height: 1.3;
+    }
+
+    .summary-card-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      font-family: Menlo, Monaco, "SF Mono", monospace;
+      line-height: 1.2;
+    }
+
+    .task-area {
+      flex: 1;
+      padding: var(--spacing-lg);
+      overflow-y: auto;
+    }
+
+    .task-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--spacing-lg);
+    }
+
+    .task-record {
+      background-color: var(--color-surface-1);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--rounded-md);
+      padding: var(--spacing-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    .record-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-md);
+    }
+
+    .record-zone {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      line-height: 1.3;
+    }
+
+    .record-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-xs);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: var(--rounded-sm);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.3;
+      color: #FFFFFF;
+    }
+
+    .badge-success {
+      background-color: var(--color-success);
+    }
+
+    .badge-warning {
+      background-color: var(--color-warning);
+      color: #000000;
+    }
+
+    .badge-danger {
+      background-color: var(--color-danger);
+    }
+
+    .badge-info {
+      background-color: var(--color-info);
+    }
+
+    .record-stage {
+      background-color: var(--color-stage-active);
+      color: #FFFFFF;
+    }
+
+    .record-stage.received {
+      background-color: var(--color-stage-received);
+      color: var(--color-text-primary);
+    }
+
+    .record-stage.dispatched {
+      background-color: var(--color-stage-dispatched);
+      color: var(--color-text-primary);
+    }
+
+    .record-stage.complete {
+      background-color: var(--color-stage-complete);
+      color: #FFFFFF;
+    }
+
+    .record-details {
+      display: grid;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-md);
+      background-color: var(--color-surface-2);
+      border-radius: var(--rounded-sm);
+      font-size: 13px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--spacing-md);
+    }
+
+    .detail-label {
+      color: var(--color-text-secondary);
+      min-width: 60px;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      color: var(--color-text-primary);
+      font-family: Menlo, Monaco, "SF Mono", monospace;
+      text-align: right;
+      flex: 1;
+    }
+
+    .record-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: var(--rounded-sm);
+      border: 1px solid var(--color-border-subtle);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.3;
+      cursor: pointer;
+      background-color: var(--color-surface-2);
+      color: var(--color-text-primary);
+      transition: background-color var(--duration-fast);
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background-color: var(--color-border-subtle);
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: -2px;
+    }
+
+    .btn-primary {
+      background-color: var(--color-focus);
+      color: var(--color-canvas);
+      border-color: var(--color-focus);
+    }
+
+    .btn-primary:hover {
+      background-color: #1560a8;
+    }
+
+    .time-indicator {
+      font-size: 13px;
+      padding: 4px 8px;
+      border-radius: var(--rounded-sm);
+      color: var(--color-text-secondary);
+      background-color: transparent;
+    }
+
+    .time-indicator.warning {
+      color: #FFFFFF;
+      background-color: var(--color-warning);
+    }
+
+    .time-indicator.danger {
+      color: #FFFFFF;
+      background-color: var(--color-danger);
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 767px) {
+      .header {
+        padding: var(--spacing-md);
+        flex-wrap: wrap;
+      }
+
+      .header-title {
+        font-size: 20px;
+        width: 100%;
+      }
+
+      .mobile-nav-toggle {
+        display: block;
+        order: 2;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .main-wrapper {
+        flex-direction: column;
+      }
+
+      nav[data-eval="global-nav"] {
+        display: none;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border-subtle);
+        max-height: 200px;
+        position: relative;
+        z-index: 10;
+      }
+
+      nav[data-eval="global-nav"].open {
+        display: block;
+      }
+
+      .page-header {
+        padding: var(--spacing-md);
+      }
+
+      .page-title {
+        font-size: 18px;
+        margin-bottom: var(--spacing-sm);
+      }
+
+      .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+        padding: var(--spacing-md);
+        gap: var(--spacing-sm);
+      }
+
+      .summary-card {
+        padding: var(--spacing-sm);
+      }
+
+      .summary-card-label {
+        font-size: 11px;
+      }
+
+      .summary-card-value {
+        font-size: 16px;
+      }
+
+      .task-area {
+        padding: var(--spacing-md);
+      }
+
+      .task-list {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+      }
+
+      .task-record {
+        padding: var(--spacing-md);
+      }
+
+      .record-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .record-meta {
+        width: 100%;
+      }
+
+      .record-details {
+        font-size: 12px;
+      }
+
+      .detail-row {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+      }
+
+      .detail-label {
+        min-width: auto;
+      }
+
+      .detail-value {
+        text-align: left;
+      }
+
+      .record-actions {
+        width: 100%;
+      }
+
+      .record-actions .btn {
+        flex: 1;
+        min-height: 44px;
+        white-space: nowrap;
+      }
+    }
+
+    /* Tablet */
+    @media (min-width: 768px) and (max-width: 1023px) {
+      nav[data-eval="global-nav"] {
+        width: 160px;
+        padding: var(--spacing-md);
+      }
+
+      .task-list {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Desktop */
+    @media (min-width: 1024px) {
+      nav[data-eval="global-nav"] {
+        width: 200px;
+      }
+
+      .task-list {
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      }
+    }
+
+    /* Print and accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-canvas: #1A1C1E;
+        --color-surface-1: #2C2E31;
+        --color-surface-2: #3C3F43;
+        --color-text-primary: #F3F3F3;
+        --color-text-secondary: #B0B3B8;
+        --color-text-muted: #7C8185;
+        --color-border-subtle: #474A4F;
+        --color-border-strong: #565B62;
+      }
+
+      .badge-warning {
+        color: #FFFFFF;
+      }
+
+      .record-stage.received {
+        color: var(--color-text-primary);
+        background-color: #4a4c50;
+      }
+
+      .record-stage.dispatched {
+        color: var(--color-text-primary);
+        background-color: #2c4a7c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <h1 class="header-title">山域救援任務協調台</h1>
+      <button class="mobile-nav-toggle" data-eval="mobile-nav-toggle" aria-label="導覽選單">☰</button>
+    </header>
+
+    <div class="main-wrapper">
+      <nav data-eval="global-nav">
+        <button class="nav-item active">指揮台</button>
+        <button class="nav-item">責任區</button>
+        <button class="nav-item">隊伍管理</button>
+        <button class="nav-item">通訊日誌</button>
+        <button class="nav-item">設定</button>
+      </nav>
+
+      <div class="content">
+        <div class="page-header">
+          <h2 class="page-title">進行中任務監看</h2>
+        </div>
+
+        <div class="summary-cards">
+          <div class="summary-card">
+            <span class="summary-card-label">進行中任務</span>
+            <span class="summary-card-value">8</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-card-label">活動隊伍</span>
+            <span class="summary-card-value">6</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-card-label">逾期任務</span>
+            <span class="summary-card-value">1</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-card-label">平均回應</span>
+            <span class="summary-card-value">12m</span>
+          </div>
+        </div>
+
+        <div class="task-area">
+          <div class="task-list">
+            <!-- Task 1: Overdue, Active -->
+            <div class="task-record" data-eval="record" data-record-id="R001" data-record-priority="high" data-record-status="active" data-record-due="2026-07-15T12:30:00Z">
+              <div class="record-header">
+                <div class="record-zone">南投中央山脈</div>
+                <div class="record-meta">
+                  <span class="badge record-stage active">進行中</span>
+                  <span class="time-indicator danger">逾期 32分</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">玉山基地 A隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">23.47°N 120.96°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">4/4 健全</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">12:30 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn btn-primary">延期</button>
+                <button class="btn">通訊</button>
+              </div>
+            </div>
+
+            <!-- Task 2: Dispatched, Warning -->
+            <div class="task-record" data-eval="record" data-record-id="R002" data-record-priority="medium" data-record-status="dispatched" data-record-due="2026-07-15T14:00:00Z">
+              <div class="record-header">
+                <div class="record-zone">嘉義阿里山</div>
+                <div class="record-meta">
+                  <span class="badge record-stage dispatched">出發中</span>
+                  <span class="time-indicator warning">60分內</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">嘉義森林隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">23.51°N 120.81°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">3/4 待命</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">14:00 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn">加速</button>
+                <button class="btn">通訊</button>
+              </div>
+            </div>
+
+            <!-- Task 3: Active, On Track -->
+            <div class="task-record" data-eval="record" data-record-id="R003" data-record-priority="medium" data-record-status="active" data-record-due="2026-07-15T15:30:00Z">
+              <div class="record-header">
+                <div class="record-zone">花蓮合歡山</div>
+                <div class="record-meta">
+                  <span class="badge record-stage active">進行中</span>
+                  <span class="time-indicator">136分</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">花蓮高山隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">24.08°N 121.03°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">5/5 健全</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">15:30 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn">狀態</button>
+                <button class="btn">通訊</button>
+              </div>
+            </div>
+
+            <!-- Task 4: Received, Pending -->
+            <div class="task-record" data-eval="record" data-record-id="R004" data-record-priority="low" data-record-status="received" data-record-due="2026-07-15T16:00:00Z">
+              <div class="record-header">
+                <div class="record-zone">台中雪山</div>
+                <div class="record-meta">
+                  <span class="badge record-stage received">待命</span>
+                  <span class="time-indicator">161分</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">台中武陵隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">24.40°N 121.17°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">4/6 可用</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">16:00 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn btn-primary">派遣</button>
+                <button class="btn">細節</button>
+              </div>
+            </div>
+
+            <!-- Task 5: Active, Complete Soon -->
+            <div class="task-record" data-eval="record" data-record-id="R005" data-record-priority="low" data-record-status="active" data-record-due="2026-07-15T13:45:00Z">
+              <div class="record-header">
+                <div class="record-zone">宜蘭七星山</div>
+                <div class="record-meta">
+                  <span class="badge record-stage active">進行中</span>
+                  <span class="time-indicator">45分</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">宜蘭北區隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">25.06°N 121.56°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">3/3 健全</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">13:45 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn">監看</button>
+                <button class="btn">通訊</button>
+              </div>
+            </div>
+
+            <!-- Task 6: Dispatched, Healthy -->
+            <div class="task-record" data-eval="record" data-record-id="R006" data-record-priority="medium" data-record-status="dispatched" data-record-due="2026-07-15T14:45:00Z">
+              <div class="record-header">
+                <div class="record-zone">屏東南湖</div>
+                <div class="record-meta">
+                  <span class="badge record-stage dispatched">出發中</span>
+                  <span class="time-indicator">105分</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">屏東山區隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">22.64°N 120.86°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">6/6 滿員</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">14:45 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn">路線</button>
+                <button class="btn">通訊</button>
+              </div>
+            </div>
+
+            <!-- Task 7: Completed -->
+            <div class="task-record" data-eval="record" data-record-id="R007" data-record-priority="low" data-record-status="complete" data-record-due="2026-07-15T11:00:00Z">
+              <div class="record-header">
+                <div class="record-zone">新竹五指山</div>
+                <div class="record-meta">
+                  <span class="badge record-stage complete">完成</span>
+                  <span class="badge badge-success">成功</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">新竹第一隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">24.81°N 120.99°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">4/4 健全</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">完成</span>
+                  <span class="detail-value">11:00 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn">報告</button>
+                <button class="btn">歸檔</button>
+              </div>
+            </div>
+
+            <!-- Task 8: Active, Different Zone -->
+            <div class="task-record" data-eval="record" data-record-id="R008" data-record-priority="high" data-record-status="active" data-record-due="2026-07-15T13:15:00Z">
+              <div class="record-header">
+                <div class="record-zone">桃園北橫公路</div>
+                <div class="record-meta">
+                  <span class="badge record-stage active">進行中</span>
+                  <span class="time-indicator warning">15分內</span>
+                </div>
+              </div>
+              <div class="record-details">
+                <div class="detail-row">
+                  <span class="detail-label">隊伍</span>
+                  <span class="detail-value">桃園北警隊</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">座標</span>
+                  <span class="detail-value">24.76°N 121.24°E</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">人員</span>
+                  <span class="detail-value">2/4 在線</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">預計</span>
+                  <span class="detail-value">13:15 UTC</span>
+                </div>
+              </div>
+              <div class="record-actions">
+                <button class="btn btn-primary">介入</button>
+                <button class="btn">通訊</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mobile nav toggle
+    const toggle = document.querySelector('[data-eval="mobile-nav-toggle"]');
+    const nav = document.querySelector('[data-eval="global-nav"]');
+
+    if (toggle && nav) {
+      toggle.addEventListener('click', () => {
+        nav.classList.toggle('open');
+      });
+
+      // Close nav when item clicked
+      nav.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+          nav.classList.remove('open');
+        });
+      });
+
+      // Close nav on Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && nav.classList.contains('open')) {
+          nav.classList.remove('open');
+          toggle.focus();
+        }
+      });
+    }
+
+    // Navigation item active state
+    const navItems = document.querySelectorAll('[data-eval="global-nav"] .nav-item');
+    navItems.forEach((item, index) => {
+      item.addEventListener('click', () => {
+        navItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+      });
+    });
+
+    // Button interactions
+    const buttons = document.querySelectorAll('.btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+      });
+    });
+  </script>
+</body>
+</html>

@@ -18,6 +18,13 @@
       "boundary": "Passing unit tests verifies implemented invariants only; it does not make a weak model truthful or visually capable."
     },
     {
+      "id": "structured-site-planning",
+      "status": "tested_in_repo",
+      "claim": "IA manifests, end-to-end user flows, responsive wireframe plans and local XML sitemaps have fail-closed cross-artifact validation and hostile tests.",
+      "artifacts": ["wow-frontend-design/references/site-planning-wireframes.md", "wow-frontend-design/scripts/site_manifest.schema.json", "wow-frontend-design/scripts/wireframe_plan.schema.json", "wow-frontend-design/scripts/validate_site_plan.py", "wow-frontend-design/scripts/test_validate_site_plan.py"],
+      "boundary": "Passing schemas and hostile tests proves the encoded planning invariants only; it does not prove research validity, usability, visual quality, production behavior, indexing or ranking."
+    },
+    {
       "id": "traditional-chinese-showcase",
       "status": "browser_observed",
       "claim": "A real zh-Hant showcase implements light/dark/system appearance and materially different desktop/mobile composition.",

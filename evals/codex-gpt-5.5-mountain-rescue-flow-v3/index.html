@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>山域救援任務協調台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --color-primary: #245347;
+      --color-on-primary: #ffffff;
+      --color-canvas: #f4f1ea;
+      --color-ink: #16201d;
+      --color-surface: #ffffff;
+      --color-muted-surface: #e7e1d6;
+      --color-muted: #4d5b55;
+      --color-border: #c8c0b3;
+      --color-action: #245347;
+      --color-focus: #0d6e8a;
+      --color-danger: #a5382f;
+      --color-warning: #8a5a12;
+      --color-success: #2f6b4f;
+      --color-radio: #0f5f78;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --font-data: "SF Mono", Menlo, Consolas, monospace;
+      --space-1: 0.5rem;
+      --space-2: 0.75rem;
+      --space-3: 1rem;
+      --space-4: 1.5rem;
+      --space-5: 2rem;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --shadow-panel: 0 14px 32px rgb(36 40 34 / 0.08);
+      --sidebar: 15.5rem;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: var(--color-canvas);
+      color: var(--color-ink);
+      font-family: var(--font-sans);
+      line-break: strict;
+      word-break: normal;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100svh;
+      background:
+        linear-gradient(90deg, rgb(36 83 71 / 0.055) 1px, transparent 1px),
+        linear-gradient(0deg, rgb(36 83 71 / 0.055) 1px, transparent 1px),
+        radial-gradient(circle at 22% 12%, rgb(138 90 18 / 0.08), transparent 28rem),
+        var(--color-canvas);
+      background-size: 48px 48px, 48px 48px, auto, auto;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--color-focus);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      inset-block-start: 0.75rem;
+      inset-inline-start: 0.75rem;
+      z-index: 50;
+      transform: translateY(-160%);
+      border-radius: var(--radius-sm);
+      background: var(--color-ink);
+      color: white;
+      padding: 0.75rem 1rem;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      min-height: 100svh;
+    }
+
+    .side-nav {
+      border-inline-end: 1px solid var(--color-border);
+      background: rgb(255 255 255 / 0.72);
+      padding: var(--space-4);
+      position: sticky;
+      inset-block-start: 0;
+      align-self: start;
+      height: 100svh;
+    }
+
+    .brand {
+      display: grid;
+      gap: var(--space-1);
+      margin-block-end: var(--space-5);
+    }
+
+    .brand-mark {
+      width: 2.5rem;
+      height: 2.5rem;
+      border: 2px solid var(--color-primary);
+      border-radius: var(--radius-sm);
+      background:
+        repeating-linear-gradient(145deg, transparent 0 6px, rgb(36 83 71 / 0.18) 6px 8px),
+        var(--color-surface);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-data);
+      font-weight: 800;
+      color: var(--color-primary);
+    }
+
+    .brand strong,
+    .nav-title,
+    .section-label,
+    .record-title {
+      text-wrap: balance;
+    }
+
+    .brand strong {
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+
+    .brand span,
+    .nav-title,
+    .small-note {
+      color: var(--color-muted);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 0.35rem;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 0.75rem;
+      color: var(--color-muted);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .nav-link[aria-current="page"] {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      font-weight: 700;
+    }
+
+    .nav-dot {
+      width: 0.65rem;
+      height: 0.65rem;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+
+    .mobile-topbar {
+      display: none;
+    }
+
+    .workspace {
+      min-width: 0;
+      padding: clamp(1rem, 2vw, 2rem);
+    }
+
+    .topline {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-4);
+      align-items: start;
+      margin-block-end: var(--space-4);
+    }
+
+    h1 {
+      margin: 0 0 var(--space-2);
+      font-size: clamp(1.8rem, 3vw, 2.45rem);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .lede {
+      max-width: 72ch;
+      margin: 0;
+      color: var(--color-muted);
+      line-height: 1.7;
+    }
+
+    .timebox {
+      min-width: 15rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      padding: var(--space-3);
+      box-shadow: var(--shadow-panel);
+    }
+
+    .timebox span {
+      display: block;
+      color: var(--color-muted);
+      font-size: 0.85rem;
+    }
+
+    .timebox strong {
+      display: block;
+      margin-block-start: 0.25rem;
+      font-family: var(--font-data);
+      font-size: 1.15rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(8rem, 1fr));
+      gap: var(--space-3);
+      margin-block-end: var(--space-4);
+    }
+
+    .metric {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      padding: var(--space-3);
+      min-width: 0;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--color-muted);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .metric strong {
+      display: block;
+      margin-block-start: 0.25rem;
+      font-family: var(--font-data);
+      font-size: clamp(1.35rem, 2vw, 1.85rem);
+      line-height: 1.1;
+    }
+
+    .operations {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 18rem;
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .panel {
+      min-width: 0;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: rgb(255 255 255 / 0.9);
+      box-shadow: var(--shadow-panel);
+      overflow: clip;
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-3);
+      border-block-end: 1px solid var(--color-border);
+      background:
+        linear-gradient(90deg, rgb(36 83 71 / 0.08), transparent 42%),
+        var(--color-surface);
+    }
+
+    .panel-heading h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .tool-button,
+    .mobile-nav-toggle {
+      min-height: 44px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-ink);
+      padding: 0.55rem 0.75rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .tool-button[aria-pressed="true"] {
+      border-color: var(--color-primary);
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      font-weight: 700;
+    }
+
+    .task-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.94rem;
+    }
+
+    .task-table caption {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .task-table th,
+    .task-table td {
+      padding: 0.85rem 0.75rem;
+      text-align: start;
+      vertical-align: middle;
+      border-block-end: 1px solid rgb(200 192 179 / 0.8);
+    }
+
+    .task-table th {
+      color: var(--color-muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      background: #faf8f4;
+    }
+
+    .task-table tbody tr {
+      background: var(--color-surface);
+    }
+
+    .task-table tbody tr[data-overdue="true"] {
+      box-shadow: inset 4px 0 0 var(--color-danger);
+    }
+
+    .task-cell-main {
+      min-width: 14rem;
+    }
+
+    .record-title {
+      display: block;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+
+    .record-meta {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      margin-block-start: 0.4rem;
+      color: var(--color-muted);
+      font-family: var(--font-data);
+      font-size: 0.82rem;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 1.8rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      padding: 0.2rem 0.55rem;
+      font-family: var(--font-data);
+      font-size: 0.82rem;
+      font-weight: 800;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .priority-critical {
+      background: #f7dfdc;
+      color: #7e211b;
+      border-color: #d7a19b;
+    }
+
+    .priority-high {
+      background: #f2e4c9;
+      color: #684008;
+      border-color: #d7b36f;
+    }
+
+    .priority-medium {
+      background: #dae9e0;
+      color: #22543c;
+      border-color: #9fc2ad;
+    }
+
+    .status-search {
+      background: #e6eef0;
+      color: #164d5d;
+      border-color: #a9c8cf;
+    }
+
+    .status-medical {
+      background: #eee4d1;
+      color: #5e4819;
+      border-color: #d8c28f;
+    }
+
+    .status-standby {
+      background: #e3e1dc;
+      color: #4b4f4b;
+      border-color: #c4beb3;
+    }
+
+    .due-overdue {
+      background: var(--color-danger);
+      color: var(--color-on-primary);
+    }
+
+    .due-soon {
+      background: var(--color-warning);
+      color: var(--color-on-primary);
+    }
+
+    .due-watch {
+      background: #e9e0cd;
+      color: #5f4312;
+      border-color: #c8a763;
+    }
+
+    .radio {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      white-space: nowrap;
+      font-family: var(--font-data);
+      font-weight: 700;
+    }
+
+    .radio::before {
+      content: "";
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 50%;
+      background: var(--color-success);
+      box-shadow: 0 0 0 4px rgb(47 107 79 / 0.14);
+    }
+
+    .radio[data-state="weak"]::before {
+      background: var(--color-warning);
+      box-shadow: 0 0 0 4px rgb(138 90 18 / 0.16);
+    }
+
+    .radio[data-state="lost"]::before {
+      background: var(--color-danger);
+      box-shadow: 0 0 0 4px rgb(165 56 47 / 0.16);
+    }
+
+    .load {
+      font-family: var(--font-data);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .side-panel {
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    .map-panel {
+      position: relative;
+      min-height: 20rem;
+      padding: var(--space-3);
+      background:
+        radial-gradient(ellipse at 26% 36%, transparent 0 26%, rgb(36 83 71 / 0.22) 26.5% 27.5%, transparent 28% 35%, rgb(36 83 71 / 0.16) 35.5% 36.5%, transparent 37%),
+        radial-gradient(ellipse at 70% 64%, transparent 0 20%, rgb(138 90 18 / 0.22) 20.5% 21.5%, transparent 22% 30%, rgb(138 90 18 / 0.14) 30.5% 31.5%, transparent 32%),
+        linear-gradient(90deg, rgb(22 32 29 / 0.06) 1px, transparent 1px),
+        linear-gradient(0deg, rgb(22 32 29 / 0.06) 1px, transparent 1px),
+        #fbfaf7;
+      background-size: auto, auto, 28px 28px, 28px 28px, auto;
+    }
+
+    .map-panel h2,
+    .log-panel h2 {
+      margin: 0 0 var(--space-2);
+      font-size: 1rem;
+    }
+
+    .map-pin {
+      position: absolute;
+      display: inline-grid;
+      place-items: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      border: 2px solid var(--color-surface);
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: white;
+      font-family: var(--font-data);
+      font-size: 0.8rem;
+      font-weight: 800;
+      box-shadow: 0 6px 18px rgb(22 32 29 / 0.22);
+    }
+
+    .pin-1 { inset-block-start: 33%; inset-inline-start: 30%; }
+    .pin-2 { inset-block-start: 55%; inset-inline-start: 63%; background: var(--color-danger); }
+    .pin-3 { inset-block-start: 70%; inset-inline-start: 42%; background: var(--color-radio); }
+
+    .log-panel {
+      padding: var(--space-3);
+    }
+
+    .log-list {
+      display: grid;
+      gap: var(--space-2);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .log-list li {
+      display: grid;
+      grid-template-columns: 4.5rem minmax(0, 1fr);
+      gap: var(--space-2);
+      border-block-start: 1px solid var(--color-border);
+      padding-block-start: var(--space-2);
+      line-height: 1.55;
+    }
+
+    .log-list time {
+      color: var(--color-muted);
+      font-family: var(--font-data);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .mobile-records {
+      display: none;
+    }
+
+    @media (max-width: 1100px) {
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .operations {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 760px) {
+      body.nav-open {
+        overflow: hidden;
+      }
+
+      .app-shell {
+        display: block;
+      }
+
+      .mobile-topbar {
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        border-block-end: 1px solid var(--color-border);
+        background: rgb(244 241 234 / 0.96);
+        padding: max(0.65rem, env(safe-area-inset-top)) 1rem 0.65rem;
+        backdrop-filter: blur(10px);
+      }
+
+      .mobile-brand {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+        font-weight: 800;
+      }
+
+      .mobile-brand span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mobile-nav-toggle {
+        flex: 0 0 auto;
+      }
+
+      .side-nav {
+        position: fixed;
+        inset: 0 0 auto 0;
+        z-index: 30;
+        height: auto;
+        max-height: min(88svh, 34rem);
+        transform: translateY(-110%);
+        transition: transform 180ms ease-out;
+        border-inline-end: 0;
+        border-block-end: 1px solid var(--color-border);
+        box-shadow: 0 22px 60px rgb(22 32 29 / 0.2);
+        padding-block-start: calc(env(safe-area-inset-top) + 1rem);
+      }
+
+      body.nav-open .side-nav {
+        transform: translateY(0);
+      }
+
+      .workspace {
+        padding: 1rem;
+      }
+
+      .topline {
+        display: block;
+        margin-block-end: var(--space-3);
+      }
+
+      .lede {
+        font-size: 0.96rem;
+      }
+
+      .timebox {
+        margin-block-start: var(--space-3);
+        min-width: 0;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .metric {
+        padding: var(--space-2);
+      }
+
+      .panel-heading {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .toolbar {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-block-end: 0.15rem;
+      }
+
+      .desktop-table {
+        padding: var(--space-3);
+      }
+
+      .task-table,
+      .task-table tbody,
+      .task-table tr,
+      .task-table td {
+        display: block;
+      }
+
+      .task-table thead {
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      .task-table tbody {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .task-table tbody tr:nth-child(1) { order: 1; }
+      .task-table tbody tr:nth-child(3) { order: 2; }
+      .task-table tbody tr:nth-child(5) { order: 3; }
+      .task-table tbody tr:nth-child(2) { order: 4; }
+      .task-table tbody tr:nth-child(6) { order: 5; }
+      .task-table tbody tr:nth-child(8) { order: 6; }
+      .task-table tbody tr:nth-child(4) { order: 7; }
+      .task-table tbody tr:nth-child(7) { order: 8; }
+
+      .task-table tbody tr {
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+      }
+
+      .task-table tbody tr[data-overdue="true"] {
+        box-shadow: inset 5px 0 0 var(--color-danger);
+      }
+
+      .task-table td {
+        border-block-end: 0;
+        padding: 0.45rem var(--space-3);
+      }
+
+      .task-table td:first-child {
+        padding-block-start: var(--space-3);
+      }
+
+      .task-table td:last-child {
+        padding-block-end: var(--space-3);
+      }
+
+      .task-table td[data-label] {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+      }
+
+      .task-table td[data-label]::before {
+        content: attr(data-label);
+        color: var(--color-muted);
+        font-size: 0.78rem;
+        line-height: 1.4;
+        flex: 0 0 auto;
+      }
+
+      .task-cell-main {
+        min-width: 0;
+      }
+
+      .side-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .workspace {
+        padding-inline: 0.75rem;
+      }
+
+      h1 {
+        font-size: 1.72rem;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tool-button {
+        padding-inline: 0.65rem;
+      }
+
+      .tag {
+        font-size: 0.78rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到任務列表</a>
+  <div class="mobile-topbar">
+    <div class="mobile-brand" aria-label="山域救援任務協調台">
+      <span class="brand-mark" aria-hidden="true">SAR</span>
+      <span>任務協調台</span>
+    </div>
+    <button class="mobile-nav-toggle" type="button" data-eval="mobile-nav-toggle" aria-controls="global-nav" aria-expanded="false">導覽</button>
+  </div>
+
+  <div class="app-shell">
+    <nav class="side-nav" id="global-nav" data-eval="global-nav" aria-label="主要導覽">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">SAR</span>
+        <strong>山域救援任務協調台</strong>
+        <span>北區聯合指揮席</span>
+      </div>
+      <p class="nav-title">任務視圖</p>
+      <ul class="nav-list">
+        <li><a class="nav-link" href="#main" aria-current="page"><span class="nav-dot"></span>即時任務</a></li>
+        <li><a class="nav-link" href="#map"><span class="nav-dot"></span>責任區圖層</a></li>
+        <li><a class="nav-link" href="#radio-log"><span class="nav-dot"></span>通訊紀錄</a></li>
+        <li><a class="nav-link" href="#resources"><span class="nav-dot"></span>隊伍負荷</a></li>
+      </ul>
+    </nav>
+
+    <main class="workspace" id="main">
+      <section class="topline" aria-labelledby="page-title">
+        <div>
+          <h1 id="page-title">即時任務比較</h1>
+          <p class="lede">監看責任區、急迫度、任務階段、期限與通訊狀態。資料為本機靜態示範，不代表遠端同步或派遣已完成。</p>
+        </div>
+        <aside class="timebox" aria-label="值勤時間">
+          <span>指揮席時間</span>
+          <strong>15:42 TST</strong>
+          <span>天候：午後雷雨機率升高</span>
+        </aside>
+      </section>
+
+      <section class="summary-grid" aria-label="摘要">
+        <article class="metric">
+          <span>開放任務</span>
+          <strong>8</strong>
+        </article>
+        <article class="metric">
+          <span>超時期限</span>
+          <strong>2</strong>
+        </article>
+        <article class="metric">
+          <span>通訊弱訊或中斷</span>
+          <strong>3</strong>
+        </article>
+        <article class="metric" id="resources">
+          <span>隊伍高負荷</span>
+          <strong>3</strong>
+        </article>
+      </section>
+
+      <div class="operations">
+        <section class="panel" aria-labelledby="tasks-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="tasks-title">任務列表</h2>
+              <p class="small-note">桌面橫向比較；手機依優先判斷改成 inbox。</p>
+            </div>
+            <div class="toolbar" aria-label="任務篩選">
+              <button class="tool-button" type="button" aria-pressed="true">全部</button>
+              <button class="tool-button" type="button" aria-pressed="false">超時</button>
+              <button class="tool-button" type="button" aria-pressed="false">弱訊</button>
+            </div>
+          </div>
+
+          <div class="desktop-table">
+            <table class="task-table">
+              <caption>山域救援任務比較表</caption>
+              <thead>
+                <tr>
+                  <th scope="col">任務</th>
+                  <th scope="col">責任區</th>
+                  <th scope="col">急迫度</th>
+                  <th scope="col">階段</th>
+                  <th scope="col">期限</th>
+                  <th scope="col">隊伍</th>
+                  <th scope="col">通訊</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-eval="record" data-record-id="mtn-001" data-overdue="true">
+                  <td class="task-cell-main"><span class="record-title">雪山東稜失聯回報</span><span class="record-meta"><span>24.388N</span><span>121.244E</span></span></td>
+                  <td data-label="責任區">北一區</td>
+                  <td data-label="急迫度"><span class="tag priority-critical" data-eval="record-priority">極高</span></td>
+                  <td data-label="階段"><span class="tag status-search" data-eval="record-status">搜索擴線</span></td>
+                  <td data-label="期限"><span class="tag due-overdue" data-eval="record-due">超時 18分</span></td>
+                  <td data-label="隊伍"><span class="load">A2 / 86%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="weak">CH-3 弱訊</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-002">
+                  <td class="task-cell-main"><span class="record-title">松蘿湖踝傷後送</span><span class="record-meta"><span>24.579N</span><span>121.501E</span></span></td>
+                  <td data-label="責任區">東二區</td>
+                  <td data-label="急迫度"><span class="tag priority-high" data-eval="record-priority">高</span></td>
+                  <td data-label="階段"><span class="tag status-medical" data-eval="record-status">醫療評估</span></td>
+                  <td data-label="期限"><span class="tag due-soon" data-eval="record-due">12分內</span></td>
+                  <td data-label="隊伍"><span class="load">M1 / 72%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="ok">CH-5 穩定</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-003">
+                  <td class="task-cell-main"><span class="record-title">南湖圈谷低溫暴露</span><span class="record-meta"><span>24.362N</span><span>121.439E</span></span></td>
+                  <td data-label="責任區">北二區</td>
+                  <td data-label="急迫度"><span class="tag priority-critical" data-eval="record-priority">極高</span></td>
+                  <td data-label="階段"><span class="tag status-medical" data-eval="record-status">保溫處置</span></td>
+                  <td data-label="期限"><span class="tag due-watch" data-eval="record-due">36分內</span></td>
+                  <td data-label="隊伍"><span class="load">H1 / 91%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="lost">CH-2 中斷</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-004">
+                  <td class="task-cell-main"><span class="record-title">塔曼山迷途座標校正</span><span class="record-meta"><span>24.706N</span><span>121.421E</span></span></td>
+                  <td data-label="責任區">西三區</td>
+                  <td data-label="急迫度"><span class="tag priority-medium" data-eval="record-priority">中</span></td>
+                  <td data-label="階段"><span class="tag status-search" data-eval="record-status">定位確認</span></td>
+                  <td data-label="期限"><span class="tag due-watch" data-eval="record-due">58分內</span></td>
+                  <td data-label="隊伍"><span class="load">B4 / 48%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="ok">CH-1 穩定</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-005" data-overdue="true">
+                  <td class="task-cell-main"><span class="record-title">加羅湖落石通報</span><span class="record-meta"><span>24.481N</span><span>121.455E</span></span></td>
+                  <td data-label="責任區">東一區</td>
+                  <td data-label="急迫度"><span class="tag priority-high" data-eval="record-priority">高</span></td>
+                  <td data-label="階段"><span class="tag status-standby" data-eval="record-status">路線封控</span></td>
+                  <td data-label="期限"><span class="tag due-overdue" data-eval="record-due">超時 7分</span></td>
+                  <td data-label="隊伍"><span class="load">R2 / 64%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="weak">CH-4 弱訊</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-006">
+                  <td class="task-cell-main"><span class="record-title">品田斷崖繩索支援</span><span class="record-meta"><span>24.392N</span><span>121.300E</span></span></td>
+                  <td data-label="責任區">北一區</td>
+                  <td data-label="急迫度"><span class="tag priority-critical" data-eval="record-priority">極高</span></td>
+                  <td data-label="階段"><span class="tag status-standby" data-eval="record-status">技術待命</span></td>
+                  <td data-label="期限"><span class="tag due-soon" data-eval="record-due">24分內</span></td>
+                  <td data-label="隊伍"><span class="load">T3 / 88%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="ok">CH-6 穩定</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-007">
+                  <td class="task-cell-main"><span class="record-title">羅馬縱走雨勢觀測</span><span class="record-meta"><span>24.642N</span><span>121.324E</span></span></td>
+                  <td data-label="責任區">西二區</td>
+                  <td data-label="急迫度"><span class="tag priority-medium" data-eval="record-priority">中</span></td>
+                  <td data-label="階段"><span class="tag status-search" data-eval="record-status">撤退評估</span></td>
+                  <td data-label="期限"><span class="tag due-watch" data-eval="record-due">1時20分</span></td>
+                  <td data-label="隊伍"><span class="load">C1 / 39%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="ok">CH-7 穩定</span></td>
+                </tr>
+                <tr data-eval="record" data-record-id="mtn-008">
+                  <td class="task-cell-main"><span class="record-title">大霸北稜補給交會</span><span class="record-meta"><span>24.463N</span><span>121.258E</span></span></td>
+                  <td data-label="責任區">北三區</td>
+                  <td data-label="急迫度"><span class="tag priority-high" data-eval="record-priority">高</span></td>
+                  <td data-label="階段"><span class="tag status-standby" data-eval="record-status">交會排程</span></td>
+                  <td data-label="期限"><span class="tag due-watch" data-eval="record-due">45分內</span></td>
+                  <td data-label="隊伍"><span class="load">L5 / 77%</span></td>
+                  <td data-label="通訊"><span class="radio" data-state="ok">CH-8 穩定</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="side-panel" aria-label="輔助資訊">
+          <section class="panel map-panel" id="map" aria-labelledby="map-title">
+            <h2 id="map-title">責任區地形索引</h2>
+            <p class="small-note">示意地形格線，不代表實際地圖。</p>
+            <span class="map-pin pin-1" aria-label="北一區">N1</span>
+            <span class="map-pin pin-2" aria-label="東一區超時">E1</span>
+            <span class="map-pin pin-3" aria-label="西二區">W2</span>
+          </section>
+          <section class="panel log-panel" id="radio-log" aria-labelledby="log-title">
+            <h2 id="log-title">通訊紀錄</h2>
+            <ul class="log-list">
+              <li><time>15:38</time><span>CH-3 回報雪山東稜訊號間歇，改 5 分鐘短報。</span></li>
+              <li><time>15:31</time><span>CH-2 南湖圈谷無回應，請北二區中繼站確認。</span></li>
+              <li><time>15:24</time><span>CH-5 松蘿湖隊伍完成傷者固定，等待後送路線。</span></li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var toggle = document.querySelector('[data-eval="mobile-nav-toggle"]');
+      var nav = document.getElementById('global-nav');
+      if (!toggle || !nav) return;
+
+      function setOpen(open) {
+        document.body.classList.toggle('nav-open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        if (open) {
+          var current = nav.querySelector('[aria-current="page"]') || nav.querySelector('a');
+          if (current) current.focus();
+        } else {
+          toggle.focus();
+        }
+      }
+
+      toggle.addEventListener('click', function () {
+        setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+      });
+
+      nav.addEventListener('click', function (event) {
+        if (event.target.closest('a') && window.matchMedia('(max-width: 760px)').matches) {
+          setOpen(false);
+        }
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+          setOpen(false);
+        }
+      });
+    }());
+  </script>
+</body>
+</html>

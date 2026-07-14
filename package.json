@@ -10,6 +10,7 @@
   "scripts": {
     "check:dashboard-audit": "node --check evals/playwright_dashboard_audit.cjs",
     "audit:dashboards": "node evals/playwright_dashboard_audit.cjs",
+    "audit:visual-v3": "node evals/playwright_visual_v3_audit.cjs",
     "capture:showcase": "node evals/capture_showcase.cjs"
   },
   "devDependencies": {

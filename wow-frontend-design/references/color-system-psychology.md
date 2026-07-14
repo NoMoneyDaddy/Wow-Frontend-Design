@@ -64,6 +64,8 @@ role × surface × default/hover/focus/active/selected/disabled/loading/error/su
 
 Color roles need non-color companions: label, icon, pattern, position, outline, or shape. Status and brand colors must not silently share a role when that makes decoration look actionable or makes an action look like an error.
 
+Keep independent record dimensions orthogonal. Urgency, lifecycle status, due state, assignment, and selection must not recolor one another's label. The same semantic value uses the same role and non-color cue wherever it appears; an overdue row may emphasize its due label or boundary, but must not silently turn an unchanged lifecycle status into an error state.
+
 Use Oklab/OKLCH when perceptually steadier ramps, interpolation, or controlled chroma are useful, with sRGB-compatible fallbacks and gamut testing. CSS Color 4 describes the spaces and their interpolation properties; it does not guarantee accessible contrast or device equivalence. See [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/).
 
 Define:

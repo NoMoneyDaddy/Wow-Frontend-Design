@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>藏頁書局｜首頁</title>
+  <meta name="description" content="藏頁書局首頁。以紙感編目、主題書脊與精選推薦，快速找到下一本想讀的書。" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fbf7f2;
+      --panel: #f0e6d8;
+      --panel-strong: #e7d7c2;
+      --text: #241b16;
+      --muted: #6e6258;
+      --primary: #8a4b2a;
+      --primary-ink: #fff7ef;
+      --success: #2e6a4a;
+      --danger: #a5483b;
+      --line: rgba(36, 27, 22, 0.12);
+      --shadow: 0 18px 40px rgba(57, 37, 24, 0.08);
+      --display: "Iowan Old Style", "Songti TC", "Noto Serif TC", "Times New Roman", serif;
+      --reading: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif;
+      --ui: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
+      --page: clamp(1rem, 3vw, 2.25rem);
+      --section: clamp(1.5rem, 4vw, 3rem);
+      --measure: 68ch;
+      --r-sm: .5rem;
+      --r-md: 1rem;
+      --r-lg: 1.5rem;
+      --r-pill: 999px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(138,75,42,.08), transparent 30%),
+        radial-gradient(circle at left 15%, rgba(240,230,216,.8), transparent 28%),
+        linear-gradient(180deg, #fcf9f5 0%, var(--bg) 100%);
+      font: 400 16px/1.7 var(--reading);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; text-decoration: none; }
+    a:hover { color: var(--primary); }
+    a:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--primary) 72%, white);
+      outline-offset: 2px;
+    }
+    .skip {
+      position: absolute;
+      inset-inline-start: 1rem;
+      inset-block-start: 1rem;
+      padding: .75rem 1rem;
+      background: var(--primary);
+      color: var(--primary-ink);
+      border-radius: var(--r-pill);
+      transform: translateY(-180%);
+      transition: transform .2s ease;
+      z-index: 20;
+    }
+    .skip:focus { transform: translateY(0); }
+    .shell {
+      width: min(1180px, calc(100% - 2 * var(--page)));
+      margin-inline: auto;
+      padding-block: clamp(1rem, 2vw, 1.5rem) 3rem;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: var(--section);
+    }
+    .brand {
+      display: grid;
+      gap: .2rem;
+      font-family: var(--display);
+    }
+    .brand strong {
+      font-size: 1.2rem;
+      letter-spacing: .02em;
+    }
+    .brand span { color: var(--muted); font: 600 .85rem/1.2 var(--ui); }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: .5rem;
+      font: 600 .92rem/1.1 var(--ui);
+    }
+    nav a {
+      padding: .72rem .95rem;
+      border-radius: var(--r-pill);
+      background: rgba(240,230,216,.72);
+    }
+    nav a[aria-current="page"] {
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr);
+      gap: var(--section);
+      align-items: stretch;
+      margin-bottom: var(--section);
+    }
+    .hero-copy {
+      padding: clamp(1.25rem, 3vw, 2rem);
+      border-radius: calc(var(--r-lg) + .25rem);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.15)),
+        var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .eyebrow {
+      margin: 0 0 .85rem;
+      font: 700 .82rem/1.1 var(--ui);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    h1, h2, h3 { margin: 0; font-family: var(--display); line-height: 1.1; }
+    h1 {
+      font-size: clamp(2.5rem, 7vw, 5rem);
+      max-width: 10ch;
+      letter-spacing: -.03em;
+    }
+    .lede {
+      margin: 1rem 0 0;
+      max-width: 58ch;
+      color: var(--text);
+      font-size: 1.05rem;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: 1.5rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.75rem;
+      padding: .78rem 1.05rem;
+      border-radius: var(--r-pill);
+      border: 0;
+      font: 700 .94rem/1.1 var(--ui);
+      transition: transform .18s ease, background-color .18s ease, color .18s ease;
+      cursor: pointer;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--primary); color: var(--primary-ink); }
+    .btn-secondary { background: var(--panel-strong); color: var(--text); }
+    .hero-meta {
+      display: grid;
+      gap: 1rem;
+      padding: clamp(1.1rem, 2.6vw, 1.5rem);
+      border-radius: calc(var(--r-lg) + .25rem);
+      background: linear-gradient(180deg, rgba(232,214,194,.95), rgba(240,230,216,.9));
+    }
+    .shelf {
+      display: grid;
+      gap: .85rem;
+    }
+    .shelf-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .shelf-head p, .muted { margin: 0; color: var(--muted); }
+    .spine {
+      display: grid;
+      grid-template-columns: 4px 1fr;
+      gap: .85rem;
+      padding: .9rem;
+      border-radius: var(--r-md);
+      background: rgba(251,247,242,.72);
+    }
+    .spine-bar {
+      border-radius: var(--r-pill);
+      background: linear-gradient(180deg, var(--primary), #a96c4e);
+    }
+    .spine h3 {
+      font-size: 1.08rem;
+      margin-bottom: .15rem;
+    }
+    .spine p { margin: 0; color: var(--muted); font-size: .95rem; }
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1.3fr .7fr;
+      gap: var(--section);
+      align-items: start;
+      margin-bottom: var(--section);
+    }
+    .section {
+      padding: clamp(1rem, 2.4vw, 1.5rem);
+      border-radius: calc(var(--r-lg) + .15rem);
+      background: rgba(255,255,255,.44);
+      backdrop-filter: blur(4px);
+    }
+    .section > header {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+    }
+    .section h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      display: grid;
+      gap: .85rem;
+      padding: 1rem;
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      box-shadow: 0 10px 24px rgba(57,37,24,.05);
+    }
+    .cover {
+      position: relative;
+      min-height: 11rem;
+      border-radius: var(--r-md);
+      overflow: hidden;
+      padding: 1rem;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.22), transparent 38%),
+        linear-gradient(180deg, #8a4b2a 0%, #a66342 55%, #6f3522 100%);
+      color: var(--primary-ink);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+    .cover::after {
+      content: "";
+      position: absolute;
+      inset-inline-end: 0;
+      inset-block: 0;
+      width: 14px;
+      background: rgba(255,255,255,.2);
+    }
+    .cover strong {
+      position: relative;
+      font-family: var(--display);
+      font-size: 1.8rem;
+      max-width: 4ch;
+      line-height: 1;
+      letter-spacing: -.04em;
+    }
+    .cover em {
+      position: relative;
+      font: 700 .72rem/1 var(--ui);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      opacity: .88;
+      font-style: normal;
+    }
+    .card h3 {
+      font-size: 1.2rem;
+      line-height: 1.15;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+      align-items: center;
+      color: var(--muted);
+      font: 600 .88rem/1.1 var(--ui);
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2rem;
+      padding: 0 .7rem;
+      border-radius: var(--r-pill);
+      background: var(--panel-strong);
+      color: var(--text);
+      font: 700 .82rem/1 var(--ui);
+    }
+    .price {
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .aside-stack {
+      display: grid;
+      gap: 1rem;
+    }
+    .note {
+      padding: 1rem;
+      border-radius: var(--r-lg);
+      background: linear-gradient(180deg, rgba(138,75,42,.08), rgba(240,230,216,.84));
+    }
+    .note p { margin: .25rem 0 0; color: var(--muted); }
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: var(--section);
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font: 600 .9rem/1.4 var(--ui);
+    }
+    @media (max-width: 980px) {
+      .hero, .grid-two, .cards { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 1.1rem, 1180px); padding-block-start: .75rem; }
+      header { align-items: start; flex-direction: column; }
+      nav { justify-content: flex-start; width: 100%; overflow-x: auto; padding-bottom: .15rem; }
+      nav a { white-space: nowrap; }
+      .hero-copy, .hero-meta, .section, .card { border-radius: 1.15rem; }
+      .hero-copy { padding: 1rem; }
+      .btn { width: 100%; }
+      .hero-actions { display: grid; }
+      h1 { max-width: 11ch; }
+      .cards { gap: .85rem; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">跳到主要內容</a>
+  <div class="shell">
+    <header>
+      <a class="brand" href="index.html" aria-label="藏頁書局首頁">
+        <strong>藏頁書局</strong>
+        <span>選書・目錄・書頁</span>
+      </a>
+      <nav aria-label="主要導覽">
+        <a href="index.html" aria-current="page">首頁</a>
+        <a href="catalog.html">目錄</a>
+        <a href="book.html">書頁</a>
+      </nav>
+    </header>
+
+    <main id="content">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">今日推薦</p>
+          <h1 id="hero-title">先看懂一本書，再決定要不要帶走。</h1>
+          <p class="lede">藏頁書局把封面、摘要、價格與供貨狀態排成同一條決策路徑。你可以先快速掃描，再進一步比較，最後進到單本頁面完成選擇。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="catalog.html">瀏覽目錄</a>
+            <a class="btn btn-secondary" href="book.html">看單本示例</a>
+          </div>
+        </div>
+        <aside class="hero-meta" aria-label="今日精選">
+          <div class="shelf-head">
+            <div>
+              <p class="eyebrow" style="margin-bottom:.35rem;">主題書脊</p>
+              <p class="muted">用一眼能辨識的分類帶，代替雜亂的資訊牆。</p>
+            </div>
+          </div>
+          <div class="spine">
+            <div class="spine-bar" aria-hidden="true"></div>
+            <div>
+              <h3>城市夜讀</h3>
+              <p>散文、小說、設計與影像。適合想找慢節奏讀物的人。</p>
+            </div>
+          </div>
+          <div class="spine">
+            <div class="spine-bar" style="background:linear-gradient(180deg,#2e6a4a,#4a8d67)" aria-hidden="true"></div>
+            <div>
+              <h3>工具與方法</h3>
+              <p>寫作、程式、研究方法與實務手冊，便於直接比較。</p>
+            </div>
+          </div>
+          <div class="spine">
+            <div class="spine-bar" style="background:linear-gradient(180deg,#a5483b,#c16c5a)" aria-hidden="true"></div>
+            <div>
+              <h3>新進書目</h3>
+              <p>現貨與預購一起列出，避免翻頁後才知道無庫存。</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid-two" aria-label="精選與提示">
+        <div class="section">
+          <header>
+            <h2>本週精選</h2>
+            <a class="tag" href="catalog.html">前往完整目錄</a>
+          </header>
+          <div class="cards">
+            <article class="card">
+              <div class="cover"><strong>墨</strong><em>novel</em></div>
+              <div class="meta-row"><span class="tag">小說</span><span class="price">NT$420</span><span>現貨 18</span></div>
+              <h3>墨色河岸</h3>
+              <p class="muted">以沿岸城市為背景的短篇合集，適合想快速進入故事感的人。</p>
+            </article>
+            <article class="card">
+              <div class="cover" style="background:linear-gradient(145deg, rgba(255,255,255,.18), transparent 38%), linear-gradient(180deg,#2e6a4a 0%, #508c69 55%, #224a36 100%);"><strong>編</strong><em>guide</em></div>
+              <div class="meta-row"><span class="tag">工具書</span><span class="price">NT$560</span><span>現貨 7</span></div>
+              <h3>編排手冊</h3>
+              <p class="muted">關於版面、字級與閱讀節奏的實作手冊，適合專業工作者。</p>
+            </article>
+            <article class="card">
+              <div class="cover" style="background:linear-gradient(145deg, rgba(255,255,255,.18), transparent 38%), linear-gradient(180deg,#a5483b 0%, #c26b57 55%, #742c24 100%);"><strong>走</strong><em>travel</em></div>
+              <div class="meta-row"><span class="tag">旅行</span><span class="price">NT$390</span><span>預購中</span></div>
+              <h3>步行地圖</h3>
+              <p class="muted">以步行路線串起街區、書店與咖啡館，節奏輕、內容實用。</p>
+            </article>
+          </div>
+        </div>
+        <aside class="aside-stack">
+          <section class="note">
+            <p class="eyebrow" style="margin-bottom:.35rem;">購書方式</p>
+            <h2 style="font-size:1.4rem;">先比內容，再下單。</h2>
+            <p>每本書都保留作者、頁數、裝幀與供貨狀態。你可以先比，再決定要不要結帳。</p>
+          </section>
+          <section class="note">
+            <p class="eyebrow" style="margin-bottom:.35rem;">手機閱讀</p>
+            <h2 style="font-size:1.4rem;">單手也能完成選書。</h2>
+            <p>在窄螢幕上，封面、價格與主要動作會先出現，較長的說明再往下展開。</p>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <footer>
+      <span>藏頁書局 © 2026</span>
+      <span><a href="catalog.html">目錄</a> · <a href="book.html">書頁</a></span>
+    </footer>
+  </div>
+</body>
+</html>

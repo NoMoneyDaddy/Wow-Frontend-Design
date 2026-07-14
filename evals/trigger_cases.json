@@ -164,6 +164,13 @@
       "required_references": ["behavioral-design-evidence.md", "creative-direction.md", "mobile-responsive.md", "motion-system.md", "interaction-audit.md", "quality-gates.md"]
     },
     {
+      "id": "site-planning-wireflow-contract",
+      "locale": "zh-Hant",
+      "prompt": "替跨角色繁中產品先建立資訊架構 sitemap 與響應式 wireflow，再產生可驗證的 XML sitemap；要涵蓋權限、真實內容極端值、載入與錯誤恢復、互動回饋和手機重組，不得把 wireframe 自評成可用性證明。",
+      "expected": "trigger",
+      "required_references": ["site-planning-wireframes.md", "product-discovery-usability.md", "mobile-responsive.md", "search-discovery.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
       "id": "backend-database-migration",
       "locale": "en",
       "prompt": "Write a PostgreSQL migration that backfills invoice status and adds a partial index.",

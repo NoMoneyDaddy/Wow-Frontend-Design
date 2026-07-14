@@ -36,6 +36,7 @@ Read only the references needed for the current request:
 - Read [color-system-psychology.md](references/color-system-psychology.md) when selecting or auditing color, contrast, semantic states, light/dark/high-contrast appearances, or any color-emotion/conversion claim.
 - Read [visual-material-system.md](references/visual-material-system.md) when borders, typography, component colors, light, depth, texture, effects, and motion must form a coherent craft system.
 - Read [brand-system-fidelity.md](references/brand-system-fidelity.md) when extracting an existing brand, extending a design system, separating campaign treatment, or preserving brand voice/assets across product surfaces.
+- Read [design-md-contract.md](references/design-md-contract.md) for every implementation that creates or changes a visual system. Use repository-root `DESIGN.md` as the persistent cross-page and cross-agent visual contract.
 - Always read [anti-ai-slop.md](references/anti-ai-slop.md) for BUILD, broad RETROFIT, and any request for distinctive, premium, memorable, award-level, or non-generic output. It is an evidence gate, not a style ban.
 - Read [visual-storytelling.md](references/visual-storytelling.md) when photography, advertising imagery, cinematic composition, image-first exploration, or film language shapes the frontend.
 - Read [retrofit.md](references/retrofit.md) before changing an existing project.
@@ -63,6 +64,7 @@ Read only the references needed for the current request:
 - Read [behavioral-design-evidence.md](references/behavioral-design-evidence.md) only when maintaining this skill or when a material decision explicitly invokes perception, cognition, persuasion, advertising, trust, or conversion research.
 - Read [research-validation-loop.md](references/research-validation-loop.md) only when maintaining this skill or converting research, model runs, browser findings, or reviewer feedback into durable rules and tests.
 - Read [product-discovery-usability.md](references/product-discovery-usability.md) only when discovery, interviews, personas, IA research, or usability testing is requested, or a material product decision lacks evidence. Do not force it onto a low-risk build or repair.
+- Read [site-planning-wireframes.md](references/site-planning-wireframes.md) for multi-route sites, new or uncertain product flows, sitemap/wireframe/prototype requests, or redesigns with material hierarchy risk. Skip it for a low-risk component change with known routes, tasks, states, and content order.
 
 ## Execute the workflow
 
@@ -106,9 +108,23 @@ Before code, state these eight artifacts in terse working notes:
 
 If the user supplied a brand system, derive the thesis from it. For an empty build or broad redesign without one, compare only enough meaningfully different directions to resolve a named choice—normally two, sometimes three—then choose one. For focused repair/polish, derive one direction from the existing system instead of expanding scope. Use [design-exploration.md](references/design-exploration.md) for isolated labs and structured feedback. Do not ask the user to decide routine implementation details when evidence supports a clear choice.
 
+For implementation work that creates or changes the visual system, create or update repository-root `DESIGN.md` after selecting the thesis and before composing pages. Extract existing code and approved brand evidence instead of inventing a parallel system. For a new document, use `assets/DESIGN.template.md` only as a structural starting point and replace every example name, value, and rationale with project-derived decisions. Keep the document proportionate, but preserve the official token frontmatter and human-readable section order described in [design-md-contract.md](references/design-md-contract.md).
+
+Before composing pages, manually preflight new `DESIGN.md` frontmatter: unit-bearing dimensional zeros such as `0em`/`0px`, wholly quoted font stacks, required `colors.primary`, no orphan colors, 4.5:1 component foreground/background pairs, resolved references, and only whitelisted properties. Do this even when the official CLI cannot run; still label the lint result `UNVERIFIED` until the pinned CLI actually executes.
+
+### 2.5. Plan routes and wireflows when structure is uncertain
+
+When [site-planning-wireframes.md](references/site-planning-wireframes.md) is routed, separate the IA sitemap, wireframe/wireflow plan, and crawler XML sitemap. Use the machine-readable examples in `scripts/site_manifest.example.json` and `scripts/wireframe_plan.example.json` when the deliverable needs a durable contract. Record route audience, permission, primary task, lifecycle, navigation, locale, discovery intent, page regions, representative/extreme content, required states, interaction feedback/recovery, and a transformation for every mobile region.
+
+Keep these artifacts proportionate. Do not force wireframes onto a focused repair whose structure is already proven, and do not stop at a wireframe when implementation was requested. Treat all wireframe claims as planning hypotheses; they cannot self-certify usability, accessibility, comprehension, conversion, brand fit, or production readiness.
+
 ### 3. Build the system before the sections
 
 Define semantic tokens for color, typography, spacing, layout, shape, depth, and motion. Use fluid values where they improve continuity. Establish the page shell, content width, grid behavior, focus style, and responsive mode changes before polishing individual sections. When appearance switching is in scope, tune light and dark tokens independently and verify `system | light | dark`; never treat inversion or a lone media query as complete theme support.
+
+Treat `DESIGN.md` tokens as the normative visual values and implement them through shared CSS variables, theme configuration, or component tokens. Do not fork tokens or component styling per page. When production code and an existing `DESIGN.md` disagree, identify the drift and resolve it explicitly; do not silently choose whichever is easier.
+
+For self-contained multi-page output, copy one identical root-token block and shell primitive set into every page before adding route-specific composition. At desktop and mobile, compare computed root tokens plus header/nav/action styles across routes; visual resemblance alone does not prove the same system is being consumed.
 
 When motion or SVG is material, extend the contract. Motion records purpose, trigger, runtime, interrupt/cleanup path, and reduced-motion result. SVG records asset type, trust level, embedding mode, accessible intent, ID namespace, provenance/license, and optimization/security policy.
 
@@ -123,6 +139,8 @@ Design the content hierarchy once, then compose it for each context:
 - Desktop may use simultaneity, wide comparison, peripheral context, hover detail, and spatial tension.
 - Mobile should use priority, progressive disclosure, thumb-reachable actions, intentional cropping, concise navigation, and shorter decision paths.
 - Preserve identity across both while allowing different order, controls, density, and motion.
+- Preserve one logical interactive identity per record across breakpoints. Do not render hidden desktop and mobile copies with duplicate IDs, evaluator hooks, accessible names, or competing state; recompose one source of truth or render mutually exclusive templates with equivalent focus and state behavior.
+- Treat writing-mode changes, oversized type, sticky rails, and absolute overlays as collision-prone: measure their rendered boxes at every target breakpoint and ensure the horizontal replacement is the same readable content, not a hidden vertical element plus an unrelated substitute.
 
 Create a transformation table for major regions: `region → desktop role → mobile equivalent → order → interaction → deferred/removed content`. Use [mobile-responsive.md](references/mobile-responsive.md) for the required checks.
 
@@ -152,7 +170,9 @@ For the identity pass, run the truth, task-surface, product-swap, representation
 
 ### 7. Verify with evidence
 
-Run the project's available tests, lint, typecheck, and build. Use a real browser when available. Check representative routes and states at narrow mobile, common mobile, tablet portrait, tablet landscape, desktop, and wide desktop sizes. Also check keyboard navigation, 200% text resize/zoom, 400% zoom or 320 CSS px equivalent reflow, reduced motion, long text, and console errors. Exercise modal/menu background scroll, link selection, Escape, focus return, valid→invalid form recovery, dynamic accessible names/counts, and repeated desktop/mobile navigation visibility instead of trusting source keywords.
+Run the project's available tests, lint, typecheck, and build. Use a real browser when available. Check representative routes and states at narrow mobile, common mobile, tablet portrait, tablet landscape, desktop, and wide desktop sizes. Also check keyboard navigation, 200% text resize/zoom, 400% zoom or 320 CSS px equivalent reflow, reduced motion, long text, and console errors. Treat an unintentionally wrapped or clipped short action label as a layout failure; measure rendered text instead of trusting source length. Exercise modal/menu background scroll, link selection, Escape, focus return, valid→invalid form recovery, dynamic accessible names/counts, and repeated desktop/mobile navigation visibility instead of trusting source keywords.
+
+When `DESIGN.md` exists and the official CLI is locally available, lint it with the repository-pinned CLI version. Resolve every error. For a new generated system, also resolve every warning; for an extracted existing system, document any warning that must remain. If the CLI is unavailable, report the check as unverified rather than installing or fetching a mutable latest version without permission.
 
 When motion or SVG exists, run the static risk audit when Python is available:
 
@@ -176,6 +196,12 @@ When public search, answer, or generative discovery is in scope, run the advisor
 
 ```bash
 python3 <skill-dir>/scripts/search_discovery_audit.py <project-root>
+```
+
+When a machine-readable site manifest and wireframe plan are in scope, validate them together. Add one or more `--sitemap` paths only for evaluator-supplied local XML sitemap artifacts; the validator never fetches child sitemaps from the network:
+
+```bash
+python3 <skill-dir>/scripts/validate_site_plan.py site-manifest.json wireframe-plan.json --sitemap sitemap.xml
 ```
 
 Treat static-audit output as risk discovery only. Browser behavior, renderer compatibility, semantic beat frames, loop seams, rendered SVG equivalence, accessibility, security boundaries, animation cleanup, and performance still require dedicated checks.

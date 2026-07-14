@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>書目｜巷口書架</title>
+  <style>
+    :root{--color-primary:#4B241A;--color-on-primary:#FFF8EF;--color-surface:#FFF8EF;--color-on-surface:#241815;--color-muted:#6B5B54;--color-line:#D9C8B8;--color-wash:#F1E5D5;--color-note:#7A3E22;--space-1:8px;--space-2:16px;--space-3:24px;--space-4:clamp(32px,6vw,72px);--measure:66ch;--radius-small:6px;--radius-medium:8px;--shadow:0 16px 36px rgba(75,36,26,.12);--font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--color-surface);color:var(--color-on-surface);font-family:var(--font);line-height:1.7}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:.22em}a:focus-visible,button:focus-visible{outline:3px solid #9B5A32;outline-offset:3px}.skip{position:absolute;inset-inline-start:12px;inset-block-start:-60px;background:var(--color-primary);color:var(--color-on-primary);padding:10px 12px;border-radius:var(--radius-small);z-index:5}.skip:focus{inset-block-start:12px}.site-header{position:sticky;top:0;z-index:3;background:rgba(255,248,239,.94);border-bottom:1px solid var(--color-line);backdrop-filter:blur(10px)}.nav{max-width:1180px;margin:auto;padding:12px clamp(16px,4vw,40px);display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{font-weight:800}.links{display:flex;gap:6px;flex-wrap:wrap}.links a{padding:8px 10px;border-radius:var(--radius-small);color:var(--color-muted)}.links a[aria-current="page"]{background:var(--color-primary);color:var(--color-on-primary)}.section{max-width:1180px;margin:auto;padding:var(--space-4) clamp(16px,4vw,40px)}.page-head{display:grid;grid-template-columns:minmax(0,.9fr) minmax(260px,.55fr);gap:32px;align-items:end;border-bottom:1px solid var(--color-line)}.kicker,.eyebrow{color:var(--color-note);font-weight:800;margin:0 0 10px}.page-head h1{font-size:clamp(2.2rem,6vw,4.8rem);line-height:1.08;margin:0 0 18px;letter-spacing:0}.lead{max-width:var(--measure);font-size:1.12rem;color:#46342D;margin:0 0 24px}.index-panel{background:var(--color-wash);border:1px solid var(--color-line);border-radius:var(--radius-medium);padding:18px}.index-panel ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}.index-panel a{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(75,36,26,.18);padding:8px 0}.catalog{display:grid;grid-template-columns:220px minmax(0,1fr);gap:36px}.rail{position:sticky;top:88px;align-self:start;border-left:6px solid var(--color-primary);padding-left:16px}.rail h2{font-size:1.1rem;margin:0 0 10px}.rail a{display:block;padding:7px 0;color:var(--color-muted)}.stack{display:grid;gap:20px}.category{padding-block:10px}.category h2{font-size:clamp(1.55rem,3vw,2.25rem);margin:0 0 14px}.book-card{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:18px;align-items:start;padding:18px 0;border-top:1px solid var(--color-line)}.book-card::before{content:"";inline-size:12px;block-size:100%;min-height:96px;background:linear-gradient(#4B241A,#7A3E22);border-radius:3px}.book-card h3{font-size:1.28rem;margin:0}.book-card p{margin:6px 0 0;color:var(--color-muted)}.book-card small{display:block;color:var(--color-note);font-weight:750}.tag{border:1px solid var(--color-primary);border-radius:var(--radius-small);padding:8px 10px;white-space:nowrap;font-weight:750}.footer{border-top:1px solid var(--color-line);padding:26px clamp(16px,4vw,40px);color:var(--color-muted);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}@media (max-width:820px){.nav{align-items:flex-start;flex-direction:column}.links{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}.links a{text-align:center}.page-head{grid-template-columns:1fr}.catalog{grid-template-columns:1fr}.rail{position:static;border-left:0;border-block:1px solid var(--color-line);padding:12px 0}.rail div{display:flex;overflow:auto;gap:14px;padding-bottom:4px}.rail a{white-space:nowrap}.book-card{grid-template-columns:10px minmax(0,1fr)}.book-card .tag{grid-column:2;justify-self:start}.footer{display:block}}@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">跳到主要內容</a>
+  <header class="site-header">
+    <nav class="nav" aria-label="主要導覽">
+      <a class="brand" href="index.html">巷口書架</a>
+      <div class="links">
+        <a href="index.html">首頁</a>
+        <a href="catalog.html" aria-current="page">書目</a>
+        <a href="book.html">本週選書</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="section page-head">
+      <div>
+        <p class="kicker">書目索引</p>
+        <h1>先選一條書脊，再看一本書。</h1>
+        <p class="lead">這裡是示範書目，不宣稱即時庫存。每本書都附一行選書理由，幫你判斷它是不是今天要帶走的那一本。</p>
+      </div>
+      <aside class="index-panel" aria-label="快速分類">
+        <ul>
+          <li><a href="#literature"><span>文學與故事</span><b>3</b></a></li>
+          <li><a href="#city"><span>城市與生活</span><b>3</b></a></li>
+          <li><a href="#design"><span>設計與紙本</span><b>3</b></a></li>
+        </ul>
+      </aside>
+    </section>
+    <section class="section catalog" aria-label="分類書目">
+      <aside class="rail" aria-label="分類導覽">
+        <h2>分類</h2>
+        <div>
+          <a href="#literature">文學與故事</a>
+          <a href="#city">城市與生活</a>
+          <a href="#design">設計與紙本</a>
+        </div>
+      </aside>
+      <div class="stack">
+        <section class="category" id="literature">
+          <p class="eyebrow">01</p>
+          <h2>文學與故事</h2>
+          <article class="book-card"><div><small>小說</small><h3>遠方的燈一直亮著</h3><p>適合想用短篇重新進入閱讀的人。</p></div><a class="tag" href="book.html">看選書</a></article>
+          <article class="book-card"><div><small>散文</small><h3>雨線以南</h3><p>把城市午後寫成可以停留的頁面。</p></div><span class="tag">到店翻閱</span></article>
+          <article class="book-card"><div><small>詩</small><h3>慢慢折返的句子</h3><p>篇幅短，適合睡前或通勤閱讀。</p></div><span class="tag">新到架</span></article>
+        </section>
+        <section class="category" id="city">
+          <p class="eyebrow">02</p>
+          <h2>城市與生活</h2>
+          <article class="book-card"><div><small>地方</small><h3>街角的午後地圖</h3><p>用步行路線理解一座城的記憶。</p></div><span class="tag">店員推薦</span></article>
+          <article class="book-card"><div><small>飲食</small><h3>餐桌旁的微光</h3><p>關於小店、家常菜與共食的故事。</p></div><span class="tag">可預留</span></article>
+          <article class="book-card"><div><small>生活</small><h3>手作物的時間</h3><p>從器物、修補和材料看日常節奏。</p></div><span class="tag">慢讀</span></article>
+        </section>
+        <section class="category" id="design">
+          <p class="eyebrow">03</p>
+          <h2>設計與紙本</h2>
+          <article class="book-card"><div><small>書籍設計</small><h3>紙頁邊境</h3><p>理解裝幀、留白與閱讀介面的入門書。</p></div><span class="tag">主題架</span></article>
+          <article class="book-card"><div><small>字體</small><h3>字距之間</h3><p>給在意排版細節的讀者。</p></div><span class="tag">少量</span></article>
+          <article class="book-card"><div><small>影像</small><h3>光落在封面上</h3><p>談攝影書如何建立觀看順序。</p></div><span class="tag">展示中</span></article>
+        </section>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <span>書目為示範內容，實際到店狀態需另行確認。</span>
+    <span><a href="index.html">首頁</a> · <a href="book.html">本週選書</a></span>
+  </footer>
+</body>
+</html>

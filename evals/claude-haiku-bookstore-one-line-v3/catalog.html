@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="瀏覽我們的完整書籍目錄。精選文學、推理、科學、歷史等各類書籍。">
+  <meta name="color-scheme" content="light dark">
+  <title>書籍目錄 — 書局</title>
+  <style>
+    :root {
+      --color-primary: #2C2416;
+      --color-on-primary: #FFFFFF;
+      --color-surface: #FAF8F3;
+      --color-on-surface: #2C2416;
+      --color-surface-variant: #F0EDE6;
+      --color-on-surface-variant: #59574E;
+      --color-accent: #C4732F;
+      --color-on-accent: #FFFFFF;
+      --color-success: #4CAF50;
+      --color-error: #D32F2F;
+
+      --font-serif: "Georgia", "Times New Roman", serif;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-xxl: 48px;
+
+      --radius-none: 0px;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+
+      --duration-base: 260ms;
+      --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-primary: #F5F3F0;
+        --color-on-primary: #1A1816;
+        --color-surface: #2C2A26;
+        --color-on-surface: #F5F3F0;
+        --color-surface-variant: #3C3A35;
+        --color-on-surface-variant: #B5B1AA;
+        --color-accent: #D89B4F;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--color-primary);
+      color: var(--color-on-surface);
+      font-family: var(--font-sans);
+    }
+
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background-color: var(--color-accent);
+      color: var(--color-on-accent);
+      padding: var(--space-sm) var(--space-md);
+      text-decoration: none;
+      z-index: 100;
+    }
+
+    .skip-link:focus {
+      top: 0;
+    }
+
+    header {
+      background-color: var(--color-primary);
+      color: var(--color-on-primary);
+      padding: var(--space-lg) var(--space-md);
+      border-bottom: 1px solid var(--color-surface-variant);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: 700;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    nav {
+      display: flex;
+      gap: var(--space-xl);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    nav a {
+      color: var(--color-on-primary);
+      text-decoration: none;
+      padding: var(--space-sm) 0;
+      border-bottom: 2px solid transparent;
+      transition: border-color var(--duration-base) var(--ease-out);
+    }
+
+    nav a:hover,
+    nav a:focus {
+      border-bottom-color: var(--color-accent);
+      outline: none;
+    }
+
+    nav a.current {
+      border-bottom-color: var(--color-accent);
+    }
+
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--color-on-primary);
+      font-size: 24px;
+      cursor: pointer;
+      padding: var(--space-sm);
+    }
+
+    @media (max-width: 767px) {
+      nav {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background-color: var(--color-primary);
+        flex-direction: column;
+        gap: var(--space-xl);
+        padding: var(--space-xxl) var(--space-lg);
+        z-index: 40;
+      }
+
+      nav[aria-expanded="true"] {
+        display: flex;
+      }
+
+      .nav-toggle {
+        display: block;
+      }
+    }
+
+    main {
+      background-color: var(--color-surface);
+      min-height: 100vh;
+    }
+
+    .page-layout {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--space-lg);
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: var(--space-xl);
+    }
+
+    @media (max-width: 767px) {
+      .page-layout {
+        grid-template-columns: 1fr;
+        gap: var(--space-lg);
+      }
+
+      body {
+        padding-bottom: 60px;
+      }
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      margin: 0 0 var(--space-lg) 0;
+      color: var(--color-primary);
+      grid-column: 1 / -1;
+    }
+
+    /* Filter sidebar */
+    .filters {
+      background-color: var(--color-surface);
+      padding: var(--space-lg);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-surface-variant);
+      height: fit-content;
+      position: sticky;
+      top: 100px;
+    }
+
+    @media (max-width: 767px) {
+      .filters {
+        display: none;
+        position: fixed;
+        inset: 0;
+        top: auto;
+        bottom: 60px;
+        border-radius: 0;
+        border: none;
+        overflow-y: auto;
+        z-index: 35;
+        background-color: var(--color-primary);
+        color: var(--color-on-primary);
+      }
+
+      .filters[aria-expanded="true"] {
+        display: block;
+      }
+
+      .filters-close {
+        display: block;
+        background: none;
+        border: none;
+        color: var(--color-on-primary);
+        font-size: 24px;
+        cursor: pointer;
+        padding: var(--space-lg);
+        position: absolute;
+        top: var(--space-lg);
+        right: var(--space-lg);
+      }
+    }
+
+    .filters-close {
+      display: none;
+    }
+
+    .filter-group {
+      margin-bottom: var(--space-lg);
+    }
+
+    .filter-group h3 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 var(--space-md) 0;
+      color: var(--color-on-surface-variant);
+    }
+
+    @media (max-width: 767px) {
+      .filter-group h3 {
+        color: var(--color-on-primary);
+      }
+    }
+
+    .filter-option {
+      display: flex;
+      align-items: center;
+      margin-bottom: var(--space-sm);
+    }
+
+    .filter-option input[type="checkbox"],
+    .filter-option input[type="radio"] {
+      margin-right: var(--space-sm);
+      cursor: pointer;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--color-accent);
+    }
+
+    .filter-option label {
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--color-on-surface);
+    }
+
+    @media (max-width: 767px) {
+      .filter-option label {
+        color: var(--color-on-primary);
+      }
+    }
+
+    .filter-button {
+      width: 100%;
+      padding: 10px;
+      background-color: var(--color-accent);
+      color: var(--color-on-accent);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 500;
+      margin-top: var(--space-md);
+      transition: background-color var(--duration-base) var(--ease-out);
+    }
+
+    .filter-button:hover {
+      background-color: #A85F2A;
+    }
+
+    .filter-button:focus {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    /* Content area */
+    .content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-lg);
+      gap: var(--space-md);
+    }
+
+    @media (max-width: 767px) {
+      .toolbar {
+        flex-wrap: wrap;
+      }
+    }
+
+    .filter-toggle {
+      display: none;
+      background-color: var(--color-surface-variant);
+      color: var(--color-on-surface);
+      border: 1px solid var(--color-on-surface-variant);
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    @media (max-width: 767px) {
+      .filter-toggle {
+        display: block;
+      }
+    }
+
+    .sort-select {
+      padding: 8px 12px;
+      background-color: var(--color-surface);
+      color: var(--color-on-surface);
+      border: 1px solid var(--color-on-surface-variant);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .sort-select:focus {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    .results-count {
+      font-size: 14px;
+      color: var(--color-on-surface-variant);
+    }
+
+    /* Books grid */
+    .books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+
+    @media (max-width: 767px) {
+      .books-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-md);
+      }
+    }
+
+    .book-card {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-surface-variant);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      text-decoration: none;
+      color: var(--color-on-surface);
+      transition: transform var(--duration-base) var(--ease-out),
+                  box-shadow var(--duration-base) var(--ease-out);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .book-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .book-card:focus {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .book-card:hover {
+        transform: none;
+      }
+    }
+
+    .book-cover {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      background: linear-gradient(135deg, var(--color-surface-variant), var(--color-on-surface-variant));
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--color-on-surface-variant);
+    }
+
+    .book-title {
+      font-family: var(--font-serif);
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+      line-height: 1.4;
+    }
+
+    .book-author {
+      font-size: 12px;
+      color: var(--color-on-surface-variant);
+      margin: 0 0 var(--space-sm) 0;
+    }
+
+    .book-price {
+      font-weight: 600;
+      color: var(--color-accent);
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--space-xxl);
+      color: var(--color-on-surface-variant);
+    }
+
+    .empty-state h2 {
+      color: var(--color-on-surface-variant);
+      font-size: 20px;
+    }
+
+    footer {
+      background-color: var(--color-primary);
+      color: var(--color-on-primary);
+      padding: var(--space-xl) var(--space-lg);
+      margin-top: var(--space-xxl);
+      border-top: 1px solid var(--color-surface-variant);
+      text-align: center;
+    }
+
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    footer nav {
+      gap: var(--space-lg);
+      justify-content: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    footer a {
+      color: var(--color-on-primary);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color var(--duration-base) var(--ease-out);
+    }
+
+    footer a:hover {
+      border-bottom-color: var(--color-accent);
+    }
+
+    .footer-meta {
+      font-size: 13px;
+      color: var(--color-on-surface-variant);
+      margin-top: var(--space-lg);
+    }
+
+    @media (max-width: 767px) {
+      footer nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: var(--color-surface);
+        border-top: 1px solid var(--color-surface-variant);
+        padding: 0;
+        margin: 0;
+        display: flex;
+        justify-content: space-around;
+        gap: 0;
+        height: 60px;
+        z-index: 30;
+      }
+
+      footer nav a {
+        flex: 1;
+        padding: 8px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: var(--color-on-surface);
+        border-bottom: none;
+        border-top: 2px solid transparent;
+      }
+
+      footer nav a:hover,
+      footer nav a:focus {
+        border-top-color: var(--color-accent);
+        color: var(--color-accent);
+        background-color: rgba(196, 115, 47, 0.05);
+      }
+
+      .footer-meta {
+        padding: var(--space-lg) var(--space-md) var(--space-xl);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (prefers-contrast: more) {
+      .book-card,
+      .filters {
+        border-width: 2px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip-link">跳至主要內容</a>
+
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">書局</a>
+      <button class="nav-toggle" aria-label="打開導航菜單" aria-expanded="false" id="nav-toggle">☰</button>
+      <nav id="main-nav" aria-label="主導航">
+        <a href="/">首頁</a>
+        <a href="/catalog.html" class="current">書籍目錄</a>
+        <a href="/#about">關於我們</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="page-layout">
+      <h1>書籍目錄</h1>
+
+      <aside class="filters" id="filters" aria-label="過濾選項">
+        <button class="filters-close" aria-label="關閉過濾菜單" id="filters-close">✕</button>
+
+        <div class="filter-group">
+          <h3>分類</h3>
+          <div class="filter-option">
+            <input type="checkbox" id="cat-all" value="all">
+            <label for="cat-all">全部書籍</label>
+          </div>
+          <div class="filter-option">
+            <input type="checkbox" id="cat-fiction" value="fiction">
+            <label for="cat-fiction">文學小說</label>
+          </div>
+          <div class="filter-option">
+            <input type="checkbox" id="cat-mystery" value="mystery">
+            <label for="cat-mystery">推理懸疑</label>
+          </div>
+          <div class="filter-option">
+            <input type="checkbox" id="cat-science" value="science">
+            <label for="cat-science">科學知識</label>
+          </div>
+          <div class="filter-option">
+            <input type="checkbox" id="cat-history" value="history">
+            <label for="cat-history">歷史傳記</label>
+          </div>
+          <div class="filter-option">
+            <input type="checkbox" id="cat-poetry" value="poetry">
+            <label for="cat-poetry">詩集散文</label>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <h3>價格範圍</h3>
+          <div class="filter-option">
+            <input type="radio" id="price-all" name="price" value="all" checked>
+            <label for="price-all">全部價格</label>
+          </div>
+          <div class="filter-option">
+            <input type="radio" id="price-under300" name="price" value="under300">
+            <label for="price-under300">NT$300 以下</label>
+          </div>
+          <div class="filter-option">
+            <input type="radio" id="price-300-400" name="price" value="300-400">
+            <label for="price-300-400">NT$300 - NT$400</label>
+          </div>
+          <div class="filter-option">
+            <input type="radio" id="price-over400" name="price" value="over400">
+            <label for="price-over400">NT$400 以上</label>
+          </div>
+        </div>
+
+        <button class="filter-button">應用過濾</button>
+      </aside>
+
+      <div class="content">
+        <div class="toolbar">
+          <button class="filter-toggle" id="filter-toggle">🔍 篩選</button>
+          <div class="results-count">
+            <span id="book-count">12</span> 本書籍
+          </div>
+          <select class="sort-select" id="sort-select" aria-label="排序方式">
+            <option value="latest">最新上市</option>
+            <option value="popular">最受歡迎</option>
+            <option value="price-low">價格：低至高</option>
+            <option value="price-high">價格：高至低</option>
+            <option value="title">書名 A-Z</option>
+          </select>
+        </div>
+
+        <div class="books-grid" id="books-grid">
+          <!-- Books will be rendered here -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-content">
+      <nav aria-label="頁腳導航">
+        <a href="/catalog.html">書籍</a>
+        <a href="/#about">關於</a>
+        <a href="/#contact">聯絡</a>
+      </nav>
+      <div class="footer-meta">
+        <p>&copy; 2025 書局 — 精選書籍。保留一切權利。</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Book data
+    const books = [
+      { id: 1, title: "月光下的歌聲", author: "李明翔", price: 380, category: "fiction", rating: 4.5 },
+      { id: 2, title: "時間的秘密", author: "張欣怡", price: 420, category: "science", rating: 4.3 },
+      { id: 3, title: "山脈之心", author: "王俊傑", price: 350, category: "fiction", rating: 4.7 },
+      { id: 4, title: "海邊的回憶", author: "陳思涵", price: 390, category: "poetry", rating: 4.4 },
+      { id: 5, title: "城市的故事", author: "黃美琴", price: 360, category: "fiction", rating: 4.6 },
+      { id: 6, title: "夢中的對話", author: "劉志偉", price: 400, category: "mystery", rating: 4.2 },
+      { id: 7, title: "星空物語", author: "許晶晶", price: 410, category: "science", rating: 4.5 },
+      { id: 8, title: "古城尋跡", author: "董明聰", price: 440, category: "history", rating: 4.8 },
+      { id: 9, title: "流水歲月", author: "何家燕", price: 370, category: "poetry", rating: 4.3 },
+      { id: 10, title: "謎案追蹤", author: "馬俊豪", price: 385, category: "mystery", rating: 4.4 },
+      { id: 11, title: "世界的奧秘", author: "楊家寶", price: 450, category: "science", rating: 4.6 },
+      { id: 12, title: "帝國興衰", author: "蘇文浩", price: 430, category: "history", rating: 4.7 },
+    ];
+
+    const grid = document.getElementById('books-grid');
+    const filterToggle = document.getElementById('filter-toggle');
+    const filtersPanel = document.getElementById('filters');
+    const filtersClose = document.getElementById('filters-close');
+    const sortSelect = document.getElementById('sort-select');
+    const bookCountSpan = document.getElementById('book-count');
+    const navToggle = document.getElementById('nav-toggle');
+    const mainNav = document.getElementById('main-nav');
+
+    function renderBooks(filtered = books) {
+      grid.innerHTML = '';
+      if (filtered.length === 0) {
+        grid.parentElement.innerHTML = '<div class="empty-state"><h2>未找到書籍</h2><p>請調整篩選條件，重新搜尋。</p></div>';
+        bookCountSpan.textContent = 0;
+      } else {
+        filtered.forEach(book => {
+          const card = document.createElement('a');
+          card.href = `/book.html?id=${book.id}`;
+          card.className = 'book-card';
+          card.innerHTML = `
+            <div class="book-cover">封面</div>
+            <h3 class="book-title">${book.title}</h3>
+            <p class="book-author">${book.author}</p>
+            <p class="book-price">NT$${book.price}</p>
+          `;
+          grid.appendChild(card);
+        });
+        bookCountSpan.textContent = filtered.length;
+      }
+    }
+
+    filterToggle.addEventListener('click', () => {
+      filtersPanel.setAttribute('aria-expanded', filtersPanel.getAttribute('aria-expanded') !== 'true');
+    });
+
+    filtersClose.addEventListener('click', () => {
+      filtersPanel.removeAttribute('aria-expanded');
+    });
+
+    sortSelect.addEventListener('change', (e) => {
+      let sorted = [...books];
+      switch (e.target.value) {
+        case 'popular':
+          sorted.sort((a, b) => b.rating - a.rating);
+          break;
+        case 'price-low':
+          sorted.sort((a, b) => a.price - b.price);
+          break;
+        case 'price-high':
+          sorted.sort((a, b) => b.price - a.price);
+          break;
+        case 'title':
+          sorted.sort((a, b) => a.title.localeCompare(b.title, 'zh-Hant'));
+          break;
+        case 'latest':
+        default:
+          sorted = [...books];
+      }
+      renderBooks(sorted);
+    });
+
+    navToggle.addEventListener('click', function() {
+      const isExpanded = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', !isExpanded);
+      if (!isExpanded) {
+        mainNav.setAttribute('aria-expanded', 'true');
+      } else {
+        mainNav.removeAttribute('aria-expanded');
+      }
+    });
+
+    mainNav.addEventListener('click', function(e) {
+      if (e.target.tagName === 'A') {
+        navToggle.setAttribute('aria-expanded', 'false');
+        this.removeAttribute('aria-expanded');
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        if (filtersPanel.getAttribute('aria-expanded') === 'true') {
+          filtersPanel.removeAttribute('aria-expanded');
+        }
+        if (navToggle.getAttribute('aria-expanded') === 'true') {
+          navToggle.setAttribute('aria-expanded', 'false');
+          mainNav.removeAttribute('aria-expanded');
+        }
+      }
+    });
+
+    // Initial render
+    renderBooks();
+  </script>
+</body>
+</html>

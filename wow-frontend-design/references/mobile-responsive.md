@@ -39,6 +39,8 @@ Create this before implementing responsive CSS:
 
 Every major region needs an explicit answer. “Stack” is not an answer unless the reading order and interaction remain optimal.
 
+Keep one logical record and state source across responsive modes. A desktop table and mobile card may look different, but hidden duplicate DOM copies must not create repeated IDs, evaluator hooks, accessible identities, stale state, or two independently focusable controls. Prefer one semantic record recomposed by CSS; when distinct templates are necessary, render only the active template and prove state and focus parity in both directions.
+
 ## 3. Apply mobile composition patterns
 
 ### Navigation
@@ -116,6 +118,7 @@ At every size verify:
 - image crop and signature moment;
 - loading, empty, error, and success states;
 - no unexpected overflow.
+- short command labels remain intentionally one line unless the component contract explicitly allows wrapping; verify rendered line boxes and clipping, not only page overflow.
 
 For every modal menu, run this exact sequence: record page scroll → open → attempt background scroll and confirm it is locked → activate an internal destination and confirm the sheet closes with coherent focus → reopen → press Escape and confirm focus returns to the opener. Source presence is not evidence.
 

@@ -41,6 +41,7 @@ REQUIRED_CAPABILITY_IDS = {
     "motion-svg-lottie",
     "search-aeo-geo",
     "skill-package",
+    "structured-site-planning",
     "traditional-chinese-showcase",
     "webgl-advanced-media",
 }

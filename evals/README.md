@@ -31,9 +31,17 @@ Dashboard replay 也必須以固定 brief、兩個原始 model artifact、相同
 - `claude-haiku-showcase/`：Claude 弱模型固定 brief 與隔離輸出目錄。
 - `claude-opus-showcase/`：Claude 強模型的相同固定 brief 與隔離輸出目錄。
 - `claude-{haiku,opus}-product-dashboard/`：共用 `briefs/product-dashboard.md` 的非 landing 產品 UI 原始產物與 run manifest；兩者目前都未通過 strict acceptance。
+- `briefs/{mountain-rescue-flow,city-poetry-festival,bookstore-one-line}-v3.md`：兩個完整視覺題與一句話原題；hash 固定在生成 ledger。
+- `{claude-{haiku,sonnet,opus},codex-gpt-{5.4-mini,5.4,5.5}}-*-v3/`：18 個同 context 產物；前兩題各一頁，書局三頁，全部含 `DESIGN.md` 與 run manifest。
+- `product-flow-v3-generation-results.json`：18 次正式生成；保留 Sonnet 詩祭的原始 connection failure，不用補測覆寫。
+- `product-flow-v3-infrastructure-retry.json`：Sonnet 詩祭唯一一次同參數 infrastructure retry；只補足視覺比較。
+- `product-flow-v3-design-md-results.json`：官方 `@google/design.md@0.2.0` lint 的 18 份完整結果。
+- `product-flow-v3-visual-results.json`：60 個 desktop/mobile viewport 結果、問題碼、PNG path 與 SHA-256。
+- `product-flow-v3-manual-review.json`：60 張逐張非盲檢視後的 18 筆 bounded 人工觀察，不是模型排名。
 - `claude-haiku-product-dashboard-remake/`：唯一一次 anti-slop remediation invocation 的拒絕紀錄；輸出政策在 publish 前熔斷，沒有可接受網站產物。
 - `benchmark-matrix.md`：上述八案的人類可讀來源與 controlled-comparison 規則；`product_cases.json` 是其 definition-only fixture。兩者列出案例都不等於執行或通過。
 - `capability-status.json`：公開 claim ledger。每項能力都要有現存 artifact 與明示 boundary；validator 只確保狀態結構與路徑未腐化，不替內容升級證據。
+- `../wow-frontend-design/scripts/{site_manifest,wireframe_plan}.example.json`：有效的 IA／wireflow 契約範例；`validate_site_plan.py` 會連同本機 XML sitemap 驗證 route、權限、狀態、手機轉換、證據引用與 canonical 集合。通過不等於使用者研究、視覺品質、可用性或索引結果。
 - `dashboard-playwright-acceptance.json`：嚴格 acceptance replay；4/4 viewport 失敗，命令 exit 1，沒有 DOM click fallback。
 - `dashboard-playwright-replay.json`：同案 diagnostic replay；可在真實 click 失敗後用 DOM click 繼續蒐集其他觀察，但永遠不能轉成通過。
 
@@ -43,6 +51,13 @@ Dashboard replay 也必須以固定 brief、兩個原始 model artifact、相同
 
 ```bash
 python3 wow-frontend-design/scripts/validate_product_cases.py evals/product_cases.json
+python3 wow-frontend-design/scripts/validate_site_plan.py \
+  wow-frontend-design/scripts/site_manifest.example.json \
+  wow-frontend-design/scripts/wireframe_plan.example.json \
+  --sitemap wow-frontend-design/scripts/sitemap.example.xml
+python3 wow-frontend-design/scripts/validate_product_flow_evidence.py \
+  evals/product-flow-v3-visual-results.json \
+  --repository-root .
 ```
 
 這個命令成功只代表八個固定案例、必要欄位與 locale 分布自洽，不得轉述為任何模型完成案例或取得分數。
@@ -55,9 +70,13 @@ Runner 預設以 `CLAUDE_AUTH_MODE=official` 清除繼承的 Anthropic API key/t
 
 本地模型可加入矩陣，但每次開始前都要揭露 runtime、精確 model/quantization、來源授權、下載與 RAM/VRAM/storage、命令、network 行為、可讀／可寫資料及清理方式，並取得使用者當次明確同意。未同意時只能準備 fixture/evaluator；不得下載、啟動或呼叫模型。雲端與本地結果分 cohort 報告，禁止 silent fallback。
 
-Claude runner 只給固定 `Write` 工具，在暫存空目錄產出恰好三個模型檔案；沒有 `Read`、`Edit`、`Bash` 或 network tool。Haiku/Opus 都收到相同 `CONSTRAINED` lane、trusted Skill revision 與 untrusted brief 邊界。產物通過 allowlist、size、HTML/CSS/JS resource-sink 檢查後才複製到固定目標；protocol-relative URL、外連／local resource、`@import`、meta refresh、form action 與常見動態 network/navigation sink 會 fail closed。受控評測可先建立 repo 外、evaluator-owned 目錄並設 `CLAUDE_REJECTED_OUTPUT_DIR=/absolute/path`；拒絕輸出會以 `0600` 保存，另附 reason、bytes 與 SHA-256。未設定時仍 fail closed，但 raw rejected output 不保留；quarantine 不能位於 repository 內。
+Claude runner 只給固定 `Write` 工具，在暫存空目錄產出 case allowlist 指定檔案；沒有 `Read`、`Edit`、`Bash` 或 network tool。Haiku/Sonnet/Opus 都收到相同 trusted Skill revision 與 untrusted brief 邊界。產物通過 allowlist、size 與視覺網站輸出檢查後才複製到固定目標。受控評測可先建立 repo 外、evaluator-owned 目錄並設 `CLAUDE_REJECTED_OUTPUT_DIR=/absolute/path`；拒絕輸出會以 `0600` 保存，另附 reason、bytes 與 SHA-256。未設定時仍 fail closed，但 raw rejected output 不保留；quarantine 不能位於 repository 內。
 
-既有 showcase 呼叫維持 `run_claude_case.sh <haiku|opus> <固定 showcase 目錄>`；其他固定案例使用 `run_claude_case.sh <haiku|opus> --case product-dashboard`。單次 remediation case 只允許 Haiku。新式呼叫不接受 target 路徑，runner 只依 `model × case` allowlist 導出輸出目錄；不得改用任意或 traversal 路徑。
+受控矩陣以 `CLAUDE_CODE_EFFORT_LEVEL=auto` 使用各 Claude 模型預設 effort，並以 `CLAUDE_CODE_DISABLE_THINKING=1` 強制關閉 extended thinking。Codex cohort 忽略個人 `model_reasoning_effort`，使用模型預設 effort，並固定 `model_reasoning_summary="none"`；Codex 這些模型沒有可驗證的 zero-reasoning 模式，因此只宣稱關閉 summary，不宣稱停用內部 reasoning。
+
+OpenAI cohort 使用已登入 ChatGPT 的 Codex CLI，精確請求 `gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5`，忽略個人 config/rules，採 `workspace-write` sandbox、ephemeral session、無 web search／OSS local provider，並套用相同 case allowlist 與視覺輸出檢查。v3 沒有 GPT-5.6。CLI 接受 requested identifier 不代表回報 backend snapshot；manifest 不會猜解析版本。Claude 與 Codex CLI 的工具面不同，因此跨 provider 只作分 cohort 觀察；同 provider 內才是工具面一致比較。
+
+既有 showcase 呼叫維持 `run_claude_case.sh <haiku|sonnet|opus> <固定 showcase 目錄>`；v3 使用 `run_claude_case.sh <haiku|sonnet|opus> --case <fixed-v3-case>`。Codex 對應使用 `run_codex_case.sh <gpt-5.4-mini|gpt-5.4|gpt-5.5> --case <fixed-v3-case>`。新式呼叫不接受任意 target 路徑，runner 只依 `model × case` allowlist 導出輸出目錄。
 
 成功執行另由 evaluator 產生 `run-manifest.json`，記錄 `run_id`、固定 case ID/target、auth mode、Claude CLI path/version、請求的 model alias、runner/brief/trusted context/output hashes 與清除的環境變數名稱。Claude CLI 若未回報 alias 實際解析到的完整 model ID，manifest 會明確記為 `not_reported_by_cli`，不猜測 resolved exact model。
 

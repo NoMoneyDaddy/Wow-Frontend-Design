@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>山域救援任務協調台</title>
+<style>
+/* ─── 設計系統 tokens ─────────────────────────────────── */
+:root {
+  --color-primary:         #0F1923;
+  --color-surface:         #161F29;
+  --color-surface-raised:  #1E2A36;
+  --color-surface-overlay: #243040;
+  --color-border-subtle:   #2A3A4A;
+  --color-border-strong:   #3D5268;
+  --color-ink-primary:     #E8EDF2;
+  --color-ink-secondary:   #8FA8BF;
+  --color-ink-disabled:    #4A6278;
+  --color-action:          #3D8BCD;
+  --color-action-hover:    #5AA3DD;
+  --color-focus:           #5AA3DD;
+  --color-danger:          #C0392B;
+  --color-danger-bg:       rgba(192,57,43,.15);
+  --color-warning:         #B07D2A;
+  --color-warning-bg:      rgba(176,125,42,.15);
+  --color-success:         #2E7D4F;
+  --color-success-bg:      rgba(46,125,79,.15);
+
+  --priority-critical:     #C0392B;
+  --priority-high:         #B07D2A;
+  --priority-normal:       #2E6B9E;
+
+  --status-active:         #3D8BCD;
+  --status-standby:        #5A6E7E;
+  --status-resolved:       #2E7D4F;
+
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
+               "PingFang TC", "Noto Sans TC", monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  40px;
+
+  --nav-width: 200px;
+  --detail-width: 320px;
+  --duration-fast: 140ms;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+}
+
+/* ─── Reset ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--color-primary);
+  color: var(--color-ink-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  word-break: normal;
+}
+:lang(zh-Hant) { line-break: strict; }
+
+a { color: var(--color-action); text-decoration: none; }
+a:hover { color: var(--color-action-hover); }
+
+/* skip link */
+.skip-link {
+  position: absolute; left: -9999px; top: var(--space-sm);
+  background: var(--color-action); color: #fff;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  font-size: 12px; font-weight: 600;
+  z-index: 9999;
+}
+.skip-link:focus { left: var(--space-sm); }
+
+/* ─── Focus ─────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* ─── App shell ─────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Side nav ──────────────────────────────────────── */
+.side-nav {
+  width: var(--nav-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.side-nav__logo {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.side-nav__logo-mark {
+  display: flex; align-items: center; gap: var(--space-sm);
+}
+.side-nav__logo-icon {
+  width: 28px; height: 28px;
+  background: var(--color-action);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
+  color: #fff; flex-shrink: 0;
+}
+.side-nav__logo-text {
+  font-size: 12px; font-weight: 600;
+  color: var(--color-ink-primary);
+  line-height: 1.2;
+}
+.side-nav__logo-sub {
+  font-size: 10px; font-weight: 400;
+  color: var(--color-ink-secondary);
+  letter-spacing: 0.04em;
+}
+
+.side-nav__section { padding: var(--space-sm) 0; }
+.side-nav__section-label {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600;
+  color: var(--color-ink-disabled);
+  letter-spacing: 0.1em;
+  padding: var(--space-xs) var(--space-md);
+  text-transform: uppercase;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: 7px var(--space-md);
+  color: var(--color-ink-secondary);
+  font-size: 13px; font-weight: 400;
+  border-radius: var(--radius-sm);
+  margin: 1px var(--space-xs);
+  cursor: pointer;
+  border: none; background: transparent;
+  width: calc(100% - var(--space-sm));
+  text-align: left;
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-item:hover {
+  background: var(--color-surface-overlay);
+  color: var(--color-ink-primary);
+}
+.nav-item.is-active {
+  background: var(--color-surface-overlay);
+  color: var(--color-ink-primary);
+  font-weight: 600;
+}
+.nav-item__icon { font-size: 14px; flex-shrink: 0; }
+.nav-item__badge {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--color-danger);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.side-nav__status {
+  margin-top: auto;
+  padding: var(--space-md);
+  border-top: 1px solid var(--color-border-subtle);
+}
+.side-nav__status-row {
+  display: flex; align-items: center; gap: var(--space-sm);
+  font-size: 12px; color: var(--color-ink-secondary);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--color-success);
+}
+.status-dot.warn { background: var(--color-warning); }
+
+/* ─── Main content ──────────────────────────────────── */
+.main-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+/* ─── Top bar ────────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--space-lg);
+  height: 52px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.top-bar__mobile-toggle {
+  display: none;
+  background: none; border: none;
+  color: var(--color-ink-secondary);
+  font-size: 18px; cursor: pointer;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+}
+
+.top-bar__title {
+  font-size: 15px; font-weight: 600;
+  color: var(--color-ink-primary);
+  flex: 1;
+}
+
+.top-bar__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.top-bar__actions { display: flex; gap: var(--space-xs); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-sans);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
+  padding: 5px var(--space-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.btn-primary {
+  background: var(--color-action);
+  color: #fff; border-color: var(--color-action);
+}
+.btn-primary:hover { background: var(--color-action-hover); border-color: var(--color-action-hover); }
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink-secondary);
+  border-color: var(--color-border-strong);
+}
+.btn-ghost:hover {
+  background: var(--color-surface-overlay);
+  color: var(--color-ink-primary);
+}
+
+/* ─── Summary strip ─────────────────────────────────── */
+.summary-strip {
+  display: flex; gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.summary-stat {
+  flex: 0 0 auto;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  min-width: 100px;
+}
+.summary-stat__value {
+  font-family: var(--font-mono);
+  font-size: 22px; font-weight: 600;
+  line-height: 1.1;
+  color: var(--color-ink-primary);
+}
+.summary-stat__value.danger  { color: var(--color-danger); }
+.summary-stat__value.warning { color: var(--color-warning); }
+.summary-stat__value.action  { color: var(--color-action); }
+.summary-stat__label {
+  font-size: 11px; font-weight: 600;
+  color: var(--color-ink-secondary);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+/* ─── Work area ─────────────────────────────────────── */
+.work-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+/* ─── Table toolbar ─────────────────────────────────── */
+.table-toolbar {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: var(--space-sm) 0;
+  display: flex; align-items: center; gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.toolbar-filters {
+  display: flex; gap: var(--space-xs); flex-wrap: wrap;
+}
+
+.filter-chip {
+  font-family: var(--font-sans);
+  font-size: 12px; font-weight: 400;
+  padding: 3px var(--space-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.filter-chip:hover, .filter-chip.is-active {
+  background: var(--color-surface-overlay);
+  color: var(--color-ink-primary);
+  border-color: var(--color-action);
+}
+
+.toolbar-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ─── Task table (desktop) ──────────────────────────── */
+.task-table-wrap {
+  overflow-x: auto;
+  margin-top: var(--space-sm);
+}
+
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 780px;
+}
+
+.task-table th {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-ink-disabled);
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+  background: var(--color-surface);
+  position: sticky; top: 52px;
+}
+
+.task-table th:first-child { padding-left: 0; }
+
+.task-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+.task-table td:first-child { padding-left: 0; }
+
+.task-table tr:hover td {
+  background: var(--color-surface-raised);
+}
+
+/* record-id col */
+.col-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  width: 80px;
+}
+
+/* priority col */
+.col-priority { width: 60px; }
+
+/* task name */
+.col-task { min-width: 160px; }
+.task-name {
+  font-size: 13px; font-weight: 600;
+  color: var(--color-ink-primary);
+  display: block;
+}
+.task-location {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+  display: block;
+  margin-top: 2px;
+}
+
+/* zone col */
+.col-zone { width: 100px; white-space: nowrap; }
+.zone-label {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+/* status col */
+.col-status { width: 90px; }
+
+/* due col */
+.col-due { width: 100px; }
+
+/* team col */
+.col-team { white-space: nowrap; min-width: 100px; }
+.team-text { font-size: 12px; color: var(--color-ink-primary); }
+.team-radio {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+  display: block;
+}
+
+/* ─── Priority indicator ────────────────────────────── */
+.priority-indicator {
+  display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.priority-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.priority-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+}
+.priority-critical .priority-dot { background: var(--priority-critical); }
+.priority-critical .priority-label { color: var(--priority-critical); }
+.priority-high .priority-dot { background: var(--priority-high); box-shadow: 0 0 0 2px rgba(176,125,42,.2); }
+.priority-high .priority-label { color: var(--priority-high); }
+.priority-normal .priority-dot { background: var(--priority-normal); }
+.priority-normal .priority-label { color: var(--color-ink-secondary); }
+
+/* ─── Status badge ──────────────────────────────────── */
+.status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.status-active  { background: rgba(61,139,205,.15); color: var(--status-active); }
+.status-standby { background: rgba(90,110,126,.2);  color: var(--status-standby); }
+.status-resolved{ background: rgba(46,125,79,.15);  color: var(--status-resolved); }
+
+/* ─── Due time ──────────────────────────────────────── */
+.due-time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.due-time.overdue   { color: var(--color-danger); font-weight: 600; }
+.due-time.imminent  { color: var(--color-warning); font-weight: 600; }
+.due-time.normal    { color: var(--color-ink-secondary); }
+.due-time.resolved  { color: var(--color-ink-disabled); }
+
+/* ─── Task cards (mobile) ───────────────────────────── */
+.task-cards { display: none; }
+
+.task-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+.task-card__header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.task-card__id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-disabled);
+}
+.task-card__name {
+  font-size: 14px; font-weight: 600;
+  color: var(--color-ink-primary);
+}
+.task-card__location {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--color-ink-secondary);
+  margin-top: 2px;
+}
+.task-card__meta {
+  display: flex; flex-wrap: wrap; gap: var(--space-sm);
+  align-items: center;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+}
+.task-card__meta-item {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--color-ink-secondary);
+}
+.task-card__meta-icon { font-size: 11px; }
+
+/* ─── Mobile nav overlay ────────────────────────────── */
+.mobile-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 100;
+}
+.mobile-overlay.is-open { display: block; }
+
+.mobile-drawer {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: var(--nav-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-subtle);
+  transform: translateX(-100%);
+  transition: transform var(--duration-fast) var(--ease-out);
+  z-index: 101;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.mobile-drawer.is-open { transform: translateX(0); }
+
+.mobile-drawer__close {
+  align-self: flex-end;
+  margin: var(--space-sm);
+  background: none; border: none;
+  color: var(--color-ink-secondary);
+  font-size: 18px; cursor: pointer;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Responsive ─────────────────────────────────────── */
+@media (max-width: 767px) {
+  .side-nav { display: none; }
+  .top-bar__mobile-toggle { display: flex; }
+
+  .app-shell { flex-direction: column; }
+  .main-content { overflow: hidden; }
+
+  .summary-strip { padding: var(--space-sm) var(--space-md); }
+  .summary-stat { min-width: 80px; }
+  .summary-stat__value { font-size: 18px; }
+
+  .work-area { padding: 0 var(--space-md) var(--space-md); }
+
+  .task-table-wrap { display: none; }
+  .task-cards { display: block; margin-top: var(--space-sm); }
+
+  .top-bar { padding: 0 var(--space-md); height: 48px; }
+  .top-bar__meta { display: none; }
+  .top-bar__actions .btn-ghost { display: none; }
+}
+
+@media (min-width: 768px) and (max-width: 1099px) {
+  :root { --nav-width: 180px; --detail-width: 0px; }
+}
+
+/* ─── Reduced motion ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
+
+/* ─── Forced colors ──────────────────────────────────── */
+@media (forced-colors: active) {
+  .priority-dot { forced-color-adjust: none; border: 2px solid currentColor; }
+  .status-badge { border: 1px solid currentColor; }
+  .task-card { border: 1px solid ButtonText; }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface); }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">跳至主要內容</a>
+
+<!-- Mobile overlay -->
+<div class="mobile-overlay" id="mobile-overlay" role="presentation" aria-hidden="true"></div>
+
+<!-- Mobile drawer nav -->
+<nav class="mobile-drawer" id="mobile-drawer" aria-label="行動端全域導覽" aria-hidden="true">
+  <button class="mobile-drawer__close" id="mobile-drawer-close" aria-label="關閉導覽">✕</button>
+  <div class="side-nav__logo">
+    <div class="side-nav__logo-mark">
+      <div class="side-nav__logo-icon" aria-hidden="true">⛰</div>
+      <div>
+        <div class="side-nav__logo-text">山域救援</div>
+        <div class="side-nav__logo-sub">SARC · 協調台</div>
+      </div>
+    </div>
+  </div>
+  <div class="side-nav__section">
+    <div class="side-nav__section-label">監看</div>
+    <button class="nav-item is-active">
+      <span class="nav-item__icon" aria-hidden="true">📋</span>任務總覽
+      <span class="nav-item__badge" aria-label="3 筆待處理">3</span>
+    </button>
+    <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">🗺</span>地圖視圖</button>
+    <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">📡</span>通訊狀態</button>
+  </div>
+  <div class="side-nav__section">
+    <div class="side-nav__section-label">管理</div>
+    <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">👥</span>隊伍負荷</button>
+    <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">📦</span>裝備清單</button>
+    <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">📝</span>事後報告</button>
+  </div>
+</nav>
+
+<!-- App shell -->
+<div class="app-shell">
+
+  <!-- Desktop side nav -->
+  <nav class="side-nav" aria-label="全域導覽" data-eval="global-nav">
+    <div class="side-nav__logo">
+      <div class="side-nav__logo-mark">
+        <div class="side-nav__logo-icon" aria-hidden="true">⛰</div>
+        <div>
+          <div class="side-nav__logo-text">山域救援</div>
+          <div class="side-nav__logo-sub">SARC · 協調台</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-nav__section">
+      <div class="side-nav__section-label">監看</div>
+      <button class="nav-item is-active">
+        <span class="nav-item__icon" aria-hidden="true">📋</span>任務總覽
+        <span class="nav-item__badge" aria-label="3 筆待處理">3</span>
+      </button>
+      <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">🗺</span>地圖視圖</button>
+      <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">📡</span>通訊狀態</button>
+    </div>
+
+    <div class="side-nav__section">
+      <div class="side-nav__section-label">管理</div>
+      <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">👥</span>隊伍負荷</button>
+      <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">📦</span>裝備清單</button>
+      <button class="nav-item"><span class="nav-item__icon" aria-hidden="true">📝</span>事後報告</button>
+    </div>
+
+    <div class="side-nav__status" role="status" aria-live="polite" aria-label="系統狀態">
+      <div class="side-nav__status-row">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>指管系統上線</span>
+      </div>
+      <div class="side-nav__status-row" style="margin-top:4px;">
+        <span class="status-dot warn" aria-hidden="true"></span>
+        <span>衛星通訊延遲 2 s</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main-content" id="main-content">
+
+    <!-- Top bar -->
+    <header class="top-bar" role="banner">
+      <button
+        class="top-bar__mobile-toggle"
+        id="mobile-nav-toggle"
+        data-eval="mobile-nav-toggle"
+        aria-label="開啟導覽選單"
+        aria-expanded="false"
+        aria-controls="mobile-drawer"
+      >☰</button>
+
+      <h1 class="top-bar__title">任務總覽</h1>
+
+      <span class="top-bar__meta" aria-label="系統時間">
+        <span id="live-time" aria-live="off"></span> · UTC+8
+      </span>
+
+      <div class="top-bar__actions">
+        <button class="btn btn-ghost">匯出報告</button>
+        <button class="btn btn-primary">＋ 新增任務</button>
+      </div>
+    </header>
+
+    <!-- Summary strip -->
+    <section class="summary-strip" aria-label="任務摘要統計">
+      <div class="summary-stat">
+        <div class="summary-stat__value action" id="stat-total">8</div>
+        <div class="summary-stat__label">任務總數</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat__value action" id="stat-active">5</div>
+        <div class="summary-stat__label">進行中</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat__value warning" id="stat-high">2</div>
+        <div class="summary-stat__label">高急迫度</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat__value danger" id="stat-critical">1</div>
+        <div class="summary-stat__label">緊急</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat__value" style="color:var(--color-ink-secondary)">2</div>
+        <div class="summary-stat__label">待命</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-stat__value" style="color:var(--status-resolved)">1</div>
+        <div class="summary-stat__label">已結案</div>
+      </div>
+    </section>
+
+    <!-- Work area -->
+    <div class="work-area" role="region" aria-label="任務工作區">
+
+      <!-- Toolbar -->
+      <div class="table-toolbar" role="toolbar" aria-label="任務篩選">
+        <div class="toolbar-filters" role="group" aria-label="急迫度篩選">
+          <button class="filter-chip is-active">全部</button>
+          <button class="filter-chip">
+            <span aria-hidden="true" style="color:var(--priority-critical)">●</span> 緊急
+          </button>
+          <button class="filter-chip">
+            <span aria-hidden="true" style="color:var(--priority-high)">▲</span> 高
+          </button>
+          <button class="filter-chip">
+            <span aria-hidden="true" style="color:var(--priority-normal)">■</span> 一般
+          </button>
+        </div>
+        <div class="toolbar-filters" role="group" aria-label="任務階段篩選">
+          <button class="filter-chip">進行中</button>
+          <button class="filter-chip">待命</button>
+          <button class="filter-chip">已結案</button>
+        </div>
+        <span class="toolbar-count" aria-live="polite" aria-label="顯示 8 筆任務">共 8 筆</span>
+      </div>
+
+      <!-- Desktop table -->
+      <div class="task-table-wrap" role="region" aria-label="任務列表">
+        <table class="task-table" aria-label="任務監看列表">
+          <caption class="sr-only">山域救援任務列表，共 8 筆，包含急迫度、階段、時限、責任區及隊伍資訊</caption>
+          <style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;}</style>
+          <thead>
+            <tr>
+              <th scope="col">任務 ID</th>
+              <th scope="col">急迫度</th>
+              <th scope="col">任務名稱／地點</th>
+              <th scope="col">責任區</th>
+              <th scope="col">階段</th>
+              <th scope="col">時限</th>
+              <th scope="col">隊伍／頻道</th>
+            </tr>
+          </thead>
+          <tbody id="task-table-body">
+            <!-- injected by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile cards -->
+      <div class="task-cards" id="task-cards" aria-label="任務卡片列表">
+        <!-- injected by JS -->
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+/* ── Static demo data ─────────────────────────────────────── */
+const TASKS = [
+  {
+    id: "SAR-2025-047",
+    name: "合歡山東峰迷途",
+    location: "TWD97 N24°08.3′ E121°18.7′ · 3,421 m",
+    zone: "南投責任區",
+    priority: "critical",
+    priorityLabel: "緊急",
+    status: "active",
+    statusLabel: "進行中",
+    due: -25,   // minutes relative (neg = overdue)
+    team: "合歡搜救大隊 A 組",
+    radio: "VHF CH-5",
+  },
+  {
+    id: "SAR-2025-046",
+    name: "雪山主峰失聯者",
+    location: "TWD97 N24°22.8′ E121°15.4′ · 3,886 m",
+    zone: "苗栗責任區",
+    priority: "high",
+    priorityLabel: "高",
+    status: "active",
+    statusLabel: "進行中",
+    due: 48,
+    team: "雪霸搜救隊 B 組",
+    radio: "VHF CH-7",
+  },
+  {
+    id: "SAR-2025-045",
+    name: "玉山北峰墜落事故",
+    location: "TWD97 N23°28.2′ E120°57.1′ · 3,858 m",
+    zone: "嘉義責任區",
+    priority: "high",
+    priorityLabel: "高",
+    status: "active",
+    statusLabel: "進行中",
+    due: 112,
+    team: "玉管處山搜隊",
+    radio: "UHF CH-12",
+  },
+  {
+    id: "SAR-2025-044",
+    name: "奇萊東稜體力不支",
+    location: "TWD97 N24°11.5′ E121°22.3′ · 2,908 m",
+    zone: "花蓮責任區",
+    priority: "normal",
+    priorityLabel: "一般",
+    status: "active",
+    statusLabel: "進行中",
+    due: 180,
+    team: "奇萊搜救隊 C 組",
+    radio: "VHF CH-3",
+  },
+  {
+    id: "SAR-2025-043",
+    name: "北大武山天候受困",
+    location: "TWD97 N22°42.6′ E120°43.9′ · 2,934 m",
+    zone: "屏東責任區",
+    priority: "normal",
+    priorityLabel: "一般",
+    status: "standby",
+    statusLabel: "待命",
+    due: 360,
+    team: "大武山搜救站",
+    radio: "VHF CH-5",
+  },
+  {
+    id: "SAR-2025-042",
+    name: "郡大山路跡不明",
+    location: "TWD97 N23°37.4′ E120°55.8′ · 3,263 m",
+    zone: "南投責任區",
+    priority: "normal",
+    priorityLabel: "一般",
+    status: "active",
+    statusLabel: "進行中",
+    due: 240,
+    team: "信義消防分隊搜救組",
+    radio: "UHF CH-9",
+  },
+  {
+    id: "SAR-2025-041",
+    name: "加里山落石擦傷",
+    location: "TWD97 N24°31.2′ E121°09.8′ · 1,748 m",
+    zone: "苗栗責任區",
+    priority: "normal",
+    priorityLabel: "一般",
+    status: "standby",
+    statusLabel: "待命",
+    due: 90,
+    team: "泰安消防搜救隊",
+    radio: "VHF CH-2",
+  },
+  {
+    id: "SAR-2025-040",
+    name: "能高越嶺迷途撤離",
+    location: "TWD97 N23°56.7′ E121°14.2′ · 2,218 m",
+    zone: "南投責任區",
+    priority: "normal",
+    priorityLabel: "一般",
+    status: "resolved",
+    statusLabel: "已結案",
+    due: null,
+    team: "仁愛搜救大隊 D 組",
+    radio: "VHF CH-4",
+  },
+];
+
+/* ── Helpers ──────────────────────────────────────────────── */
+function prioritySymbol(p) {
+  return p === "critical" ? "●" : p === "high" ? "▲" : "■";
+}
+function priorityAriaLabel(p, label) {
+  return `急迫度：${label}`;
+}
+function dueClass(due, status) {
+  if (status === "resolved") return "resolved";
+  if (due === null) return "resolved";
+  if (due < 0) return "overdue";
+  if (due < 60) return "imminent";
+  return "normal";
+}
+function dueText(due, status) {
+  if (status === "resolved") return "已結案";
+  if (due === null) return "—";
+  if (due < 0) return `超時 ${Math.abs(due)} 分`;
+  const h = Math.floor(due / 60);
+  const m = due % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m} 分`;
+}
+function dueAriaLabel(due, status) {
+  if (status === "resolved") return "任務已結案";
+  if (due === null) return "無時限";
+  if (due < 0) return `超時 ${Math.abs(due)} 分鐘`;
+  if (due < 60) return `剩餘 ${due} 分鐘，即將到期`;
+  const h = Math.floor(due / 60); const m = due % 60;
+  return `剩餘 ${h > 0 ? h + ' 小時 ' : ''}${m} 分鐘`;
+}
+function statusClass(s) {
+  return s === "active" ? "status-active" : s === "standby" ? "status-standby" : "status-resolved";
+}
+
+/* ── Render desktop table ─────────────────────────────────── */
+function renderTable() {
+  const tbody = document.getElementById("task-table-body");
+  tbody.innerHTML = TASKS.map(t => {
+    const dc = dueClass(t.due, t.status);
+    const dt = dueText(t.due, t.status);
+    const dA = dueAriaLabel(t.due, t.status);
+    const sc = statusClass(t.status);
+    const sym = prioritySymbol(t.priority);
+    return `
+<tr data-eval="record" data-record-id="${t.id}"
+    data-record-priority="${t.priority}"
+    data-record-status="${t.status}"
+    data-record-due="${t.due !== null ? t.due : 'none'}">
+  <td class="col-id">${t.id}</td>
+  <td class="col-priority">
+    <span class="priority-indicator priority-${t.priority}"
+          aria-label="${priorityAriaLabel(t.priority, t.priorityLabel)}">
+      <span class="priority-dot" aria-hidden="true"></span>
+      <span class="priority-label" aria-hidden="true">${sym} ${t.priorityLabel}</span>
+    </span>
+  </td>
+  <td class="col-task">
+    <span class="task-name">${t.name}</span>
+    <span class="task-location">${t.location}</span>
+  </td>
+  <td class="col-zone">
+    <span class="zone-label">${t.zone}</span>
+  </td>
+  <td class="col-status">
+    <span class="status-badge ${sc}">${t.statusLabel}</span>
+  </td>
+  <td class="col-due">
+    <span class="due-time ${dc}" aria-label="${dA}">${dt}</span>
+  </td>
+  <td class="col-team">
+    <span class="team-text">${t.team}</span>
+    <span class="team-radio">${t.radio}</span>
+  </td>
+</tr>`;
+  }).join("");
+}
+
+/* ── Render mobile cards ──────────────────────────────────── */
+function renderCards() {
+  const container = document.getElementById("task-cards");
+  container.innerHTML = TASKS.map(t => {
+    const dc = dueClass(t.due, t.status);
+    const dt = dueText(t.due, t.status);
+    const dA = dueAriaLabel(t.due, t.status);
+    const sc = statusClass(t.status);
+    const sym = prioritySymbol(t.priority);
+    return `
+<article class="task-card"
+         data-eval="record" data-record-id="${t.id}"
+         data-record-priority="${t.priority}"
+         data-record-status="${t.status}"
+         data-record-due="${t.due !== null ? t.due : 'none'}"
+         aria-label="任務 ${t.id}：${t.name}">
+  <div class="task-card__header">
+    <div>
+      <div class="task-card__id">${t.id}</div>
+      <div class="task-card__name">${t.name}</div>
+      <div class="task-card__location">${t.location}</div>
+    </div>
+    <span class="priority-indicator priority-${t.priority}"
+          aria-label="${priorityAriaLabel(t.priority, t.priorityLabel)}">
+      <span class="priority-dot" aria-hidden="true"></span>
+      <span class="priority-label" aria-hidden="true">${sym}</span>
+    </span>
+  </div>
+  <div class="task-card__meta">
+    <span class="status-badge ${sc}">${t.statusLabel}</span>
+    <span class="task-card__meta-item">
+      <span class="task-card__meta-icon" aria-hidden="true">⏱</span>
+      <span class="due-time ${dc}" aria-label="${dA}">${dt}</span>
+    </span>
+    <span class="task-card__meta-item">
+      <span class="task-card__meta-icon" aria-hidden="true">📍</span>
+      <span>${t.zone}</span>
+    </span>
+    <span class="task-card__meta-item">
+      <span class="task-card__meta-icon" aria-hidden="true">📡</span>
+      <span>${t.radio}</span>
+    </span>
+  </div>
+</article>`;
+  }).join("");
+}
+
+/* ── Live clock ───────────────────────────────────────────── */
+function updateClock() {
+  const el = document.getElementById("live-time");
+  if (!el) return;
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  el.textContent = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+
+/* ── Mobile nav ───────────────────────────────────────────── */
+function initMobileNav() {
+  const toggle = document.getElementById("mobile-nav-toggle");
+  const drawer = document.getElementById("mobile-drawer");
+  const overlay = document.getElementById("mobile-overlay");
+  const closeBtn = document.getElementById("mobile-drawer-close");
+  let prevFocus = null;
+
+  function openDrawer() {
+    prevFocus = document.activeElement;
+    drawer.classList.add("is-open");
+    overlay.classList.add("is-open");
+    drawer.removeAttribute("aria-hidden");
+    overlay.removeAttribute("aria-hidden");
+    toggle.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+    closeBtn.focus();
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove("is-open");
+    overlay.classList.remove("is-open");
+    drawer.setAttribute("aria-hidden", "true");
+    overlay.setAttribute("aria-hidden", "true");
+    toggle.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+    if (prevFocus) prevFocus.focus();
+  }
+
+  toggle.addEventListener("click", openDrawer);
+  closeBtn.addEventListener("click", closeDrawer);
+  overlay.addEventListener("click", closeDrawer);
+
+  drawer.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); closeDrawer(); }
+    if (e.key === "Tab") {
+      const focusable = drawer.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
+  });
+}
+
+/* ── Filter chips (demo interaction) ─────────────────────── */
+function initFilters() {
+  document.querySelectorAll(".toolbar-filters").forEach(group => {
+    group.querySelectorAll(".filter-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        group.querySelectorAll(".filter-chip").forEach(c => {
+          c.classList.remove("is-active");
+          c.removeAttribute("aria-pressed");
+        });
+        chip.classList.add("is-active");
+        chip.setAttribute("aria-pressed", "true");
+      });
+    });
+  });
+}
+
+/* ── Init ─────────────────────────────────────────────────── */
+renderTable();
+renderCards();
+updateClock();
+setInterval(updateClock, 1000);
+initMobileNav();
+initFilters();
+</script>
+</body>
+</html>

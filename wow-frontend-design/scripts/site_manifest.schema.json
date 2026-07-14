@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/wow-frontend-design/site_manifest.schema.json",
+  "title": "Wow Frontend Design site manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "manifest_id", "default_locale", "supported_locales", "approved_origins", "routes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "manifest_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "default_locale": {"type": "string", "minLength": 2},
+    "supported_locales": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 2}},
+    "approved_origins": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "format": "uri"}},
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "parent_id", "page_type", "locale", "visibility", "roles", "primary_task", "lifecycle", "navigation", "discovery", "state_triggers", "redirect_to", "evidence"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "path": {"type": "string", "pattern": "^/"},
+          "parent_id": {"type": ["string", "null"]},
+          "page_type": {"enum": ["landing", "marketing", "product", "dashboard", "auth", "docs", "legal", "detail", "form", "commerce", "editorial"]},
+          "locale": {"type": "string"},
+          "visibility": {"enum": ["public", "authenticated", "role_restricted", "private"]},
+          "roles": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "primary_task": {"type": "string", "minLength": 3},
+          "lifecycle": {"enum": ["active", "draft", "retired", "redirect"]},
+          "navigation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["surfaces", "label", "publicly_linked"],
+            "properties": {
+              "surfaces": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["primary", "secondary", "contextual", "footer", "none"]}},
+              "label": {"type": ["string", "null"]},
+              "publicly_linked": {"type": "boolean"}
+            }
+          },
+          "discovery": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["indexing", "canonical_url", "include_in_sitemap", "lastmod", "alternate_route_ids"],
+            "properties": {
+              "indexing": {"enum": ["index", "noindex"]},
+              "canonical_url": {"type": ["string", "null"]},
+              "include_in_sitemap": {"type": "boolean"},
+              "lastmod": {"type": ["string", "null"]},
+              "alternate_route_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+            }
+          },
+          "state_triggers": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["static", "remote_data", "form", "auth_guard", "mutation", "overlay"]}},
+          "redirect_to": {"type": ["string", "null"]},
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "sources"],
+            "properties": {
+              "status": {"enum": ["provided", "observed", "hypothesis", "unknown"]},
+              "sources": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

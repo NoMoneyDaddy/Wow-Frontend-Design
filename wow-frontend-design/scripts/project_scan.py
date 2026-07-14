@@ -177,6 +177,7 @@ TEST_SIGNALS = {
 }
 
 MANIFEST_NAMES = {
+    "DESIGN.md",
     "Gemfile",
     "Package.swift",
     "angular.json",
@@ -200,12 +201,14 @@ MANIFEST_NAMES = {
     "pubspec.yaml",
     "pyproject.toml",
     "requirements.txt",
+    "site-manifest.json",
     "svelte.config.js",
     "tailwind.config.js",
     "tailwind.config.ts",
     "turbo.json",
     "vite.config.js",
     "vite.config.ts",
+    "wireframe-plan.json",
 }
 
 LOCKFILE_NAMES = {

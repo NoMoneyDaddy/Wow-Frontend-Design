@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>折角書局 | 書目總覽</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --color-primary: #A0432D;
+      --color-on-primary: #FFF8F0;
+      --color-surface: #F4E7D6;
+      --color-on-surface: #241B17;
+      --color-muted-surface: #E8D7C3;
+      --color-muted-ink: #6C5A51;
+      --shadow-soft: 0 16px 36px rgba(36, 27, 23, 0.08);
+      --border-strong: 2px solid rgba(36, 27, 23, 0.92);
+      --border-soft: 1px solid rgba(36, 27, 23, 0.18);
+      --page-pad: clamp(1rem, 2.6vw, 2rem);
+      --content-max: 76rem;
+      --measure: 60ch;
+      --radius-sm: 0.45rem;
+      --radius-md: 0.9rem;
+      --radius-lg: 1.6rem;
+      --font-display: "Iowan Old Style", Baskerville, "Times New Roman", serif;
+      --font-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --ease: cubic-bezier(.2, .8, .2, 1);
+      --duration: 180ms;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--color-on-surface);
+      background:
+        linear-gradient(180deg, rgba(244, 231, 214, 0.98), rgba(244, 231, 214, 0.94)),
+        repeating-linear-gradient(
+          0deg,
+          rgba(36, 27, 23, 0.06) 0,
+          rgba(36, 27, 23, 0.06) 1px,
+          transparent 1px,
+          transparent 5.25rem
+        );
+      line-height: 1.75;
+    }
+
+    a { color: inherit; }
+    button { font: inherit; }
+    :focus-visible {
+      outline: 3px solid var(--color-primary);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -3rem;
+      padding: .7rem 1rem;
+      background: var(--color-on-surface);
+      color: var(--color-surface);
+      border-radius: var(--radius-sm);
+      z-index: 100;
+    }
+
+    .skip-link:focus { top: 1rem; }
+
+    .site-header,
+    .site-footer,
+    main {
+      width: min(100%, calc(var(--content-max) + var(--page-pad) * 2));
+      margin: 0 auto;
+      padding-inline: var(--page-pad);
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      padding-block: 1rem;
+      background: linear-gradient(180deg, rgba(244, 231, 214, 0.96), rgba(244, 231, 214, 0.84));
+      backdrop-filter: blur(10px);
+    }
+
+    .brand {
+      display: inline-flex;
+      gap: .8rem;
+      align-items: center;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .brand-mark {
+      inline-size: 2.6rem;
+      block-size: 2.6rem;
+      border-radius: var(--radius-sm);
+      border: var(--border-strong);
+      background:
+        linear-gradient(135deg, var(--color-primary) 0 48%, transparent 48% 100%),
+        linear-gradient(180deg, #fef6ec, #ebdac6);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .brand-text strong { display: block; }
+    .brand-text span { display: block; font-size: .78rem; color: var(--color-muted-ink); }
+
+    .nav-toggle {
+      display: none;
+      border: var(--border-strong);
+      border-radius: 999px;
+      background: transparent;
+      padding: .65rem 1rem;
+    }
+
+    .site-nav {
+      justify-self: end;
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+    }
+
+    .site-nav a {
+      text-decoration: none;
+      padding: .45rem .8rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+    }
+
+    .site-nav a[aria-current="page"],
+    .site-nav a:hover {
+      border-color: rgba(36, 27, 23, 0.18);
+      background: rgba(255, 248, 240, 0.6);
+    }
+
+    .catalog-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(17rem, .9fr);
+      gap: 1.25rem;
+      align-items: end;
+      padding-block: 1.5rem 1rem;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      padding: .35rem .7rem;
+      border-radius: var(--radius-sm);
+      background: var(--color-on-surface);
+      color: var(--color-surface);
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+    }
+
+    h1, h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      letter-spacing: -0.03em;
+    }
+
+    h1 {
+      margin-top: .9rem;
+      font-size: clamp(2.6rem, 7vw, 4.6rem);
+      line-height: 1.04;
+      max-width: 9ch;
+    }
+
+    .catalog-hero p,
+    .catalog-meta p {
+      margin: .9rem 0 0;
+      max-width: var(--measure);
+      color: var(--color-muted-ink);
+    }
+
+    .catalog-meta {
+      padding: 1.2rem;
+      border-radius: var(--radius-lg);
+      border: var(--border-soft);
+      background: rgba(255, 248, 240, 0.74);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .catalog-meta strong {
+      display: block;
+      font-size: 1.1rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
+      gap: 1.25rem;
+      padding-block: 1rem 3rem;
+    }
+
+    .filters,
+    .results {
+      border-radius: var(--radius-lg);
+      border: var(--border-soft);
+      background: rgba(255, 248, 240, 0.72);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .filters {
+      position: sticky;
+      top: 5.6rem;
+      align-self: start;
+      padding: 1.2rem;
+      display: grid;
+      gap: .8rem;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .65rem;
+    }
+
+    .filter-chip {
+      border: var(--border-soft);
+      border-radius: 999px;
+      background: transparent;
+      padding: .7rem 1rem;
+      font-weight: 700;
+      color: var(--color-on-surface);
+    }
+
+    .filter-chip[aria-pressed="true"] {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .results {
+      padding: 1rem;
+    }
+
+    .results-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: end;
+      padding: .6rem .4rem 1rem;
+      border-bottom: var(--border-soft);
+    }
+
+    .results-head p {
+      margin: 0;
+      color: var(--color-muted-ink);
+    }
+
+    .shelf-list {
+      display: grid;
+    }
+
+    .shelf-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1.35fr) minmax(13rem, .9fr) auto;
+      gap: 1rem;
+      align-items: start;
+      padding: 1rem .4rem;
+      border-top: var(--border-soft);
+    }
+
+    .shelf-row:first-child { border-top: 0; }
+
+    .shelf-mark {
+      min-inline-size: 3.6rem;
+      min-block-size: 8.8rem;
+      padding: .85rem .7rem;
+      border-radius: .85rem .85rem .2rem .2rem;
+      border: var(--border-strong);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      background: linear-gradient(180deg, rgba(255, 248, 240, 0.94), rgba(232, 215, 195, 0.7));
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .shelf-row[data-genre="featured"] .shelf-mark,
+    .shelf-row[data-genre="urban"] .shelf-mark {
+      background: linear-gradient(180deg, var(--color-primary), #7a2f20);
+      color: var(--color-on-primary);
+    }
+
+    .book-title {
+      margin: 0 0 .45rem;
+      font-size: 1.35rem;
+    }
+
+    .meta,
+    .excerpt,
+    .stock-note {
+      color: var(--color-muted-ink);
+      font-size: .95rem;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem .8rem;
+      margin-bottom: .75rem;
+    }
+
+    .meta span {
+      padding-bottom: .15rem;
+      border-bottom: 1px solid rgba(36, 27, 23, 0.18);
+    }
+
+    .excerpt { margin: 0; }
+
+    .cta-group {
+      display: grid;
+      gap: .65rem;
+      justify-items: start;
+    }
+
+    .button,
+    .text-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.8rem;
+      padding: .8rem 1rem;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .button {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .text-link {
+      border: var(--border-soft);
+      background: rgba(244, 231, 214, 0.72);
+    }
+
+    .empty-state {
+      display: none;
+      padding: 1.4rem .4rem .6rem;
+      color: var(--color-muted-ink);
+    }
+
+    .site-footer {
+      padding-block: 1rem 3rem;
+      color: var(--color-muted-ink);
+      font-size: .92rem;
+    }
+
+    @media (max-width: 920px) {
+      .site-header {
+        grid-template-columns: auto auto;
+        align-items: start;
+      }
+
+      .nav-toggle { display: inline-flex; justify-self: end; }
+
+      .site-nav {
+        display: none;
+        grid-column: 1 / -1;
+        justify-self: stretch;
+        flex-direction: column;
+        align-items: stretch;
+        padding: .75rem;
+        border-radius: var(--radius-lg);
+        border: var(--border-soft);
+        background: rgba(255, 248, 240, 0.92);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .site-nav[data-open="true"] { display: flex; }
+      .catalog-hero,
+      .layout { grid-template-columns: 1fr; }
+      .filters { position: static; }
+    }
+
+    @media (max-width: 720px) {
+      .shelf-row {
+        grid-template-columns: auto 1fr;
+        gap: .85rem;
+      }
+
+      .cta-group,
+      .excerpt-wrap {
+        grid-column: 1 / -1;
+      }
+
+      .results-head {
+        flex-direction: column;
+        align-items: start;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .filters {
+        padding-inline: .9rem;
+      }
+
+      .filter-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: .2rem;
+      }
+
+      .filter-chip { white-space: nowrap; }
+
+      .button,
+      .text-link {
+        width: 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>折角書局</strong>
+        <span>把書感擺回桌面</span>
+      </span>
+    </a>
+    <div></div>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">選單</button>
+    <nav id="site-nav" class="site-nav" aria-label="主要導覽">
+      <a href="index.html">首頁</a>
+      <a href="catalog.html" aria-current="page">書目總覽</a>
+      <a href="book.html">本週主書</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="catalog-hero" aria-labelledby="catalog-title">
+      <div>
+        <span class="eyebrow">書目總覽</span>
+        <h1 id="catalog-title">先看整排。再決定哪一本值得停。</h1>
+        <p>這頁把書做成一列列可比對的層架，而不是平均卡片。桌面先比出版資訊與摘要，手機先看分類、書名與主動作，次要資訊往下接。</p>
+      </div>
+      <aside class="catalog-meta">
+        <strong>本頁為靜態選書示意</strong>
+        <p>篩選只在本頁切換顯示，不代表即時庫存。若要深讀，請進單書頁看節錄與閱讀線索。</p>
+      </aside>
+    </section>
+
+    <div class="layout">
+      <aside class="filters" aria-labelledby="filter-title">
+        <div>
+          <span class="eyebrow">架位切換</span>
+          <h2 id="filter-title">照題材收斂</h2>
+        </div>
+        <p>手機把篩選搬到最前面，先做選擇再看書列。桌面保留側邊，方便對照當前書架。</p>
+        <div class="filter-row" role="toolbar" aria-label="書目篩選">
+          <button class="filter-chip" type="button" aria-pressed="true" data-filter="all">全部書架</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="urban">城市散文</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="food">飲食記憶</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="poetry">詩與短章</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="featured">本週主書</button>
+        </div>
+      </aside>
+
+      <section class="results" aria-labelledby="results-title">
+        <div class="results-head">
+          <div>
+            <span class="eyebrow">目前視圖</span>
+            <h2 id="results-title">全部書架</h2>
+          </div>
+          <p id="results-count">共 6 本示意書目</p>
+        </div>
+
+        <div class="shelf-list">
+          <article class="shelf-row" data-genre="featured urban" id="urban">
+            <div class="shelf-mark">主書</div>
+            <div>
+              <h3 class="book-title">海風中的字</h3>
+              <div class="meta">
+                <span>陳岸舟</span>
+                <span>城市散文</span>
+                <span>320 頁</span>
+              </div>
+              <p class="excerpt">在港邊地景與小店書寫之間來回，適合想從節奏感進入一座城市的人。</p>
+            </div>
+            <div class="excerpt-wrap">
+              <p class="stock-note">關鍵字：港口、步行、地方書寫。這本是首頁與單書頁共同主角，方便跨頁追路徑。</p>
+            </div>
+            <div class="cta-group">
+              <a class="button" href="book.html">看單書頁</a>
+              <a class="text-link" href="index.html">回首頁脈絡</a>
+            </div>
+          </article>
+
+          <article class="shelf-row" data-genre="urban">
+            <div class="shelf-mark">城市</div>
+            <div>
+              <h3 class="book-title">港邊書店學</h3>
+              <div class="meta">
+                <span>林一禾</span>
+                <span>地方研究</span>
+                <span>256 頁</span>
+              </div>
+              <p class="excerpt">從舊書攤、碼頭與巷口書店談閱讀如何改變一條街的記憶密度。</p>
+            </div>
+            <div class="excerpt-wrap">
+              <p class="stock-note">適合搭配《海風中的字》一起比讀。桌面可直接對照題材與厚度，手機會先看到書名與動作。</p>
+            </div>
+            <div class="cta-group">
+              <a class="button" href="book.html#related">看同架推薦</a>
+              <a class="text-link" href="index.html#collection-title">回主題架</a>
+            </div>
+          </article>
+
+          <article class="shelf-row" data-genre="food" id="food">
+            <div class="shelf-mark">飲食</div>
+            <div>
+              <h3 class="book-title">料理的邊界</h3>
+              <div class="meta">
+                <span>周瑀庭</span>
+                <span>飲食文化</span>
+                <span>288 頁</span>
+              </div>
+              <p class="excerpt">從家常菜切進移動與遷徙，讓味道成為理解地方的另一種索引。</p>
+            </div>
+            <div class="excerpt-wrap">
+              <p class="stock-note">對照重點是敘事密度，不是假裝即時庫存。此站不宣稱可直接下單。</p>
+            </div>
+            <div class="cta-group">
+              <a class="button" href="book.html#inside">看節錄樣式</a>
+              <a class="text-link" href="index.html#path-title">回使用路徑</a>
+            </div>
+          </article>
+
+          <article class="shelf-row" data-genre="food">
+            <div class="shelf-mark">夜市</div>
+            <div>
+              <h3 class="book-title">夜市考</h3>
+              <div class="meta">
+                <span>葉清歌</span>
+                <span>生活觀察</span>
+                <span>208 頁</span>
+              </div>
+              <p class="excerpt">把招牌、步速、油煙與聲音寫成現場觀察，適合短章閱讀。</p>
+            </div>
+            <div class="excerpt-wrap">
+              <p class="stock-note">偏輕快、好入口，適合手機先看摘要再進一步查單書內容。</p>
+            </div>
+            <div class="cta-group">
+              <a class="button" href="book.html">沿用主書頁樣式</a>
+              <a class="text-link" href="index.html">回首頁</a>
+            </div>
+          </article>
+
+          <article class="shelf-row" data-genre="poetry">
+            <div class="shelf-mark">詩集</div>
+            <div>
+              <h3 class="book-title">窗邊讀詩</h3>
+              <div class="meta">
+                <span>蘇檀</span>
+                <span>詩與短章</span>
+                <span>144 頁</span>
+              </div>
+              <p class="excerpt">頁數短，但停頓長。適合在結束一天前，留一段白給自己。</p>
+            </div>
+            <div class="excerpt-wrap">
+              <p class="stock-note">這類書在手機會收斂為短摘要與單一主動作，避免資訊過散。</p>
+            </div>
+            <div class="cta-group">
+              <a class="button" href="book.html#inside">看節錄區</a>
+              <a class="text-link" href="index.html#visit">回營業資訊</a>
+            </div>
+          </article>
+
+          <article class="shelf-row" data-genre="poetry">
+            <div class="shelf-mark">獨立</div>
+            <div>
+              <h3 class="book-title">頁角備忘錄</h3>
+              <div class="meta">
+                <span>折角編輯部</span>
+                <span>獨立出版</span>
+                <span>96 頁</span>
+              </div>
+              <p class="excerpt">關於讀者如何在書裡留下折角、時間與再次回頭的理由。</p>
+            </div>
+            <div class="excerpt-wrap">
+              <p class="stock-note">這本是視覺概念的來源，讓書脊與索引卡語法有產品內的來處。</p>
+            </div>
+            <div class="cta-group">
+              <a class="button" href="book.html#related">看相關推薦</a>
+              <a class="text-link" href="index.html#collection-title">回首頁編輯挑書</a>
+            </div>
+          </article>
+        </div>
+
+        <p class="empty-state" id="empty-state">這個架位目前沒有示意書目。可切回「全部書架」重新挑。</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    書目切換僅改變本頁顯示，不代表庫存與預約結果。
+  </footer>
+
+  <script>
+    const navButton = document.querySelector('.nav-toggle');
+    const nav = document.querySelector('#site-nav');
+    if (navButton && nav) {
+      const closeNav = () => {
+        nav.dataset.open = 'false';
+        navButton.setAttribute('aria-expanded', 'false');
+      };
+      navButton.addEventListener('click', () => {
+        const open = nav.dataset.open === 'true';
+        nav.dataset.open = String(!open);
+        navButton.setAttribute('aria-expanded', String(!open));
+      });
+      nav.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeNav();
+          navButton.focus();
+        }
+      });
+    }
+
+    const chips = Array.from(document.querySelectorAll('.filter-chip'));
+    const rows = Array.from(document.querySelectorAll('.shelf-row'));
+    const title = document.querySelector('#results-title');
+    const count = document.querySelector('#results-count');
+    const emptyState = document.querySelector('#empty-state');
+    const labels = {
+      all: '全部書架',
+      urban: '城市散文',
+      food: '飲食記憶',
+      poetry: '詩與短章',
+      featured: '本週主書'
+    };
+
+    const applyFilter = (filter) => {
+      let visibleCount = 0;
+      rows.forEach((row) => {
+        const match = filter === 'all' || row.dataset.genre.split(' ').includes(filter);
+        row.hidden = !match;
+        if (match) visibleCount += 1;
+      });
+      title.textContent = labels[filter];
+      count.textContent = `共 ${visibleCount} 本示意書目`;
+      emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+    };
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        chips.forEach((button) => button.setAttribute('aria-pressed', 'false'));
+        chip.setAttribute('aria-pressed', 'true');
+        applyFilter(chip.dataset.filter);
+      });
+    });
+  </script>
+</body>
+</html>
