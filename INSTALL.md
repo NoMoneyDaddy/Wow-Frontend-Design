@@ -1,0 +1,100 @@
+# 安裝與發現
+
+`wow-frontend-design/` 本身就是符合 Agent Skills 格式的 skill 目錄。安裝只代表 host 能發現 metadata；不代表特定模型、工具、框架或品質已通過實測。
+
+## AI 直接安裝（Codex）
+
+在 Codex 對話貼上：
+
+```text
+Use GitHub CLI to preview and install wow-frontend-design from
+NoMoneyDaddy/Wow-Frontend-Design at commit <FULL_COMMIT_SHA> for Codex user scope.
+Do not overwrite an existing skill or execute bundled scripts during installation.
+Report the installed path, source URL, revision, scope, and host.
+```
+
+也可直接請 `$skill-installer` 安裝同一個完整 commit 的 `wow-frontend-design` 子目錄；目的目錄已存在時必須中止，不覆寫同名 skill。安裝後若未出現，重新啟動 Codex。
+
+## 官方 GitHub CLI：先預覽，再一行安裝
+
+`gh skill` 自 GitHub CLI 2.90.0 起內建，目前仍是可能變動的 preview；支援 Codex、Claude Code、GitHub Copilot、Gemini CLI 與多個其他 agent host。先用 `gh --version` 確認版本，再唯讀預覽完整 skill tree：
+
+```bash
+gh skill preview NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md
+```
+
+再指定 host 與 scope；以下安裝到 Codex 使用者範圍：
+
+```bash
+gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md --agent codex --scope user
+```
+
+正式部署加上已發布 tag 或完整 commit：
+
+```bash
+gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md --agent codex --scope user --pin <release-tag-or-full-sha>
+```
+
+把 `--agent` 改為 `claude-code`、`github-copilot` 或 `gemini-cli` 即可導向該 host；用 `gh skill list --json skillName,sourceURL,scope,version,pinned,path` 驗證來源與安裝位置。preview 命令、參數或 metadata 可能隨 GitHub CLI 版本改變；正式流程固定 CLI 版本與 skill commit。預覽與安裝成功仍不證明模型已正確觸發，需再跑 host discovery／invocation smoke test。
+
+## Host 原生方式
+
+| Host | 使用者範圍 | 專案範圍 | 安裝／發現驗證 |
+| --- | --- | --- | --- |
+| Codex | `~/.agents/skills/wow-frontend-design/` | `.agents/skills/wow-frontend-design/` | 輸入 `$wow-frontend-design`，或以 `/skills` 查找 |
+| Claude Code | `~/.claude/skills/wow-frontend-design/` | `.claude/skills/wow-frontend-design/` | 輸入 `/wow-frontend-design`；新建頂層 skills 目錄後必要時重啟 |
+| GitHub Copilot | `~/.copilot/skills/` 或 `~/.agents/skills/` | `.github/skills/`、`.claude/skills/` 或 `.agents/skills/` | 用 Copilot／`gh skill` 列出後，以符合 description 的請求驗證 |
+| Gemini CLI | `~/.gemini/skills/` 或 `~/.agents/skills/` | `.gemini/skills/` 或 `.agents/skills/` | `/skills list`、`/skills reload`；也可用下方官方 CLI |
+
+Gemini CLI 可從 remote skill URL 安裝；workspace scope 不污染使用者全域：
+
+```bash
+gemini skills install https://github.com/NoMoneyDaddy/Wow-Frontend-Design/tree/main/wow-frontend-design --scope workspace
+```
+
+若已 clone repo，可用無 Node、無 telemetry 的本機複製：
+
+```bash
+mkdir -p .agents/skills
+cp -R wow-frontend-design .agents/skills/
+```
+
+也可用 GitHub CLI 從目前 checkout 安裝；local 模式用 skill name，不用 remote 的 `.../SKILL.md` 路徑語法：
+
+```bash
+gh skill install . wow-frontend-design --from-local --agent codex --scope project
+```
+
+目的目錄已存在時不要直接覆寫。先比較版本與 diff，再改名備份或由使用者明示升級策略。複製後保留 skill 內的 `LICENSE`。
+
+## Claude.ai 與 API
+
+Claude.ai custom skills、Claude API workspace skills、Claude Code filesystem skills彼此不自動同步。Claude.ai 需上傳 skill zip；Claude API 需先建立 custom skill/version 再以 `skill_id` 掛載；兩者的資料保留、code execution、network 與 package 限制不同。不要把 Claude Code 安裝成功轉述成 API 或 claude.ai 已安裝。
+
+## 不原生支援 Agent Skills 的模型
+
+模型本身不負責發現 skill；agent host／wrapper 必須：
+
+1. 掃描 `SKILL.md` frontmatter 的 `name` 與 `description`；
+2. 任務匹配時載入完整 `SKILL.md`；
+3. 依路由按需讀取相對 `references/`；
+4. 只在授權工具存在時執行 `scripts/`；
+5. 把缺 browser、vision、command、write 或 context 能力轉成明示 evidence ceiling。
+
+單純把整個 skill 塞進 system prompt 是 prompt adapter，不是原生安裝；必須另標 cohort，不能宣稱與 Codex、Claude Code、Copilot 或 Gemini CLI 的 discovery 行為相同。
+
+## 版本、完整性與卸載
+
+- production pin release tag、完整 commit 或已審查 skill version；不要浮動追蹤 `main`。`gh skill` 安裝會注入來源 metadata，供 `gh skill update --dry-run` 核對。
+- 部署前驗證 `SKILL.md` frontmatter、相對 reference、單元測試與來源 lock。
+- 記錄安裝來源、revision、hash、host/version、scope 與安裝時間。
+- 停用優先於刪除；Codex 在 `~/.codex/config.toml` 使用精確絕對路徑：
+
+  ```toml
+  [[skills.config]]
+  path = "/absolute/path/to/wow-frontend-design/SKILL.md"
+  enabled = false
+  ```
+
+  Gemini 可用 `/skills disable wow-frontend-design`。
+- 卸載只刪除使用者明確指定的那個 scope 與精確 skill 目錄；不要遞迴清除整個 `skills/`。

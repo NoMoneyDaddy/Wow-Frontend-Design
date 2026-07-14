@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+  <title id="title">WOW Frontend Design</title>
+  <desc id="desc">A modular editorial grid introduces a universal frontend Agent Skill with first-class Traditional Chinese and true mobile design.</desc>
+  <rect width="1280" height="360" fill="#f4eee3"/>
+  <g stroke="#1e1a17" stroke-opacity=".1">
+    <path d="M40 0v360M120 0v360M200 0v360M280 0v360M360 0v360M440 0v360M520 0v360M600 0v360M680 0v360M760 0v360M840 0v360M920 0v360M1000 0v360M1080 0v360M1160 0v360M1240 0v360"/>
+    <path d="M0 40h1280M0 120h1280M0 200h1280M0 280h1280"/>
+  </g>
+  <rect x="40" y="40" width="1200" height="280" rx="32" fill="#fffdf8" stroke="#1e1a17" stroke-opacity=".16"/>
+  <rect x="80" y="80" width="12" height="200" fill="#b4542d"/>
+  <text x="128" y="138" fill="#1e1a17" font-family="ui-serif, Georgia, serif" font-size="64" font-weight="700">WOW Frontend Design</text>
+  <text x="132" y="192" fill="#5e554d" font-family="ui-sans-serif, system-ui, sans-serif" font-size="25">跨模型・跨框架・跨語系的前端設計 Agent Skill</text>
+  <text x="132" y="248" fill="#1e1a17" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" letter-spacing="2">TRUE MOBILE  /  ZH-HANT  /  EVIDENCE-DRIVEN</text>
+  <g transform="translate(1020 76)">
+    <rect width="148" height="224" rx="28" fill="#1e1a17"/>
+    <rect x="10" y="10" width="128" height="204" rx="20" fill="#f4eee3"/>
+    <rect x="30" y="38" width="88" height="10" rx="5" fill="#b4542d"/>
+    <rect x="30" y="68" width="72" height="8" rx="4" fill="#1e1a17"/>
+    <rect x="30" y="84" width="94" height="8" rx="4" fill="#1e1a17" opacity=".55"/>
+    <rect x="30" y="116" width="94" height="52" rx="14" fill="#fffdf8" stroke="#1e1a17" stroke-opacity=".14"/>
+    <circle cx="74" cy="192" r="8" fill="#b4542d"/>
+  </g>
+</svg>

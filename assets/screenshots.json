@@ -1,0 +1,129 @@
+{
+  "schema_version": 2,
+  "status": "observed_release_showcase_not_regression_baseline",
+  "captured_at": "2026-07-14T12:35:55.419Z",
+  "case_id": "weak-model-showcase-release-capture",
+  "route": "http://127.0.0.1:4175/",
+  "repository_commit": null,
+  "source_binding": "commit-independent pre-release capture: integrity is bound to the exact source, capture-script, dependency-lock and image hashes below; repository_commit remains null by design to avoid a self-referential release cycle",
+  "environment": {
+    "os": "darwin 25.5.0 arm64",
+    "browser": "Google Chrome 150.0.7871.114",
+    "automation": "Playwright 1.61.1",
+    "headless": true,
+    "browser_executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "locale": "zh-TW",
+    "timezone": "Asia/Taipei",
+    "color_profile": "not explicitly controlled",
+    "reduced_motion": "reduce",
+    "network": "local static server; console errors, failed requests, HTTP >=400 and external requests asserted empty",
+    "wait_condition": "networkidle + document.readyState=complete + document.fonts.ready/status=loaded + explicit theme applied",
+    "screenshot_options": {
+      "full_page": true,
+      "animations": "disabled",
+      "type": "png"
+    }
+  },
+  "capture_command": "CHROME_EXECUTABLE_PATH=/absolute/path/to/chrome node evals/capture_showcase.cjs http://127.0.0.1:4175/",
+  "capture_script": {
+    "path": "evals/capture_showcase.cjs",
+    "sha256": "72672961348785ffcf9a5b9029dddca711c897bdaebe4743dd184647a7e089b6"
+  },
+  "dependency_lock": {
+    "path": "package-lock.json",
+    "sha256": "3fa919e8262eec48b65e538d17b32ce37047250184b40a5a75a1826992395b11"
+  },
+  "source_files": [
+    {
+      "path": "evals/weak-model-showcase/index.html",
+      "sha256": "014f12c8227342d754a6189300d5bc39f529f6446ce388189b5328d84de4c43c"
+    },
+    {
+      "path": "evals/weak-model-showcase/styles.css",
+      "sha256": "c4004716121fddd39a00d72e54ac42c327b587957922739ec93d1d0abe59771f"
+    },
+    {
+      "path": "evals/weak-model-showcase/app.js",
+      "sha256": "4eb8ce8a5a26dc11990b7a3c3eb75dbe75a9590f26a12f180a9d6b970681d3a4"
+    },
+    {
+      "path": "evals/weak-model-showcase/theme-init.js",
+      "sha256": "7d078e5f5964006384c76bbd329db34195bc68f856c63a7511bcd8ca78040071"
+    }
+  ],
+  "captures": [
+    {
+      "path": "assets/showcase-desktop.png",
+      "viewport": "1440x1000",
+      "device_scale_factor": 1,
+      "decoded_size": "1440x3358",
+      "theme": "light",
+      "state": "default_top_of_page",
+      "document": {
+        "language": "zh-Hant",
+        "theme": "light",
+        "activeElement": "body",
+        "scrollX": 0,
+        "scrollY": 0,
+        "readyState": "complete",
+        "fonts": "loaded"
+      },
+      "sha256": "71b49af6acc78c51b25fd2b81173fcf65901f08a27688e334707399b51ef605c"
+    },
+    {
+      "path": "assets/showcase-desktop-dark.png",
+      "viewport": "1440x1000",
+      "device_scale_factor": 1,
+      "decoded_size": "1440x3358",
+      "theme": "dark",
+      "state": "default_top_of_page",
+      "document": {
+        "language": "zh-Hant",
+        "theme": "dark",
+        "activeElement": "body",
+        "scrollX": 0,
+        "scrollY": 0,
+        "readyState": "complete",
+        "fonts": "loaded"
+      },
+      "sha256": "3a2e17826dfab60ddbe4ba8d5471910771f19324beaf1ce198a7dec4e2eba671"
+    },
+    {
+      "path": "assets/showcase-mobile.png",
+      "viewport": "390x844",
+      "device_scale_factor": 1,
+      "decoded_size": "390x4932",
+      "theme": "light",
+      "state": "default_top_of_page",
+      "document": {
+        "language": "zh-Hant",
+        "theme": "light",
+        "activeElement": "body",
+        "scrollX": 0,
+        "scrollY": 0,
+        "readyState": "complete",
+        "fonts": "loaded"
+      },
+      "sha256": "1f5ed3f99349de5b0498501706043b6976044db1b91182e8768f744808d7396c"
+    },
+    {
+      "path": "assets/showcase-mobile-dark.png",
+      "viewport": "390x844",
+      "device_scale_factor": 1,
+      "decoded_size": "390x4932",
+      "theme": "dark",
+      "state": "default_top_of_page",
+      "document": {
+        "language": "zh-Hant",
+        "theme": "dark",
+        "activeElement": "body",
+        "scrollX": 0,
+        "scrollY": 0,
+        "readyState": "complete",
+        "fonts": "loaded"
+      },
+      "sha256": "ae35a9d0c527765cbdae4b4523d322525b86c25b35bc2246f23a83447b61d742"
+    }
+  ],
+  "claim_boundary": "Captures support rendered visual observation only. They do not prove design quality, WCAG conformance, cross-browser compatibility, interaction, performance, or future regression equivalence."
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 3,
+  "case_id": "replace-with-fixed-case-id",
+  "run_id": "replace-with-unique-run-id",
+  "trust_boundary": {
+    "evaluator_owned": true,
+    "outside_model_write_scope": true,
+    "integrity": "unsigned",
+    "note": "This policy and its ledger must be stored outside the model-writable workspace. Same-boundary files are forgeable and must fail closed; this is not a signature."
+  },
+  "release_acceptance": {
+    "decision": "not_accepted",
+    "reason": "No evaluator release acceptance has been recorded for this example."
+  },
+  "evidence": {
+    "js-syntax": {
+      "kind": "command",
+      "claim_types": ["syntax"],
+      "command": ["node", "--check", "app.js"],
+      "command_sha256": "52b4e9033736622f5a39a47747da48229599dad8b7ca682f2c22a4b09f889d4c",
+      "cwd": "workspace"
+    },
+    "browser-critical-path": {
+      "kind": "command",
+      "claim_types": ["browser_behavior", "localization_rendered"],
+      "command": ["npx", "playwright", "test", "tests/critical-path.spec.ts"],
+      "command_sha256": "4ce178e58c73954cf66a996cfea3abe74ba82e53cd4827dee5fa5f6f85d547e1",
+      "cwd": "workspace"
+    },
+    "mobile-default": {
+      "kind": "artifact",
+      "claim_types": ["rendered_visual"],
+      "artifact_kind": "screenshot",
+      "path": "artifacts/mobile-default.png",
+      "context": {
+        "route": "/",
+        "viewport": "390x844",
+        "locale": "zh-Hant",
+        "state": "default"
+      }
+    }
+  }
+}

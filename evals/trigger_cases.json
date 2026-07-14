@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "purpose": "Evaluator-owned activation and reference-routing fixtures. These cases do not score visual quality.",
+  "cases": [
+    {
+      "id": "build-zh-hant-editorial-mobile",
+      "locale": "zh-Hant",
+      "prompt": "從空專案打造繁體中文的獨立雜誌網站，桌機像編輯台，手機要改成拇指優先且不是縮小桌機版。",
+      "expected": "trigger",
+      "required_references": ["creative-direction.md", "mobile-responsive.md", "localization.md", "implementation.md", "quality-gates.md"]
+    },
+    {
+      "id": "retrofit-existing-checkout",
+      "locale": "en",
+      "prompt": "Inspect this existing Nuxt checkout, preserve its routes and APIs, then redesign the UI and error states without changing the framework.",
+      "expected": "trigger",
+      "required_references": ["retrofit.md", "platform-adapters.md", "implementation.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "polish-focused-css",
+      "locale": "zh-Hant",
+      "prompt": "只調整這個產品頁的字級、留白、視覺層級與手機斷點，不要擴大功能範圍。",
+      "expected": "trigger",
+      "required_references": ["creative-direction.md", "mobile-responsive.md", "retrofit.md", "quality-gates.md"]
+    },
+    {
+      "id": "motion-svg-lottie",
+      "locale": "en",
+      "prompt": "Create a responsive branded Lottie hero from an SVG mark, with a static reduced-motion poster and exact runtime cleanup.",
+      "expected": "trigger",
+      "required_references": ["motion-system.md", "svg-system.md", "advanced-media.md", "quality-gates.md"]
+    },
+    {
+      "id": "audit-interaction-read-only",
+      "locale": "zh-Hant",
+      "prompt": "唯讀審查現有手機選單與表單，驗證開啟、Escape、返回焦點及成功後再輸入錯誤的狀態，不要修改程式碼。",
+      "expected": "trigger",
+      "required_references": ["mobile-responsive.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "external-skills-composition",
+      "locale": "zh-Hant",
+      "prompt": "把 Swiss design、Nuxt 與 Lottie 相關 skills 綜合用在這個網站，但要先判斷版本、授權與衝突。",
+      "expected": "trigger",
+      "required_references": ["curated-skill-integration.md", "platform-adapters.md", "motion-system.md"]
+    },
+    {
+      "id": "traditional-chinese-webfont",
+      "locale": "zh-Hant",
+      "prompt": "替繁中內容網站選擇可商用開源字體，做 WOFF2 子集、fallback 與 CLS 最佳化，並檢查第三方 webfont 的隱私。",
+      "expected": "trigger",
+      "required_references": ["localization.md", "typography-webfonts.md", "frontend-security.md", "quality-gates.md"]
+    },
+    {
+      "id": "image-first-campaign-site",
+      "locale": "zh-Hant",
+      "prompt": "先產兩個攝影主視覺方向，再萃取可實作規則建立繁中活動網站；圖片不能取代真實內容、手機構圖與互動狀態。",
+      "expected": "trigger",
+      "required_references": ["design-exploration.md", "visual-storytelling.md", "mobile-responsive.md", "localization.md", "implementation.md"]
+    },
+    {
+      "id": "webgl-progressive-hero",
+      "locale": "en",
+      "prompt": "Build a product-specific WebGL hero with semantic DOM content, a poster fallback, reduced motion, context-loss recovery, bounded DPR, and teardown.",
+      "expected": "trigger",
+      "required_references": ["advanced-media.md", "motion-system.md", "frontend-security.md", "quality-gates.md"]
+    },
+    {
+      "id": "operations-dashboard-table",
+      "locale": "zh-Hant",
+      "prompt": "重構繁中營運後台的高密度訂單表格、篩選、批次操作與手機詳情流程；保留資料與權限模型，不要改成卡片式 landing page。",
+      "expected": "trigger",
+      "required_references": ["retrofit.md", "component-composition.md", "mobile-responsive.md", "localization.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "design-system-components",
+      "locale": "en",
+      "prompt": "Audit and extend the existing design system with menu, dialog, form-field, table, surface, typography, state, and responsive composition contracts.",
+      "expected": "trigger",
+      "required_references": ["component-composition.md", "typography-webfonts.md", "platform-adapters.md", "wcag-aa-checklist.md", "quality-gates.md"]
+    },
+    {
+      "id": "pattern-selection-not-template",
+      "locale": "zh-Hant",
+      "prompt": "替內容與任務選擇 Hero、比較、FAQ、表格、圖表、通知或對話框；只使用真正適合的 pattern，不要全部拼成模板。",
+      "expected": "trigger",
+      "required_references": ["pattern-catalog.md", "component-composition.md", "creative-direction.md", "mobile-responsive.md"]
+    },
+    {
+      "id": "brand-extraction-campaign-boundary",
+      "locale": "zh-Hant",
+      "prompt": "從既有官網、產品介面、品牌規範與短期 campaign 混合資料提取品牌；標記明示、觀察、推論與未知，保留系統不變量，不把活動視覺誤當永久設計系統。",
+      "expected": "trigger",
+      "required_references": ["creative-direction.md", "brand-system-fidelity.md", "retrofit.md", "typography-webfonts.md", "quality-gates.md"]
+    },
+    {
+      "id": "ethical-choice-architecture",
+      "locale": "en",
+      "prompt": "Redesign subscription consent, renewal disclosure and cancellation without dark patterns; treat attention and click metrics as hypotheses rather than conversion proof.",
+      "expected": "trigger",
+      "required_references": ["behavioral-design-evidence.md", "component-composition.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "seo-aeo-geo-public-discovery",
+      "locale": "zh-Hant",
+      "prompt": "替多語內容產品整合 SEO、AEO 與 GEO：處理繁中 canonical/hreflang、結構化資料、robots/sitemap、JavaScript rendering 與 AI crawler 政策，但不要保證排名或引用。",
+      "expected": "trigger",
+      "required_references": ["search-discovery.md", "localization.md", "platform-adapters.md", "frontend-security.md", "quality-gates.md"]
+    },
+    {
+      "id": "theme-color-psychology-boundary",
+      "locale": "zh-Hant",
+      "prompt": "替現有品牌建立 system、淺色、深色與高對比色彩系統；校準文字、控制項、狀態與材質，並把『紅色提高轉換』視為待驗證假說而不是定律。",
+      "expected": "trigger",
+      "required_references": ["color-system-psychology.md", "visual-material-system.md", "brand-system-fidelity.md", "wcag-aa-checklist.md", "quality-gates.md"]
+    },
+    {
+      "id": "cross-platform-design-tokens",
+      "locale": "en",
+      "prompt": "Extend the existing design-token source across web, iOS and Android; preserve aliases, themes and brand modes, validate DTCG exchange, detect cycles and generated drift without forcing a rewrite.",
+      "expected": "trigger",
+      "required_references": ["design-token-portability.md", "color-system-psychology.md", "brand-system-fidelity.md", "platform-adapters.md", "quality-gates.md"]
+    },
+    {
+      "id": "dashboard-data-visualization",
+      "locale": "zh-Hant",
+      "prompt": "設計繁中營運 dashboard 的趨勢圖、分類圖與異常狀態；分清零值、缺值與不確定性，不能只靠顏色，手機要保留精確值與比較任務。",
+      "expected": "trigger",
+      "required_references": ["data-visualization-color.md", "component-composition.md", "color-system-psychology.md", "mobile-responsive.md", "localization.md", "quality-gates.md"]
+    },
+    {
+      "id": "no-visual-first-pass",
+      "locale": "zh-Hant",
+      "prompt": "這個單一模型環境沒有瀏覽器、圖片或截圖工具；仍要產出低風險首版，但不得宣稱畫面、WCAG 或跨瀏覽器已驗證。",
+      "expected": "trigger",
+      "required_references": ["no-visual-first-pass.md", "weak-model-playbook.md", "model-routing.md", "quality-gates.md"]
+    },
+    {
+      "id": "visual-regression-provenance",
+      "locale": "en",
+      "prompt": "Add screenshot regression evidence for mobile and desktop light/dark states with immutable baseline/candidate/diff provenance, deterministic fixtures and human review; do not treat pixel diffs as design quality.",
+      "expected": "trigger",
+      "required_references": ["visual-regression-evidence.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "anti-ai-slop-product-repair",
+      "locale": "zh-Hant",
+      "prompt": "這個 AI 產出的繁中產品 dashboard 滿是相同圓角卡、假成功訊息與桌機縮小版手機介面；保留正確產品模式，依任務證據修掉同質化與互動問題，不要為了反 AI 而強迫怪異設計。",
+      "expected": "trigger",
+      "required_references": ["anti-ai-slop.md", "creative-direction.md", "component-composition.md", "mobile-responsive.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "product-discovery-usability-research",
+      "locale": "zh-Hant",
+      "prompt": "先規劃這個跨角色產品的訪談、persona 證據、資訊架構驗證與可用性測試；沒有真實研究資料時不得虛構受訪者、語錄或完成率，也不要預設固定人數與技術棧。",
+      "expected": "trigger",
+      "required_references": ["product-discovery-usability.md", "brand-system-fidelity.md", "interaction-audit.md", "behavioral-design-evidence.md", "quality-gates.md"]
+    },
+    {
+      "id": "attention-hierarchy-evidence",
+      "locale": "zh-Hant",
+      "prompt": "審查這個繁中高風險流程的視覺注意力與層級：分清 saliency、fixation、理解與轉換，檢查錯誤、通知、手機與 reduced motion，不准用熱圖或心理學口號直接宣稱使用者會理解。",
+      "expected": "trigger",
+      "required_references": ["behavioral-design-evidence.md", "creative-direction.md", "mobile-responsive.md", "motion-system.md", "interaction-audit.md", "quality-gates.md"]
+    },
+    {
+      "id": "backend-database-migration",
+      "locale": "en",
+      "prompt": "Write a PostgreSQL migration that backfills invoice status and adds a partial index.",
+      "expected": "do_not_trigger",
+      "required_references": []
+    },
+    {
+      "id": "translate-plain-contract",
+      "locale": "zh-Hant",
+      "prompt": "把這份純文字採購合約翻譯成繁體中文，不需要網頁或介面。",
+      "expected": "do_not_trigger",
+      "required_references": []
+    },
+    {
+      "id": "native-ios-only",
+      "locale": "en",
+      "prompt": "Refactor this native SwiftUI settings screen; there is no web frontend.",
+      "expected": "do_not_trigger",
+      "required_references": []
+    },
+    {
+      "id": "generic-image-request",
+      "locale": "zh-Hant",
+      "prompt": "生成一張沒有介面用途的水彩山景插畫。",
+      "expected": "do_not_trigger",
+      "required_references": []
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  GH_CLI_VERSION: "2.95.0"
+  GH_CLI_LINUX_AMD64_SHA256: "25d1e4729e8808c9ed3d613e96ebd3f3e44446f2d368c89d878a71a36ddb3d8c"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Install pinned GitHub CLI with Skill preview
+        run: |
+          archive="gh_${GH_CLI_VERSION}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/$archive"
+          echo "${GH_CLI_LINUX_AMD64_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gh_${GH_CLI_VERSION}_linux_amd64/bin" >> "$GITHUB_PATH"
+
+      - name: Verify pinned GitHub CLI
+        run: |
+          gh --version | head -n 1 | grep -Eq "^gh version ${GH_CLI_VERSION//./\\.} "
+          gh skill --help >/dev/null
+
+      - name: Install pinned evaluator dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Validate installable Skill package
+        run: python3 wow-frontend-design/scripts/validate_installability.py wow-frontend-design --repository-root .
+
+      - name: Validate GitHub CLI Skill publication
+        run: gh skill publish --dry-run
+
+      - name: Smoke-test local GitHub CLI installation
+        run: |
+          gh skill install . wow-frontend-design --from-local --dir "$RUNNER_TEMP/skills"
+          python3 wow-frontend-design/scripts/validate_installability.py "$RUNNER_TEMP/skills/wow-frontend-design"
+          if gh skill install . wow-frontend-design --from-local --dir "$RUNNER_TEMP/skills"; then
+            echo "second install unexpectedly overwrote the existing skill" >&2
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s wow-frontend-design/scripts -p 'test_*.py' -v
+
+      - name: Validate trigger fixtures
+        run: python3 wow-frontend-design/scripts/validate_trigger_cases.py evals/trigger_cases.json --references wow-frontend-design/references
+
+      - name: Validate external source lock
+        run: python3 wow-frontend-design/scripts/validate_external_sources.py wow-frontend-design/references/external-sources.lock.json
+
+      - name: Validate product fixtures
+        run: python3 wow-frontend-design/scripts/validate_product_cases.py evals/product_cases.json
+
+      - name: Validate bounded capability claims
+        run: python3 wow-frontend-design/scripts/validate_capability_status.py evals/capability-status.json --repository-root .
+
+      - name: Validate release screenshot provenance
+        run: python3 wow-frontend-design/scripts/validate_screenshot_manifest.py assets/screenshots.json --repository-root .
+
+      - name: Validate dashboard failure evidence
+        run: python3 wow-frontend-design/scripts/validate_dashboard_evidence.py evals/dashboard-browser-results.json --repository-root .
+
+      - name: Check showcase JavaScript
+        run: |
+          node --check evals/weak-model-showcase/app.js
+          node --check evals/weak-model-showcase/theme-init.js
+          node --check evals/capture_showcase.cjs
+          node --check evals/playwright_dashboard_audit.cjs
+
+      - name: Check showcase source signals
+        run: python3 evals/weak-model-showcase/verify.py
+
+      - name: Audit motion and SVG risks
+        run: python3 wow-frontend-design/scripts/motion_svg_audit.py evals/weak-model-showcase --fail-on high
+
+      - name: Audit declared theme contrast pairs
+        run: python3 wow-frontend-design/scripts/contrast_pair_audit.py evals/weak-model-showcase/theme-contrast-pairs.json
+
+      - name: Audit search metadata
+        run: python3 wow-frontend-design/scripts/search_discovery_audit.py evals/weak-model-showcase
+
+      - name: Check Claude runner syntax
+        run: bash -n evals/run_claude_case.sh

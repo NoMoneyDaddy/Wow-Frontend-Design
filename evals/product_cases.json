@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "case_set_id": "wow-cross-product-non-landing-v1",
+  "fixture_status": "schema_coverage_only",
+  "model_results_included": false,
+  "purpose": "Evaluator-owned cross-product case definitions. This fixture validates schema, non-landing product coverage, and locale distribution only; it does not record execution or model quality.",
+  "required_locales": ["zh-Hant", "en"],
+  "claim_boundary": {
+    "validates": ["fixture_schema", "case_coverage", "locale_distribution"],
+    "does_not_validate": ["model_quality", "case_execution", "skill_activation", "reference_routing", "browser_behavior", "wcag_conformance"]
+  },
+  "cases": [
+    {
+      "case_id": "b2b-audit-log",
+      "locale": "en",
+      "surface_type": "data_table",
+      "audience": "Compliance operator investigating an incident under time and audit pressure.",
+      "primary_task": "Trace an incident across stable records, then export the authorized evidence set.",
+      "expected_representation": ["dense audit table", "filters and saved views", "bulk export", "record detail"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["approved enterprise tokens", "documented product terminology and permission model"],
+        "must_not_infer": ["campaign styling is a durable product invariant", "decoration may override status or permission semantics"],
+        "ethics_constraints": ["preserve audit integrity and disclose export scope"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "Cross-record comparison remains available in the dense desktop table.",
+        "changes": ["surface summary rows first", "move full evidence into a deliberate detail route"],
+        "must_preserve": ["stable record identity", "cross-record comparison", "authorized export"]
+      },
+      "hidden_acceptance_focus": ["permission boundaries", "stable row identity", "keyboard operation", "virtualization fallback"]
+    },
+    {
+      "case_id": "medical-appointment",
+      "locale": "zh-Hant",
+      "surface_type": "form_flow",
+      "audience": "正在壓力情境下預約、改期或取消門診的病人。",
+      "primary_task": "完成可恢復的預約變更，並在需要時找到明確的緊急聯絡途徑。",
+      "expected_representation": ["引導式表單流程", "進度與恢復狀態", "取消與改期路徑", "緊急聯絡資訊"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["核准的醫療機構語氣與術語", "明示的隱私與照護政策"],
+        "must_not_infer": ["不存在的醫療成效或信任背書", "由冷靜配色推導病人理解或安全"],
+        "ethics_constraints": ["不得脅迫預約", "保護健康與聯絡資料", "取消與預約保持合理對稱"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "桌機可並列顯示時段、摘要與流程說明。",
+        "changes": ["保留可續作狀態", "改成虛擬鍵盤安全的單步控制", "讓緊急聯絡路徑持續可找"],
+        "must_preserve": ["預約條件", "取消能力", "錯誤恢復"]
+      },
+      "hidden_acceptance_focus": ["驗證後恢復", "取消對稱性", "隱私界線", "錯誤理解"]
+    },
+    {
+      "case_id": "api-key-management",
+      "locale": "en",
+      "surface_type": "settings",
+      "audience": "Developer issuing, rotating, copying, and revoking production credentials.",
+      "primary_task": "Create or rotate a key, capture its one-time value safely, and revoke the intended scope without ambiguity.",
+      "expected_representation": ["credential settings", "key inventory table", "one-time secret reveal", "destructive confirmation"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["documented product terminology", "existing security and permission conventions"],
+        "must_not_infer": ["campaign language applies to secret handling", "a masked value proves safe storage"],
+        "ethics_constraints": ["never fabricate, log, or re-display a one-time secret"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "Desktop keeps key inventory, scope, age, and actions comparable.",
+        "changes": ["show masked key summaries", "move reveal and destructive actions into deliberate detail sheets"],
+        "must_preserve": ["one-time secret warning", "copy feedback", "revocation scope"]
+      },
+      "hidden_acceptance_focus": ["one-time secret lifecycle", "copy status", "revocation scope", "Back and refresh safety"]
+    },
+    {
+      "case_id": "cart-return-subscription",
+      "locale": "zh-Hant",
+      "surface_type": "commerce",
+      "audience": "要調整購物車、退貨或訂閱承諾的既有顧客。",
+      "primary_task": "在看清價格、續訂與退款條件後，完成變更、取消或復原。",
+      "expected_representation": ["交易摘要", "條款與費用", "變更表單", "狀態時間軸"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["明示價格與續訂條款", "核准的退款政策與商品資料"],
+        "must_not_infer": ["稀缺或倒數壓力", "隱藏費用可由品牌語氣合理化"],
+        "ethics_constraints": ["拒絕 dark patterns", "接受與取消成本合理對稱", "承諾前揭露重要條款"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "桌機並列項目、總額、條款與狀態。",
+        "changes": ["持續顯示總額與重要條款", "避免固定 UI 遮住內容或取消路徑"],
+        "must_preserve": ["價格計算", "退款與續訂條件", "復原能力"]
+      },
+      "hidden_acceptance_focus": ["接受與取消對稱性", "過期總額", "在地化價格與條款", "失敗恢復"]
+    },
+    {
+      "case_id": "editorial-archive",
+      "locale": "zh-Hant",
+      "surface_type": "editorial",
+      "audience": "尋找、閱讀、引用並註記長篇史料的讀者與研究者。",
+      "primary_task": "從索引找到可信材料，保留篩選脈絡，閱讀並記錄可追溯引用。",
+      "expected_representation": ["搜尋與索引", "長文閱讀器", "來源 metadata", "註記與引用"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["核准的編輯語氣", "具來源與權利資料的圖像及文獻"],
+        "must_not_infer": ["活動封面等於永久閱讀系統", "無來源素材可作史料證據"],
+        "ethics_constraints": ["保留引用脈絡與素材權利", "區分編輯內容、使用者註記與未知來源"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "桌機可同時呈現索引、閱讀內容、metadata 與註記。",
+        "changes": ["提供閱讀控制", "保留可續作的 archive 篩選", "把次要 metadata 放入可找回的 disclosure"],
+        "must_preserve": ["標題與 landmark 順序", "引用來源", "閱讀位置"]
+      },
+      "hidden_acceptance_focus": ["heading 與 landmark 順序", "長篇繁中排版", "引用完整性", "offline 與失敗狀態"]
+    },
+    {
+      "case_id": "collaboration-inbox",
+      "locale": "en",
+      "surface_type": "collaboration",
+      "audience": "Team member triaging high-volume messages, assignments, and presence changes.",
+      "primary_task": "Prioritize incoming work, inspect context, and apply bulk or individual state changes without losing place.",
+      "expected_representation": ["inbox list", "master-detail context", "bulk state controls", "presence and permission states"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["existing collaboration terminology", "documented moderation and presence rules"],
+        "must_not_infer": ["unknown user content is trusted brand copy", "presence implies availability or consent"],
+        "ethics_constraints": ["preserve moderation and permission boundaries", "do not expose private presence or message data"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "Desktop retains list and detail context for rapid triage.",
+        "changes": ["prioritize the inbox list", "open message context as a detail route", "move frequent actions into thumb reach"],
+        "must_preserve": ["read and unread identity", "history position", "bulk selection state"]
+      },
+      "hidden_acceptance_focus": ["read and unread identity", "race and offline recovery", "focus and history", "empty and permission states"]
+    },
+    {
+      "case_id": "preferences-settings",
+      "locale": "zh-Hant",
+      "surface_type": "settings",
+      "audience": "要修改相依設定、預設值、同意或帳戶資料的既有使用者。",
+      "primary_task": "理解設定影響後完成變更，並能復原、撤回同意或安全處理破壞性操作。",
+      "expected_representation": ["分組設定表單", "相依 disclosure", "搜尋與任務群組", "儲存與復原狀態"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["既有設定術語與預設值文件", "明示的同意與資料保留政策"],
+        "must_not_infer": ["預選同意符合使用者利益", "行銷優先級可覆寫設定相依性"],
+        "ethics_constraints": ["預設透明且可逆", "撤回同意可找且可完成", "破壞性操作需明確後果"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "桌機用分組表單與相依說明保持全局脈絡。",
+        "changes": ["提供設定搜尋與任務群組", "保持表單與虛擬鍵盤安全", "延後次要說明但不可隱藏後果"],
+        "must_preserve": ["相依關係", "目前值與未儲存狀態", "撤回與復原路徑"]
+      },
+      "hidden_acceptance_focus": ["相依錯誤", "paste、autofill 與 IME", "save 與 revert", "同意撤回"]
+    },
+    {
+      "case_id": "brand-system-campaign",
+      "locale": "en",
+      "surface_type": "design_system",
+      "audience": "Brand owner governing durable product UI and a time-bounded campaign across locales.",
+      "primary_task": "Apply an approved campaign expression without replacing product-system invariants, accessibility, or fallback behavior.",
+      "expected_representation": ["semantic tokens", "reusable components", "bounded campaign overlay", "expiry and fallback contract"],
+      "brand_evidence_boundary": {
+        "allowed_sources": ["explicit approved guidelines", "repeated first-party observations with explicit provenance", "owned assets with rights"],
+        "must_not_infer": ["one campaign is the master brand system", "inferred or unknown rules are official invariants"],
+        "ethics_constraints": ["label explicit, observed, inferred, and unknown evidence", "preserve locale, rights, accessibility, and product safety"]
+      },
+      "mobile_transformation": {
+        "desktop_context": "Desktop campaign art direction may expand while product components retain their task model.",
+        "changes": ["adapt campaign crop and pacing", "retain product navigation and controls", "provide expiry fallback"],
+        "must_preserve": ["system invariants", "product task model", "locale and asset rights"]
+      },
+      "hidden_acceptance_focus": ["invariant preservation", "overlay expiry and fallback", "locale behavior", "asset provenance and rights"]
+    }
+  ]
+}

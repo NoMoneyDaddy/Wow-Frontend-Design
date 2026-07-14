@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>港務巡檢工單控制台</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">跳至主要內容</a>
+
+  <header class="app-header">
+    <div class="header-container">
+      <h1 class="app-title">港務巡檢控制台</h1>
+      <nav class="main-nav">
+        <button class="nav-item" data-section="dashboard" aria-current="page">儀表板</button>
+        <button class="nav-item" data-section="reports">報表</button>
+        <button class="nav-item" data-section="settings">設定</button>
+      </nav>
+      <div class="user-indicator" aria-label="登入使用者">主管</div>
+    </div>
+  </header>
+
+  <main id="main-content" class="app-main">
+    <div class="content-wrapper">
+      <!-- Summary metrics -->
+      <section class="metrics-section" aria-label="工單摘要統計">
+        <div class="metric-card">
+          <div class="metric-value" id="total-count">8</div>
+          <div class="metric-label">全部工單</div>
+        </div>
+        <div class="metric-card metric-alert">
+          <div class="metric-value" id="overdue-count">1</div>
+          <div class="metric-label">逾期</div>
+        </div>
+        <div class="metric-card metric-warning">
+          <div class="metric-value" id="urgent-count">2</div>
+          <div class="metric-label">高優先度</div>
+        </div>
+        <div class="metric-card metric-success">
+          <div class="metric-value" id="completed-count">2</div>
+          <div class="metric-label">已完成</div>
+        </div>
+      </section>
+
+      <!-- Filter controls -->
+      <section class="filter-section" aria-label="工單篩選">
+        <div class="filter-header">
+          <h2>篩選與搜尋</h2>
+          <button class="filter-toggle" id="filter-toggle" aria-expanded="false" aria-controls="filter-controls">
+            <span class="filter-icon">⚙</span>
+            <span class="filter-label">顯示篩選</span>
+          </button>
+        </div>
+
+        <div class="filter-controls" id="filter-controls" role="region" aria-label="篩選控制面板">
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="search-input">搜尋工單編號或描述</label>
+              <input
+                type="text"
+                id="search-input"
+                class="filter-input"
+                placeholder="輸入關鍵字…"
+                aria-label="搜尋工單"
+              >
+            </div>
+          </div>
+
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="area-filter">區域</label>
+              <select id="area-filter" class="filter-select" aria-label="依區域篩選">
+                <option value="">全部區域</option>
+                <option value="north">北區</option>
+                <option value="south">南區</option>
+                <option value="east">東區</option>
+                <option value="west">西區</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="status-filter">狀態</label>
+              <select id="status-filter" class="filter-select" aria-label="依狀態篩選">
+                <option value="">全部狀態</option>
+                <option value="open">待處理</option>
+                <option value="in-progress">進行中</option>
+                <option value="completed">已完成</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="priority-filter">優先度</label>
+              <select id="priority-filter" class="filter-select" aria-label="依優先度篩選">
+                <option value="">全部優先度</option>
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button id="clear-filters" class="btn btn-secondary">清除所有條件</button>
+          </div>
+        </div>
+
+        <div class="result-count" aria-live="polite" aria-atomic="true">
+          <span id="result-message">顯示 8 筆工單</span>
+        </div>
+      </section>
+
+      <!-- Workorder list -->
+      <section class="workorder-section" aria-label="工單列表">
+        <div id="empty-state" class="empty-state" role="region" aria-label="沒有結果">
+          <div class="empty-icon">🔍</div>
+          <h3>沒有符合的工單</h3>
+          <p>試試調整篩選條件或清除搜尋。</p>
+        </div>
+
+        <table id="workorder-table" class="workorder-table" aria-label="港務巡檢工單">
+          <thead>
+            <tr>
+              <th scope="col">工單編號</th>
+              <th scope="col">描述</th>
+              <th scope="col">區域</th>
+              <th scope="col">優先度</th>
+              <th scope="col">狀態</th>
+              <th scope="col">期限</th>
+              <th scope="col">負責人</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody id="workorder-body">
+            <!-- Populated by JavaScript -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Error state demonstration -->
+      <section id="error-section" class="error-section" role="region" aria-label="系統狀態">
+        <!-- Shown only when demonstrating error -->
+      </section>
+    </div>
+  </main>
+
+  <!-- Detail overlay -->
+  <div id="detail-overlay" class="detail-overlay" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden>
+    <div class="detail-backdrop" id="detail-backdrop"></div>
+    <div class="detail-panel">
+      <div class="detail-header">
+        <h2 id="detail-title">工單詳情</h2>
+        <button class="detail-close" id="detail-close" aria-label="關閉詳情">✕</button>
+      </div>
+      <div class="detail-content">
+        <div class="detail-form">
+          <div class="form-group">
+            <label>工單編號</label>
+            <div class="form-value" id="detail-id"></div>
+          </div>
+
+          <div class="form-group">
+            <label>描述</label>
+            <div class="form-value" id="detail-description"></div>
+          </div>
+
+          <div class="form-group">
+            <label>區域</label>
+            <div class="form-value" id="detail-area"></div>
+          </div>
+
+          <div class="form-group">
+            <label>優先度</label>
+            <div class="form-value" id="detail-priority"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="detail-status">狀態</label>
+            <select id="detail-status" class="form-control">
+              <option value="open">待處理</option>
+              <option value="in-progress">進行中</option>
+              <option value="completed">已完成</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>期限</label>
+            <div class="form-value" id="detail-deadline"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="detail-assignee">負責人</label>
+            <select id="detail-assignee" class="form-control">
+              <option value="unassigned">未指派</option>
+              <option value="alice">Alice 王</option>
+              <option value="bob">Bob 李</option>
+              <option value="charlie">Charlie 陳</option>
+              <option value="diana">Diana 黃</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>建立時間</label>
+            <div class="form-value" id="detail-created"></div>
+          </div>
+        </div>
+
+        <div id="detail-success" class="success-message" role="status" aria-live="polite" hidden>
+          ✓ 工單已更新
+        </div>
+      </div>
+
+      <div class="detail-footer">
+        <button id="detail-save" class="btn btn-primary">保存變更</button>
+        <button id="detail-cancel" class="btn btn-secondary">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error demo modal -->
+  <div id="error-demo" class="detail-overlay" role="dialog" aria-modal="true" aria-labelledby="error-title" hidden>
+    <div class="detail-backdrop"></div>
+    <div class="detail-panel error-panel">
+      <div class="detail-header">
+        <h2 id="error-title">⚠ 同步失敗</h2>
+        <button class="detail-close" id="error-close" aria-label="關閉訊息">✕</button>
+      </div>
+      <div class="detail-content">
+        <p>工單編號 WO-001 的狀態更新失敗。網路連線中斷。</p>
+        <p style="margin-top: 1rem; font-size: 0.875rem; color: var(--color-muted);">此為示例錯誤狀態。實際應用將顯示真實同步錯誤和復原選項。</p>
+      </div>
+      <div class="detail-footer">
+        <button id="error-retry" class="btn btn-primary">重試</button>
+        <button id="error-dismiss" class="btn btn-secondary">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

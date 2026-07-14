@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>潮間帶聲音檔案館｜臺灣海岸聲景公民採集</title>
+<meta name="description" content="收錄臺灣潮間帶的退潮、藤壺、招潮蟹與夜浪聲景。依地點聆聽、收藏一筆紀錄，加入公民聲音採集計畫。">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要內容</a>
+
+<header class="site-head">
+  <div class="wrap head-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>潮間帶聲音檔案館</strong>
+        <span class="brand-sub">臺灣海岸聲景・公民採集</span>
+      </span>
+    </div>
+    <nav class="head-nav" aria-label="主要導覽">
+      <a href="#listen">聲景</a>
+      <a href="#filter">依地點</a>
+      <a href="#join">加入採集</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="intro wrap" aria-labelledby="intro-title">
+    <div class="intro-copy">
+      <p class="eyebrow">一頁讀懂，十秒入海</p>
+      <h1 id="intro-title">記錄潮水退去那一刻，海岸還在說話。</h1>
+      <p class="lede">
+        我們沿著臺灣海岸線，在退潮的兩小時內錄下潮池、藻礁與泥灘的聲音。
+        每一筆都附上採集人筆記與潮汐刻度。挑一個地點聆聽，收藏你想再聽一次的那一段。
+      </p>
+      <div class="intro-actions">
+        <a class="btn btn-primary" href="#filter">開始聆聽</a>
+        <a class="btn btn-ghost" href="#join">成為採集人</a>
+      </div>
+    </div>
+    <dl class="intro-stats" aria-label="檔案概況">
+      <div class="stat">
+        <dt>已收錄聲景</dt>
+        <dd><span class="num" data-total-count>4</span> 筆</dd>
+      </div>
+      <div class="stat">
+        <dt>採集地點</dt>
+        <dd><span class="num">4</span> 處海岸</dd>
+      </div>
+      <div class="stat stat-fav">
+        <dt>你的收藏</dt>
+        <dd><span class="num" data-fav-count aria-live="polite">0</span> 筆</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section id="filter" class="filter-sec wrap" aria-labelledby="filter-title">
+    <div class="filter-head">
+      <h2 id="filter-title">依地點篩選</h2>
+      <p class="filter-status" data-result-status aria-live="polite">顯示全部 4 筆聲景</p>
+    </div>
+    <div class="chips" role="group" aria-label="採集地點">
+      <button type="button" class="chip is-active" data-region="all" aria-pressed="true">全部海岸</button>
+      <button type="button" class="chip" data-region="north" aria-pressed="false">北海岸</button>
+      <button type="button" class="chip" data-region="northeast" aria-pressed="false">東北角</button>
+      <button type="button" class="chip" data-region="southwest" aria-pressed="false">西南潟湖</button>
+      <button type="button" class="chip" data-region="penghu" aria-pressed="false">澎湖</button>
+    </div>
+  </section>
+
+  <section id="listen" class="listen-sec wrap" aria-labelledby="listen-title">
+    <h2 id="listen-title" class="sr-only">聲景清單</h2>
+    <ul class="record-list" data-record-list>
+
+      <li class="record" data-region="north" data-seed="17">
+        <article aria-labelledby="rec-1-title">
+          <div class="rec-top">
+            <p class="rec-place"><span class="tick" aria-hidden="true"></span>北海岸・富貴角</p>
+            <button type="button" class="fav" aria-pressed="false" data-fav>
+              <span class="fav-ico" aria-hidden="true"></span>
+              <span class="fav-label">收藏</span>
+            </button>
+          </div>
+          <h3 id="rec-1-title" class="rec-title">富貴角藻礁晨潮</h3>
+          <div class="spectro" data-spectro aria-hidden="true"></div>
+          <dl class="rec-meta">
+            <div><dt>時長</dt><dd><span class="mono">04:12</span></dd></div>
+            <div><dt>潮位</dt><dd><span class="mono">退潮 −0.6m</span></dd></div>
+            <div><dt>採集</dt><dd><span class="mono">05:40</span></dd></div>
+          </dl>
+          <button type="button" class="detail-toggle" data-detail-toggle aria-expanded="false" hidden>採集筆記</button>
+          <div class="rec-detail" data-detail>
+            <p class="rec-notes">
+              退潮露出藻礁的第一分鐘最安靜，接著是水從石孔滲落的細碎聲。
+              遠處有風切過玄武岩，像有人反覆翻書。
+            </p>
+            <p class="rec-by">採集人・林潮生</p>
+          </div>
+        </article>
+      </li>
+
+      <li class="record" data-region="northeast" data-seed="41">
+        <article aria-labelledby="rec-2-title">
+          <div class="rec-top">
+            <p class="rec-place"><span class="tick" aria-hidden="true"></span>東北角・和美潮池</p>
+            <button type="button" class="fav" aria-pressed="false" data-fav>
+              <span class="fav-ico" aria-hidden="true"></span>
+              <span class="fav-label">收藏</span>
+            </button>
+          </div>
+          <h3 id="rec-2-title" class="rec-title">潮池藤壺的退潮吐息</h3>
+          <div class="spectro" data-spectro aria-hidden="true"></div>
+          <dl class="rec-meta">
+            <div><dt>時長</dt><dd><span class="mono">06:38</span></dd></div>
+            <div><dt>潮位</dt><dd><span class="mono">退潮 −0.9m</span></dd></div>
+            <div><dt>採集</dt><dd><span class="mono">14:05</span></dd></div>
+          </dl>
+          <button type="button" class="detail-toggle" data-detail-toggle aria-expanded="false" hidden>採集筆記</button>
+          <div class="rec-detail" data-detail>
+            <p class="rec-notes">
+              藤壺閉殼時發出密集的啵啵聲，退潮後整片潮池像在低聲沸騰。
+              把耳機音量調小，才聽得見底下寄居蟹拖著殼的摩擦。
+            </p>
+            <p class="rec-by">採集人・吳岩</p>
+          </div>
+        </article>
+      </li>
+
+      <li class="record" data-region="southwest" data-seed="73">
+        <article aria-labelledby="rec-3-title">
+          <div class="rec-top">
+            <p class="rec-place"><span class="tick" aria-hidden="true"></span>西南潟湖・七股</p>
+            <button type="button" class="fav" aria-pressed="false" data-fav>
+              <span class="fav-ico" aria-hidden="true"></span>
+              <span class="fav-label">收藏</span>
+            </button>
+          </div>
+          <h3 id="rec-3-title" class="rec-title">七股潟湖招潮蟹群</h3>
+          <div class="spectro" data-spectro aria-hidden="true"></div>
+          <dl class="rec-meta">
+            <div><dt>時長</dt><dd><span class="mono">03:55</span></dd></div>
+            <div><dt>潮位</dt><dd><span class="mono">退潮 −0.4m</span></dd></div>
+            <div><dt>採集</dt><dd><span class="mono">16:20</span></dd></div>
+          </dl>
+          <button type="button" class="detail-toggle" data-detail-toggle aria-expanded="false" hidden>採集筆記</button>
+          <div class="rec-detail" data-detail>
+            <p class="rec-notes">
+              泥灘上成千的招潮蟹揮螯，聲音細得像雨落在紙上。
+              有漁筏遠遠駛過，低頻讓整片泥地跟著震了一下。
+            </p>
+            <p class="rec-by">採集人・陳汐</p>
+          </div>
+        </article>
+      </li>
+
+      <li class="record" data-region="penghu" data-seed="29">
+        <article aria-labelledby="rec-4-title">
+          <div class="rec-top">
+            <p class="rec-place"><span class="tick" aria-hidden="true"></span>澎湖・望安</p>
+            <button type="button" class="fav" aria-pressed="false" data-fav>
+              <span class="fav-ico" aria-hidden="true"></span>
+              <span class="fav-label">收藏</span>
+            </button>
+          </div>
+          <h3 id="rec-4-title" class="rec-title">望安沙灘的夜浪</h3>
+          <div class="spectro" data-spectro aria-hidden="true"></div>
+          <dl class="rec-meta">
+            <div><dt>時長</dt><dd><span class="mono">08:02</span></dd></div>
+            <div><dt>潮位</dt><dd><span class="mono">退潮 −0.7m</span></dd></div>
+            <div><dt>採集</dt><dd><span class="mono">22:48</span></dd></div>
+          </dl>
+          <button type="button" class="detail-toggle" data-detail-toggle aria-expanded="false" hidden>採集筆記</button>
+          <div class="rec-detail" data-detail>
+            <p class="rec-notes">
+              夜裡沒有遊客，只剩浪一層層鋪上沙又收回。
+              間隔很規律，像有人在替海岸線量脈搏。
+            </p>
+            <p class="rec-by">採集人・郭海</p>
+          </div>
+        </article>
+      </li>
+
+    </ul>
+    <p class="empty-state" data-empty hidden>這個地點目前還沒有聲景。換一個海岸試試，或加入採集把它補上。</p>
+  </section>
+
+  <section id="join" class="join-sec" aria-labelledby="join-title">
+    <div class="wrap join-inner">
+      <div class="join-copy">
+        <h2 id="join-title">加入採集，收到新的海岸聲景</h2>
+        <p>
+          每當有新的潮間帶聲景入庫，我們會寄一封信給你，附上採集地點與那天的潮汐。
+          不轉寄、不追蹤位置，隨時可退訂。
+        </p>
+      </div>
+      <form class="join-form" novalidate data-form>
+        <div class="field">
+          <label for="email">你的電子信箱</label>
+          <input type="email" id="email" name="email" inputmode="email"
+                 autocomplete="email" placeholder="name@ocean.tw"
+                 aria-describedby="email-hint email-error" required>
+          <p id="email-hint" class="hint">用來寄送新聲景通知。</p>
+          <p id="email-error" class="error" data-error hidden></p>
+        </div>
+        <button type="submit" class="btn btn-primary">加入採集通知</button>
+        <p class="form-status" role="status" data-status></p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-inner">
+    <p>潮間帶聲音檔案館・公民聲景計畫</p>
+    <p class="foot-note">所有聲景由採集志工於臺灣海岸實地錄製。</p>
+  </div>
+</footer>
+
+<nav class="tabbar" aria-label="快速導覽">
+  <a href="#listen">聲景</a>
+  <a href="#filter">篩選</a>
+  <a href="#join" class="tab-join">加入</a>
+  <a href="#main" class="tab-fav">
+    收藏<span class="tab-badge" data-fav-count aria-hidden="true">0</span>
+  </a>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>

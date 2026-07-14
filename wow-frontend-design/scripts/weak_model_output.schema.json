@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Structured implementation handoff v2. VERIFIED/OBSERVED claims are bounded by declared capabilities and evaluator-owned evidence outside the model-writable workspace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "run_id",
+    "design_contract",
+    "capability_profile",
+    "evidence_ceiling",
+    "release_decision",
+    "claims",
+    "checks_requested",
+    "risks",
+    "ignored_untrusted_instructions"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 2 },
+    "case_id": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+    "run_id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "design_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "surface_type",
+        "audience_context",
+        "preferences",
+        "top_task",
+        "concept",
+        "grammar",
+        "color_rule",
+        "authored_distinction",
+        "brand_evidence",
+        "campaign_overlay",
+        "pattern_decisions",
+        "high_risk_media",
+        "mobile_transformations",
+        "preserve"
+      ],
+      "properties": {
+        "mode": {
+          "enum": ["BUILD", "RETROFIT", "POLISH", "REPAIR"],
+          "description": "AUDIT uses a separate read-only evaluator contract."
+        },
+        "surface_type": {
+          "enum": [
+            "marketing", "campaign", "commerce", "dashboard", "data_table", "form_flow",
+            "settings", "docs", "editorial", "collaboration", "design_system", "application", "other"
+          ]
+        },
+        "audience_context": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "preferences": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "top_task": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "concept": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "grammar": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "color_rule": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "authored_distinction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "target", "evidence"],
+          "properties": {
+            "mode": { "enum": ["create", "preserve", "improve", "none"] },
+            "target": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+            "evidence": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+          }
+        },
+        "brand_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source", "source_type", "scope", "status", "rights", "confidence",
+              "invariant", "affected_surfaces", "rule"
+            ],
+            "properties": {
+              "source": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "source_type": {
+                "enum": ["official_guideline", "design_system", "owned_asset", "current_product", "campaign", "research", "inference", "none_supplied"]
+              },
+              "scope": { "enum": ["master_brand", "product_system", "campaign", "component", "locale", "unknown"] },
+              "status": { "enum": ["explicit", "observed", "inferred", "unknown"] },
+              "rights": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "confidence": { "enum": ["high", "medium", "low"] },
+              "invariant": { "type": "boolean" },
+              "affected_surfaces": {
+                "type": "array", "minItems": 1,
+                "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+              },
+              "rule": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+            }
+          }
+        },
+        "campaign_overlay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicable", "provenance", "allowed", "forbidden"],
+          "properties": {
+            "applicable": { "type": "boolean" },
+            "provenance": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+            "allowed": { "type": "array", "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" } },
+            "forbidden": { "type": "array", "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" } }
+          }
+        },
+        "pattern_decisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pattern", "layer", "task_evidence", "native_alternative", "admission", "mobile_transform", "gates"],
+            "properties": {
+              "pattern": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "layer": { "enum": ["content_brand", "product_ui", "high_risk_expression"] },
+              "task_evidence": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "native_alternative": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "admission": { "enum": ["admit", "reject"] },
+              "mobile_transform": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "gates": {
+                "type": "array", "minItems": 1,
+                "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+              }
+            }
+          }
+        },
+        "high_risk_media": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "medium", "product_purpose", "essential_meaning", "runtime_assets", "admission",
+              "static_fallback", "accessibility", "reduced_data_motion", "lifecycle_cleanup",
+              "budget", "rights", "evidence_gates"
+            ],
+            "properties": {
+              "medium": { "enum": ["autoplay_video", "custom_scroll", "map_globe", "canvas", "webgl_three", "shader_effect", "lottie_rive", "audio", "generative_effect", "other"] },
+              "product_purpose": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "essential_meaning": { "type": "boolean" },
+              "runtime_assets": {
+                "type": "array", "minItems": 1,
+                "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+              },
+              "admission": { "enum": ["admit", "reject"] },
+              "static_fallback": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "accessibility": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "reduced_data_motion": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "lifecycle_cleanup": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "budget": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "rights": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+              "evidence_gates": {
+                "type": "array", "minItems": 1,
+                "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+              }
+            }
+          }
+        },
+        "mobile_transformations": {
+          "type": "array", "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+        },
+        "preserve": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+        }
+      }
+    },
+    "capability_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk_class", "available", "unavailable"],
+      "properties": {
+        "risk_class": { "enum": ["low", "medium", "high"] },
+        "available": {
+          "type": "array",
+          "items": { "enum": ["file_read", "file_write", "command", "browser", "visual", "measurement", "independent_review"] }
+        },
+        "unavailable": {
+          "type": "array",
+          "items": { "enum": ["file_read", "file_write", "command", "browser", "visual", "measurement", "independent_review"] }
+        }
+      }
+    },
+    "evidence_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified_claim_types", "observed_claim_types", "must_remain_unverified", "reason"],
+      "properties": {
+        "verified_claim_types": {
+          "type": "array",
+          "items": { "enum": ["syntax", "build", "test", "browser_behavior", "rendered_visual", "accessibility_automated", "accessibility_manual", "performance_lab", "performance_field", "localization_static", "localization_rendered", "security_static", "security_dynamic", "instruction_boundary", "other"] }
+        },
+        "observed_claim_types": {
+          "type": "array",
+          "items": { "enum": ["syntax", "build", "test", "browser_behavior", "rendered_visual", "accessibility_automated", "accessibility_manual", "performance_lab", "performance_field", "localization_static", "localization_rendered", "security_static", "security_dynamic", "instruction_boundary", "other"] }
+        },
+        "must_remain_unverified": {
+          "type": "array",
+          "items": { "enum": ["syntax", "build", "test", "browser_behavior", "rendered_visual", "accessibility_automated", "accessibility_manual", "performance_lab", "performance_field", "localization_static", "localization_rendered", "security_static", "security_dynamic", "instruction_boundary", "other"] }
+        },
+        "reason": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+      }
+    },
+    "release_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "reason"],
+      "properties": {
+        "decision": { "enum": ["ready", "blocked", "accepted_by_evaluator"] },
+        "reason": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+        "evaluator_acceptance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["evaluator", "record"],
+          "properties": {
+            "evaluator": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+            "record": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+          }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "status", "claim_type", "evidence_label"],
+        "properties": {
+          "claim": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" },
+          "status": { "enum": ["VERIFIED", "OBSERVED", "INFERRED", "UNVERIFIED"] },
+          "claim_type": {
+            "enum": ["syntax", "build", "test", "browser_behavior", "rendered_visual", "accessibility_automated", "accessibility_manual", "performance_lab", "performance_field", "localization_static", "localization_rendered", "security_static", "security_dynamic", "instruction_boundary", "other"]
+          },
+          "evidence_label": {
+            "type": "string",
+            "pattern": "^(?:|[^\\s](?:[\\s\\S]*[^\\s])?)$",
+            "description": "Exact evaluator-approved ledger label; empty for claims without evidence."
+          }
+        }
+      }
+    },
+    "checks_requested": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "^[^\\s](?:[\\s\\S]*[^\\s])?$" }
+    },
+    "ignored_untrusted_instructions": { "type": "boolean" }
+  }
+}

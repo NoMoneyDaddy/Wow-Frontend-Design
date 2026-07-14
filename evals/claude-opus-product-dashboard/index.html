@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>港務巡檢工單控制台</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#work-list">跳至工單列表</a>
+
+<header class="topbar">
+  <div class="topbar__brand">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2v20M5 8l7-4 7 4M4 20h16M8 20v-6M16 20v-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <span class="topbar__title">港務巡檢 · 工單控制台</span>
+  </div>
+  <nav class="topbar__nav" aria-label="主要導覽">
+    <a href="#work-list" aria-current="page">工單</a>
+    <a href="#summary">值班摘要</a>
+    <a href="#filters">篩選</a>
+  </nav>
+  <div class="topbar__shift">
+    <span class="dot" aria-hidden="true"></span>
+    <span>值班中 · 甲班</span>
+  </div>
+</header>
+
+<main class="shell">
+  <section id="summary" class="summary" aria-label="值班摘要指標">
+    <h1 class="summary__h">值班摘要</h1>
+    <ul class="metrics" id="metrics"></ul>
+    <p class="summary__note">摘要為全部工單即時概況；請於下方工作區處理個別工單。</p>
+  </section>
+
+  <section class="workspace">
+    <form id="filters" class="filters" aria-label="工單篩選與搜尋">
+      <div class="filters__row">
+        <div class="field">
+          <label for="f-search">搜尋工單</label>
+          <input type="search" id="f-search" name="search" inputmode="search"
+                 placeholder="工單編號、標題或負責人" autocomplete="off">
+        </div>
+      </div>
+      <div class="filters__row filters__row--controls">
+        <div class="field">
+          <label for="f-zone">區域</label>
+          <select id="f-zone" name="zone"></select>
+        </div>
+        <div class="field">
+          <label for="f-priority">優先度</label>
+          <select id="f-priority" name="priority">
+            <option value="">全部優先度</option>
+            <option value="high">高</option>
+            <option value="mid">中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-status">狀態</label>
+          <select id="f-status" name="status">
+            <option value="">全部狀態</option>
+            <option value="pending">待處理</option>
+            <option value="active">處理中</option>
+            <option value="waiting">待料</option>
+            <option value="done">已完成</option>
+          </select>
+        </div>
+        <div class="field field--toggle">
+          <label class="check">
+            <input type="checkbox" id="f-overdue" name="overdue">
+            <span>僅顯示逾期</span>
+          </label>
+        </div>
+        <button type="button" class="btn btn--ghost" id="clear-filters">清除條件</button>
+      </div>
+    </form>
+
+    <div class="board">
+      <section class="list-panel" aria-labelledby="list-heading">
+        <div class="list-panel__head">
+          <h2 id="list-heading">工單列表</h2>
+          <p class="result-count" id="result-count" aria-live="polite"></p>
+        </div>
+        <ol class="worklist" id="work-list" aria-label="巡檢工單"></ol>
+        <div class="empty" id="empty-state" hidden>
+          <p class="empty__title">沒有符合條件的工單</p>
+          <p class="empty__body">請放寬篩選條件或清除搜尋文字。</p>
+          <button type="button" class="btn btn--ghost" id="empty-clear">清除條件</button>
+        </div>
+      </section>
+
+      <aside class="detail" id="detail" aria-labelledby="detail-heading" tabindex="-1">
+        <div class="detail__placeholder" id="detail-empty">
+          <p>從左側選取一張工單以檢視詳情並更新負責人與狀態。</p>
+        </div>
+        <div class="detail__body" id="detail-body" hidden></div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

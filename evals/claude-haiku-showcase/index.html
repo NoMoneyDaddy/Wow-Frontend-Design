@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="潮間帶聲景檔案館——臺灣公民採集計畫">
+  <title>潮間帶聲景檔案館</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">跳至主要內容</a>
+
+  <header class="site-header">
+    <div class="header-content">
+      <h1 class="site-title">潮間帶聲景</h1>
+      <p class="site-tagline">臺灣潮汐生態的聲音檔案</p>
+    </div>
+    <button class="filter-toggle" id="filter-toggle" aria-label="顯示/隱藏地點篩選" aria-expanded="false" aria-controls="filter-sheet">
+      <span class="filter-icon">⚙</span>
+      <span class="filter-label">篩選地點</span>
+    </button>
+  </header>
+
+  <nav class="filter-sheet" id="filter-sheet" hidden aria-label="地點篩選">
+    <div class="filter-sheet-content">
+      <button class="filter-sheet-close" id="filter-close" aria-label="關閉篩選">✕</button>
+      <h2 class="filter-title">地點篩選</h2>
+      <fieldset class="filter-options">
+        <legend>選擇地點</legend>
+        <label class="filter-option">
+          <input type="radio" name="location" value="all" checked>
+          <span>全部地點</span>
+        </label>
+        <label class="filter-option">
+          <input type="radio" name="location" value="tainan">
+          <span>臺南竹塹古蹟區</span>
+        </label>
+        <label class="filter-option">
+          <input type="radio" name="location" value="keelung">
+          <span>基隆和平島</span>
+        </label>
+        <label class="filter-option">
+          <input type="radio" name="location" value="kinmen">
+          <span>金門古寧頭</span>
+        </label>
+      </fieldset>
+    </div>
+  </nav>
+
+  <main id="main-content" class="main-content">
+    <section class="hero">
+      <div class="hero-content">
+        <h2>與潮汐同行的聲景檔案庫</h2>
+        <p>每次潮落潮漲，臺灣的海岸線都在唱歌。貝殼碎裂、波浪拍打、鳥鳴交織——邀請你透過錄音筆，記錄那些即將消失的聲景。</p>
+      </div>
+      <div class="spectrogram-demo">
+        <svg viewBox="0 0 200 60" aria-hidden="true">
+          <rect x="10" y="50" width="4" height="6" fill="#4fa876"/>
+          <rect x="16" y="40" width="4" height="16" fill="#4fa876"/>
+          <rect x="22" y="35" width="4" height="21" fill="#4fa876"/>
+          <rect x="28" y="30" width="4" height="26" fill="#4fa876"/>
+          <rect x="34" y="25" width="4" height="31" fill="#4fa876"/>
+          <rect x="40" y="28" width="4" height="28" fill="#4fa876"/>
+          <rect x="46" y="33" width="4" height="23" fill="#4fa876"/>
+          <rect x="52" y="38" width="4" height="18" fill="#4fa876"/>
+          <rect x="58" y="45" width="4" height="11" fill="#4fa876"/>
+          <rect x="64" y="52" width="4" height="4" fill="#4fa876"/>
+          <rect x="70" y="50" width="4" height="6" fill="#4fa876"/>
+          <rect x="76" y="42" width="4" height="14" fill="#4fa876"/>
+          <rect x="82" y="36" width="4" height="20" fill="#4fa876"/>
+          <rect x="88" y="32" width="4" height="24" fill="#4fa876"/>
+          <rect x="94" y="29" width="4" height="27" fill="#4fa876"/>
+          <rect x="100" y="31" width="4" height="25" fill="#4fa876"/>
+          <rect x="106" y="37" width="4" height="19" fill="#4fa876"/>
+          <rect x="112" y="43" width="4" height="13" fill="#4fa876"/>
+          <rect x="118" y="49" width="4" height="7" fill="#4fa876"/>
+          <rect x="124" y="51" width="4" height="5" fill="#4fa876"/>
+          <line x1="10" y1="56" x2="130" y2="56" stroke="#ccc" stroke-width="1"/>
+        </svg>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="filter-bar-desktop">
+        <button class="filter-chip" data-filter="all" aria-pressed="true">全部</button>
+        <button class="filter-chip" data-filter="tainan">臺南</button>
+        <button class="filter-chip" data-filter="keelung">基隆</button>
+        <button class="filter-chip" data-filter="kinmen">金門</button>
+      </div>
+
+      <div class="soundscapes-grid" id="soundscapes-grid">
+        <article class="soundscape-card" data-location="tainan">
+          <header class="card-header">
+            <h3>竹塹古蹟區——貝殼碎裂的午後</h3>
+            <p class="card-meta">臺南 · 2024 年 8 月 12 日</p>
+          </header>
+          <div class="card-body">
+            <p>退潮後的沙灘上，貝殼在陽光下碎裂成細微的聲響。這段錄音捕捉了十分鐘內三十隻螺貝的自然破碎聲，是潮間帶物理變化的聲音檔案。</p>
+            <div class="card-spectrogram">
+              <span class="spec-bar" style="height: 35%"></span>
+              <span class="spec-bar" style="height: 52%"></span>
+              <span class="spec-bar" style="height: 68%"></span>
+              <span class="spec-bar" style="height: 45%"></span>
+              <span class="spec-bar" style="height: 58%"></span>
+              <span class="spec-bar" style="height: 72%"></span>
+              <span class="spec-bar" style="height: 48%"></span>
+              <span class="spec-bar" style="height: 61%"></span>
+            </div>
+            <div class="card-metadata">
+              <span class="metadata-item">時長：8:43</span>
+              <span class="metadata-item">潮位：低潮 –0.8m</span>
+              <span class="metadata-item">溫度：32°C</span>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <button class="save-button" data-id="s001" aria-pressed="false">
+              <span class="save-icon">☆</span>
+              <span class="save-text">收藏</span>
+            </button>
+            <span class="save-count" data-id="s001">0</span>
+          </footer>
+        </article>
+
+        <article class="soundscape-card" data-location="keelung">
+          <header class="card-header">
+            <h3>和平島——海浪與礁石的對話</h3>
+            <p class="card-meta">基隆 · 2024 年 8 月 15 日</p>
+          </header>
+          <div class="card-body">
+            <p>大浪拍打黑色礁石的聲音層次豐富。低頻的轟鳴、中頻的衝擊、高頻的水珠飛濺——一首天然的交響樂。這段錄音展現了潮汐動力的完整頻譜。</p>
+            <div class="card-spectrogram">
+              <span class="spec-bar" style="height: 42%"></span>
+              <span class="spec-bar" style="height: 61%"></span>
+              <span class="spec-bar" style="height: 78%"></span>
+              <span class="spec-bar" style="height: 65%"></span>
+              <span class="spec-bar" style="height: 52%"></span>
+              <span class="spec-bar" style="height: 68%"></span>
+              <span class="spec-bar" style="height: 81%"></span>
+              <span class="spec-bar" style="height: 55%"></span>
+            </div>
+            <div class="card-metadata">
+              <span class="metadata-item">時長：12:17</span>
+              <span class="metadata-item">潮位：漲潮 +1.2m</span>
+              <span class="metadata-item">溫度：28°C</span>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <button class="save-button" data-id="s002" aria-pressed="false">
+              <span class="save-icon">☆</span>
+              <span class="save-text">收藏</span>
+            </button>
+            <span class="save-count" data-id="s002">0</span>
+          </footer>
+        </article>
+
+        <article class="soundscape-card" data-location="kinmen">
+          <header class="card-header">
+            <h3>古寧頭——候鳥遷徙的季節交響</h3>
+            <p class="card-meta">金門 · 2024 年 9 月 2 日</p>
+          </header>
+          <div class="card-body">
+            <p>秋季遷徙期間，數千隻候鳥在潮間帶覓食。鳴叫聲、翅膀拍打聲、足踏水聲混合而成的自然合唱，是生態季節更替的聲音日誌。</p>
+            <div class="card-spectrogram">
+              <span class="spec-bar" style="height: 28%"></span>
+              <span class="spec-bar" style="height: 45%"></span>
+              <span class="spec-bar" style="height: 62%"></span>
+              <span class="spec-bar" style="height: 58%"></span>
+              <span class="spec-bar" style="height: 51%"></span>
+              <span class="spec-bar" style="height: 64%"></span>
+              <span class="spec-bar" style="height: 72%"></span>
+              <span class="spec-bar" style="height: 48%"></span>
+            </div>
+            <div class="card-metadata">
+              <span class="metadata-item">時長：15:32</span>
+              <span class="metadata-item">潮位：中潮 +0.3m</span>
+              <span class="metadata-item">溫度：26°C</span>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <button class="save-button" data-id="s003" aria-pressed="false">
+              <span class="save-icon">☆</span>
+              <span class="save-text">收藏</span>
+            </button>
+            <span class="save-count" data-id="s003">0</span>
+          </footer>
+        </article>
+      </div>
+    </section>
+
+    <section class="subscription-section">
+      <div class="subscription-content">
+        <h2>加入採集計畫</h2>
+        <p>每週收到新的聲景故事、採集指南與潮汐預報。協助我們記錄臺灣海岸的聲音變化。</p>
+        <form class="subscription-form" id="subscription-form" novalidate>
+          <div class="form-group">
+            <label for="subscriber-email">電子郵件</label>
+            <input
+              type="email"
+              id="subscriber-email"
+              name="email"
+              required
+              aria-required="true"
+              aria-describedby="email-error"
+              placeholder="你的電子郵件">
+            <span class="form-error" id="email-error" role="alert" aria-live="polite"></span>
+          </div>
+          <button type="submit" class="form-submit">加入通知</button>
+          <div class="form-success" id="form-success" role="status" aria-live="polite" hidden>
+            <p>感謝！歡迎加入潮間帶聲景社群。確認信已寄至您的郵箱。</p>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>潮間帶聲景檔案館 © 2024 · 公民科學計畫</p>
+    <p>使用錄音筆記錄海岸生態 · 貢獻你的聲景故事</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

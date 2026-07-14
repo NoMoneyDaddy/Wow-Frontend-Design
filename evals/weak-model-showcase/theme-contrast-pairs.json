@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "scope_note": "Evaluator-declared opaque sRGB token pairs only; rendered alpha, media, antialiasing and WCAG conformance remain separate checks.",
+  "pairs": [
+    {"id":"light-text-primary-canvas","appearance":"light","kind":"normal-text","foreground":"#1f1a16","background":"#f3ede2","required_ratio":4.5},
+    {"id":"light-text-secondary-canvas","appearance":"light","kind":"normal-text","foreground":"#5e544b","background":"#f3ede2","required_ratio":4.5},
+    {"id":"light-brand-text-canvas","appearance":"light","kind":"normal-text","foreground":"#70431f","background":"#f3ede2","required_ratio":4.5},
+    {"id":"light-placeholder-input","appearance":"light","kind":"normal-text","foreground":"#655b52","background":"#fffdf8","required_ratio":4.5},
+    {"id":"light-input-border","appearance":"light","kind":"non-text","foreground":"#87796d","background":"#fffdf8","required_ratio":3.0},
+    {"id":"light-focus-canvas","appearance":"light","kind":"non-text","foreground":"#70431f","background":"#f3ede2","required_ratio":3.0},
+    {"id":"light-solid-button","appearance":"light","kind":"normal-text","foreground":"#fffdf8","background":"#1f1a16","required_ratio":4.5},
+    {"id":"light-error-surface","appearance":"light","kind":"normal-text","foreground":"#85351f","background":"#fffdf8","required_ratio":4.5},
+    {"id":"light-success-surface","appearance":"light","kind":"normal-text","foreground":"#285d39","background":"#fffdf8","required_ratio":4.5},
+    {"id":"dark-text-primary-canvas","appearance":"dark","kind":"normal-text","foreground":"#f4eee5","background":"#171411","required_ratio":4.5},
+    {"id":"dark-text-secondary-canvas","appearance":"dark","kind":"normal-text","foreground":"#c9bdb1","background":"#171411","required_ratio":4.5},
+    {"id":"dark-brand-text-canvas","appearance":"dark","kind":"normal-text","foreground":"#efb47b","background":"#171411","required_ratio":4.5},
+    {"id":"dark-placeholder-input","appearance":"dark","kind":"normal-text","foreground":"#b9aea3","background":"#2c2722","required_ratio":4.5},
+    {"id":"dark-input-border","appearance":"dark","kind":"non-text","foreground":"#9a8d81","background":"#2c2722","required_ratio":3.0},
+    {"id":"dark-focus-canvas","appearance":"dark","kind":"non-text","foreground":"#ffd09f","background":"#171411","required_ratio":3.0},
+    {"id":"dark-solid-button","appearance":"dark","kind":"normal-text","foreground":"#2c2722","background":"#f4eee5","required_ratio":4.5},
+    {"id":"dark-error-surface","appearance":"dark","kind":"normal-text","foreground":"#ffb8aa","background":"#2c2722","required_ratio":4.5},
+    {"id":"dark-success-surface","appearance":"dark","kind":"normal-text","foreground":"#9dd9af","background":"#2c2722","required_ratio":4.5}
+  ]
+}

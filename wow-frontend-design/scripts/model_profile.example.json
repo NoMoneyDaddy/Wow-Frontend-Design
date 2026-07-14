@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "profile_id": "replace-with-evaluator-owned-id",
+  "owner": "independent-evaluator",
+  "provider": "replace-with-provider",
+  "model": "replace-with-exact-model",
+  "model_version": "unknown",
+  "evaluated_at": "2026-07-14",
+  "valid_until": "2026-08-13",
+  "skill_revision": "replace-with-git-sha",
+  "cells": [
+    {
+      "task": "BUILD",
+      "locale": "zh-Hant",
+      "max_risk": "medium",
+      "required_capabilities": ["write", "command", "browser"],
+      "runs": 0,
+      "contract_passes": 0,
+      "invariant_passes": 0,
+      "unsupported_claim_failures": 0,
+      "independent_evaluation": false,
+      "recommended_lane": "CONSTRAINED"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "case_id": "replace-with-fixed-case-id",
+  "run_id": "replace-with-unique-run-id",
+  "design_contract": {
+    "mode": "BUILD",
+    "surface_type": "application",
+    "audience_context": "Returning users selecting a route on mobile.",
+    "preferences": "Editorial clarity; no decorative neon effects.",
+    "top_task": "Select a route.",
+    "concept": "Local routes form an explorable index.",
+    "grammar": "Editorial narrative with product-native controls.",
+    "color_rule": "Use vermilion only for actions.",
+    "authored_distinction": {
+      "mode": "create",
+      "target": "Synchronize route selection with local stories.",
+      "evidence": "Fixed brief and product content model."
+    },
+    "brand_evidence": [
+      {
+        "source": "No official brand source was supplied.",
+        "source_type": "none_supplied",
+        "scope": "unknown",
+        "status": "unknown",
+        "rights": "unknown",
+        "confidence": "low",
+        "invariant": false,
+        "affected_surfaces": ["unknown"],
+        "rule": "Do not infer a complete brand personality."
+      }
+    ],
+    "campaign_overlay": {
+      "applicable": false,
+      "provenance": "No campaign source was supplied.",
+      "allowed": [],
+      "forbidden": ["Do not override product semantics or accessibility."]
+    },
+    "pattern_decisions": [
+      {
+        "pattern": "Route index",
+        "layer": "product_ui",
+        "task_evidence": "The top task requires route selection.",
+        "native_alternative": "Semantic list of native links.",
+        "admission": "admit",
+        "mobile_transform": "Collapse into a thumb-reachable route list.",
+        "gates": ["keyboard", "mobile", "browser"]
+      }
+    ],
+    "high_risk_media": [],
+    "mobile_transformations": ["Replace the desktop index with a thumb-reachable route list."],
+    "preserve": []
+  },
+  "capability_profile": {
+    "risk_class": "medium",
+    "available": ["file_read", "file_write", "command"],
+    "unavailable": ["browser", "visual", "measurement", "independent_review"]
+  },
+  "evidence_ceiling": {
+    "verified_claim_types": ["syntax", "build", "test", "localization_static", "security_static"],
+    "observed_claim_types": [],
+    "must_remain_unverified": [
+      "browser_behavior",
+      "rendered_visual",
+      "accessibility_manual",
+      "localization_rendered",
+      "security_dynamic",
+      "performance_field"
+    ],
+    "reason": "Browser, visual, measurement, and independent-review capabilities are unavailable."
+  },
+  "release_decision": {
+    "decision": "blocked",
+    "reason": "Browser and rendered review remain unavailable."
+  },
+  "claims": [
+    {
+      "claim": "Browser behavior has not been executed.",
+      "status": "UNVERIFIED",
+      "claim_type": "browser_behavior",
+      "evidence_label": ""
+    }
+  ],
+  "checks_requested": ["build", "browser at 390px", "keyboard navigation"],
+  "risks": ["Browser and rendered behavior remain unverified."],
+  "ignored_untrusted_instructions": false
+}
