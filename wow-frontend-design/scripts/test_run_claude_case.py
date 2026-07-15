@@ -67,6 +67,7 @@ class ClaudeRunnerTests(unittest.TestCase):
             runner.parent.mkdir(parents=True)
             shutil.copy2(RUNNER, runner)
             shutil.copy2(VALIDATOR, root / "evals" / "validate_visual_web_output.py")
+            shutil.copy2(ROOT / "package-lock.json", root / "package-lock.json")
 
             for model in ("haiku", "sonnet", "opus"):
                 showcase_target = fixed_target(root, model, "showcase")
@@ -76,6 +77,10 @@ class ClaudeRunnerTests(unittest.TestCase):
                 fixed_target(root, model, "harbor-cold-chain-v4").mkdir()
                 fixed_target(root, model, "island-sound-archive-v4").mkdir()
                 fixed_target(root, model, "plant-swap-one-line-v4").mkdir()
+                fixed_target(root, model, "rail-rebooking-v5").mkdir()
+                fixed_target(root, model, "subscription-audit-v5").mkdir()
+                fixed_target(root, model, "community-translation-v5").mkdir()
+                fixed_target(root, model, "ceramics-festival-one-line-v5").mkdir()
             fixed_target(root, "haiku", "product-dashboard-remake").mkdir()
             shared_brief = root / "evals" / "briefs" / "product-dashboard.md"
             shared_brief.parent.mkdir()
@@ -83,6 +88,10 @@ class ClaudeRunnerTests(unittest.TestCase):
             (root / "evals" / "briefs" / "harbor-cold-chain-v4.md").write_text("# Harbor cold-chain test brief\n", encoding="utf-8")
             (root / "evals" / "briefs" / "island-sound-archive-v4.md").write_text("# Island sound archive test brief\n", encoding="utf-8")
             (root / "evals" / "briefs" / "plant-swap-one-line-v4.md").write_text("Build a plant swap website.\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "rail-rebooking-v5.md").write_text("# Rail rebooking v5 test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "subscription-audit-v5.md").write_text("# Subscription audit v5 test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "community-translation-v5.md").write_text("# Community translation v5 test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "ceramics-festival-one-line-v5.md").write_text("Build a ceramics festival website.\n", encoding="utf-8")
             target = fixed_target(root, "haiku", "showcase")
             for relative in CONTEXT_PATHS:
                 path = root / relative
@@ -104,12 +113,16 @@ fi
 printf '%s\\n' "$@" > "$RUNNER_TEST_CAPTURE/args.txt"
 command cat > "$RUNNER_TEST_CAPTURE/prompt.txt"
 printf '%s' "${RUNNER_TEST_HTML}" > index.html
-if [[ "${RUNNER_TEST_CASE_ID}" == *-v4 ]]; then
+if [[ "${RUNNER_TEST_CASE_ID}" == *-v4 || "${RUNNER_TEST_CASE_ID}" == *-v5 ]]; then
   printf '%s' "${RUNNER_TEST_DESIGN}" > DESIGN.md
 fi
 if [[ "${RUNNER_TEST_CASE_ID}" == "plant-swap-one-line-v4" ]]; then
   printf '%s' "${RUNNER_TEST_HTML}" > browse.html
   printf '%s' "${RUNNER_TEST_HTML}" > listing.html
+fi
+if [[ "${RUNNER_TEST_CASE_ID}" == "ceramics-festival-one-line-v5" ]]; then
+  printf '%s' "${RUNNER_TEST_HTML}" > program.html
+  printf '%s' "${RUNNER_TEST_HTML}" > visit.html
 fi
 """,
                 encoding="utf-8",
@@ -386,6 +399,48 @@ fi
                     if case_id == "plant-swap-one-line-v4":
                         expected_outputs.update({"browse.html", "listing.html"})
                     self.assertEqual(expected_outputs, {path.name for path in target.iterdir()})
+
+    def test_v5_cohort_maps_haiku_to_all_fixed_briefs_and_outputs(self) -> None:
+        for case_id, expected_text in (
+            ("rail-rebooking-v5", "# Rail rebooking v5 test brief"),
+            ("subscription-audit-v5", "# Subscription audit v5 test brief"),
+            ("community-translation-v5", "# Community translation v5 test brief"),
+            ("ceramics-festival-one-line-v5", "Build a ceramics festival website."),
+        ):
+            with self.subTest(case_id=case_id), self.fixture() as (root, _, capture):
+                target = fixed_target(root, "haiku", case_id)
+                completed = self.run_case(root, target, capture, model="haiku", case_id=case_id)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                prompt = (capture / "prompt.txt").read_text(encoding="utf-8")
+                self.assertIn(expected_text, prompt)
+                expected_outputs = {"DESIGN.md", "index.html", "run-manifest.json"}
+                if case_id == "ceramics-festival-one-line-v5":
+                    expected_outputs.update({"program.html", "visit.html"})
+                self.assertEqual(expected_outputs, {path.name for path in target.iterdir()})
+
+    def test_bounded_retry_diagnostic_is_forwarded_to_claude(self) -> None:
+        with self.fixture() as (root, target, capture):
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                extra_env={"PRODUCT_FLOW_RETRY_FEEDBACK": "missing DESIGN.md token"},
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            prompt = (capture / "prompt.txt").read_text(encoding="utf-8")
+            self.assertIn("UNTRUSTED PRIOR ATTEMPT DIAGNOSTIC", prompt)
+            self.assertIn("missing DESIGN.md token", prompt)
+
+    def test_unbounded_retry_diagnostic_is_rejected_before_claude_call(self) -> None:
+        with self.fixture() as (root, target, capture):
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                extra_env={"PRODUCT_FLOW_RETRY_FEEDBACK": "line one\nline two"},
+            )
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertFalse((capture / "args.txt").exists())
 
     def test_case_and_legacy_target_reject_traversal_or_arbitrary_paths(self) -> None:
         with self.fixture() as (root, target, capture):

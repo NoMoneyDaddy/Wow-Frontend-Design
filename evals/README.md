@@ -2,30 +2,46 @@
 
 這些案例用來評測 `wow-frontend-design` 在不同模型上的行為，不是品質宣傳素材。Fixture validator 只證明資料結構與內部參照一致；只有實際 host/model integration run 才能證明 Skill activation 或 reference routing。
 
-## 最近發布的 v4 證據
+## 目前發布的 v6 自修復 cohort
 
-最近一次固定 Codex cohort 共 9 個 target：三個 v4 主題 × `gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5`。生成 9/9 完成、13 attempts、3 個 case 重試；官方 DESIGN lint 9/9 clean；Playwright 保留 30 張完整 PNG。更新後 auditor 對相同 HTML 的結果為 2/9 無 blocker、7/9 有觀察到的 blocker。
+固定只使用 `gpt-5.4-mini`，涵蓋 8 個互相錯開的產品、12 routes 與 4 個裝置 profiles。初始 generation 最終 8/8 完成；6 案依 browser finding 局部修復，口述歷史再補一次正文流修復，補助審查則修正 evaluator false positive。最終官方 `DESIGN.md` verifier 8/8 clean，64/64 PNG 通過尺寸、DPR、hash、auditor 與 inventory 完整性檢查；deterministic visual、runtime、network 與 body-flow findings 都是 0。
+
+- `product-flow-v6-repaired-v2-generation-results.json`：最終 target、repair／promotion provenance、attempt 與 manifest hash。
+- `product-flow-v6-repaired-v2-design-md-results.json`：pinned `@google/design.md@0.3.0` 的 8/8 clean 結果。
+- `product-flow-v6-visual-results.json`：64 張 screenshot 的 route、state、裝置訊號、hash 與 browser findings。
+- `product-flow-v6-repaired-v2-targets/`：最終網站與 `DESIGN.md`。
+- `../assets/product-flow-v6/`：發布的完整 screenshot inventory。
+- `../wow-frontend-design/scripts/validate_product_flow_v6_evidence.py`：拒絕 stale／額外／缺少圖片、model drift、錯誤 viewport、body-flow finding 與 auditor drift。
+
+Mobile profile 使用 Android Chromium UA、touch、`isMobile=true`、DPR 3 與 mobile viewport/screen；這是 browser device emulation，不是實體 iOS／Android 認證，也不是所有瀏覽器或正式 WCAG conformance。
+
+## 目前保留的 v5 mini raw artifacts
+
+固定 cohort 只使用 `gpt-5.4-mini`，涵蓋列車改簽、訂閱稽核、多人翻譯審校與低資訊量三頁陶藝祭。生成 4/4 完成、5 attempts、1 case 自動重試；官方 DESIGN lint 4/4 clean。四個原始 target 都留下 repair-required finding，現行 Skill 已吸收但未倒改原始產物。所有舊 screenshot 與 screenshot-bound manifest 已於 2026-07-15 清空，不再作發布證據。
+
+- `product-flow-v5-mini-generation-results.json`：凍結 Skill／brief、attempt history、exact model selector 與 manifest。
+- `product-flow-v5-mini-design-md-results.json`：更新 lockfile 後以 pinned `@google/design.md@0.3.0` 重驗的結果。
+- `product-flow-v5-mini-targets/`：四組原始 HTML、DESIGN 與 manifest。
+
+這批只保留為優化來源，不代表現行 Skill 通過。現行證據是上方 v6 自修復 cohort。
+
+## 歷史 v4 證據
+
+歷史固定 Codex cohort 共 9 個 target：三個 v4 主題 × `gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5`。生成 9/9 完成、13 attempts、3 個 case 重試；官方 DESIGN lint 9/9 clean。舊 screenshot 與 visual report 已清空。
 
 - `product-flow-v4-generation-results.json`：固定 Skill／brief、attempt history、target 與 manifest。
 - `product-flow-v4-design-md-results.json`：pinned `@google/design.md@0.2.0` 結果。
-- `product-flow-v4-visual-results.json`：viewport、auditor、runtime 與 visual findings。
 - `product-flow-v4-targets/`：9 組原始 HTML、DESIGN 與 manifest。
-- `../assets/product-flow-v4/`：README 展示用 30 張桌機／手機截圖；展示不等於 acceptance pass。
 
-```bash
-python3 wow-frontend-design/scripts/validate_product_flow_evidence.py \
-  evals/product-flow-v4-visual-results.json --repository-root .
-```
+生成使用凍結的 pre-optimization Skill；現行 Skill 的新完整重跑結果見上方 v6 cohort。
 
-驗證器會拒絕被隱藏的 retry、stale manifest／DESIGN／PNG hash、錯誤尺寸、遺失或額外截圖，以及被改寫的 visual blocker。生成使用凍結的 pre-optimization Skill；現行 Skill 雖已吸收發現，尚未以相同 cohort 重跑。
-
-## 本輪題型與後續政策
+## 題型與後續政策
 
 - 換掉 v4 三個主題；測不同產品功能、互動路徑與測試面向，不把舊案換皮重跑。
 - 執行前先研究現代網頁的設計感、字體編排、層級、材質、動效節制與響應式呈現，再把來源轉成可驗證規則。第一個方法論案例是 [Design Skill Comparison Lab](https://designskill.qiaomu.ai/)；只採用其題型分離、實際互動與雙軌評估思路，不照搬作者分數。
-- 第一批只跑 `gpt-5.4-mini`、`gpt-5.4` 與 Claude Haiku；Codex 與 Claude 分 provider cohort 執行、分開報告，不混成直接排名。
-- 截圖用於 README 的功能／成果展示；測試報告仍分開列出 blocker，不能以好看的截圖取代 acceptance。
-- 新一輪完成後才替換 README 的「最近一次」結果與圖；舊報告保留其凍結 Skill 與 evaluator provenance。
+- 本輪依使用者指定只跑 `gpt-5.4-mini`；其他模型未進入此 cohort。Codex 與 Claude 若日後加入，仍分 provider cohort 報告，不混成直接排名。
+- 新截圖只用於 README 的功能／成果展示；測試報告仍分開列出 repair history 與 boundary，不能以好看的截圖取代 acceptance。
+- 舊 screenshot 已清空；v6 發布依 [`TEST_PLAN.md`](TEST_PLAN.md) 建立獨立 cohort，不沿用舊 hash。
 
 `playwright_dashboard_audit.cjs` 會重播固定 dashboard 的桌機／手機行為矩陣，不修改模型產物。以 repo 根目錄的 `package-lock.json` 安裝固定 Playwright 版本；使用系統瀏覽器時設定 `CHROME_EXECUTABLE_PATH`，再傳入 Haiku 與 Opus 的本機 URL。預設是 acceptance mode：任何互動失敗會非零退出，禁止 DOM click fallback。`--diagnostic` 才允許 fallback 以繼續觀察，但 verdict 永遠是 `diagnostic_only`。輸出的 JSON 是互動證據，不是視覺品質分數。
 
@@ -35,18 +51,9 @@ CHROME_EXECUTABLE_PATH=/absolute/path/to/chrome npm run audit:dashboards -- \
   http://127.0.0.1:4178/ http://127.0.0.1:4179/
 ```
 
-## 更新截圖與 hash 證據
+## v6 截圖與 hash 證據
 
-截圖、capture script、Playwright lock 與來源檔案互相以 SHA-256 綁定。更新任何一項後，必須在同一個受控環境重新產生 manifest；不可手改 hash 讓 validator 變綠：
-
-```bash
-npm ci --ignore-scripts --no-audit --no-fund
-python3 -m http.server 4175 --bind 127.0.0.1 --directory evals/weak-model-showcase
-CHROME_EXECUTABLE_PATH=/absolute/path/to/chrome npm run capture:showcase -- http://127.0.0.1:4175/
-python3 wow-frontend-design/scripts/validate_screenshot_manifest.py assets/screenshots.json --repository-root .
-```
-
-Dashboard replay 也必須以固定 brief、兩個原始 model artifact、相同瀏覽器與 `package-lock.json` 重跑。Acceptance 應保留真實非零 exit；diagnostic JSON 只能保存 continuation evidence。重算 `dashboard-browser-results.json` 的 hash 後，再跑 `validate_dashboard_evidence.py`。若無法重跑原始環境，就保留舊證據並明確標 stale／不可比較，不得只換 hash。
+v6 report 把 screenshot、route、state、viewport、DPR、browser、source、auditor 與 dependency lock 互相以 SHA-256 綁定。Evidence validator 會拒絕 stale byte、缺圖、額外圖片、錯誤尺寸、model drift、body-flow finding 或 auditor drift；不可手改 hash 讓 validator 變綠。完整規格與執行紀錄見 [`TEST_PLAN.md`](TEST_PLAN.md)。
 
 ## 目前案例
 
@@ -56,7 +63,8 @@ Dashboard replay 也必須以固定 brief、兩個原始 model artifact、相同
 - `claude-haiku-showcase/`：Claude 弱模型固定 brief 與隔離輸出目錄。
 - `claude-opus-showcase/`：Claude 強模型的相同固定 brief 與隔離輸出目錄。
 - `claude-{haiku,opus}-product-dashboard/`：共用 `briefs/product-dashboard.md` 的非 landing 產品 UI 原始產物與 run manifest；兩者目前都未通過 strict acceptance。
-- `briefs/{harbor-cold-chain,island-sound-archive,plant-swap-one-line}-v4.md`：高密度操作、editorial archive 與低資訊多頁社區三個互相錯開的測試方向；hash 固定在新一輪 generation ledger。
+- `briefs/{rail-rebooking,subscription-audit,community-translation,ceramics-festival-one-line}-v5.md`：交通恢復、高密度資料操作、多語審校與低資訊多頁 editorial 四個互相錯開的方向；hash 固定在 generation ledger。
+- `briefs/*-v6.md`、`product-flow-v6-repaired-v2-targets/`、`product-flow-v6-visual-results.json` 與 `../assets/product-flow-v6/`：目前 8 案自修復 cohort 的 brief、最終網站、browser report 與 64 張發布截圖。
 - `claude-haiku-product-dashboard-remake/`：唯一一次 anti-slop remediation invocation 的拒絕紀錄；輸出政策在 publish 前熔斷，沒有可接受網站產物。
 - `benchmark-matrix.md`：上述八案的人類可讀來源與 controlled-comparison 規則；`product_cases.json` 是其 definition-only fixture。兩者列出案例都不等於執行或通過。
 - `capability-status.json`：公開 claim ledger。每項能力都要有現存 artifact 與明示 boundary；validator 只確保狀態結構與路徑未腐化，不替內容升級證據。
@@ -74,6 +82,8 @@ python3 wow-frontend-design/scripts/validate_site_plan.py \
   wow-frontend-design/scripts/site_manifest.example.json \
   wow-frontend-design/scripts/wireframe_plan.example.json \
   --sitemap wow-frontend-design/scripts/sitemap.example.xml
+python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py \
+  evals/product-flow-v6-visual-results.json --repository-root .
 ```
 
 這個命令成功只代表八個固定案例、必要欄位與 locale 分布自洽，不得轉述為任何模型完成案例或取得分數。
@@ -90,9 +100,9 @@ Claude runner 只給固定 `Write` 工具，在暫存空目錄產出 case allowl
 
 受控矩陣以 `CLAUDE_CODE_EFFORT_LEVEL=auto` 使用各 Claude 模型預設 effort，並以 `CLAUDE_CODE_DISABLE_THINKING=1` 強制關閉 extended thinking。Codex cohort 忽略個人 `model_reasoning_effort`，使用模型預設 effort，並固定 `model_reasoning_summary="none"`；Codex 這些模型沒有可驗證的 zero-reasoning 模式，因此只宣稱關閉 summary，不宣稱停用內部 reasoning。
 
-OpenAI cohort 使用已登入 ChatGPT 的 Codex CLI，精確請求 `gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5`，忽略個人 config/rules，採 `workspace-write` sandbox、ephemeral session、無 web search／OSS local provider，並顯式啟用內建 multi-agent、browser 與 computer-use capability。Runner 只把 `auth.json` 複製進權限 `0600` 的臨時 `CODEX_HOME`，同時換掉 `HOME`、淨化 `PATH`；完成後會掃描 JSONL log，若發現主機使用者 Skill、原始 Codex Skill、repo `node_modules`、套件管理器、網路命令、git、MCP/web-search 或工作區外暫存路徑，就拒絕發布該次輸出。官方 `DESIGN.md` lint 只由外層 pinned evaluator 執行，implementation model 不得自行用 `npx` 取得工具。CLI 接受 requested identifier 不代表回報 backend snapshot；manifest 不會猜解析版本。Claude 與 Codex CLI 的工具面不同，因此跨 provider 只作分 cohort 觀察；同 provider 內才是工具面一致比較。
+OpenAI cohort 使用已登入 ChatGPT 的 Codex CLI，v5 mini 精確請求 `gpt-5.4-mini`，忽略個人 config/rules，採 `workspace-write` sandbox、ephemeral session、無 web search／OSS local provider，並停用 implementation builder 的 multi-agent、browser 與 computer-use capability；瀏覽器與截圖只由外層 evaluator 擁有。Runner 只把 `auth.json` 複製進權限 `0600` 的臨時 `CODEX_HOME`，同時換掉 `HOME`、淨化 `PATH`；完成後會掃描 JSONL log，若發現主機使用者 Skill、原始 Codex Skill、repo `node_modules`、套件管理器、網路命令、git、MCP/web-search 或工作區外暫存路徑，就拒絕發布該次輸出。官方 `DESIGN.md` lint 只由外層 pinned evaluator 執行。CLI 接受 requested identifier 不代表回報 backend snapshot；manifest 不猜解析版本。
 
-既有 showcase 呼叫維持 `run_claude_case.sh <haiku|sonnet|opus> <固定 showcase 目錄>`；v4 使用 `run_claude_case.sh <haiku|sonnet|opus> --case <fixed-v4-case>`。Codex 對應使用 `run_codex_case.sh <gpt-5.4-mini|gpt-5.4|gpt-5.5> --case <fixed-v4-case>`。新式呼叫不接受任意 target 路徑，runner 只依 `model × case` allowlist 導出輸出目錄。
+既有 showcase 呼叫維持 `run_claude_case.sh <haiku|sonnet|opus> <固定 showcase 目錄>`；v5 使用 `run_claude_case.sh <haiku|sonnet> --case <fixed-v5-case>`。Codex 對應使用 `run_codex_case.sh <gpt-5.4-mini|gpt-5.4> --case <fixed-v5-case>`。新式呼叫不接受任意 target 路徑，runner 只依 `model × case` allowlist 導出輸出目錄。
 
 ## 後續完整矩陣
 
@@ -102,6 +112,7 @@ OpenAI cohort 使用已登入 ChatGPT 的 Codex CLI，精確請求 `gpt-5.4-mini
 RUN_ROOT=/absolute/evaluator-owned/product-flow-run
 npm run eval:product-flow -- \
   --provider codex \
+  --model gpt-5.4-mini \
   --target-root "$RUN_ROOT/targets" \
   --generation-output "$RUN_ROOT/generation.json" \
   --design-output "$RUN_ROOT/design-md.json" \
@@ -109,7 +120,7 @@ npm run eval:product-flow -- \
   --screenshot-dir "$RUN_ROOT/screenshots"
 ```
 
-每個 generation case 預設最多嘗試三次；timeout 與 generation failure 會重試，model resolution、輸出政策與本機設定錯誤不會盲目重試。`DESIGN.md` lint 與 screenshot capture 也各最多三次。Mobile 使用 `390×844` CSS viewport、Android Chromium UA、touch、`isMobile=true` 與 DPR 3，不只是改變視窗大小。每次 attempt 都保留在 generation ledger；只有全部 case 完成、所有 `DESIGN.md` 零 error／warning、且每個 page/viewport 都有完整解碼、尺寸與 SHA-256 相符的 PNG，才回報 execution complete。任何 blocking visual issue 會另外回報 acceptance failed 並回傳非零；有截圖不等於通過。修復外部服務或設定後，以相同路徑加 `--resume`；若 generation 已用完原上限，明確提高 `--max-attempts` 後續跑，舊 attempt 不得覆蓋。
+每個 generation case 預設最多嘗試三次；timeout、generation failure 與 output-policy rejection 會把前次 bounded diagnostic 交給 fresh attempt 重試；model resolution、本機設定與不可恢復 infrastructure failure 不盲目重試。只要 runner output 持續推進，inactivity deadline 就延後，另有 hard ceiling。`DESIGN.md` lint 與 screenshot capture 也各最多三次。缺少固定 verifier 時，實際 Skill 先依 lockfile／精確版本安全安裝到 project/evaluator cache；不得 global install 或改產品 runtime dependency。Mobile 使用 `390×844` CSS viewport、Android Chromium UA、touch、`isMobile=true` 與 DPR 3，不只是改變視窗大小。每次 attempt 都保留在 generation ledger；全部 case、clean DESIGN 與完整 PNG inventory 才回報 execution complete。repair-required visual issue 會保留網站與截圖、輸出結構化診斷並讓 benchmark 非零；一般 Skill 使用則自動回送 AI 修復。修復後以相同路徑加 `--resume`，舊 attempt 不覆蓋。
 
 成功執行另由 evaluator 產生 `run-manifest.json`，記錄 `run_id`、固定 case ID/target、auth mode、Claude CLI path/version、請求的 model alias、runner/brief/trusted context/output hashes 與清除的環境變數名稱。Claude CLI 若未回報 alias 實際解析到的完整 model ID，manifest 會明確記為 `not_reported_by_cli`，不猜測 resolved exact model。
 

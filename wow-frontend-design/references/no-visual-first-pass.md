@@ -35,7 +35,7 @@ After each pass, inspect the diff against the freeze card. This is self-correcti
 
 ## Browserless checks
 
-Run only tools already present or approved by the user/project:
+Run tools already present or safely resolved by the Skill's automatic tool contract:
 
 - build, typecheck, lint, unit tests, framework static generation;
 - HTML/JS/CSS parsing or project compiler checks;
@@ -44,7 +44,7 @@ Run only tools already present or approved by the user/project:
 - source checks for semantic roles, complete state tokens, `color-scheme`, reduced motion, forced colors, focus, intrinsic media dimensions/aspect ratio, logical properties, min/max sizing, wrapping and overflow risks;
 - deterministic interaction state tests that do not claim real focus, layout, paint, accessibility tree, touch, IME, or browser behavior.
 
-Do not install a headless browser, upload private code/screenshots, or call an external visual service without authorization. If image generation is available but rendering is not, generated art can explore mood; it cannot validate the implemented page.
+When browser verification belongs to the requested workflow and browser policy permits the selected engine, the Skill may install an exact pinned browser/verifier into a project-local or evaluator-owned cache. Do not install globally, change application runtime dependencies, use mutable latest versions, upload private code/screenshots, or call an external visual service. If installation is impossible because the sandbox is offline/read-only or authority is missing, keep the page and mark rendered evidence unavailable. If image generation is available but rendering is not, generated art can explore mood; it cannot validate the implemented page.
 
 ## Prefer resilient patterns
 

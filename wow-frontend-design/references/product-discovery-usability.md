@@ -63,3 +63,9 @@ Never run external submissions, purchases, messages, uploads, production writes,
 The interview/persona/IA/usability structure above was independently paraphrased after critical review of the MIT-licensed `.agents/skills` subtree in [zz41354899/goodux-skills at `c1a1fc9ae9c275abb0c86d114ab654285fd68bff`](https://github.com/zz41354899/goodux-skills/tree/c1a1fc9ae9c275abb0c86d114ab654285fd68bff/.agents/skills). The repository root had no detected license at review time, so its website and installer are not treated as reusable material.
 
 Do not adopt its fixed participant/persona/variant counts, fixed severity-to-schedule mapping, framework stack, industry-to-style catalogue, or one-skill-only rule. Do not run its installer: installation behavior and existing-directory replacement require a separate security review and explicit authorization.
+
+## Legal open reading references
+
+- [Introduction to Human-Computer Interaction](https://introductiontohci.org/) is a free, current HCI textbook published under CC BY-NC-ND 4.0. Use it as reading/reference; do not remix its text into this MIT Skill.
+- [政府網站營運交流平台：以使用者為中心的設計](https://www.webguide.nat.gov.tw/guidelines/442/show) is a Traditional Chinese Taiwan-government reference for UCD context. Its official status does not make every recommendation universal; verify the current service, audience, and accessibility requirements.
+- [智慧財產局 UI/UX 設計指引](https://tiponet.tipo.gov.tw/TIPO_UIUX/) is a Traditional Chinese service-specific example. Extract transferable questions and patterns only; do not treat one agency's implementation as a universal component library.

@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>島線鐵路中斷改簽工作台</title>
+    <style>
+      :root {
+        --canvas: #f3eee5;
+        --surface: #fffdf9;
+        --muted-surface: #e9e1d6;
+        --primary: #17324a;
+        --on-primary: #ffffff;
+        --on-surface: #1b232b;
+        --muted: #4d5a66;
+        --caution: #6d430f;
+        --on-caution: #fff7ea;
+        --danger: #6f2c2c;
+        --on-danger: #ffffff;
+        --shadow: 0 20px 40px rgba(23, 50, 74, 0.08);
+        --focus: 0 0 0 3px rgba(23, 50, 74, 0.22);
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 24px;
+        --gap-xs: 6px;
+        --gap-sm: 10px;
+        --gap-md: 16px;
+        --gap-lg: 24px;
+        --gap-xl: 32px;
+        --measure: 72rem;
+        --font-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui,
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        color-scheme: light;
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-body);
+        color: var(--on-surface);
+        background:
+          radial-gradient(circle at top left, rgba(23, 50, 74, 0.06), transparent 26%),
+          linear-gradient(180deg, #f8f4ec 0%, var(--canvas) 45%, #efe8dc 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(
+            90deg,
+            transparent 0,
+            transparent calc(50% - 1px),
+            rgba(23, 50, 74, 0.04) calc(50% - 1px),
+            rgba(23, 50, 74, 0.04) calc(50% + 1px),
+            transparent calc(50% + 1px)
+          ),
+          repeating-linear-gradient(
+            180deg,
+            rgba(23, 50, 74, 0.028) 0,
+            rgba(23, 50, 74, 0.028) 1px,
+            transparent 1px,
+            transparent 32px
+          );
+        opacity: 0.45;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 90%);
+      }
+
+      main {
+        position: relative;
+        z-index: 1;
+        width: min(calc(100% - 1.5rem), var(--measure));
+        margin: 0 auto;
+        padding: clamp(1rem, 2.5vw, 2rem) 0 clamp(2rem, 5vw, 3.5rem);
+      }
+
+      .stage {
+        background: rgba(255, 253, 249, 0.92);
+        border: 1px solid rgba(23, 50, 74, 0.12);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        padding: clamp(1rem, 3vw, 2rem);
+        backdrop-filter: blur(6px);
+      }
+
+      .hero {
+        display: grid;
+        gap: var(--gap-sm);
+        margin-bottom: var(--gap-lg);
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 2.8rem);
+        line-height: 1.1;
+        letter-spacing: 0;
+        max-width: 18ch;
+      }
+
+      .hero p {
+        max-width: 60ch;
+        color: var(--muted);
+      }
+
+      .flow {
+        display: grid;
+        gap: var(--gap-lg);
+      }
+
+      .route-cluster {
+        display: grid;
+        gap: var(--gap-lg);
+      }
+
+      .trip-card,
+      .choices,
+      .summary-panel {
+        background: var(--surface);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(23, 50, 74, 0.12);
+      }
+
+      .trip-card,
+      .summary-panel {
+        padding: clamp(1rem, 2.2vw, 1.5rem);
+      }
+
+      .trip-route {
+        display: grid;
+        gap: var(--gap-xs);
+        margin-bottom: var(--gap-md);
+        padding-bottom: var(--gap-md);
+        border-bottom: 1px solid rgba(23, 50, 74, 0.1);
+      }
+
+      .trip-route .route-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--gap-sm);
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .route-node {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 700;
+        color: var(--on-surface);
+      }
+
+      .route-node::before {
+        content: "";
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 999px;
+        background: var(--primary);
+        box-shadow: 0 0 0 3px rgba(23, 50, 74, 0.1);
+      }
+
+      .route-break {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 999px;
+        background: rgba(109, 67, 15, 0.12);
+        color: var(--caution);
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      .trip-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--gap-md);
+      }
+
+      .trip-grid dl,
+      .summary-grid dl {
+        margin: 0;
+        display: grid;
+        gap: 0.3rem;
+      }
+
+      .trip-grid dt,
+      .summary-grid dt {
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .trip-grid dd,
+      .summary-grid dd {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.45;
+      }
+
+      .trip-grid strong,
+      .summary-grid strong,
+      .option-time,
+      .option-duration,
+      .option-route,
+      .option-fare,
+      .option-access {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .trip-note {
+        margin-top: var(--gap-md);
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      .choices {
+        padding: clamp(0.9rem, 2vw, 1.25rem);
+      }
+
+      .choices legend {
+        padding: 0;
+        margin: 0 0 var(--gap-sm);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--on-surface);
+      }
+
+      .choices-help,
+      .state-note {
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.45;
+      }
+
+      .choices-error {
+        margin-top: var(--gap-sm);
+        color: var(--danger);
+        font-size: 0.92rem;
+        font-weight: 700;
+      }
+
+      .choices[data-error="true"] {
+        border-color: rgba(111, 44, 44, 0.55);
+        box-shadow: 0 0 0 1px rgba(111, 44, 44, 0.18);
+      }
+
+      .option-list {
+        display: grid;
+        gap: var(--gap-md);
+        margin-top: var(--gap-md);
+      }
+
+      .option-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: var(--gap-md);
+        align-items: start;
+        padding: 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(23, 50, 74, 0.12);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(233, 225, 214, 0.5));
+        cursor: pointer;
+        transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+      }
+
+      .option-card:hover {
+        border-color: rgba(23, 50, 74, 0.24);
+        box-shadow: 0 10px 24px rgba(23, 50, 74, 0.06);
+        transform: translateY(-1px);
+      }
+
+      .option-card:has(input:focus-visible) {
+        box-shadow: var(--focus);
+      }
+
+      .option-card input {
+        margin-top: 0.15rem;
+        width: 1.2rem;
+        height: 1.2rem;
+        accent-color: var(--primary);
+      }
+
+      .option-body {
+        min-width: 0;
+        display: grid;
+        gap: var(--gap-sm);
+      }
+
+      .option-top {
+        display: flex;
+        gap: var(--gap-md);
+        align-items: start;
+        justify-content: space-between;
+      }
+
+      .option-kicker {
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+      }
+
+      .option-title {
+        font-size: 1.1rem;
+        line-height: 1.35;
+        font-weight: 700;
+      }
+
+      .option-time {
+        font-size: 1.4rem;
+        line-height: 1;
+        font-weight: 700;
+        color: var(--primary);
+        white-space: nowrap;
+      }
+
+      .option-summary {
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      .option-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--gap-sm);
+      }
+
+      .option-meta {
+        display: grid;
+        gap: 0.25rem;
+        padding: 0.75rem 0.8rem;
+        border-radius: var(--radius-sm);
+        background: var(--muted-surface);
+      }
+
+      .option-meta span:first-child {
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+
+      .option-meta span:last-child {
+        font-size: 0.95rem;
+        line-height: 1.35;
+        color: var(--on-surface);
+      }
+
+      .option-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gap-xs);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.28rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .badge--limited {
+        background: var(--danger);
+        color: var(--on-danger);
+      }
+
+      .badge--calm {
+        background: rgba(23, 50, 74, 0.08);
+        color: var(--primary);
+      }
+
+      .option-card:has(input:checked) {
+        border-color: rgba(23, 50, 74, 0.38);
+        box-shadow: 0 0 0 2px rgba(23, 50, 74, 0.12), 0 12px 26px rgba(23, 50, 74, 0.07);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(233, 225, 214, 0.7));
+      }
+
+      .option-card.is-selected {
+        border-color: rgba(23, 50, 74, 0.38);
+        box-shadow: 0 0 0 2px rgba(23, 50, 74, 0.12), 0 12px 26px rgba(23, 50, 74, 0.07);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(233, 225, 214, 0.7));
+      }
+
+      .option-card:has(input:checked) .badge--calm {
+        background: rgba(23, 50, 74, 0.12);
+      }
+
+      .option-card.is-selected .badge--calm {
+        background: rgba(23, 50, 74, 0.12);
+      }
+
+      .option-card:has(input:checked) .option-time {
+        color: var(--primary);
+      }
+
+      .option-card.is-selected .option-time {
+        color: var(--primary);
+      }
+
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gap-sm);
+        align-items: center;
+        margin-top: var(--gap-md);
+      }
+
+      button {
+        appearance: none;
+        border: 0;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .button-primary,
+      .button-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.95rem;
+        padding: 0.85rem 1.1rem;
+        border-radius: var(--radius-sm);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+      }
+
+      .button-primary {
+        background: var(--primary);
+        color: var(--on-primary);
+        box-shadow: 0 12px 22px rgba(23, 50, 74, 0.16);
+      }
+
+      .button-primary:hover {
+        transform: translateY(-1px);
+      }
+
+      .button-back {
+        background: var(--surface);
+        color: var(--primary);
+        border: 1px solid rgba(23, 50, 74, 0.16);
+      }
+
+      .button-primary:focus-visible,
+      .button-back:focus-visible,
+      .option-card:focus-within {
+        outline: none;
+        box-shadow: var(--focus);
+      }
+
+      .button-primary:disabled {
+        opacity: 0.52;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .summary-panel {
+        display: grid;
+        gap: var(--gap-md);
+        background: linear-gradient(180deg, rgba(233, 225, 214, 0.9), rgba(233, 225, 214, 0.6));
+      }
+
+      .summary-panel[hidden] {
+        display: none;
+      }
+
+      .summary-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gap-sm);
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .summary-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.3rem 0.6rem;
+        border-radius: 999px;
+        background: rgba(23, 50, 74, 0.1);
+        color: var(--primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+
+      .summary-grid {
+        display: grid;
+        gap: var(--gap-sm);
+      }
+
+      .summary-grid > div {
+        display: grid;
+        gap: 0.35rem;
+        padding: 0.8rem 0.9rem;
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.56);
+      }
+
+      .summary-note {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+
+      .summary-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gap-sm);
+      }
+
+      @media (min-width: 52rem) {
+        .flow {
+          grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 0.95fr);
+          align-items: start;
+        }
+
+        .hero,
+        .route-cluster,
+        .choices,
+        .action-row {
+          grid-column: 1;
+        }
+
+        .summary-panel {
+          grid-column: 2;
+          grid-row: 2 / span 3;
+          position: sticky;
+          top: 1.25rem;
+        }
+
+        .route-cluster {
+          margin-bottom: 0;
+        }
+      }
+
+      @media (max-width: 40rem) {
+        main {
+          width: min(calc(100% - 1rem), var(--measure));
+          padding-top: 0.75rem;
+        }
+
+        .stage {
+          padding: 0.85rem;
+          border-radius: 20px;
+        }
+
+        .hero h1 {
+          max-width: 14ch;
+        }
+
+        .trip-grid,
+        .option-metrics {
+          grid-template-columns: 1fr;
+        }
+
+        .option-card {
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .option-top {
+          flex-direction: column;
+          gap: var(--gap-xs);
+        }
+
+        .option-time {
+          font-size: 1.2rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="stage" data-eval="rebooking-flow">
+        <header class="hero">
+          <p class="eyebrow">島線鐵路 · 中斷改簽</p>
+          <h1>花蓮往台北 16:40 車次因落石停駛，先比較可改簽方案。</h1>
+          <p id="flow-note" class="state-note" aria-live="polite">
+            先選一個替代方案，再看送出前摘要；本頁只做模擬，不會真的完成改簽。
+          </p>
+        </header>
+
+        <div class="flow" data-eval="recovery-step" data-state="choose" aria-describedby="flow-note">
+          <div class="route-cluster">
+            <section class="trip-card" aria-labelledby="trip-title">
+              <div class="trip-route">
+                <div class="route-line" aria-hidden="true">
+                  <span class="route-node">花蓮 16:40</span>
+                  <span class="route-break">落石停駛</span>
+                  <span class="route-node">台北</span>
+                </div>
+              </div>
+              <h2 id="trip-title">原訂行程與限制</h2>
+              <div class="trip-grid">
+                <dl>
+                  <dt>同行人數</dt>
+                  <dd><strong>2 位成人</strong>、1 位孩童</dd>
+                </dl>
+                <dl>
+                  <dt>無障礙需求</dt>
+                  <dd><strong>1 位乘客需無階梯動線</strong></dd>
+                </dl>
+                <dl>
+                  <dt>中斷原因</dt>
+                  <dd>落石影響行車，原班次停駛</dd>
+                </dl>
+                <dl>
+                  <dt>改簽目標</dt>
+                  <dd>先選替代方案，再核對差額</dd>
+                </dl>
+              </div>
+              <p class="trip-note">
+                這個工作台會保留同行限制與交通風險，避免在壓力下忽略無障礙與座位條件。
+              </p>
+            </section>
+
+            <fieldset class="choices" aria-labelledby="choices-title" data-eval="choices">
+              <legend id="choices-title">選擇替代方案</legend>
+              <p class="choices-help">
+                每個方案都顯示出發／抵達、總耗時、轉乘、座位與無障礙資訊。選好後再進確認摘要。
+              </p>
+              <p class="choices-error" id="choices-error" hidden>請先選擇一個替代方案，再進入確認摘要。</p>
+
+              <div class="option-list">
+                <label
+                  class="option-card"
+                  data-eval="alternative-option"
+                  data-option-id="fastest-transfer"
+                  data-option-title="最快抵達：花蓮 → 羅東轉乘一次 → 台北"
+                  data-option-depart="16:52"
+                  data-option-arrive="18:56"
+                  data-option-duration="2 小時 04 分"
+                  data-option-transfer="轉乘 1 次"
+                  data-option-seat="對號座剩少量"
+                  data-option-access="羅東轉乘可安排無階梯動線，月台較忙"
+                  data-option-fare="補差額 NT$180"
+                  data-option-badge="座位緊張"
+                >
+                  <input type="radio" name="alternative" value="fastest-transfer" />
+                  <div class="option-body">
+                    <div class="option-top">
+                      <div>
+                        <p class="option-kicker">方案 1 · 最快抵達</p>
+                        <h3 class="option-title">花蓮 → 羅東轉乘一次 → 台北</h3>
+                      </div>
+                      <strong class="option-time">18:56 抵達</strong>
+                    </div>
+                    <p class="option-summary">先走一次轉乘，讓到站時間最早，但名額比較吃緊。</p>
+                    <div class="option-badges">
+                      <span class="badge badge--limited">座位緊張</span>
+                      <span class="badge badge--calm">無障礙可安排</span>
+                    </div>
+                    <div class="option-metrics">
+                      <div class="option-meta">
+                        <span>時間</span>
+                        <span>16:52 出發 · 2 小時 04 分</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>轉乘</span>
+                        <span>轉乘 1 次</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>座位</span>
+                        <span>對號座剩少量</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>費用</span>
+                        <span>補差額 NT$180</span>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  class="option-card"
+                  data-eval="alternative-option"
+                  data-option-id="later-direct"
+                  data-option-title="較晚直達：花蓮 → 台北"
+                  data-option-depart="17:38"
+                  data-option-arrive="19:54"
+                  data-option-duration="2 小時 16 分"
+                  data-option-transfer="轉乘 0 次"
+                  data-option-seat="對號座仍有少量"
+                  data-option-access="全程無階梯動線，適合不想換車"
+                  data-option-fare="補差額 NT$120"
+                  data-option-badge="直達"
+                >
+                  <input type="radio" name="alternative" value="later-direct" />
+                  <div class="option-body">
+                    <div class="option-top">
+                      <div>
+                        <p class="option-kicker">方案 2 · 較晚直達</p>
+                        <h3 class="option-title">花蓮 → 台北</h3>
+                      </div>
+                      <strong class="option-time">19:54 抵達</strong>
+                    </div>
+                    <p class="option-summary">少一次移動，改成直達，但抵達時間稍晚。</p>
+                    <div class="option-badges">
+                      <span class="badge badge--calm">直達</span>
+                      <span class="badge badge--calm">全程無階梯</span>
+                    </div>
+                    <div class="option-metrics">
+                      <div class="option-meta">
+                        <span>時間</span>
+                        <span>17:38 出發 · 2 小時 16 分</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>轉乘</span>
+                        <span>轉乘 0 次</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>座位</span>
+                        <span>對號座仍有少量</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>費用</span>
+                        <span>補差額 NT$120</span>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  class="option-card"
+                  data-eval="alternative-option"
+                  data-option-id="hold-ticket"
+                  data-option-title="保留票券，稍後處理"
+                  data-option-depart="16:40"
+                  data-option-arrive="待定"
+                  data-option-duration="先不變動"
+                  data-option-transfer="轉乘 0 次"
+                  data-option-seat="原票保留，不保證座位"
+                  data-option-access="保留原無階梯需求，待人工接手"
+                  data-option-fare="目前 NT$0"
+                  data-option-badge="稍後處理"
+                >
+                  <input type="radio" name="alternative" value="hold-ticket" />
+                  <div class="option-body">
+                    <div class="option-top">
+                      <div>
+                        <p class="option-kicker">方案 3 · 保留票券</p>
+                        <h3 class="option-title">先不改動，留待稍後處理</h3>
+                      </div>
+                      <strong class="option-time">抵達待定</strong>
+                    </div>
+                    <p class="option-summary">先把票券保留下來，適合還要確認同行者或接駁安排的人。</p>
+                    <div class="option-badges">
+                      <span class="badge badge--calm">暫不改簽</span>
+                      <span class="badge badge--limited">座位不保證</span>
+                    </div>
+                    <div class="option-metrics">
+                      <div class="option-meta">
+                        <span>時間</span>
+                        <span>16:40 維持原票 · 抵達待定</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>轉乘</span>
+                        <span>轉乘 0 次</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>座位</span>
+                        <span>原票保留，不保證座位</span>
+                      </div>
+                      <div class="option-meta">
+                        <span>費用</span>
+                        <span>目前 NT$0</span>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div class="action-row">
+                <button class="button-primary" type="button" data-eval="primary-action">
+                  前往確認摘要
+                </button>
+                <button class="button-back" type="button" data-eval="back-action" hidden>
+                  返回修改
+                </button>
+              </div>
+            </fieldset>
+          </div>
+
+          <aside class="summary-panel" data-eval="confirmation-summary" hidden aria-labelledby="summary-title">
+            <div class="summary-head">
+              <h2 id="summary-title" class="summary-title" tabindex="-1">送出前確認摘要</h2>
+              <span class="status-chip">尚未送出交易</span>
+            </div>
+            <div class="summary-grid">
+              <div>
+                <dl>
+                  <dt>選定方案</dt>
+                  <dd id="summary-option">尚未選擇</dd>
+                </dl>
+              </div>
+              <div>
+                <dl>
+                  <dt>乘客與限制</dt>
+                  <dd id="summary-passengers">2 位成人、1 位孩童；1 位乘客需無階梯動線</dd>
+                </dl>
+              </div>
+              <div>
+                <dl>
+                  <dt>時間與費用差額</dt>
+                  <dd id="summary-time">尚未選擇方案</dd>
+                </dl>
+              </div>
+              <div>
+                <dl>
+                  <dt>座位與無障礙</dt>
+                  <dd id="summary-access">座位與動線資訊會依所選方案更新</dd>
+                </dl>
+              </div>
+            </div>
+            <p class="summary-note" id="summary-note">
+              這裡只顯示送出前檢視內容，不會真的完成改簽。
+            </p>
+            <div class="summary-actions">
+              <button class="button-primary" type="button" id="confirm-ack">
+                我已檢視，未送出交易
+              </button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const flow = document.querySelector('[data-eval="recovery-step"]');
+      const fieldset = document.querySelector('[data-eval="choices"]');
+      const radios = Array.from(document.querySelectorAll('input[name="alternative"]'));
+      const primaryAction = document.querySelector('.action-row [data-eval="primary-action"]');
+      const backAction = document.querySelector('[data-eval="back-action"]');
+      const summary = document.querySelector('[data-eval="confirmation-summary"]');
+      const errorMessage = document.getElementById('choices-error');
+      const flowNote = document.getElementById('flow-note');
+      const summaryOption = document.getElementById('summary-option');
+      const summaryTime = document.getElementById('summary-time');
+      const summaryAccess = document.getElementById('summary-access');
+      const summaryNote = document.getElementById('summary-note');
+      const ackButton = document.getElementById('confirm-ack');
+
+      function getSelectedRadio() {
+        return radios.find((radio) => radio.checked) || null;
+      }
+
+      function updateSummary(radio) {
+        const optionCard = radio?.closest('[data-eval="alternative-option"]');
+        const optionTitle = optionCard?.dataset.optionTitle || '尚未選擇';
+        const time = optionCard
+          ? `${optionCard.dataset.optionDepart} 出發，${optionCard.dataset.optionArrive} 抵達，總耗時 ${optionCard.dataset.optionDuration}，${optionCard.dataset.optionFare}。`
+          : '尚未選擇方案';
+        const access = optionCard
+          ? `${optionCard.dataset.optionSeat}；${optionCard.dataset.optionAccess}。`
+          : '座位與動線資訊會依所選方案更新';
+
+        summaryOption.textContent = optionTitle;
+        summaryTime.textContent = time;
+        summaryAccess.textContent = access;
+        summaryNote.textContent =
+          '這裡只顯示送出前檢視內容，不會真的完成改簽。';
+        flowNote.textContent = radio
+          ? '已選定方案，按下後會進入送出前摘要；本頁只做模擬，不會真的完成改簽。'
+          : '先選一個替代方案，再看送出前摘要；本頁只做模擬，不會真的完成改簽。';
+      }
+
+      function clearError() {
+        fieldset.dataset.error = 'false';
+        errorMessage.hidden = true;
+      }
+
+      function showError() {
+        fieldset.dataset.error = 'true';
+        errorMessage.hidden = false;
+      }
+
+      function enterConfirmState() {
+        const radio = getSelectedRadio();
+        if (!radio) {
+          showError();
+          radios[0].focus();
+          return;
+        }
+
+        clearError();
+        updateSummary(radio);
+        flow.dataset.state = 'confirm';
+        summary.hidden = false;
+        backAction.hidden = false;
+        ackButton.textContent = '我已檢視，未送出交易';
+        primaryAction.textContent = '模擬確認，不送出交易';
+        requestAnimationFrame(() => {
+          const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          document.getElementById('summary-title').focus();
+          summary.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+        });
+      }
+
+      function returnToChoices() {
+        flow.dataset.state = 'choose';
+        summary.hidden = true;
+        backAction.hidden = true;
+        primaryAction.textContent = '前往確認摘要';
+        ackButton.textContent = '我已檢視，未送出交易';
+        summaryNote.textContent = '這裡只顯示送出前檢視內容，不會真的完成改簽。';
+        flowNote.textContent =
+          '先選一個替代方案，再看送出前摘要；本頁只做模擬，不會真的完成改簽。';
+        const target = getSelectedRadio();
+        if (target) {
+          target.focus();
+        }
+      }
+
+      radios.forEach((radio) => {
+        radio.id = `alt-${radio.value}`;
+        radio.addEventListener('change', () => {
+          clearError();
+          updateSummary(radio);
+          radios.forEach((item) => {
+            const card = item.closest('.option-card');
+            card?.classList.toggle('is-selected', item.checked);
+          });
+          primaryAction.disabled = false;
+          if (flow.dataset.state === 'confirm') {
+            backAction.hidden = false;
+          }
+        });
+      });
+
+      radios.forEach((radio) => {
+        const card = radio.closest('.option-card');
+        card?.classList.toggle('is-selected', radio.checked);
+      });
+
+      primaryAction.addEventListener('click', () => {
+        if (flow.dataset.state === 'choose') {
+          enterConfirmState();
+          return;
+        }
+
+        summaryNote.textContent = '已檢視送出前摘要，但沒有送出任何交易。';
+        ackButton.textContent = '已檢視，未送出交易';
+        flowNote.textContent = '確認內容已檢視；仍未送出交易。';
+      });
+
+      backAction.addEventListener('click', returnToChoices);
+
+      ackButton.addEventListener('click', () => {
+        summaryNote.textContent = '已檢視送出前摘要，但沒有送出任何交易。';
+        flowNote.textContent = '確認內容已檢視；仍未送出交易。';
+      });
+
+      updateSummary(null);
+      primaryAction.disabled = false;
+    </script>
+  </body>
+</html>

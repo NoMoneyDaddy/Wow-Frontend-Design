@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "started_at": "2026-07-15T10:50:24Z",
+  "finished_at": "2026-07-15T11:01:27Z",
+  "contract": {
+    "briefs": {
+      "wind-maintenance-dispatch-v6": {
+        "path": "evals/briefs/wind-maintenance-dispatch-v6.md",
+        "sha256": "0b89c53f79afab52fd4b8085c56e2ed2808fbacf7f9f5683fc53a71d2886c5d4"
+      },
+      "type-foundry-specimen-v6": {
+        "path": "evals/briefs/type-foundry-specimen-v6.md",
+        "sha256": "841543350af6da8f1e774a7dc50739a369d78a2a6d56b43f58b3956964a120cb"
+      },
+      "repair-cafe-intake-v6": {
+        "path": "evals/briefs/repair-cafe-intake-v6.md",
+        "sha256": "d9cf53ddff4867b991525e62b3e4724ef754dff3151cac2a7b865b64a8d1d5bc"
+      },
+      "night-market-allergen-v6": {
+        "path": "evals/briefs/night-market-allergen-v6.md",
+        "sha256": "4cdd4cb5c65adeea7deab486f9d77d61a2595ef4462340b05f61d962238a6276"
+      },
+      "royalty-statement-v6": {
+        "path": "evals/briefs/royalty-statement-v6.md",
+        "sha256": "5eb3322eb3804d9aef4c0d89f8e3e791a79d483cffcf17659e4b5f8d58be43fb"
+      },
+      "packaging-configurator-v6": {
+        "path": "evals/briefs/packaging-configurator-v6.md",
+        "sha256": "9917c674acde8fa084811b2ff02a1d0a49cc1c98129e9b7180a718b01fd27417"
+      },
+      "oral-history-archive-v6": {
+        "path": "evals/briefs/oral-history-archive-v6.md",
+        "sha256": "87f749f1c6a1fa2ad22b228da2dc08031c538b88bf5021702613a8ad2a156b77"
+      },
+      "grant-review-board-v6": {
+        "path": "evals/briefs/grant-review-board-v6.md",
+        "sha256": "8608347ca88d29a7d49a8ff02ec972a95b6e0a81075f40f04504e1f244468455"
+      }
+    },
+    "skill": {
+      "path": "wow-frontend-design/SKILL.md",
+      "sha256": "b2690afe84f76d5bd88a02ac087749d196f6fa27765f587d114e659bfe6adcaf"
+    },
+    "trusted_context": [
+      {
+        "path": "wow-frontend-design/SKILL.md",
+        "sha256": "b2690afe84f76d5bd88a02ac087749d196f6fa27765f587d114e659bfe6adcaf"
+      },
+      {
+        "path": "wow-frontend-design/references/creative-direction.md",
+        "sha256": "b168c4e8b3e1ed50237687fc22a827946c025b0bc8660c290da04954a80322b3"
+      },
+      {
+        "path": "wow-frontend-design/references/anti-ai-slop.md",
+        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+      },
+      {
+        "path": "wow-frontend-design/references/mobile-responsive.md",
+        "sha256": "133d8df3887922d9ef133119577b83affae2f915fcee6b6005b3fe883ff2e186"
+      },
+      {
+        "path": "wow-frontend-design/references/localization.md",
+        "sha256": "3eb817b38ca717d4e9ac154bccc5bd662319266478705e92e6c138e759becda5"
+      },
+      {
+        "path": "wow-frontend-design/references/typography-webfonts.md",
+        "sha256": "9d946351ad7a07c0a1eb9cfd3069387e9afa2fa4996b5616c82f8c11c1d30b5c"
+      },
+      {
+        "path": "wow-frontend-design/references/typographic-layout.md",
+        "sha256": "adb607257a234cb1809759bbbdde8c67bea6442db395029c4f89b3a3a6c85c78"
+      },
+      {
+        "path": "wow-frontend-design/references/implementation.md",
+        "sha256": "4474d1fbde8666c1342861b1b260e948d977eed018417c2873295739e09c22be"
+      },
+      {
+        "path": "wow-frontend-design/references/component-composition.md",
+        "sha256": "688cc24e5117eaaaa8037546cf73d9972af249b8bcecbd3bf180b22f4dadab78"
+      },
+      {
+        "path": "wow-frontend-design/references/quality-gates.md",
+        "sha256": "a92248db6cf063aaa1c3fd6d1532fcc4f55d60ed3533c452c175193e6bf4f731"
+      },
+      {
+        "path": "wow-frontend-design/references/weak-model-playbook.md",
+        "sha256": "14ebaeb9c0097a9438d9d2c3da15565981bfe4f7f95d07ce120645d82982e285"
+      },
+      {
+        "path": "wow-frontend-design/references/color-system-psychology.md",
+        "sha256": "08c018fa2fcd4e283af877bd804c9c97cb4ab3cc4cc24d896b8ab55f44d22d72"
+      },
+      {
+        "path": "wow-frontend-design/references/design-md-contract.md",
+        "sha256": "63c2ef3c0417ffef151a7a0f2b6aff35fa6b8ad3f3f4bf77e5ecc35767c20080"
+      },
+      {
+        "path": "wow-frontend-design/assets/DESIGN.template.md",
+        "sha256": "b0151780e69ca8dcd2b83b8b2bbd265646d31c139ae9b9e54abc30f49ad7028d"
+      }
+    ],
+    "evaluator_inputs": [
+      {
+        "path": "evals/run_product_flow_evaluation.py",
+        "sha256": "beca4105c75c3c6ded7c74e3837deb863c3b3552c91fe3093b1504b10d722198"
+      },
+      {
+        "path": "evals/run_product_flow_matrix.py",
+        "sha256": "cc57297bee017489673c295fc1ed9e33d9736a2e340cf2f9d584a7ae1e533c31"
+      },
+      {
+        "path": "evals/lint_design_md_matrix.py",
+        "sha256": "82d8b44304cf06b36393b35b7bc59992816829af15dac34a891257322431e795"
+      },
+      {
+        "path": "evals/playwright_visual_v6_audit.cjs",
+        "sha256": "c5221de34b2de98543401ca4e9826244631f5d6f7faf10fa302246b70da310c8"
+      },
+      {
+        "path": "evals/run_claude_case.sh",
+        "sha256": "3b403ebc0146cb5bd905e93156904ed84d01b4f0cc2cc5d74044c821c7619e76"
+      },
+      {
+        "path": "evals/run_codex_case.sh",
+        "sha256": "63c267c48e43d4381a11da72421270b7711d897222a85a442f6af9751921926b"
+      },
+      {
+        "path": "evals/validate_visual_web_output.py",
+        "sha256": "099accc1602fc6c3dffed7c3c0e4fc44182a0265cee71499ca358420532d8d4f"
+      },
+      {
+        "path": "evals/validate_design_md_clean.py",
+        "sha256": "f95fd19e1a4d8bfcb30d757fac8117f9a617903e79789bd067b77d16dd02783e"
+      },
+      {
+        "path": "evals/validate_codex_log_policy.py",
+        "sha256": "9daf52fc38c7914a90f0e45567e6946eed9f1e86e7ddb850695498401d358214"
+      }
+    ],
+    "outputs_by_case": {
+      "wind-maintenance-dispatch-v6": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "type-foundry-specimen-v6": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "repair-cafe-intake-v6": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "night-market-allergen-v6": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "royalty-statement-v6": [
+        "DESIGN.md",
+        "index.html"
+      ],
+      "packaging-configurator-v6": [
+        "DESIGN.md",
+        "index.html",
+        "materials.html",
+        "summary.html"
+      ],
+      "oral-history-archive-v6": [
+        "DESIGN.md",
+        "index.html",
+        "archive.html",
+        "story.html"
+      ],
+      "grant-review-board-v6": [
+        "DESIGN.md",
+        "index.html"
+      ]
+    },
+    "artifact_root": "evals/product-flow-v6-initial-targets",
+    "providers_are_separate_cohorts": true,
+    "resolved_backend_snapshots_may_be_unreported": true,
+    "generation_settings": {
+      "effort": "model_default",
+      "claude_extended_thinking": false,
+      "codex_reasoning_summary": "none",
+      "codex_internal_reasoning_disable_supported": false
+    }
+  },
+  "selection": {
+    "provider": "codex",
+    "model": "gpt-5.4-mini",
+    "theme": "all",
+    "count": 8
+  },
+  "results": [
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "wind-maintenance-dispatch-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/run-manifest.json",
+      "finished_at": "2026-07-15T10:50:24Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T10:50:24Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T10:50:24Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/run-manifest.json",
+          "finished_at": "2026-07-15T10:50:24Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "type-foundry-specimen-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6/run-manifest.json",
+      "finished_at": "2026-07-15T10:50:24Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T10:50:24Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T10:50:24Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6/run-manifest.json",
+          "finished_at": "2026-07-15T10:50:24Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "repair-cafe-intake-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6",
+      "status": "completed",
+      "exit_code": 0,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6/run-manifest.json",
+      "finished_at": "2026-07-15T11:01:27Z",
+      "duration_seconds": 663.63,
+      "started_at": "2026-07-15T10:50:24Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T10:50:24Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6/run-manifest.json",
+          "finished_at": "2026-07-15T11:01:27Z",
+          "duration_seconds": 663.63,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 663.63
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "night-market-allergen-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-night-market-allergen-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-night-market-allergen-v6/run-manifest.json",
+      "finished_at": "2026-07-15T11:01:27Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T11:01:27Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T11:01:27Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-night-market-allergen-v6/run-manifest.json",
+          "finished_at": "2026-07-15T11:01:27Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "royalty-statement-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-royalty-statement-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-royalty-statement-v6/run-manifest.json",
+      "finished_at": "2026-07-15T11:01:27Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T11:01:27Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T11:01:27Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-royalty-statement-v6/run-manifest.json",
+          "finished_at": "2026-07-15T11:01:27Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "packaging-configurator-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-packaging-configurator-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-packaging-configurator-v6/run-manifest.json",
+      "finished_at": "2026-07-15T11:01:27Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T11:01:27Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T11:01:27Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-packaging-configurator-v6/run-manifest.json",
+          "finished_at": "2026-07-15T11:01:27Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "oral-history-archive-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-oral-history-archive-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
+      "finished_at": "2026-07-15T11:01:27Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T11:01:27Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T11:01:27Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
+          "finished_at": "2026-07-15T11:01:27Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "grant-review-board-v6",
+      "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-grant-review-board-v6",
+      "status": "existing_completed",
+      "exit_code": null,
+      "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-grant-review-board-v6/run-manifest.json",
+      "finished_at": "2026-07-15T11:01:27Z",
+      "duration_seconds": 0.0,
+      "started_at": "2026-07-15T11:01:27Z",
+      "attempt_count": 1,
+      "attempts": [
+        {
+          "started_at": "2026-07-15T11:01:27Z",
+          "status": "existing_completed",
+          "exit_code": null,
+          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-grant-review-board-v6/run-manifest.json",
+          "finished_at": "2026-07-15T11:01:27Z",
+          "duration_seconds": 0.0,
+          "attempt": 1
+        }
+      ],
+      "total_duration_seconds": 0.0
+    }
+  ],
+  "retry_policy": {
+    "inactivity_timeout_seconds": 1800,
+    "hard_timeout_seconds": 7200,
+    "active_output_extends_inactivity_deadline": true,
+    "prior_diagnostic_is_forwarded_to_fresh_retry": true,
+    "max_attempts_per_case": 3,
+    "retry_delay_seconds": 2.0,
+    "retryable_statuses": [
+      "generation_failed",
+      "output_policy_rejected",
+      "timeout"
+    ],
+    "incomplete_matrix_exit_code": 1
+  },
+  "summary": {
+    "requested": 8,
+    "completed": 8,
+    "failed": 0,
+    "attempts": 8,
+    "retried_cases": 0,
+    "statuses": {
+      "completed": 1,
+      "existing_completed": 7
+    }
+  }
+}

@@ -38,6 +38,16 @@ SAFE_HTML = '<!doctype html><html lang="zh-Hant"><head><title>Test</title><style
 SAFE_CSS = "body { color: #111; background: #fff; }"
 SAFE_JS = "document.querySelector('a').addEventListener('click', () => {});"
 SAFE_DESIGN = "---\nversion: alpha\nname: Runner Test\ncolors:\n  primary: \"#111111\"\n---\n# Runner Test\n## Overview\nTest.\n"
+V6_CASES = (
+    "wind-maintenance-dispatch-v6",
+    "type-foundry-specimen-v6",
+    "repair-cafe-intake-v6",
+    "night-market-allergen-v6",
+    "royalty-statement-v6",
+    "packaging-configurator-v6",
+    "oral-history-archive-v6",
+    "grant-review-board-v6",
+)
 
 
 class CodexRunnerTests(unittest.TestCase):
@@ -47,11 +57,27 @@ class CodexRunnerTests(unittest.TestCase):
         shutil.copy2(VALIDATOR, root / "evals" / "validate_visual_web_output.py")
         shutil.copy2(DESIGN_VALIDATOR, root / "evals" / "validate_design_md_clean.py")
         shutil.copy2(TRACE_VALIDATOR, root / "evals" / "validate_codex_log_policy.py")
+        shutil.copy2(ROOT / "package-lock.json", root / "package-lock.json")
         (root / "evals" / "briefs" / "harbor-cold-chain-v4.md").write_text("# Harbor cold-chain brief\n", encoding="utf-8")
         (root / "evals" / "briefs" / "island-sound-archive-v4.md").write_text("# Island sound archive brief\n", encoding="utf-8")
         (root / "evals" / "briefs" / "plant-swap-one-line-v4.md").write_text("Build a plant swap website.\n", encoding="utf-8")
+        (root / "evals" / "briefs" / "rail-rebooking-v5.md").write_text("# Rail rebooking v5 brief\n", encoding="utf-8")
+        (root / "evals" / "briefs" / "subscription-audit-v5.md").write_text("# Subscription audit v5 brief\n", encoding="utf-8")
+        (root / "evals" / "briefs" / "community-translation-v5.md").write_text("# Community translation v5 brief\n", encoding="utf-8")
+        (root / "evals" / "briefs" / "ceramics-festival-one-line-v5.md").write_text("Build a ceramics festival website.\n", encoding="utf-8")
+        for case_id in V6_CASES:
+            (root / "evals" / "briefs" / f"{case_id}.md").write_text(f"# {case_id} brief\n", encoding="utf-8")
         for model in ("gpt-5.4-mini", "gpt-5.4", "gpt-5.5"):
-            for case_id in ("harbor-cold-chain-v4", "island-sound-archive-v4", "plant-swap-one-line-v4"):
+            for case_id in (
+                "harbor-cold-chain-v4",
+                "island-sound-archive-v4",
+                "plant-swap-one-line-v4",
+                "rail-rebooking-v5",
+                "subscription-audit-v5",
+                "community-translation-v5",
+                "ceramics-festival-one-line-v5",
+                *V6_CASES,
+            ):
                 (root / "evals" / f"codex-{model}-{case_id}").mkdir()
         for relative in CONTEXTS:
             path = root / relative
@@ -89,6 +115,18 @@ printf '%s' "$RUNNER_TEST_DESIGN" > "$stage/DESIGN.md"
 if [[ "$RUNNER_TEST_CASE_ID" == "plant-swap-one-line-v4" ]]; then
   printf '%s' "$RUNNER_TEST_HTML" > "$stage/browse.html"
   printf '%s' "$RUNNER_TEST_HTML" > "$stage/listing.html"
+fi
+if [[ "$RUNNER_TEST_CASE_ID" == "ceramics-festival-one-line-v5" ]]; then
+  printf '%s' "$RUNNER_TEST_HTML" > "$stage/program.html"
+  printf '%s' "$RUNNER_TEST_HTML" > "$stage/visit.html"
+fi
+if [[ "$RUNNER_TEST_CASE_ID" == "packaging-configurator-v6" ]]; then
+  printf '%s' "$RUNNER_TEST_HTML" > "$stage/materials.html"
+  printf '%s' "$RUNNER_TEST_HTML" > "$stage/summary.html"
+fi
+if [[ "$RUNNER_TEST_CASE_ID" == "oral-history-archive-v6" ]]; then
+  printf '%s' "$RUNNER_TEST_HTML" > "$stage/archive.html"
+  printf '%s' "$RUNNER_TEST_HTML" > "$stage/story.html"
 fi
 if [[ -n "${RUNNER_TEST_CODEX_LOG:-}" ]]; then
   printf '%s\n' "$RUNNER_TEST_CODEX_LOG"
@@ -189,13 +227,31 @@ fi
                 self.assertIn("--ignore-rules", arguments)
                 self.assertIn("--strict-config", arguments)
                 enabled = [arguments[index + 1] for index, value in enumerate(arguments[:-1]) if value == "--enable"]
-                self.assertEqual(["multi_agent", "browser_use", "computer_use"], enabled)
+                disabled = [arguments[index + 1] for index, value in enumerate(arguments[:-1]) if value == "--disable"]
+                self.assertEqual([], enabled)
+                self.assertEqual(
+                    [
+                        "apps",
+                        "multi_agent",
+                        "browser_use",
+                        "computer_use",
+                        "image_generation",
+                        "plugins",
+                        "skill_mcp_dependency_install",
+                        "tool_call_mcp_elicitation",
+                        "tool_suggest",
+                    ],
+                    disabled,
+                )
                 self.assertIn('model_reasoning_summary="none"', arguments)
                 self.assertNotIn("model_reasoning_effort", "\n".join(arguments))
                 prompt = (capture / "prompt.txt").read_text(encoding="utf-8")
                 self.assertIn("# Harbor cold-chain brief", prompt)
                 self.assertIn("Create exactly DESIGN.md and one self-contained index.html", prompt)
-                self.assertIn("Use one bounded reviewer subagent", prompt)
+                self.assertIn("Do not spawn subagents", prompt)
+                self.assertIn("do not run git status, git diff", prompt)
+                self.assertIn("Do not discover or read installed skills", prompt)
+                self.assertIn("the independent evaluator owns browser interaction", prompt)
                 target = root / "evals" / f"codex-{model}-harbor-cold-chain-v4"
                 manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
                 self.assertEqual(model, manifest["model"]["requested_identifier"])
@@ -214,6 +270,10 @@ fi
                 self.assertNotIn("node_modules/.bin", captured_environment)
                 self.assertTrue(manifest["environment"]["user_skills_hidden_by_isolated_home"])
                 self.assertEqual("passed", manifest["environment"]["forbidden_host_path_audit"])
+                self.assertFalse(manifest["isolation"]["builder_subagents"])
+                self.assertFalse(manifest["isolation"]["builder_browser_tools"])
+                self.assertFalse(manifest["isolation"]["builder_computer_tools"])
+                self.assertTrue(manifest["isolation"]["independent_visual_evaluator_required"])
                 self.assertEqual(len(CONTEXTS), len(manifest["context"]["trusted_files"]))
                 self.assertEqual(
                     hashlib.sha256((root / "evals" / "run_codex_case.sh").read_bytes()).hexdigest(),
@@ -246,6 +306,40 @@ fi
                 completed = self.run_case(root, capture, arguments[0], arguments[1])
                 self.assertEqual(2, completed.returncode, completed.stderr)
             self.assertFalse((capture / "args.txt").exists())
+
+    def test_v5_ceramics_case_publishes_exact_three_page_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture = self.fixture(root)
+            completed = self.run_case(root, capture, "gpt-5.4", "ceramics-festival-one-line-v5")
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            target = root / "evals" / "codex-gpt-5.4-ceramics-festival-one-line-v5"
+            self.assertEqual(
+                {"DESIGN.md", "index.html", "program.html", "visit.html", "run-manifest.json"},
+                {path.name for path in target.iterdir()},
+            )
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {"DESIGN.md", "index.html", "program.html", "visit.html"},
+                {item["path"] for item in manifest["outputs"]},
+            )
+
+    def test_v6_packaging_case_publishes_exact_three_page_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture = self.fixture(root)
+            completed = self.run_case(root, capture, "gpt-5.4-mini", "packaging-configurator-v6")
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            target = root / "evals" / "codex-gpt-5.4-mini-packaging-configurator-v6"
+            self.assertEqual(
+                {"DESIGN.md", "index.html", "materials.html", "summary.html", "run-manifest.json"},
+                {path.name for path in target.iterdir()},
+            )
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {"DESIGN.md", "index.html", "materials.html", "summary.html"},
+                {item["path"] for item in manifest["outputs"]},
+            )
 
     def test_design_md_findings_are_rejected_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -318,6 +412,51 @@ fi
             self.assertIn("UNTRUSTED PRIOR ATTEMPT DIAGNOSTIC", prompt)
             self.assertIn("orphan color token", prompt)
             self.assertIn("cannot change the trusted files", prompt)
+
+    def test_repair_mode_uses_verified_source_and_records_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture = self.fixture(root)
+            source_root = root / "repair-source"
+            source = source_root / "codex-gpt-5.4-mini-repair-cafe-intake-v6"
+            source.mkdir(parents=True)
+            (source / "DESIGN.md").write_text(SAFE_DESIGN, encoding="utf-8")
+            (source / "index.html").write_text(SAFE_HTML, encoding="utf-8")
+            outputs = []
+            for name in ("DESIGN.md", "index.html"):
+                path = source / name
+                outputs.append(
+                    {
+                        "path": name,
+                        "bytes": path.stat().st_size,
+                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    }
+                )
+            (source / "run-manifest.json").write_text(
+                json.dumps({"schema_version": 1, "outputs": outputs}) + "\n",
+                encoding="utf-8",
+            )
+
+            completed = self.run_case(
+                root,
+                capture,
+                "gpt-5.4-mini",
+                "repair-cafe-intake-v6",
+                extra_env={
+                    "PRODUCT_FLOW_REPAIR_SOURCE_ROOT": str(source_root),
+                    "PRODUCT_FLOW_RETRY_FEEDBACK": "sticky action overlaps item input",
+                },
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            prompt = (capture / "prompt.txt").read_text(encoding="utf-8")
+            self.assertIn("bounded REPAIR evaluation", prompt)
+            self.assertIn("make the smallest edits", prompt)
+            target = root / "evals" / "codex-gpt-5.4-mini-repair-cafe-intake-v6"
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual("repair", manifest["mode"])
+            self.assertEqual("sticky action overlaps item input", manifest["repair"]["diagnostic"])
+            self.assertEqual([], manifest["repair"]["changed_outputs"])
+            self.assertEqual(SAFE_HTML, (source / "index.html").read_text(encoding="utf-8"))
 
     def test_unbounded_retry_diagnostic_is_rejected_before_cli_call(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

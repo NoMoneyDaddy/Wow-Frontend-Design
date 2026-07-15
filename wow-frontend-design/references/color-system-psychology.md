@@ -68,6 +68,17 @@ Keep independent record dimensions orthogonal. Urgency, lifecycle status, due st
 
 Use Oklab/OKLCH when perceptually steadier ramps, interpolation, or controlled chroma are useful, with sRGB-compatible fallbacks and gamut testing. CSS Color 4 describes the spaces and their interpolation properties; it does not guarantee accessible contrast or device equivalence. See [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/).
 
+When the support matrix needs progressive enhancement, put the broad fallback first and the wide-gamut value second:
+
+```css
+:root {
+  --brand-action: #365fe0;
+  --brand-action: oklch(57% 0.18 254);
+}
+```
+
+The quoted `oklch()` string is also valid in official `DESIGN.md` color frontmatter; see [design-md-contract.md](design-md-contract.md). Keep the source-of-truth role synchronized with the CSS fallback pair. Test out-of-gamut clipping/mapping and the resolved browser color at every supported appearance instead of treating the authored OKLCH coordinates as rendered evidence.
+
 Define:
 
 - a lightness ladder with named surface and text roles;

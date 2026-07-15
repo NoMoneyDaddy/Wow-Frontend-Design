@@ -41,6 +41,8 @@ Every major region needs an explicit answer. “Stack” is not an answer unless
 
 Keep one logical record and state source across responsive modes. A desktop table and mobile card may look different, but hidden duplicate DOM copies must not create repeated IDs, evaluator hooks, accessible identities, stale state, or two independently focusable controls. Prefer one semantic record recomposed by CSS; when distinct templates are necessary, render only the active template and prove state and focus parity in both directions.
 
+Repeat the transformation table for reachable states, not only the default page. At minimum cross the affected viewport with `default`, `open/expanded`, `filtered`, `validation/error`, and `success/confirmation` when those states exist. A page that becomes mobile-safe only before interaction is not responsive.
+
 ## 3. Apply mobile composition patterns
 
 ### Navigation
@@ -89,10 +91,12 @@ Keep one logical record and state source across responsive modes. A desktop tabl
 - Prefer fluid tokens with `clamp()` for type, spacing, and gaps; constrain line length separately.
 - Use Grid/Flexbox intrinsic sizing, `minmax()`, `min()`, `max()`, and container queries where component context matters.
 - Add `min-width: 0` to flexible children that contain long text.
+- Audit selector specificity across responsive states. A desktop rule such as `.content-grid.review-open` can outrank a later mobile `.content-grid` rule and silently restore desktop columns after interaction. Match or intentionally exceed the state selector inside the media/container query, or move the responsive state into a lower-specificity architecture; verify computed grid/flex values after the state changes.
 - Apply `box-sizing: border-box` to bounded layout primitives. Audit the sum of shell offsets, gaps, padding, and percentage/viewport widths; never use `overflow-x: hidden` as the fix for a child that exceeds the viewport.
 - Use logical properties (`margin-inline`, `padding-block`, `inset-inline-end`) to support RTL and writing modes.
 - Reserve media dimensions with `aspect-ratio` or explicit sizes to prevent layout shift.
 - Avoid fixed heights for text containers.
+- Reject de facto vertical text produced by a squeezed horizontal column. Intentional vertical Chinese uses `writing-mode`, correct column progression, punctuation, and a horizontal responsive equivalent; a one-character-wide horizontal paragraph is a layout failure.
 - Avoid `100vw` inside pages with scrollbars; it commonly creates overflow.
 - Cap canvas/WebGL device pixel ratio, pause off-screen loops, debounce expensive resize work, and reduce density on small or low-power devices.
 - Support `prefers-reduced-motion`; consider `prefers-reduced-data` as an enhancement where available.
@@ -121,6 +125,7 @@ At every size verify:
 - image crop and signature moment;
 - loading, empty, error, and success states;
 - no unexpected overflow.
+- no long prose squeezed below its script-aware useful measure, no tall multi-line command caused by a narrow track, and no large unexplained void or detached summary after state changes;
 - short command labels remain intentionally one line unless the component contract explicitly allows wrapping; verify rendered line boxes and clipping, not only page overflow.
 - fixed/sticky UI leaves the current primary content and focused control unobscured, including safe areas and the virtual keyboard.
 - responsive alternatives preserve the same required content, semantics, and declared test/evaluator hook; only the presentation and interaction mode change.
@@ -128,5 +133,7 @@ At every size verify:
 For every modal menu, run this exact sequence: record page scroll → open → attempt background scroll and confirm it is locked → activate an internal destination and confirm the sheet closes with coherent focus → reopen → press Escape and confirm focus returns to the opener. Source presence is not evidence.
 
 Capture separate mobile and desktop screenshots. A desktop screenshot narrowed by CSS is not proof of a designed mobile experience.
+
+Viewport emulation is browser evidence, not automatically a physical-device claim. Record CSS viewport, DPR, user agent, touch capability, `isMobile`, browser engine, and whether the run used a simulator/emulator or physical device. A true mobile browser profile is stronger than width-only resizing; it still does not prove browser chrome, virtual keyboard, GPU/font rasterization, OS accessibility services, thermal limits, or real touch behavior. Use a simulator/emulator or device for risks that depend on those layers.
 
 Keep one browser session and sweep adjacent widths around every observed mode change rather than checking only named devices. Start with coarse samples, then narrow the failing interval until the actual transition range is known. Verify both directions across that range with the same route, data, locale, zoom, theme, and open/closed interaction state; watch for a one-pixel overlap, hidden action, focus loss, stale overlay, crop jump, or accidental overflow between headline viewports.

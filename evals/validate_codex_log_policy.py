@@ -18,15 +18,28 @@ FORBIDDEN_EXECUTABLES = (
     "git",
     "npm",
     "npx",
+    "osascript",
     "pnpm",
     "rsync",
+    "safaridriver",
     "scp",
     "ssh",
+    "swift",
+    "swiftc",
     "wget",
+    "xcrun",
     "yarn",
 )
-FORBIDDEN_ITEM_TYPES = {"mcp_tool_call", "web_search"}
-OUTSIDE_TEMP_PREFIXES = ("/private/tmp", "/private/var/folders", "/tmp", "/var/folders")
+FORBIDDEN_ITEM_TYPES = {
+    "browser_tool_call",
+    "collab_tool_call",
+    "computer_tool_call",
+    "mcp_tool_call",
+    "web_search",
+}
+TEMP_PATH = re.compile(
+    r"(?<![A-Za-z0-9_.-])(?P<path>/(?:private/)?(?:tmp|var/folders)(?:/[^\s'\"`|;&<>()\[\]{}]*)?)"
+)
 
 
 class PolicyError(ValueError):
@@ -55,8 +68,21 @@ def _forbidden_executable(command: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _external_temp_path(command: str, stage: Path) -> str | None:
+    """Return the first temporary path outside the evaluator-owned stage."""
+
+    canonical_stage = stage.resolve(strict=False)
+    for match in TEMP_PATH.finditer(command):
+        raw_path = match.group("path").rstrip(",.:")
+        candidate = Path(raw_path).resolve(strict=False)
+        if candidate == canonical_stage or canonical_stage in candidate.parents:
+            continue
+        return raw_path
+    return None
+
+
 def validate(path: Path, stage: Path) -> int:
-    stage = stage.resolve()
+    stage = stage.resolve(strict=False)
     checked_commands = 0
     for event in _events(path):
         item = event.get("item")
@@ -74,9 +100,9 @@ def validate(path: Path, stage: Path) -> int:
         executable = _forbidden_executable(command)
         if executable is not None:
             raise PolicyError(f"forbidden executable in trace: {executable}")
-        for prefix in OUTSIDE_TEMP_PREFIXES:
-            if prefix in command and str(stage) not in command:
-                raise PolicyError(f"command referenced evaluator-external temporary storage: {prefix}")
+        external_temp = _external_temp_path(command, stage)
+        if external_temp is not None:
+            raise PolicyError(f"command referenced evaluator-external temporary storage: {external_temp}")
     return checked_commands
 
 

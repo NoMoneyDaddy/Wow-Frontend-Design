@@ -14,6 +14,18 @@ EXPECTED_BY_CASE = {
     "harbor-cold-chain-v4": ("DESIGN.md", "index.html"),
     "island-sound-archive-v4": ("DESIGN.md", "index.html"),
     "plant-swap-one-line-v4": ("DESIGN.md", "index.html", "browse.html", "listing.html"),
+    "rail-rebooking-v5": ("DESIGN.md", "index.html"),
+    "subscription-audit-v5": ("DESIGN.md", "index.html"),
+    "community-translation-v5": ("DESIGN.md", "index.html"),
+    "ceramics-festival-one-line-v5": ("DESIGN.md", "index.html", "program.html", "visit.html"),
+    "wind-maintenance-dispatch-v6": ("DESIGN.md", "index.html"),
+    "type-foundry-specimen-v6": ("DESIGN.md", "index.html"),
+    "repair-cafe-intake-v6": ("DESIGN.md", "index.html"),
+    "night-market-allergen-v6": ("DESIGN.md", "index.html"),
+    "royalty-statement-v6": ("DESIGN.md", "index.html"),
+    "packaging-configurator-v6": ("DESIGN.md", "index.html", "materials.html", "summary.html"),
+    "oral-history-archive-v6": ("DESIGN.md", "index.html", "archive.html", "story.html"),
+    "grant-review-board-v6": ("DESIGN.md", "index.html"),
 }
 
 

@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-15T11:01:27Z",
+  "generation_ledger": {
+    "path": "evals/product-flow-v6-generation-results.json",
+    "sha256": "9d437dbd39e4cbce6e11108d01947e5c7d2c41fa4405446af6d3ed08028f6c7d"
+  },
+  "supplemental_retry_ledger": null,
+  "linter": {
+    "package": "@google/design.md",
+    "version": "0.3.0"
+  },
+  "results": [
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "wind-maintenance-dispatch-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "8fa7e980daa40306fc9729e6071ab7b858359cfb7c511fb15059cdeee24a537e",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 12 colors, 5 typography scales, 4 rounding levels, 5 spacing tokens, 9 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "type-foundry-specimen-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "9eddb6b27f2a787178fe71187313b678c5c9675651ab6093dd05020bf63382e8",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 8 colors, 4 typography scales, 4 rounding levels, 6 spacing tokens, 5 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "repair-cafe-intake-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "e4ce903a1d946261ca3202d69b35ff6756e8691f37fd85653db2e48333134852",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 10 colors, 4 typography scales, 3 rounding levels, 5 spacing tokens, 9 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "night-market-allergen-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-night-market-allergen-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "22c1b52ca32575a55d9882c194721106d591bea8209eb583199b615d0d922d05",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 7 colors, 4 typography scales, 4 rounding levels, 5 spacing tokens, 11 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "royalty-statement-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-royalty-statement-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "f5cbfb343ffb8aac954a07d831bd3aeebbb8f648392299d99c6cf923006a785c",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 17 colors, 4 typography scales, 3 rounding levels, 6 spacing tokens, 16 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "packaging-configurator-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-packaging-configurator-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "54090ceb6964b22e1c6e6cd38af399e6b85430dc88916c92608abc7293cc6634",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 12 colors, 4 typography scales, 4 rounding levels, 6 spacing tokens, 11 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "oral-history-archive-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-oral-history-archive-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "c113b42769c387d82164969245f41bc25f51bbab13b708369688930d237d9b25",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 8 colors, 4 typography scales, 4 rounding levels, 6 spacing tokens, 8 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "grant-review-board-v6",
+      "path": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-grant-review-board-v6/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "add1454f0eb2433c38a279e73110e705b2d8cf42150e3d3ea548ffdb862d0122",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 7 colors, 2 typography scales, 3 rounding levels, 5 spacing tokens, 7 components."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "checked": 8,
+    "clean": 8,
+    "with_findings": 0,
+    "infrastructure_failures": 0
+  }
+}

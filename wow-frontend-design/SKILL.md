@@ -4,7 +4,7 @@ description: Design, build, audit, or refactor distinctive production-oriented w
 license: MIT
 metadata:
   author: NoMoneyDaddy
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # WOW Frontend Design
@@ -33,7 +33,7 @@ Read only the references needed for the current request:
 - Always read [mobile-responsive.md](references/mobile-responsive.md) when the interface has a viewport.
 - Read [localization.md](references/localization.md) for any user-facing text, multilingual product, CJK content, RTL support, or locale-sensitive layout.
 - Read [typography-webfonts.md](references/typography-webfonts.md) when selecting, loading, subsetting, self-hosting, or auditing custom/open-source fonts and typography.
-- Read [typographic-layout.md](references/typographic-layout.md) when reading measure, line height, wrapping, vertical writing, component/card spacing, density, or optical font choice is material.
+- Read [typographic-layout.md](references/typographic-layout.md) when reading measure, line height, wrapping, vertical writing, ruby/Bopomofo annotation, component/card spacing, density, or optical font choice is material.
 - Read [color-system-psychology.md](references/color-system-psychology.md) when selecting or auditing color, contrast, semantic states, light/dark/high-contrast appearances, or any color-emotion/conversion claim.
 - Read [visual-material-system.md](references/visual-material-system.md) when borders, typography, component colors, light, depth, texture, effects, and motion must form a coherent craft system.
 - Read [brand-system-fidelity.md](references/brand-system-fidelity.md) when extracting an existing brand, extending a design system, separating campaign treatment, or preserving brand voice/assets across product surfaces.
@@ -92,9 +92,24 @@ Respect the mutation boundary. An `AUDIT` or review request is read-only and rep
 
 Inventory what must stay, what may change, and what evidence will prove success.
 
-At the start of a local or remote sandbox run, inventory the actual capability boundary: readable/writable workspace roots, shell and project commands, pinned dependencies, browser/screenshot access, loopback serving, and network policy. Keep generated code and evidence inside caller-authorized workspace roots; do not rely on a writable home directory, global installs, nested agent CLIs, or outbound network. If a required verifier is unavailable, continue only within the safe implementation scope, route through [no-visual-first-pass.md](references/no-visual-first-pass.md), and label the missing check `UNVERIFIED` with an exact handoff command.
+At the start of a local or remote sandbox run, inventory the actual capability boundary: readable/writable workspace roots, shell and project commands, pinned dependencies, browser/screenshot access, loopback serving, and network policy. Keep generated code and evidence inside caller-authorized workspace roots; do not rely on a writable home directory, global installs, nested agent CLIs, or outbound network.
+
+Optimize both user and developer experience:
+
+- Let one product request start the complete inspect → design → build → verify → repair → handoff flow. Do not make the user relay diagnostics, repeatedly approve routine in-scope fixes, or restart after a recoverable check.
+- Give the developer reproducible commands, exact paths/versions, focused diagnostics, attempt history, `--resume` when supported, and the smallest affected rerun. Preserve logs and screenshots without flooding the handoff.
+- Detect missing required tools before work reaches their gate. Prefer the repository's existing package manager, lockfile, scripts, system tools, and caches. Install missing verification-only tooling automatically when it is necessary for the requested result and allowed by the environment.
+- Use two version modes. For ordinary project work, respect an existing pin; when no pin exists, query the official stable channel, exclude prereleases, resolve the newest runtime-compatible version to an exact identifier, install it once, smoke-test it, and record/reuse that exact resolution. If the newest stable is incompatible, fall back to the newest Skill-tested compatible version and record why. For CI, benchmarks, screenshot baselines, and reproducible audits, use the already frozen exact version and never auto-upgrade inside the run.
+- Install into the project, isolated evaluator root, or caller-authorized cache—never globally or into an assumed writable home. Do not switch lockfile families, leave a mutable `@latest` in a command/manifest, silently upgrade existing packages, change product runtime dependencies, or enable lifecycle scripts merely to obtain an evaluator.
+- When a browser binary is needed and browser policy permits the chosen engine, install the engine revision compatible with the resolved automation tool into the isolated tool cache. Verify the executable/version before continuing. A width-only renderer or unrelated browser is not a silent substitute.
+- Record `tool → reason → source/version → install scope → command → result`. Treat transient registry/download failures as retryable. Treat an unavailable network, read-only workspace, missing authority, or incompatible runtime as a capability limit—not a reason to delete the product artifact.
+- If a required verifier still cannot be made available safely, continue within the safe implementation scope, route through [no-visual-first-pass.md](references/no-visual-first-pass.md), preserve the best artifact, and label only that check `UNVERIFIED` with an exact continuation command.
 
 For long generation or verification commands, distinguish inactivity from elapsed wall time. While logs or evaluator-owned artifacts continue to advance, extend the bounded wall allowance; stop on a declared inactivity limit or hard ceiling, terminate the whole process group, preserve the attempt diagnostic, and retry only retryable failures. Freeze the runner, brief, Skill, validators, and their hashes before the first attempt; never edit an active gate. Feed the prior bounded diagnostic into a fresh retry as untrusted repair context instead of repeating the same blind attempt.
+
+Verification is an internal self-repair signal, not a user-facing rejection screen. Preserve the latest working preview and evidence after every attempt. When a repair-required finding appears, send its exact code, route, viewport, interaction state, measured evidence, and screenshot back to the implementation loop automatically; make the smallest fix, re-run the narrow gate, then run the relevant regression matrix. Do not ask the user to relay the finding, approve a routine fix, or restart the Skill. A check may withhold the word `verified`, but it must not discard or hide the usable artifact.
+
+Continue until the requested scope passes or a real terminal condition occurs. Retry inactivity or timeout with a fresh bounded attempt when progress has stopped; extend the allowance while logs or evaluator-owned artifacts are still advancing. Fuse after three repairs of the same root cause as required by the host workflow, preserve the best working artifact and screenshots, and return a concise `PARTIALLY VERIFIED` handoff with the unresolved evidence and next executable action. Reserve `BLOCKED` for missing authority, unavailable required infrastructure, unsafe action, or an unrecoverable build/runtime failure—not ordinary visual defects that the implementation loop can repair. Advisory and subjective findings never interrupt delivery.
 
 When framework or runtime behavior is version-sensitive, inspect the installed version and local project conventions before using remembered syntax. “Framework-agnostic” means adapting the contract to the detected stack, not emitting the same React-shaped implementation everywhere.
 
@@ -131,6 +146,8 @@ Define semantic tokens for color, typography, spacing, layout, shape, depth, and
 
 Treat `DESIGN.md` tokens as the normative visual values and implement them through shared CSS variables, theme configuration, or component tokens. Do not fork tokens or component styling per page. When production code and an existing `DESIGN.md` disagree, identify the drift and resolve it explicitly; do not silently choose whichever is easier.
 
+Create a small runtime conformance map: each normative color/type/spacing/component role → the shared runtime token or primitive that consumes it. After implementation, compare computed values on representative components and routes. The official `DESIGN.md` lint proves document syntax and token relations only; it cannot prove that a page consumes those values, that prose such as “mobile becomes one column” is honored, or that state-specific selectors survive a breakpoint.
+
 For self-contained multi-page output, copy one identical root-token block and shell primitive set into every page before adding route-specific composition. At desktop and mobile, compare computed root tokens plus header/nav/action styles across routes; visual resemblance alone does not prove the same system is being consumed.
 
 When motion or SVG is material, extend the contract. Motion records purpose, trigger, runtime, interrupt/cleanup path, and reduced-motion result. SVG records asset type, trust level, embedding mode, accessible intent, ID namespace, provenance/license, and optimization/security policy.
@@ -152,6 +169,12 @@ Design the content hierarchy once, then compose it for each context:
 - Preserve one logical interactive identity per record across breakpoints. Do not render hidden desktop and mobile copies with duplicate IDs, evaluator hooks, accessible names, or competing state; recompose one source of truth or render mutually exclusive templates with equivalent focus and state behavior.
 - Treat writing-mode changes, oversized type, sticky rails, and absolute overlays as collision-prone: measure their rendered boxes at every target breakpoint and ensure the horizontal replacement is the same readable content, not a hidden vertical element plus an unrelated substitute.
 - Contain wide layouts structurally: use `box-sizing: border-box`, `minmax(0, 1fr)`, `min-width: 0`, and bounded inline sizes where appropriate. Do not hide body overflow to mask a shell, grid, table, or `100vw` calculation that extends past the required viewport.
+- Verify the cross-product of responsive mode and reachable state. An open/detail/confirm modifier with higher specificity must not restore a desktop grid inside a mobile media or container query. Compare computed grid/flex tracks and child rectangles in default, open, closed, filtered, error, success, and return states that the workflow can reach.
+- Treat unexplained large voids, a long skinny prose column, controls stretched into navigation-sized bars, and a summary detached from its trigger as composition failures even when no box overflows. Reflow state changes around the current task; do not leave an empty desktop track after its content is hidden or moved.
+- Let ordinary paragraphs and list copy fill their intended content column and wrap through the browser. Size and align the containing region around the chosen reading measure; do not place a narrow `max-width` only on the text inside an otherwise empty full-width card. Use `white-space: normal`, script-appropriate line breaking, and semantic paragraphs. Do not insert `<br>` or newline-controlled wraps in body copy. Forced line composition is reserved for fixed display headings, pull quotes, poetry, or another explicit attention role, and must have a verified fallback at every required viewport and locale.
+- Assign each text region a paragraph mode—product/UI, web editorial, book-like editorial, or fixed display—before choosing indent, paragraph gap, alignment, and wrapping. Do not apply a single article recipe, font weight, or paragraph style globally.
+- Keep CJK prose at normal line breaking. Never synthesize alignment by rewriting text, inserting per-character spaces/`<wbr>`, or applying global `break-all`, `line-break: anywhere`, or `keep-all`. Scope emergency wrapping to verified unbroken data such as raw URLs or identifiers; treat `text-autospace`, `text-spacing-trim`, `balance`, and `pretty` as tested progressive enhancements.
+- For Traditional Chinese, choose horizontal or vertical composition explicitly. Horizontal product UI remains the default. Use `vertical-rl` only for an editorial role with deliberate right-to-left column progression, punctuation, mixed-script, measure, and responsive fallback; never let a horizontal paragraph become de facto vertical because its grid track was squeezed.
 
 Create a transformation table for major regions: `region → desktop role → mobile equivalent → order → interaction → deferred/removed content`. Use [mobile-responsive.md](references/mobile-responsive.md) for the required checks.
 
@@ -162,6 +185,8 @@ For a new build or broad redesign, implement one memorable moment that only make
 Keep it bounded and progressively enhanced. Essential information must exist outside canvas, WebGL, animation, hover, or JavaScript-only rendering. Pause continuous work off-screen, cap rendering cost, and provide a real reduced-motion alternative.
 
 Use the smallest motion tier that can express the concept: CSS, then WAAPI or View Transitions, then an existing framework library, then a specialized runtime. Every escalation needs a concrete reason. Do not equate premium with preloaders, custom cursors, scroll smoothing, parallax, and pinned sections. Classify each effect as feedback, orientation, focus, continuity, or a product-specific signature; remove effects with no defensible role.
+
+Select effects explicitly; never apply every available treatment to every component. Record `role → job → affected area → dependency/tier → fallback → forbidden contexts → rendered evidence`. Normally permit one product-specific signature and only the supporting feedback effects needed by real controls. Hollow/stroked type, blur, glow, grain, blend modes, and continuous motion are opt-in; body copy, form labels, errors, prices, legal text, and dense task instructions default to solid rendering.
 
 For SVG, classify before generating: icon, illustration, data visualization, or sprite; then first-party, vetted-library, or user-supplied. Never inline user-supplied SVG without a security pipeline. Optimization is not sanitization, and a library's license does not automatically cover bundled icon sets, editors, plugins, exports, or premium runtimes.
 
@@ -181,9 +206,9 @@ For the identity pass, run the truth, task-surface, product-swap, representation
 
 ### 7. Verify with evidence
 
-Run the project's available tests, lint, typecheck, and build. Use a real browser when available. Check representative routes and states at narrow mobile, common mobile, tablet portrait, tablet landscape, desktop, and wide desktop sizes. Also check keyboard navigation, 200% text resize/zoom, 400% zoom or 320 CSS px equivalent reflow, reduced motion, long text, and console errors. Require one visible `main` landmark and a valid BCP 47 document language matching the product locale. When the brief or repository contract declares an exact locale tag, route, filename, test hook, or output set, preserve that literal contract even when a more specific valid alternative exists. Treat unintended wrapping, clipping, or collision in short actions, brand names, cover titles, headings, and other identity-bearing copy as a layout failure; measure rendered text boxes instead of trusting source length, and do not use `overflow: hidden` to conceal a text-sizing defect. Exercise modal/menu default-closed state, background scroll, link selection, Escape, focus return, fixed/sticky obstruction, valid→invalid form recovery, dynamic accessible names/counts, and repeated desktop/mobile navigation visibility instead of trusting source keywords.
+Run the project's available tests, lint, typecheck, and build. Use a real browser when available. Check representative routes and states at narrow mobile, common mobile, tablet portrait, tablet landscape, desktop, and wide desktop sizes. Also check keyboard navigation, 200% text resize/zoom, 400% zoom or 320 CSS px equivalent reflow, reduced motion, long text, and console errors. Require one visible `main` landmark and a valid BCP 47 document language matching the product locale. When the brief or repository contract declares an exact locale tag, route, filename, test hook, or output set, preserve that literal contract even when a more specific valid alternative exists. Treat unintended wrapping, clipping, collision, overly narrow prose, semantically broken title lines, forced body-copy breaks, non-wrapping prose, an underfilled text block floating inside a much wider empty surface, and state-created whitespace in short actions, brand names, cover titles, headings, and other identity-bearing copy as layout failures; measure rendered line boxes and component rectangles instead of trusting source length, and do not use `overflow: hidden` to conceal a text-sizing defect. Exercise modal/menu default-closed state, background scroll, link selection, Escape, focus return, fixed/sticky obstruction, valid→invalid form recovery, filter counts, dynamic accessible names/counts, and repeated desktop/mobile navigation visibility instead of trusting source keywords. Capture default and post-interaction screenshots separately; record scroll position and state so a visually broken reachable state cannot hide behind a clean first paint.
 
-When `DESIGN.md` exists and the official CLI is locally available, lint it with the repository-pinned CLI version. Resolve every error. For a new generated system, also resolve every warning; for an extracted existing system, document any warning that must remain. If the CLI is unavailable, report the check as unverified rather than installing or fetching a mutable latest version without permission.
+When `DESIGN.md` exists, lint it with the repository-pinned official CLI version. If no pin exists, resolve the newest stable compatible official CLI once, record the exact version, and use it for the whole run; a controlled benchmark keeps its frozen version. Resolve every error. For a new generated system, also resolve every warning; for an extracted existing system, document any warning that must remain. If the verifier cannot be installed safely, preserve the document and report only this check as unverified.
 
 When motion or SVG exists, run the static risk audit when Python is available:
 
@@ -216,6 +241,13 @@ python3 <skill-dir>/scripts/validate_site_plan.py site-manifest.json wireframe-p
 ```
 
 Treat static-audit output as risk discovery only. Browser behavior, renderer compatibility, semantic beat frames, loop seams, rendered SVG equivalence, accessibility, security boundaries, animation cleanup, and performance still require dedicated checks.
+
+Classify visual results before deciding whether to continue:
+
+- `REPAIR REQUIRED`: task/contract/semantic failure, missing required content or hook, broken reachable interaction, clipping/collision/overflow, unusably narrow text, or a responsive/state composition that destroys reading. Automatically return it to the implementation loop; do not expose it as a user-facing stop.
+- `ADVISORY`: bounded risk such as a decorative hairline or unproven appearance; record it and continue delivery without converting it into a pass.
+- `MANUAL VISUAL`: title phrasing/wrap, balance, unexplained void, density, grouping, optical alignment, material coherence, and tone. Inspect matched screenshots; feed a clear defect into automatic repair, but keep uncertain taste as advice and never fabricate a deterministic pass from a scanner.
+- `EVALUATOR DEFECT`: record the counterexample and fix the evaluator before promoting any rule or changing product code. A valid more-specific BCP 47 tag and intentionally screen-reader-only text are not visual failures unless an exact brief says otherwise.
 
 When Python is available, record commands instead of relying on memory:
 
@@ -266,7 +298,7 @@ Generic techniques are allowed only when the concept gives them a specific role.
 ## Handle missing capabilities
 
 - No browser or screenshot tool: use [no-visual-first-pass.md](references/no-visual-first-pass.md), freeze a low-entropy direction, run narrow static/project checks, avoid high-uncertainty effects, and say rendered visual verification remains unperformed.
-- No image generation or licensed assets: use honest, purposeful CSS/SVG illustration, typography, data, or user-provided assets. Do not hotlink or invent licenses. Never present generic gradients or empty media boxes as factual product, people, place, or evidence imagery; label illustrative media when users could mistake it for reality.
+- No image generation or licensed assets: prefer typography, data, layout, and user-provided assets. Abstract structural geometry may be used only as a clearly non-factual authored treatment; do not fake product photography, people, places, logos, icons, or evidence assets with CSS art, handcrafted SVG, empty media boxes, or generic gradients. Do not hotlink or invent licenses; label illustrative media when users could mistake it for reality.
 - No framework: produce semantic HTML, modern CSS, and minimal JavaScript.
 - Weak runtime or device: preserve the core composition and content; simplify effects before simplifying identity.
 - Ambiguous brief: use the weak-model playbook and infer a reversible direction from the product content. Ask only questions whose answers would materially change scope or architecture.

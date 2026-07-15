@@ -18,7 +18,7 @@ Before execution, freeze:
 case/task id → mode/scope → risk class → model/provider/version/effort → context set/hash → tool allowlist → writable paths → budget → evaluator/policy version → fallback policy
 ```
 
-The implementation model may report a missing tool or uncertainty. It may not expand its tools, select a stronger model, alter the evaluator, weaken the task, or convert its confidence into a capability fact.
+The implementation model may report a missing tool or uncertainty and may invoke the Skill's exact-version, isolated verification-tool resolver. It may not grant itself a new host capability, select a stronger model, add product runtime dependencies, install globally, alter the evaluator, weaken the task, or convert confidence into a capability fact.
 
 Capability probes must be safe and observable:
 
@@ -48,7 +48,7 @@ python3 scripts/route_model.py /evaluator/model-profile.json \
 
 The caller injects the returned lane into the run contract. The model may report a missing capability and request a downgrade; it cannot promote itself.
 
-The structured handoff must classify every supported capability as available or unavailable, then declare a non-overlapping evidence ceiling. `VERIFIED` and `OBSERVED` claims cannot exceed that ceiling. Missing browser capability caps browser behavior, manual accessibility, rendered localization, and dynamic security; missing visual capability caps rendered-visual claims. High-risk no-visual work cannot report `ready`: it is blocked or carries an exact evaluator-owned acceptance record from policy schema v3. Use `scripts/weak_model_output.example.json` as the result v2 shape.
+The structured handoff must classify every supported capability as available or unavailable, then declare a non-overlapping evidence ceiling. `VERIFIED` and `OBSERVED` claims cannot exceed that ceiling. Missing browser capability caps browser behavior, manual accessibility, rendered localization, and dynamic security; missing visual capability caps rendered-visual claims. High-risk no-visual work cannot report `ready`: preserve and hand off the best artifact as `PARTIALLY VERIFIED`, or use an exact evaluator-owned acceptance record from policy schema v3. Use `scripts/weak_model_output.example.json` as the result v2 shape.
 
 ## 3. Execution lanes
 

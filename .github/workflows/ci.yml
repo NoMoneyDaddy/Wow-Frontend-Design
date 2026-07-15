@@ -91,14 +91,8 @@ jobs:
       - name: Validate bounded capability claims
         run: python3 wow-frontend-design/scripts/validate_capability_status.py evals/capability-status.json --repository-root .
 
-      - name: Validate release screenshot provenance
-        run: python3 wow-frontend-design/scripts/validate_screenshot_manifest.py assets/screenshots.json --repository-root .
-
-      - name: Validate dashboard failure evidence
-        run: python3 wow-frontend-design/scripts/validate_dashboard_evidence.py evals/dashboard-browser-results.json --repository-root .
-
-      - name: Validate Codex v4 product-flow evidence
-        run: python3 wow-frontend-design/scripts/validate_product_flow_evidence.py evals/product-flow-v4-visual-results.json --repository-root .
+      - name: Validate published v6 evidence
+        run: npm run validate:evidence-v6
 
       - name: Check showcase JavaScript
         run: |
@@ -107,6 +101,8 @@ jobs:
           node --check evals/capture_showcase.cjs
           node --check evals/playwright_dashboard_audit.cjs
           node --check evals/playwright_visual_v4_audit.cjs
+          node --check evals/playwright_visual_v5_audit.cjs
+          node --check evals/playwright_visual_v6_audit.cjs
 
       - name: Check showcase source signals
         run: python3 evals/weak-model-showcase/verify.py
@@ -129,4 +125,3 @@ jobs:
           python3 -m py_compile evals/validate_codex_log_policy.py
           python3 -m py_compile evals/run_product_flow_matrix.py
           python3 -m py_compile evals/run_product_flow_evaluation.py
-          python3 -m py_compile wow-frontend-design/scripts/validate_product_flow_evidence.py

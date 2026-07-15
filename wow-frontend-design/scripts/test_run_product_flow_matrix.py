@@ -23,15 +23,31 @@ SPEC.loader.exec_module(matrix)
 
 
 class ProductFlowMatrixTests(unittest.TestCase):
-    def test_fixed_selection_contains_six_models_and_three_themes(self) -> None:
+    def test_fixed_selection_contains_three_models_and_eight_themes(self) -> None:
         cases = matrix.selected_cases("all", "all")
-        self.assertEqual(18, len(cases))
-        self.assertEqual(6, len(matrix.selected_cases("all", "harbor-cold-chain-v4")))
+        self.assertEqual(24, len(cases))
+        self.assertEqual(3, len(matrix.selected_cases("all", "wind-maintenance-dispatch-v6")))
         self.assertEqual(
-            {"haiku", "sonnet", "opus", "gpt-5.4-mini", "gpt-5.4", "gpt-5.5"},
+            {"haiku", "gpt-5.4-mini", "gpt-5.4"},
             {model for _, model, _ in cases},
         )
-        self.assertEqual({"harbor-cold-chain-v4", "island-sound-archive-v4", "plant-swap-one-line-v4"}, {case for _, _, case in cases})
+        self.assertEqual(
+            {
+                "wind-maintenance-dispatch-v6",
+                "type-foundry-specimen-v6",
+                "repair-cafe-intake-v6",
+                "night-market-allergen-v6",
+                "royalty-statement-v6",
+                "packaging-configurator-v6",
+                "oral-history-archive-v6",
+                "grant-review-board-v6",
+            },
+            {case for _, _, case in cases},
+        )
+        mini_cases = matrix.selected_cases("all", "all", "gpt-5.4-mini")
+        self.assertEqual(8, len(mini_cases))
+        self.assertEqual({"codex"}, {provider for provider, _, _ in mini_cases})
+        self.assertEqual({"gpt-5.4-mini"}, {model for _, model, _ in mini_cases})
 
     def test_existing_output_requires_manifest_digest_match(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -43,15 +59,19 @@ class ProductFlowMatrixTests(unittest.TestCase):
                 outputs.append({"path": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
             manifest_path = target / "run-manifest.json"
             manifest_path.write_text(json.dumps({"outputs": outputs}), encoding="utf-8")
-            self.assertEqual(outputs, matrix.verified_existing(target, "harbor-cold-chain-v4")["outputs"])
+            self.assertEqual(outputs, matrix.verified_existing(target, "wind-maintenance-dispatch-v6")["outputs"])
             (target / "index.html").write_text("changed", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "digest mismatch"):
-                matrix.verified_existing(target, "harbor-cold-chain-v4")
+                matrix.verified_existing(target, "wind-maintenance-dispatch-v6")
 
-    def test_plant_swap_is_the_multi_page_consistency_case(self) -> None:
+    def test_v6_multi_page_contracts_are_fixed(self) -> None:
         self.assertEqual(
-            ("DESIGN.md", "index.html", "browse.html", "listing.html"),
-            matrix.outputs_for("plant-swap-one-line-v4"),
+            ("DESIGN.md", "index.html", "materials.html", "summary.html"),
+            matrix.outputs_for("packaging-configurator-v6"),
+        )
+        self.assertEqual(
+            ("DESIGN.md", "index.html", "archive.html", "story.html"),
+            matrix.outputs_for("oral-history-archive-v6"),
         )
 
     def test_failure_classification_is_bounded(self) -> None:
@@ -60,10 +80,10 @@ class ProductFlowMatrixTests(unittest.TestCase):
         self.assertEqual("output_policy_rejected", matrix.classify_failure(1, "isolated output policy rejected"))
         self.assertEqual("generation_failed", matrix.classify_failure(1, "generic failure"))
 
-    def test_timeout_and_generation_failure_are_retryable(self) -> None:
+    def test_incomplete_generation_statuses_are_retryable(self) -> None:
         self.assertTrue(matrix.should_retry("timeout"))
         self.assertTrue(matrix.should_retry("generation_failed"))
-        self.assertFalse(matrix.should_retry("output_policy_rejected"))
+        self.assertTrue(matrix.should_retry("output_policy_rejected"))
         self.assertFalse(matrix.should_retry("model_resolution_failure"))
         self.assertFalse(matrix.should_retry("infrastructure_failure"))
 
@@ -82,8 +102,8 @@ class ProductFlowMatrixTests(unittest.TestCase):
 
         attempts = matrix.run_case_with_retries(
             "claude",
-            "sonnet",
-            "island-sound-archive-v4",
+            "haiku",
+            "repair-cafe-intake-v6",
             Path("unused"),
             initial_attempts=[],
             max_attempts=3,
@@ -103,7 +123,7 @@ class ProductFlowMatrixTests(unittest.TestCase):
         self.assertEqual(3, record["attempt_count"])
         self.assertEqual("one", record["started_at"])
 
-    def test_nonretryable_failure_stops_immediately(self) -> None:
+    def test_policy_failure_retries_to_the_declared_bound(self) -> None:
         calls = 0
 
         def fake_attempt(*_args: object) -> dict[str, object]:
@@ -118,8 +138,8 @@ class ProductFlowMatrixTests(unittest.TestCase):
 
         attempts = matrix.run_case_with_retries(
             "claude",
-            "sonnet",
-            "island-sound-archive-v4",
+            "haiku",
+            "repair-cafe-intake-v6",
             Path("unused"),
             initial_attempts=[],
             max_attempts=3,
@@ -128,7 +148,7 @@ class ProductFlowMatrixTests(unittest.TestCase):
             retry_delay_seconds=0,
             attempt_runner=fake_attempt,
         )
-        self.assertEqual(1, calls)
+        self.assertEqual(3, calls)
         self.assertEqual("output_policy_rejected", attempts[-1]["status"])
 
     def test_timeout_terminates_the_entire_process_group(self) -> None:
@@ -188,7 +208,7 @@ class ProductFlowMatrixTests(unittest.TestCase):
         matrix.run_case_with_retries(
             "codex",
             "gpt-5.4",
-            "harbor-cold-chain-v4",
+            "wind-maintenance-dispatch-v6",
             Path("unused"),
             initial_attempts=[],
             max_attempts=2,

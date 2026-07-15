@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run or resume the fixed six-model, three-theme visual-design cohort."""
+"""Run or resume the fixed eight-theme v6 design cohort."""
 
 from __future__ import annotations
 
@@ -18,11 +18,16 @@ from typing import Callable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v4-generation-results.json"
+DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v6-generation-results.json"
 BRIEFS = {
-    "harbor-cold-chain-v4": ROOT / "evals" / "briefs" / "harbor-cold-chain-v4.md",
-    "island-sound-archive-v4": ROOT / "evals" / "briefs" / "island-sound-archive-v4.md",
-    "plant-swap-one-line-v4": ROOT / "evals" / "briefs" / "plant-swap-one-line-v4.md",
+    "wind-maintenance-dispatch-v6": ROOT / "evals" / "briefs" / "wind-maintenance-dispatch-v6.md",
+    "type-foundry-specimen-v6": ROOT / "evals" / "briefs" / "type-foundry-specimen-v6.md",
+    "repair-cafe-intake-v6": ROOT / "evals" / "briefs" / "repair-cafe-intake-v6.md",
+    "night-market-allergen-v6": ROOT / "evals" / "briefs" / "night-market-allergen-v6.md",
+    "royalty-statement-v6": ROOT / "evals" / "briefs" / "royalty-statement-v6.md",
+    "packaging-configurator-v6": ROOT / "evals" / "briefs" / "packaging-configurator-v6.md",
+    "oral-history-archive-v6": ROOT / "evals" / "briefs" / "oral-history-archive-v6.md",
+    "grant-review-board-v6": ROOT / "evals" / "briefs" / "grant-review-board-v6.md",
 }
 SKILL = ROOT / "wow-frontend-design" / "SKILL.md"
 TRUSTED_CONTEXT = (
@@ -42,7 +47,10 @@ TRUSTED_CONTEXT = (
     ROOT / "wow-frontend-design" / "assets" / "DESIGN.template.md",
 )
 EVALUATOR_INPUTS = (
+    ROOT / "evals" / "run_product_flow_evaluation.py",
     ROOT / "evals" / "run_product_flow_matrix.py",
+    ROOT / "evals" / "lint_design_md_matrix.py",
+    ROOT / "evals" / "playwright_visual_v6_audit.cjs",
     ROOT / "evals" / "run_claude_case.sh",
     ROOT / "evals" / "run_codex_case.sh",
     ROOT / "evals" / "validate_visual_web_output.py",
@@ -50,13 +58,19 @@ EVALUATOR_INPUTS = (
     ROOT / "evals" / "validate_codex_log_policy.py",
 )
 PROVIDERS = {
-    "claude": ("haiku", "sonnet", "opus"),
-    "codex": ("gpt-5.4-mini", "gpt-5.4", "gpt-5.5"),
+    "claude": ("haiku",),
+    "codex": ("gpt-5.4-mini", "gpt-5.4"),
 }
+MODELS = tuple(model for models in PROVIDERS.values() for model in models)
 OUTPUTS_BY_CASE = {
-    "harbor-cold-chain-v4": ("DESIGN.md", "index.html"),
-    "island-sound-archive-v4": ("DESIGN.md", "index.html"),
-    "plant-swap-one-line-v4": ("DESIGN.md", "index.html", "browse.html", "listing.html"),
+    "wind-maintenance-dispatch-v6": ("DESIGN.md", "index.html"),
+    "type-foundry-specimen-v6": ("DESIGN.md", "index.html"),
+    "repair-cafe-intake-v6": ("DESIGN.md", "index.html"),
+    "night-market-allergen-v6": ("DESIGN.md", "index.html"),
+    "royalty-statement-v6": ("DESIGN.md", "index.html"),
+    "packaging-configurator-v6": ("DESIGN.md", "index.html", "materials.html", "summary.html"),
+    "oral-history-archive-v6": ("DESIGN.md", "index.html", "archive.html", "story.html"),
+    "grant-review-board-v6": ("DESIGN.md", "index.html"),
 }
 
 
@@ -78,6 +92,7 @@ def display_path(path: Path) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("all", *PROVIDERS), default="all")
+    parser.add_argument("--model", choices=("all", *MODELS), default="all")
     parser.add_argument("--theme", choices=("all", *BRIEFS), default="all")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--target-root", type=Path, default=ROOT / "evals")
@@ -100,17 +115,20 @@ def parse_args() -> argparse.Namespace:
         parser.error("--max-attempts must be within 1..10")
     if args.retry_delay_seconds < 0 or args.retry_delay_seconds > 300:
         parser.error("--retry-delay-seconds must be within 0..300")
+    if args.provider != "all" and args.model != "all" and args.model not in PROVIDERS[args.provider]:
+        parser.error(f"--model {args.model} does not belong to provider {args.provider}")
     return args
 
 
-def selected_cases(provider: str, theme: str) -> list[tuple[str, str, str]]:
+def selected_cases(provider: str, theme: str, model: str = "all") -> list[tuple[str, str, str]]:
     providers = PROVIDERS if provider == "all" else {provider: PROVIDERS[provider]}
     themes = tuple(BRIEFS) if theme == "all" else (theme,)
     return [
-        (provider_name, model, case_id)
+        (provider_name, model_name, case_id)
         for case_id in themes
         for provider_name, models in providers.items()
-        for model in models
+        for model_name in models
+        if model == "all" or model_name == model
     ]
 
 
@@ -270,7 +288,7 @@ def classify_failure(exit_code: int | None, summary: str) -> str:
 
 
 COMPLETED_STATUSES = {"completed", "existing_completed"}
-RETRYABLE_STATUSES = {"timeout", "generation_failed"}
+RETRYABLE_STATUSES = {"timeout", "generation_failed", "output_policy_rejected"}
 
 
 def should_retry(status: str) -> bool:
@@ -448,7 +466,7 @@ def main() -> int:
     ):
         raise SystemExit("fixed briefs or Skill are missing/unsafe")
 
-    cases = selected_cases(args.provider, args.theme)
+    cases = selected_cases(args.provider, args.theme, args.model)
     expected_contract = {
         "briefs": {
             case_id: {"path": str(path.relative_to(ROOT)), "sha256": digest(path)}
@@ -477,7 +495,12 @@ def main() -> int:
         *expected_contract["trusted_context"],  # type: ignore[misc]
         *expected_contract["evaluator_inputs"],  # type: ignore[misc]
     ]
-    expected_selection = {"provider": args.provider, "theme": args.theme, "count": len(cases)}
+    expected_selection = {
+        "provider": args.provider,
+        "model": args.model,
+        "theme": args.theme,
+        "count": len(cases),
+    }
     if output.exists():
         ledger = json.loads(output.read_text(encoding="utf-8"))
         if ledger.get("schema_version") != 1 or ledger.get("contract") != expected_contract:

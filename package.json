@@ -10,12 +10,14 @@
   "scripts": {
     "check:dashboard-audit": "node --check evals/playwright_dashboard_audit.cjs",
     "audit:dashboards": "node evals/playwright_dashboard_audit.cjs",
-    "audit:visual-v4": "node evals/playwright_visual_v4_audit.cjs",
+    "audit:visual-v5": "node evals/playwright_visual_v5_audit.cjs",
+    "audit:visual-v6": "node evals/playwright_visual_v6_audit.cjs",
+    "validate:evidence-v6": "python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py evals/product-flow-v6-visual-results.json --repository-root .",
     "eval:product-flow": "python3 evals/run_product_flow_evaluation.py",
-    "validate:product-flow-v4": "python3 wow-frontend-design/scripts/validate_product_flow_evidence.py evals/product-flow-v4-visual-results.json --repository-root .",
     "capture:showcase": "node evals/capture_showcase.cjs"
   },
   "devDependencies": {
+    "@google/design.md": "0.3.0",
     "playwright": "1.61.1"
   }
 }

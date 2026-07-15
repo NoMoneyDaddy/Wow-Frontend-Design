@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "run_id": "20260715T094712Z-33118-31441",
+  "status": "completed",
+  "started_at": "2026-07-15T09:47:12Z",
+  "finished_at": "2026-07-15T09:56:37Z",
+  "provider": "openai-first-party-chatgpt-oauth",
+  "authentication": {
+    "status": "Logged in using ChatGPT"
+  },
+  "case": {
+    "id": "night-market-allergen-v6",
+    "target": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-night-market-allergen-v6"
+  },
+  "cli": {
+    "path": "/opt/homebrew/bin/codex",
+    "version": "codex-cli 0.142.0"
+  },
+  "model": {
+    "requested_identifier": "gpt-5.4-mini",
+    "resolution_status": "requested_identifier_accepted_by_cli",
+    "resolved_backend_snapshot": null
+  },
+  "isolation": {
+    "sandbox": "workspace-write",
+    "ephemeral": true,
+    "user_config": "ignored",
+    "rules": "ignored",
+    "web_search": false,
+    "local_provider": false,
+    "builder_subagents": false,
+    "builder_browser_tools": false,
+    "builder_computer_tools": false,
+    "independent_visual_evaluator_required": true
+  },
+  "reasoning": {
+    "effort": "model_default",
+    "summary": "none",
+    "internal_reasoning_disable_supported": false
+  },
+  "runner": {
+    "path": "evals/run_codex_case.sh",
+    "sha256": "516fd5d0517d24d5a211eef0134a5eda6ed98eb9107a850c654f3913e2e911c7"
+  },
+  "output_validator": {
+    "path": "evals/validate_visual_web_output.py",
+    "sha256": "099accc1602fc6c3dffed7c3c0e4fc44182a0265cee71499ca358420532d8d4f"
+  },
+  "design_linter_gate": {
+    "path": "evals/validate_design_md_clean.py",
+    "sha256": "f95fd19e1a4d8bfcb30d757fac8117f9a617903e79789bd067b77d16dd02783e",
+    "package": "@google/design.md",
+    "version": "0.3.0",
+    "required_result": "zero_errors_zero_warnings"
+  },
+  "trace_policy_gate": {
+    "path": "evals/validate_codex_log_policy.py",
+    "sha256": "9daf52fc38c7914a90f0e45567e6946eed9f1e86e7ddb850695498401d358214",
+    "required_result": "no_forbidden_commands_or_tools"
+  },
+  "environment": {
+    "cleared_variable_names": [
+      "OPENAI_API_KEY",
+      "OPENAI_BASE_URL",
+      "OPENAI_API_BASE",
+      "OPENAI_ORG_ID",
+      "OPENAI_PROJECT_ID",
+      "CODEX_API_KEY",
+      "AZURE_OPENAI_API_KEY",
+      "AZURE_OPENAI_ENDPOINT",
+      "AZURE_OPENAI_BASE_URL"
+    ],
+    "auth_copied_to_ephemeral_codex_home": true,
+    "isolated_home": true,
+    "user_skills_hidden_by_isolated_home": true,
+    "path_sanitized": true,
+    "forbidden_host_path_audit": "passed"
+  },
+  "context": {
+    "brief": {
+      "path": "evals/briefs/night-market-allergen-v6.md",
+      "sha256": "4cdd4cb5c65adeea7deab486f9d77d61a2595ef4462340b05f61d962238a6276"
+    },
+    "trusted_files": [
+      {
+        "path": "wow-frontend-design/SKILL.md",
+        "sha256": "b2690afe84f76d5bd88a02ac087749d196f6fa27765f587d114e659bfe6adcaf"
+      },
+      {
+        "path": "wow-frontend-design/references/creative-direction.md",
+        "sha256": "b168c4e8b3e1ed50237687fc22a827946c025b0bc8660c290da04954a80322b3"
+      },
+      {
+        "path": "wow-frontend-design/references/anti-ai-slop.md",
+        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+      },
+      {
+        "path": "wow-frontend-design/references/mobile-responsive.md",
+        "sha256": "133d8df3887922d9ef133119577b83affae2f915fcee6b6005b3fe883ff2e186"
+      },
+      {
+        "path": "wow-frontend-design/references/localization.md",
+        "sha256": "3eb817b38ca717d4e9ac154bccc5bd662319266478705e92e6c138e759becda5"
+      },
+      {
+        "path": "wow-frontend-design/references/typography-webfonts.md",
+        "sha256": "9d946351ad7a07c0a1eb9cfd3069387e9afa2fa4996b5616c82f8c11c1d30b5c"
+      },
+      {
+        "path": "wow-frontend-design/references/typographic-layout.md",
+        "sha256": "adb607257a234cb1809759bbbdde8c67bea6442db395029c4f89b3a3a6c85c78"
+      },
+      {
+        "path": "wow-frontend-design/references/implementation.md",
+        "sha256": "4474d1fbde8666c1342861b1b260e948d977eed018417c2873295739e09c22be"
+      },
+      {
+        "path": "wow-frontend-design/references/component-composition.md",
+        "sha256": "688cc24e5117eaaaa8037546cf73d9972af249b8bcecbd3bf180b22f4dadab78"
+      },
+      {
+        "path": "wow-frontend-design/references/quality-gates.md",
+        "sha256": "a92248db6cf063aaa1c3fd6d1532fcc4f55d60ed3533c452c175193e6bf4f731"
+      },
+      {
+        "path": "wow-frontend-design/references/weak-model-playbook.md",
+        "sha256": "14ebaeb9c0097a9438d9d2c3da15565981bfe4f7f95d07ce120645d82982e285"
+      },
+      {
+        "path": "wow-frontend-design/references/color-system-psychology.md",
+        "sha256": "08c018fa2fcd4e283af877bd804c9c97cb4ab3cc4cc24d896b8ab55f44d22d72"
+      },
+      {
+        "path": "wow-frontend-design/references/design-md-contract.md",
+        "sha256": "63c2ef3c0417ffef151a7a0f2b6aff35fa6b8ad3f3f4bf77e5ecc35767c20080"
+      },
+      {
+        "path": "wow-frontend-design/assets/DESIGN.template.md",
+        "sha256": "b0151780e69ca8dcd2b83b8b2bbd265646d31c139ae9b9e54abc30f49ad7028d"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "path": "DESIGN.md",
+      "bytes": 6698,
+      "sha256": "22c1b52ca32575a55d9882c194721106d591bea8209eb583199b615d0d922d05"
+    },
+    {
+      "path": "index.html",
+      "bytes": 32959,
+      "sha256": "d970a734169802ee6d84bf33829b63f68a5171af0acef1311f1ca8b72a47285f"
+    }
+  ]
+}

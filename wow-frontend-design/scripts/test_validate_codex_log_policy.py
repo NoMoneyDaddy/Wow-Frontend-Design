@@ -62,6 +62,42 @@ class CodexLogPolicyTests(unittest.TestCase):
                 with self.assertRaises(policy.PolicyError):
                     policy.validate(trace, root)
 
+    def test_allows_only_the_evaluator_stage_across_macos_var_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            alias = str(stage)
+            if alias.startswith("/private/var/"):
+                alias = alias.removeprefix("/private")
+            trace = stage / "trace.jsonl"
+            trace.write_text(event(f"python3 '{alias}/check.py'") + "\n", encoding="utf-8")
+            self.assertEqual(1, policy.validate(trace, stage))
+
+    def test_rejects_external_temp_even_when_stage_is_also_present(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            trace = stage / "trace.jsonl"
+            trace.write_text(
+                event(f"python3 '{stage}/check.py' > /tmp/outside-result.txt") + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(policy.PolicyError, "outside-result"):
+                policy.validate(trace, stage)
+
+    def test_rejects_builder_collaboration_and_gui_executables(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            trace = stage / "trace.jsonl"
+            trace.write_text(
+                json.dumps({"item": {"type": "collab_tool_call"}}) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(policy.PolicyError, "collab_tool_call"):
+                policy.validate(trace, stage)
+
+            trace.write_text(event("/bin/zsh -lc 'safaridriver --enable'") + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(policy.PolicyError, "safaridriver"):
+                policy.validate(trace, stage)
+
 
 if __name__ == "__main__":
     unittest.main()

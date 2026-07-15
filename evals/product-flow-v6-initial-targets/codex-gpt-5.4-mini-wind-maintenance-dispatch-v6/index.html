@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>離岸風場維修派工台</title>
+  <style>
+    :root {
+      --canvas: #08131a;
+      --surface: #10212b;
+      --surface-2: #152938;
+      --ink: #eaf3f7;
+      --muted: rgba(234, 243, 247, 0.72);
+      --soft: rgba(234, 243, 247, 0.12);
+      --line: rgba(234, 243, 247, 0.16);
+      --accent: #e2a33c;
+      --accent-ink: #111a22;
+      --success: #4fbf9c;
+      --success-ink: #09211d;
+      --danger: #d86a5e;
+      --danger-ink: #231112;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+      --radius-lg: 1.25rem;
+      --radius-md: 0.8rem;
+      --radius-sm: 0.45rem;
+      --space-1: 0.375rem;
+      --space-2: 0.625rem;
+      --space-3: 0.875rem;
+      --space-4: 1rem;
+      --space-5: 1.5rem;
+      --space-6: 2rem;
+      --space-7: 2.75rem;
+      --page-max: 94rem;
+      --measure: 70ch;
+      --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+      --font-mono: "SFMono-Regular", "SF Mono", "Menlo", "Consolas", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+      scroll-behavior: smooth;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+    }
+
+    body {
+      margin: 0;
+      min-block-size: 100vh;
+      font-family: var(--font-sans);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(226, 163, 60, 0.11), transparent 28%),
+        radial-gradient(circle at 82% 12%, rgba(79, 191, 156, 0.09), transparent 20%),
+        linear-gradient(180deg, #08131a 0%, #091720 55%, #071017 100%);
+      background-attachment: fixed;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(234, 243, 247, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(234, 243, 247, 0.03) 1px, transparent 1px);
+      background-size: 100% 3.5rem, 4rem 100%;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 92%);
+      opacity: 0.7;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 1rem;
+      inset-block-start: 1rem;
+      z-index: 5;
+      padding: 0.8rem 1rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      transform: translateY(-200%);
+      transition: transform 160ms ease;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(var(--page-max), calc(100% - 2rem));
+      margin: 0 auto;
+      padding: clamp(1rem, 2vw, 2rem) 0 clamp(1.5rem, 3vw, 2.5rem);
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(16, 33, 43, 0.96), rgba(10, 21, 29, 0.96));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(4px);
+    }
+
+    .hero {
+      position: relative;
+      overflow: clip;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.85fr);
+      gap: var(--space-6);
+      padding: clamp(1.25rem, 2.5vw, 2rem);
+      margin-block-end: var(--space-4);
+      background:
+        linear-gradient(135deg, rgba(15, 43, 58, 0.94), rgba(11, 25, 33, 0.98)),
+        radial-gradient(circle at 8% 0%, rgba(226, 163, 60, 0.16), transparent 24%);
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .hero::before {
+      background-image:
+        linear-gradient(rgba(234, 243, 247, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(234, 243, 247, 0.08) 1px, transparent 1px);
+      background-size: 5rem 5rem;
+      opacity: 0.12;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 80%);
+    }
+
+    .hero::after {
+      inset-block-start: auto;
+      height: 6rem;
+      background:
+        linear-gradient(90deg, rgba(226, 163, 60, 0.0), rgba(226, 163, 60, 0.24), rgba(79, 191, 156, 0.14), rgba(226, 163, 60, 0.0)),
+        radial-gradient(circle at 12% 50%, rgba(226, 163, 60, 0.3), transparent 22%),
+        radial-gradient(circle at 42% 50%, rgba(79, 191, 156, 0.18), transparent 26%);
+      opacity: 0.75;
+      clip-path: polygon(0 72%, 15% 58%, 31% 64%, 44% 42%, 61% 54%, 76% 34%, 100% 46%, 100% 100%, 0 100%);
+    }
+
+    .eyebrow {
+      margin: 0 0 0.55rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+      max-inline-size: 12ch;
+    }
+
+    .lede {
+      margin-block-start: 0.85rem;
+      max-inline-size: var(--measure);
+      font-size: 1.02rem;
+      line-height: 1.8;
+      color: rgba(234, 243, 247, 0.88);
+    }
+
+    .hero-side {
+      display: grid;
+      gap: var(--space-4);
+      align-content: start;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-3);
+    }
+
+    .stat {
+      padding: 0.9rem 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(8, 19, 26, 0.44);
+      border: 1px solid rgba(234, 243, 247, 0.08);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: clamp(1.35rem, 2vw, 1.9rem);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 0.35rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .window-meter {
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(8, 19, 26, 0.52);
+      border: 1px solid rgba(234, 243, 247, 0.08);
+    }
+
+    .meter-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: baseline;
+      margin-block-end: 0.7rem;
+      font-size: 0.92rem;
+    }
+
+    .meter-head strong {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: var(--accent);
+    }
+
+    .meter-bar {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1.1fr 0.8fr;
+      gap: 0.45rem;
+      min-block-size: 0.95rem;
+    }
+
+    .meter-bar span {
+      border-radius: 999px;
+      background: rgba(234, 243, 247, 0.08);
+      overflow: hidden;
+    }
+
+    .meter-bar .active {
+      background:
+        linear-gradient(180deg, rgba(226, 163, 60, 0.95), rgba(226, 163, 60, 0.7)),
+        rgba(226, 163, 60, 0.35);
+      box-shadow: 0 0 0 1px rgba(226, 163, 60, 0.35);
+    }
+
+    .meter-labels {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1.1fr 0.8fr;
+      gap: 0.45rem;
+      margin-top: 0.6rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+      gap: var(--space-4);
+      align-items: end;
+      padding: 1rem;
+      margin-block-end: var(--space-4);
+    }
+
+    .toolbar-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .toolbar-head p {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-auto-flow: column;
+      gap: 0.45rem;
+      padding: 0.35rem;
+      border-radius: 999px;
+      background: rgba(8, 19, 26, 0.42);
+      border: 1px solid rgba(234, 243, 247, 0.08);
+    }
+
+    .segmented button {
+      min-block-size: 2.7rem;
+      padding: 0.7rem 1rem;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink);
+      font-weight: 700;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    .segmented button:focus-visible,
+    .row-open:focus-visible,
+    .primary-action:focus-visible,
+    .secondary-action:focus-visible,
+    .status-action:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .search {
+      display: grid;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .search input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(234, 243, 247, 0.12);
+      border-radius: var(--radius-md);
+      background: rgba(8, 19, 26, 0.52);
+      color: var(--ink);
+      padding: 0.9rem 1rem;
+    }
+
+    .search input::placeholder,
+    textarea::placeholder {
+      color: rgba(234, 243, 247, 0.46);
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1.28fr) minmax(20rem, 0.82fr);
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .list-panel,
+    .detail-panel {
+      min-inline-size: 0;
+      padding: 1rem;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .panel-head h2,
+    .panel-head h3 {
+      font-size: 1.12rem;
+      line-height: 1.2;
+    }
+
+    .panel-head p,
+    .detail-note,
+    .supporting-note,
+    .empty-state p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.65;
+    }
+
+    .table-wrap {
+      overflow: clip;
+      border-radius: calc(var(--radius-lg) - 0.2rem);
+      border: 1px solid rgba(234, 243, 247, 0.08);
+      background: rgba(8, 19, 26, 0.35);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    caption {
+      padding: 0.9rem 1rem 0.75rem;
+      text-align: left;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    thead th {
+      padding: 0.8rem 1rem;
+      border-block-end: 1px solid rgba(234, 243, 247, 0.08);
+      text-align: left;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    tbody tr {
+      border-block-end: 1px solid rgba(234, 243, 247, 0.07);
+      background: rgba(16, 33, 43, 0.24);
+      transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    tbody tr[data-filter-value="urgent"] {
+      box-shadow: inset 0 0 0 1px rgba(226, 163, 60, 0.24);
+    }
+
+    tbody tr[data-selected="true"] {
+      background: rgba(226, 163, 60, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(226, 163, 60, 0.35);
+    }
+
+    tbody tr:hover {
+      background: rgba(234, 243, 247, 0.05);
+    }
+
+    tbody th,
+    tbody td {
+      padding: 0.9rem 1rem;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    tbody td {
+      color: rgba(234, 243, 247, 0.92);
+    }
+
+    .row-open {
+      display: grid;
+      gap: 0.22rem;
+      width: 100%;
+      padding: 0;
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+    }
+
+    .row-id {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      color: var(--accent);
+    }
+
+    .row-id::before {
+      content: "";
+      inline-size: 0.5rem;
+      block-size: 0.5rem;
+      border-radius: 999px;
+      background: currentColor;
+      box-shadow: 0 0 0 3px rgba(226, 163, 60, 0.12);
+    }
+
+    .row-summary {
+      color: rgba(234, 243, 247, 0.82);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .cell-label {
+      display: none;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 2rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    .tag.urgent {
+      background: rgba(226, 163, 60, 0.94);
+      color: var(--accent-ink);
+    }
+
+    .tag.steady {
+      background: rgba(234, 243, 247, 0.09);
+      color: var(--ink);
+    }
+
+    .tag.success {
+      background: rgba(79, 191, 156, 0.18);
+      color: #a9f1de;
+    }
+
+    .tag.muted {
+      background: rgba(234, 243, 247, 0.08);
+      color: rgba(234, 243, 247, 0.84);
+    }
+
+    .detail-panel {
+      position: sticky;
+      top: 1rem;
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .detail-figure {
+      display: grid;
+      gap: 0.8rem;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      background:
+        radial-gradient(circle at top right, rgba(226, 163, 60, 0.12), transparent 30%),
+        rgba(8, 19, 26, 0.5);
+      border: 1px solid rgba(234, 243, 247, 0.08);
+    }
+
+    .detail-figure h3 {
+      font-size: 1.35rem;
+      line-height: 1.2;
+      text-wrap: balance;
+    }
+
+    .detail-figure .kicker {
+      color: var(--muted);
+      font-size: 0.86rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.8rem 1rem;
+    }
+
+    .detail-item {
+      padding: 0.75rem 0.85rem;
+      border-radius: var(--radius-sm);
+      background: rgba(234, 243, 247, 0.04);
+      border: 1px solid rgba(234, 243, 247, 0.06);
+    }
+
+    .detail-item dt {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .detail-item dd {
+      margin: 0;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    .reassign-form {
+      display: grid;
+      gap: 0.9rem;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(8, 19, 26, 0.4);
+      border: 1px solid rgba(234, 243, 247, 0.08);
+    }
+
+    .field {
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    textarea {
+      min-block-size: 7rem;
+      resize: vertical;
+    }
+
+    .primary-action,
+    .secondary-action,
+    .status-action {
+      min-block-size: 2.9rem;
+      border-radius: 999px;
+      padding: 0.78rem 1rem;
+      font-weight: 700;
+      transition: transform 160ms ease, background-color 160ms ease, color 160ms ease;
+    }
+
+    .primary-action {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    .secondary-action,
+    .status-action {
+      background: rgba(234, 243, 247, 0.08);
+      color: var(--ink);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .segmented button:hover,
+      .row-open:hover,
+      .primary-action:hover,
+      .secondary-action:hover,
+      .status-action:hover {
+        transform: translateY(-1px);
+      }
+    }
+
+    .supporting-note {
+      padding-inline: 0.2rem;
+    }
+
+    .empty-state {
+      display: grid;
+      gap: 0.75rem;
+      padding: 1.2rem;
+      margin-top: 1rem;
+      border-radius: var(--radius-md);
+      border: 1px dashed rgba(234, 243, 247, 0.16);
+      background: rgba(8, 19, 26, 0.34);
+    }
+
+    .empty-state h3 {
+      font-size: 1.1rem;
+      line-height: 1.2;
+    }
+
+    .empty-state .secondary-action {
+      justify-self: start;
+    }
+
+    .status-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      padding: 1rem 1.1rem;
+      margin-block-start: var(--space-4);
+    }
+
+    .status-panel p {
+      flex: 1 1 22rem;
+      line-height: 1.65;
+    }
+
+    .status-panel[data-tone="neutral"] {
+      background: rgba(21, 41, 56, 0.9);
+    }
+
+    .status-panel[data-tone="success"] {
+      background: rgba(9, 33, 29, 0.88);
+      border-color: rgba(79, 191, 156, 0.34);
+    }
+
+    .status-panel[data-tone="error"] {
+      background: rgba(35, 17, 18, 0.92);
+      border-color: rgba(216, 106, 94, 0.42);
+    }
+
+    .status-panel[data-tone="success"] .status-mark {
+      background: rgba(79, 191, 156, 0.18);
+      color: #a9f1de;
+    }
+
+    .status-panel[data-tone="error"] .status-mark {
+      background: rgba(216, 106, 94, 0.18);
+      color: #ffd1cc;
+    }
+
+    .status-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 2rem;
+      padding: 0.2rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      white-space: nowrap;
+      background: rgba(234, 243, 247, 0.08);
+      color: var(--ink);
+    }
+
+    .stack {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    :lang(zh-Hant-TW) {
+      line-break: strict;
+      word-break: normal;
+    }
+
+    @media (max-width: 1080px) {
+      .hero,
+      .toolbar,
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-panel {
+        position: static;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .shell {
+        width: min(100%, calc(100% - 1rem));
+        padding-top: 0.75rem;
+      }
+
+      .hero {
+        gap: var(--space-4);
+      }
+
+      .hero-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .meter-bar,
+      .meter-labels {
+        grid-template-columns: 1fr 1.8fr 1fr 0.7fr;
+      }
+
+      .toolbar-head,
+      .meter-head {
+        flex-direction: column;
+        align-items: start;
+      }
+
+      .segmented {
+        width: 100%;
+        grid-auto-flow: initial;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .segmented button {
+        width: 100%;
+      }
+
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-panel {
+        order: 2;
+      }
+
+      .list-panel {
+        order: 1;
+      }
+
+      .table-wrap {
+        overflow: visible;
+      }
+
+      table,
+      thead,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+        width: 100%;
+      }
+
+      thead {
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      caption {
+        padding-inline: 0.2rem;
+      }
+
+      tbody {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      tbody tr {
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(234, 243, 247, 0.1);
+      }
+
+      tbody th,
+      tbody td {
+        padding: 0.15rem 0.9rem;
+      }
+
+      tbody th {
+        padding-top: 0.9rem;
+      }
+
+      tbody td {
+        display: grid;
+        grid-template-columns: 6.5rem minmax(0, 1fr);
+        gap: 0.7rem;
+        align-items: start;
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
+      }
+
+      tbody td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.5;
+      }
+
+      .cell-label {
+        display: contents;
+      }
+
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .hero-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .segmented {
+        grid-template-columns: 1fr;
+      }
+
+      .status-panel {
+        align-items: stretch;
+      }
+
+      .status-panel .status-action {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#dispatch-workspace">跳到派工台</a>
+  <main class="shell stack" id="dispatch-workspace" data-eval="dispatch-workspace">
+    <header class="hero panel" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow">台灣離岸風場 · 值班調度</p>
+        <h1 id="page-title">離岸風場維修派工台</h1>
+        <p class="lede">在天候窗口縮短時，先辨識 8 筆工單中的 3 筆緊急項目，查看其中一筆，然後用本機模擬把船班改派到可用窗口，整個過程都要能在鍵盤下完成。</p>
+      </div>
+
+      <div class="hero-side">
+        <div class="hero-stats" aria-label="工作台概況">
+          <div class="stat">
+            <strong>3</strong>
+            <span>筆緊急工單</span>
+          </div>
+          <div class="stat">
+            <strong>8</strong>
+            <span>筆總工單</span>
+          </div>
+          <div class="stat">
+            <strong>本機</strong>
+            <span>模擬派工</span>
+          </div>
+        </div>
+
+        <div class="window-meter" aria-label="海況窗口示意">
+          <div class="meter-head">
+            <span>天候窗口</span>
+            <strong>示意 5 小時 20 分</strong>
+          </div>
+          <div class="meter-bar" aria-hidden="true">
+            <span></span>
+            <span class="active"></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="meter-labels" aria-hidden="true">
+            <span>低風</span>
+            <span>可出海</span>
+            <span>返航緩衝</span>
+            <span>夜間</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="toolbar panel" aria-label="篩選與搜尋">
+      <div>
+        <div class="toolbar-head">
+          <h2>工單篩選</h2>
+          <p>先鎖定緊急項目，再開啟詳情。</p>
+        </div>
+        <div class="segmented" role="group" aria-label="工單清單篩選">
+          <button type="button" data-filter-value="all" aria-pressed="true">全部 <span id="total-count">8</span></button>
+          <button type="button" data-filter-value="urgent" aria-pressed="false">緊急 <span id="urgent-count">3</span></button>
+        </div>
+      </div>
+      <label class="search" for="search-input">
+        <span>搜尋工單、風場或船班</span>
+        <input id="search-input" type="search" placeholder="例如：緊急、海嵐、T-14">
+      </label>
+    </section>
+
+    <section class="content" aria-label="工單與詳情">
+      <section class="list-panel panel" aria-labelledby="dispatch-list-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="dispatch-list-title">維修工單</h2>
+            <p>桌機顯示欄位對照，手機收斂成單欄卡片。</p>
+          </div>
+          <p class="muted">鍵盤可逐筆開啟</p>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-describedby="dispatch-caption">
+            <caption id="dispatch-caption">8 筆工單，其中 3 筆標示為緊急。</caption>
+            <thead>
+              <tr>
+                <th scope="col">工單</th>
+                <th scope="col">風場</th>
+                <th scope="col">目前船班</th>
+                <th scope="col">窗口</th>
+                <th scope="col">狀態</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody id="dispatch-table-body">
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-204" data-filter-value="urgent" data-selected="true">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-204"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="true"
+                  >
+                    <span class="row-id">TW-OFW-204</span>
+                    <span class="row-summary">葉片前緣補片 · T-14</span>
+                  </button>
+                </th>
+                <td data-label="風場">北海風場 A 區</td>
+                <td data-label="目前船班" data-cell="vessel">海嵐 7 號</td>
+                <td data-label="窗口">02:40 - 05:10</td>
+                <td data-label="狀態" data-cell="status"><span class="tag urgent">緊急</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-207" data-filter-value="standard" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-207"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-207</span>
+                    <span class="row-summary">變流器檢查 · T-09</span>
+                  </button>
+                </th>
+                <td data-label="風場">北海風場 B 區</td>
+                <td data-label="目前船班" data-cell="vessel">晨潮 11 號</td>
+                <td data-label="窗口">04:10 - 07:00</td>
+                <td data-label="狀態" data-cell="status"><span class="tag steady">待確認</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-208" data-filter-value="urgent" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-208"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-208</span>
+                    <span class="row-summary">塔筒內部滲水回查 · T-03</span>
+                  </button>
+                </th>
+                <td data-label="風場">北海風場 C 區</td>
+                <td data-label="目前船班" data-cell="vessel">東港補給 2 號</td>
+                <td data-label="窗口">03:20 - 06:30</td>
+                <td data-label="狀態" data-cell="status"><span class="tag urgent">緊急</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-211" data-filter-value="standard" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-211"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-211</span>
+                    <span class="row-summary">通訊模組校正 · T-18</span>
+                  </button>
+                </th>
+                <td data-label="風場">南支風場 A 區</td>
+                <td data-label="目前船班" data-cell="vessel">備援巡檢船</td>
+                <td data-label="窗口">05:00 - 08:20</td>
+                <td data-label="狀態" data-cell="status"><span class="tag steady">排程中</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-216" data-filter-value="urgent" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-216"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-216</span>
+                    <span class="row-summary">偏航感測器復位 · T-06</span>
+                  </button>
+                </th>
+                <td data-label="風場">南支風場 B 區</td>
+                <td data-label="目前船班" data-cell="vessel">海嵐 7 號</td>
+                <td data-label="窗口">01:50 - 04:50</td>
+                <td data-label="狀態" data-cell="status"><span class="tag urgent">緊急</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-219" data-filter-value="standard" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-219"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-219</span>
+                    <span class="row-summary">冷卻系統清潔 · T-11</span>
+                  </button>
+                </th>
+                <td data-label="風場">南支風場 C 區</td>
+                <td data-label="目前船班" data-cell="vessel">晨潮 11 號</td>
+                <td data-label="窗口">06:10 - 09:00</td>
+                <td data-label="狀態" data-cell="status"><span class="tag steady">等待船檔</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-221" data-filter-value="standard" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-221"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-221</span>
+                    <span class="row-summary">齒輪箱異音記錄 · T-02</span>
+                  </button>
+                </th>
+                <td data-label="風場">外海風場 A 區</td>
+                <td data-label="目前船班" data-cell="vessel">東港補給 2 號</td>
+                <td data-label="窗口">05:40 - 08:10</td>
+                <td data-label="狀態" data-cell="status"><span class="tag steady">待觀測</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+              <tr data-eval="dispatch-row" data-record-id="TW-OFW-224" data-filter-value="standard" data-selected="false">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="row-open"
+                    data-eval="open-dispatch"
+                    data-record-id="TW-OFW-224"
+                    aria-controls="dispatch-detail"
+                    aria-expanded="false"
+                  >
+                    <span class="row-id">TW-OFW-224</span>
+                    <span class="row-summary">纜線巡檢 · T-24</span>
+                  </button>
+                </th>
+                <td data-label="風場">外海風場 B 區</td>
+                <td data-label="目前船班" data-cell="vessel">備援巡檢船</td>
+                <td data-label="窗口">07:00 - 10:30</td>
+                <td data-label="狀態" data-cell="status"><span class="tag steady">延後</span></td>
+                <td data-label="操作"><span class="tag muted">開啟詳情</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="empty-state" class="empty-state" hidden>
+          <h3>目前沒有符合條件的工單</h3>
+          <p>請清除篩選或重新輸入關鍵字，才能回到 8 筆清單。</p>
+          <button type="button" class="secondary-action" id="reset-filters">清除篩選</button>
+        </div>
+      </section>
+
+      <article class="detail-panel panel" id="dispatch-detail" aria-labelledby="detail-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="detail-title">尚未選取工單</h2>
+            <p id="detail-subtitle" class="detail-note">先點選一筆工單，右側就會出現改派資訊。</p>
+          </div>
+          <span class="tag muted" id="detail-priority">等待選取</span>
+        </div>
+
+        <div class="detail-figure">
+          <p class="kicker">選中工單</p>
+          <dl class="detail-grid" id="detail-grid">
+            <div class="detail-item">
+              <dt>工單編號</dt>
+              <dd id="detail-id">—</dd>
+            </div>
+            <div class="detail-item">
+              <dt>機組位置</dt>
+              <dd id="detail-turbine">—</dd>
+            </div>
+            <div class="detail-item">
+              <dt>風場區段</dt>
+              <dd id="detail-farm">—</dd>
+            </div>
+            <div class="detail-item">
+              <dt>目前船班</dt>
+              <dd id="detail-vessel">—</dd>
+            </div>
+            <div class="detail-item">
+              <dt>建議窗口</dt>
+              <dd id="detail-window">—</dd>
+            </div>
+            <div class="detail-item">
+              <dt>維修內容</dt>
+              <dd id="detail-task">—</dd>
+            </div>
+          </dl>
+        </div>
+
+        <form class="reassign-form" id="reassign-form">
+          <div class="field">
+            <label for="vessel-select">改派船班</label>
+            <select id="vessel-select" required>
+              <option value="">請選擇可用船班</option>
+              <option value="海嵐 7 號">海嵐 7 號</option>
+              <option value="晨潮 11 號">晨潮 11 號</option>
+              <option value="東港補給 2 號">東港補給 2 號</option>
+              <option value="備援巡檢船">備援巡檢船</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="handoff-note">補充說明（選填）</label>
+            <textarea id="handoff-note" placeholder="例如：夜潮後改由晨潮 11 號接替，保留回航緩衝。"></textarea>
+          </div>
+
+          <button type="submit" class="primary-action" data-eval="reassign-action">送出本機改派</button>
+          <p class="supporting-note">這裡只更新本機模擬狀態，不連外部船班系統。</p>
+        </form>
+      </article>
+    </section>
+
+    <section class="status-panel panel" id="status-message" data-eval="status-message" aria-live="polite" aria-atomic="true" role="status">
+      <span class="status-mark">準備中</span>
+      <p>工作台已載入，請從左側清單開啟一筆緊急工單。</p>
+    </section>
+  </main>
+
+  <script>
+    const records = [
+      {
+        id: "TW-OFW-204",
+        urgent: true,
+        farm: "北海風場 A 區",
+        turbine: "T-14",
+        vessel: "海嵐 7 號",
+        window: "02:40 - 05:10",
+        status: "緊急",
+        task: "葉片前緣補片",
+        summary: "低風窗口剩餘不多，需要優先處理。",
+        note: "天候在清晨後轉差，需保留返航緩衝。"
+      },
+      {
+        id: "TW-OFW-207",
+        urgent: false,
+        farm: "北海風場 B 區",
+        turbine: "T-09",
+        vessel: "晨潮 11 號",
+        window: "04:10 - 07:00",
+        status: "待確認",
+        task: "變流器檢查",
+        summary: "零件已到港，等待適配船班。",
+        note: "維修人員已完成前置測試。"
+      },
+      {
+        id: "TW-OFW-208",
+        urgent: true,
+        farm: "北海風場 C 區",
+        turbine: "T-03",
+        vessel: "東港補給 2 號",
+        window: "03:20 - 06:30",
+        status: "緊急",
+        task: "塔筒內部滲水回查",
+        summary: "雨線持續移入，需快速開啟。",
+        note: "需要額外封裝材料與抽排設備。"
+      },
+      {
+        id: "TW-OFW-211",
+        urgent: false,
+        farm: "南支風場 A 區",
+        turbine: "T-18",
+        vessel: "備援巡檢船",
+        window: "05:00 - 08:20",
+        status: "排程中",
+        task: "通訊模組校正",
+        summary: "不影響發電，但需要穩定窗口。",
+        note: "可併入下一輪檢修航程。"
+      },
+      {
+        id: "TW-OFW-216",
+        urgent: true,
+        farm: "南支風場 B 區",
+        turbine: "T-06",
+        vessel: "海嵐 7 號",
+        window: "01:50 - 04:50",
+        status: "緊急",
+        task: "偏航感測器復位",
+        summary: "若延後，可能錯過今晚的低浪段。",
+        note: "已確認人員與工具可立即出發。"
+      },
+      {
+        id: "TW-OFW-219",
+        urgent: false,
+        farm: "南支風場 C 區",
+        turbine: "T-11",
+        vessel: "晨潮 11 號",
+        window: "06:10 - 09:00",
+        status: "等待船檔",
+        task: "冷卻系統清潔",
+        summary: "優先順序低於 3 筆緊急工單。",
+        note: "可等待下一班可用船期。"
+      },
+      {
+        id: "TW-OFW-221",
+        urgent: false,
+        farm: "外海風場 A 區",
+        turbine: "T-02",
+        vessel: "東港補給 2 號",
+        window: "05:40 - 08:10",
+        status: "待觀測",
+        task: "齒輪箱異音記錄",
+        summary: "先收集音檔再決定是否出海。",
+        note: "可先排遠端診斷，不急著派船。"
+      },
+      {
+        id: "TW-OFW-224",
+        urgent: false,
+        farm: "外海風場 B 區",
+        turbine: "T-24",
+        vessel: "備援巡檢船",
+        window: "07:00 - 10:30",
+        status: "延後",
+        task: "纜線巡檢",
+        summary: "海象尚可，但不是今日優先案。",
+        note: "可留到下一個作業窗口。"
+      }
+    ];
+
+    const state = {
+      filter: "all",
+      query: "",
+      selectedId: records.find((record) => record.urgent)?.id ?? records[0].id
+    };
+
+    const dom = {
+      body: document.getElementById("dispatch-table-body"),
+      empty: document.getElementById("empty-state"),
+      resetFilters: document.getElementById("reset-filters"),
+      search: document.getElementById("search-input"),
+      filterButtons: Array.from(document.querySelectorAll(".segmented [data-filter-value]")),
+      detailTitle: document.getElementById("detail-title"),
+      detailSubtitle: document.getElementById("detail-subtitle"),
+      detailPriority: document.getElementById("detail-priority"),
+      detailId: document.getElementById("detail-id"),
+      detailTurbine: document.getElementById("detail-turbine"),
+      detailFarm: document.getElementById("detail-farm"),
+      detailVessel: document.getElementById("detail-vessel"),
+      detailWindow: document.getElementById("detail-window"),
+      detailTask: document.getElementById("detail-task"),
+      vesselSelect: document.getElementById("vessel-select"),
+      handoffNote: document.getElementById("handoff-note"),
+      form: document.getElementById("reassign-form"),
+      status: document.getElementById("status-message"),
+      totalCount: document.getElementById("total-count"),
+      urgentCount: document.getElementById("urgent-count")
+    };
+
+    dom.totalCount.textContent = String(records.length);
+    dom.urgentCount.textContent = String(records.filter((record) => record.urgent).length);
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function getRecord(id) {
+      return records.find((record) => record.id === id);
+    }
+
+    function matches(record) {
+      const filterMatch = state.filter === "all" || (state.filter === "urgent" && record.urgent);
+      const query = state.query.trim().toLowerCase();
+      if (!query) {
+        return filterMatch;
+      }
+
+      const haystack = [
+        record.id,
+        record.farm,
+        record.vessel,
+        record.window,
+        record.status,
+        record.task,
+        record.summary,
+        record.note
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return filterMatch && haystack.includes(query);
+    }
+
+    function setStatus(message, tone = "neutral", actionLabel = "", actionHandler = null) {
+      dom.status.dataset.tone = tone;
+      dom.status.setAttribute("role", tone === "error" ? "alert" : "status");
+      dom.status.setAttribute("aria-live", tone === "error" ? "assertive" : "polite");
+      dom.status.replaceChildren();
+
+      const mark = document.createElement("span");
+      mark.className = "status-mark";
+      mark.textContent =
+        tone === "success" ? "成功" : tone === "error" ? "錯誤" : "提示";
+      dom.status.appendChild(mark);
+
+      const text = document.createElement("p");
+      text.textContent = message;
+      dom.status.appendChild(text);
+
+      if (actionLabel && actionHandler) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "status-action";
+        button.textContent = actionLabel;
+        button.addEventListener("click", actionHandler);
+        dom.status.appendChild(button);
+      }
+    }
+
+    function selectRecord(id, announce = true) {
+      state.selectedId = id;
+      renderSelection();
+      renderDetail();
+      if (announce) {
+        const record = getRecord(id);
+        setStatus(`已選取 ${record.id}。請先選船班，再送出本機改派。`, "neutral");
+      }
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const narrowViewport = window.matchMedia("(max-width: 780px)").matches;
+      if (narrowViewport) {
+        document.getElementById("dispatch-detail").scrollIntoView({
+          behavior: reduceMotion ? "auto" : "smooth",
+          block: "start"
+        });
+      }
+    }
+
+    function renderSelection() {
+      const rowButtons = Array.from(document.querySelectorAll("[data-eval='open-dispatch']"));
+      rowButtons.forEach((button) => {
+        const selected = button.dataset.recordId === state.selectedId;
+        button.setAttribute("aria-expanded", String(selected));
+        button.setAttribute("aria-current", selected ? "true" : "false");
+      });
+
+      document.querySelectorAll("tbody tr[data-record-id]").forEach((row) => {
+        row.dataset.selected = String(row.dataset.recordId === state.selectedId);
+      });
+    }
+
+    function renderDetail() {
+      const record = getRecord(state.selectedId) ?? records[0];
+      dom.detailTitle.textContent = record.task;
+      dom.detailSubtitle.textContent = record.summary;
+      const priorityTone = record.status === "已改派" ? "success" : record.urgent ? "urgent" : "steady";
+      dom.detailPriority.textContent = record.status === "已改派" ? "已改派" : record.urgent ? "緊急" : record.status;
+      dom.detailPriority.className = `tag ${priorityTone}`;
+      dom.detailId.textContent = record.id;
+      dom.detailTurbine.textContent = record.turbine;
+      dom.detailFarm.textContent = record.farm;
+      dom.detailVessel.textContent = record.vessel;
+      dom.detailWindow.textContent = record.window;
+      dom.detailTask.textContent = record.note;
+
+      if (!dom.vesselSelect.value) {
+        dom.vesselSelect.value = "";
+      }
+    }
+
+    function syncRecordRow(record) {
+      const row = Array.from(document.querySelectorAll("tbody tr[data-record-id]")).find(
+        (candidate) => candidate.dataset.recordId === record.id
+      );
+
+      if (!row) {
+        return;
+      }
+
+      row.dataset.filterValue = record.urgent ? "urgent" : "standard";
+      row.dataset.selected = String(record.id === state.selectedId);
+
+      const openButton = row.querySelector("[data-eval='open-dispatch']");
+      if (openButton) {
+        openButton.setAttribute("aria-expanded", String(record.id === state.selectedId));
+        openButton.setAttribute("aria-current", record.id === state.selectedId ? "true" : "false");
+      }
+
+      const vesselCell = row.querySelector('[data-cell="vessel"]');
+      if (vesselCell) {
+        vesselCell.textContent = record.vessel;
+      }
+
+      const statusCell = row.querySelector('[data-cell="status"]');
+      if (statusCell) {
+        statusCell.innerHTML =
+          record.status === "已改派"
+            ? '<span class="tag success">已改派</span>'
+            : record.urgent
+              ? '<span class="tag urgent">緊急</span>'
+              : '<span class="tag steady">' + escapeHtml(record.status) + "</span>";
+      }
+    }
+
+    function applyFilters() {
+      const visibleRows = [];
+      document.querySelectorAll("tbody tr[data-record-id]").forEach((row) => {
+        const record = getRecord(row.dataset.recordId);
+        const visible = matches(record);
+        row.hidden = !visible;
+        if (visible) {
+          visibleRows.push(row);
+        }
+      });
+
+      dom.empty.hidden = visibleRows.length !== 0;
+      document.querySelector(".table-wrap").hidden = visibleRows.length === 0;
+
+      if (visibleRows.length === 0) {
+        setStatus("目前沒有符合條件的工單。請清除篩選或重新輸入關鍵字。", "neutral");
+      }
+    }
+
+    function syncFilterButtons() {
+      dom.filterButtons.forEach((button) => {
+        const active = button.dataset.filterValue === state.filter;
+        button.setAttribute("aria-pressed", String(active));
+      });
+    }
+
+    function clearSearchAndFilter() {
+      state.filter = "all";
+      state.query = "";
+      dom.search.value = "";
+      syncFilterButtons();
+      applyFilters();
+      setStatus("已清除篩選，回到全部 8 筆工單。", "neutral");
+    }
+
+    function updateFromSearch() {
+      state.query = dom.search.value;
+      applyFilters();
+    }
+
+    function handleSubmit(event) {
+      event.preventDefault();
+      const record = getRecord(state.selectedId);
+      const vessel = dom.vesselSelect.value.trim();
+      const note = dom.handoffNote.value.trim();
+
+      if (!record) {
+        setStatus("目前沒有可送出的工單。請先選取一筆工單。", "error", "重試", () => selectRecord(records.find((item) => item.urgent)?.id ?? records[0].id, false));
+        dom.vesselSelect.focus();
+        return;
+      }
+
+      if (!vessel) {
+        dom.vesselSelect.setAttribute("aria-invalid", "true");
+        setStatus(
+          "尚未選擇船班，無法送出改派。請先挑一班可用船舶後重試。",
+          "error",
+          "重試",
+          () => {
+            dom.vesselSelect.focus();
+          }
+        );
+        dom.vesselSelect.focus();
+        return;
+      }
+
+      dom.vesselSelect.removeAttribute("aria-invalid");
+      const previous = record.vessel;
+      record.vessel = vessel;
+      record.status = "已改派";
+      record.note = note ? note : record.note;
+
+      syncRecordRow(record);
+      renderSelection();
+      renderDetail();
+      applyFilters();
+
+      setStatus(
+        `本機模擬已完成改派：${record.id} 由 ${previous} 改為 ${vessel}。`,
+        "success"
+      );
+
+      dom.vesselSelect.value = "";
+      dom.handoffNote.value = "";
+    }
+
+    document.querySelectorAll("[data-eval='open-dispatch']").forEach((button) => {
+      button.addEventListener("click", () => selectRecord(button.dataset.recordId));
+    });
+
+    renderSelection();
+    renderDetail();
+    applyFilters();
+    setStatus("已載入 8 筆工單，其中 3 筆為緊急。", "neutral");
+
+    dom.filterButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.filter = button.dataset.filterValue;
+        syncFilterButtons();
+        applyFilters();
+      });
+    });
+
+    dom.search.addEventListener("input", updateFromSearch);
+    dom.resetFilters.addEventListener("click", clearSearchAndFilter);
+    dom.form.addEventListener("submit", handleSubmit);
+
+    dom.vesselSelect.addEventListener("change", () => {
+      dom.vesselSelect.removeAttribute("aria-invalid");
+      if (dom.status.dataset.tone === "success" || dom.status.dataset.tone === "error") {
+        setStatus("請重新確認船班與說明，再送出本機改派。", "neutral");
+      }
+    });
+  </script>
+</body>
+</html>

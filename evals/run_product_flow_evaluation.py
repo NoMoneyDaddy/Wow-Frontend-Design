@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -28,13 +29,19 @@ from evidence_ledger import LedgerError, png_metadata  # noqa: E402
 
 MATRIX_RUNNER = ROOT / "evals" / "run_product_flow_matrix.py"
 DESIGN_LINTER = ROOT / "evals" / "lint_design_md_matrix.py"
-VISUAL_AUDITOR = ROOT / "evals" / "playwright_visual_v4_audit.cjs"
+VISUAL_AUDITOR = ROOT / "evals" / "playwright_visual_v6_audit.cjs"
 CASE_PAGES = {
-    "harbor-cold-chain-v4": ("index.html",),
-    "island-sound-archive-v4": ("index.html",),
-    "plant-swap-one-line-v4": ("index.html", "browse.html", "listing.html"),
+    "wind-maintenance-dispatch-v6": ("index.html",),
+    "type-foundry-specimen-v6": ("index.html",),
+    "repair-cafe-intake-v6": ("index.html",),
+    "night-market-allergen-v6": ("index.html",),
+    "royalty-statement-v6": ("index.html",),
+    "packaging-configurator-v6": ("index.html", "materials.html", "summary.html"),
+    "oral-history-archive-v6": ("index.html", "archive.html", "story.html"),
+    "grant-review-board-v6": ("index.html",),
 }
 MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
+TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 VIEWPORTS = {
     "desktop": {
         "width": 1440,
@@ -46,6 +53,16 @@ VIEWPORTS = {
         "hasTouch": False,
         "userAgent": None,
     },
+    "tablet": {
+        "width": 834,
+        "height": 1112,
+        "screenWidth": 834,
+        "screenHeight": 1112,
+        "deviceScaleFactor": 2,
+        "isMobile": True,
+        "hasTouch": True,
+        "userAgent": TABLET_USER_AGENT,
+    },
     "mobile": {
         "width": 390,
         "height": 844,
@@ -56,8 +73,30 @@ VIEWPORTS = {
         "hasTouch": True,
         "userAgent": MOBILE_USER_AGENT,
     },
+    "compact-mobile": {
+        "width": 360,
+        "height": 800,
+        "screenWidth": 360,
+        "screenHeight": 800,
+        "deviceScaleFactor": 3,
+        "isMobile": True,
+        "hasTouch": True,
+        "userAgent": MOBILE_USER_AGENT,
+    },
 }
 COMPLETED_STATUSES = {"completed", "existing_completed"}
+
+
+def locked_package_version(package_name: str) -> str:
+    payload = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+    version = payload.get("packages", {}).get(f"node_modules/{package_name}", {}).get("version")
+    if not isinstance(version, str) or not version or any(character.isspace() for character in version):
+        raise ValueError(f"package-lock.json has no exact {package_name} version")
+    return version
+
+
+PLAYWRIGHT_VERSION = locked_package_version("playwright")
+DESIGN_MD_VERSION = locked_package_version("@google/design.md")
 
 
 class EvaluationError(ValueError):
@@ -71,19 +110,21 @@ class DesignFindingsError(EvaluationError):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("all", "claude", "codex"), default="all")
+    parser.add_argument("--model", choices=("all", *matrix.MODELS), default="all")
     parser.add_argument("--theme", choices=("all", *CASE_PAGES), default="all")
     parser.add_argument("--target-root", required=True, type=Path)
     parser.add_argument("--generation-output", required=True, type=Path)
     parser.add_argument("--design-output", required=True, type=Path)
     parser.add_argument("--visual-output", required=True, type=Path)
     parser.add_argument("--screenshot-dir", required=True, type=Path)
-    parser.add_argument("--timeout-seconds", type=int, default=900)
+    parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--max-attempts", type=int, default=3)
     parser.add_argument("--retry-delay-seconds", type=float, default=5.0)
     parser.add_argument("--capture-max-attempts", type=int, default=3)
     parser.add_argument("--capture-timeout-seconds", type=int, default=300)
     parser.add_argument("--lint-max-attempts", type=int, default=3)
     parser.add_argument("--lint-timeout-seconds", type=int, default=180)
+    parser.add_argument("--tool-install-max-attempts", type=int, default=3)
     parser.add_argument("--chrome-executable", type=Path)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
@@ -95,6 +136,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--lint-max-attempts must be within 1..10")
     if args.lint_timeout_seconds < 30 or args.lint_timeout_seconds > 600:
         parser.error("--lint-timeout-seconds must be within 30..600")
+    if args.tool_install_max_attempts < 1 or args.tool_install_max_attempts > 3:
+        parser.error("--tool-install-max-attempts must be within 1..3")
+    if args.provider != "all" and args.model != "all" and args.model not in matrix.PROVIDERS[args.provider]:
+        parser.error(f"--model {args.model} does not belong to provider {args.provider}")
     return args
 
 
@@ -255,21 +300,34 @@ def validate_visual_completion(
     if not isinstance(reported_targets, list) or len(reported_targets) != len(expected_targets) or actual_targets != expected_targets:
         raise EvaluationError("visual report target inventory disagrees")
     expected = {
-        (target["case_id"], target["alias"], page, viewport)
+        (target["case_id"], target["alias"], page, "base", viewport)
         for target in targets
         for page in CASE_PAGES[target["case_id"]]
         for viewport in VIEWPORTS
     }
+    expected.update(
+        {
+            (target["case_id"], target["alias"], CASE_PAGES[target["case_id"]][0], "interaction", viewport)
+            for target in targets
+            for viewport in ("desktop", "mobile")
+        }
+    )
     results = report.get("results")
     if not isinstance(results, list) or len(results) != len(expected):
         raise EvaluationError(f"visual result count must be {len(expected)}")
     root = screenshot_dir.resolve()
-    seen: set[tuple[str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str]] = set()
     screenshot_paths: set[Path] = set()
     for result in results:
         if not isinstance(result, dict):
             raise EvaluationError("visual result is malformed")
-        key = (result.get("caseId"), result.get("alias"), result.get("page"), result.get("viewport"))
+        key = (
+            result.get("caseId"),
+            result.get("alias"),
+            result.get("page"),
+            result.get("state"),
+            result.get("viewport"),
+        )
         if key in seen or key not in expected:
             raise EvaluationError(f"visual result identity is invalid: {key}")
         seen.add(key)  # type: ignore[arg-type]
@@ -286,7 +344,7 @@ def validate_visual_completion(
             raise EvaluationError(f"screenshot escapes the requested directory: {screenshot}") from error
         if not screenshot.is_file() or screenshot.is_symlink():
             raise EvaluationError(f"screenshot is missing or unsafe: {screenshot}")
-        profile = VIEWPORTS[str(key[3])]
+        profile = VIEWPORTS[str(key[4])]
         width = int(profile["width"])
         height = int(profile["height"])
         scale = int(profile["deviceScaleFactor"])
@@ -308,7 +366,7 @@ def validate_visual_completion(
 
 def validate_design_completion(design_output: Path, targets: list[dict[str, Any]]) -> tuple[int, int]:
     report = _load_json(design_output, "DESIGN.md lint report")
-    if report.get("linter") != {"package": "@google/design.md", "version": "0.2.0"}:
+    if report.get("linter") != {"package": "@google/design.md", "version": DESIGN_MD_VERSION}:
         raise EvaluationError("DESIGN.md report did not use the pinned official linter")
     results = report.get("results")
     expected = {(target["alias"].split("-", 1)[0], target["alias"].split("-", 1)[1], target["case_id"]) for target in targets}
@@ -342,7 +400,7 @@ def validate_design_completion(design_output: Path, targets: list[dict[str, Any]
     }:
         raise EvaluationError("DESIGN.md aggregate summary is incomplete")
     if findings:
-        raise DesignFindingsError(f"DESIGN.md clean gate rejected {findings} target(s) with findings")
+        raise DesignFindingsError(f"DESIGN.md repair required for {findings} target(s)")
     return clean, findings
 
 
@@ -372,6 +430,10 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
     return normalized
 
 
+def repair_summary(findings: dict[str, list[str]]) -> str:
+    return "; ".join(f"{target}={','.join(codes)}" for target, codes in findings.items())
+
+
 def _archive_failed_path(path: Path, attempt: int) -> Path:
     destination = path.with_name(f"{path.name}.failed-attempt-{attempt}")
     if destination.exists():
@@ -386,6 +448,8 @@ def _run_generation(args: argparse.Namespace, output: Path) -> int:
         str(MATRIX_RUNNER),
         "--provider",
         args.provider,
+        "--model",
+        args.model,
         "--theme",
         args.theme,
         "--output",
@@ -409,7 +473,161 @@ def _run_generation(args: argparse.Namespace, output: Path) -> int:
         raise
 
 
+def _safe_tool_root(args: argparse.Namespace) -> Path:
+    root = args.target_root.expanduser().resolve() / ".tools"
+    if root.exists() and (root.is_symlink() or not root.is_dir()):
+        raise EvaluationError(f"tool cache is unsafe: {root}")
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _write_tool_record(root: Path, record: dict[str, Any]) -> None:
+    path = root / "tool-resolution.json"
+    temporary = root / ".tool-resolution.json.tmp"
+    temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, path)
+
+
+def _probe_playwright(environment: dict[str, str]) -> dict[str, str]:
+    completed = subprocess.run(
+        [
+            "node",
+            "-e",
+            (
+                "const p=require('playwright');"
+                "const v=require('playwright/package.json').version;"
+                "process.stdout.write(JSON.stringify({version:v,executable:p.chromium.executablePath()}));"
+            ),
+        ],
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    if completed.returncode != 0:
+        diagnostic = " ".join((completed.stderr or completed.stdout or "Playwright probe failed").split())[:500]
+        raise EvaluationError(diagnostic)
+    try:
+        value = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise EvaluationError("Playwright probe returned invalid JSON") from error
+    if value.get("version") != PLAYWRIGHT_VERSION or not isinstance(value.get("executable"), str):
+        raise EvaluationError(
+            f"Playwright version mismatch: expected {PLAYWRIGHT_VERSION}, got {value.get('version')}"
+        )
+    return {"version": value["version"], "executable": value["executable"]}
+
+
+def _install_tool_with_retries(
+    args: argparse.Namespace,
+    command: list[str],
+    environment: dict[str, str],
+    label: str,
+) -> list[dict[str, Any]]:
+    attempts: list[dict[str, Any]] = []
+    for attempt in range(1, args.tool_install_max_attempts + 1):
+        try:
+            completed = matrix.run_isolated(
+                command,
+                min(max(args.capture_timeout_seconds, 300), 900),
+                hard_timeout_seconds=1800,
+                environment=environment,
+            )
+            diagnostic = " ".join((completed.stderr or completed.stdout or "").split())[:500]
+            attempts.append({"attempt": attempt, "exit_code": completed.returncode, "diagnostic": diagnostic})
+            if completed.returncode == 0:
+                return attempts
+        except subprocess.TimeoutExpired as error:
+            attempts.append({"attempt": attempt, "exit_code": None, "diagnostic": str(error)[:500]})
+        if attempt < args.tool_install_max_attempts and args.retry_delay_seconds:
+            time.sleep(args.retry_delay_seconds)
+    raise EvaluationError(f"{label} installation failed after {len(attempts)} attempt(s): {attempts[-1]['diagnostic']}")
+
+
+def resolve_visual_tools(args: argparse.Namespace) -> dict[str, str]:
+    tool_root = _safe_tool_root(args)
+    environment = os.environ.copy()
+    record: dict[str, Any] = {
+        "schema_version": 1,
+        "playwright": {"requested_version": PLAYWRIGHT_VERSION, "install_scope": "evaluator_cache"},
+    }
+    package_cache = tool_root / f"playwright-{PLAYWRIGHT_VERSION}"
+    try:
+        probe = _probe_playwright(environment)
+        record["playwright"].update({"source": "existing", "version": probe["version"]})
+    except (EvaluationError, OSError, subprocess.TimeoutExpired):
+        npm = shutil.which("npm")
+        if npm is None:
+            raise EvaluationError("Playwright is missing and npm is unavailable for isolated installation")
+        package_cache.mkdir(parents=True, exist_ok=True)
+        environment["NODE_PATH"] = str(package_cache / "node_modules")
+        environment["PLAYWRIGHT_BROWSERS_PATH"] = str(tool_root / "browsers")
+        attempts = _install_tool_with_retries(
+            args,
+            [
+                npm,
+                "install",
+                "--prefix",
+                str(package_cache),
+                "--ignore-scripts",
+                "--no-audit",
+                "--no-fund",
+                "--package-lock=false",
+                "--save=false",
+                f"playwright@{PLAYWRIGHT_VERSION}",
+            ],
+            environment,
+            "Playwright package",
+        )
+        probe = _probe_playwright(environment)
+        record["playwright"].update({"source": "installed", "version": probe["version"], "attempts": attempts})
+
+    if args.chrome_executable is not None:
+        chrome = args.chrome_executable.expanduser().resolve()
+        if not chrome.is_file() or chrome.is_symlink():
+            raise EvaluationError(f"Chrome executable is missing or unsafe: {chrome}")
+        record["browser"] = {"source": "provided", "executable": str(chrome)}
+        _write_tool_record(tool_root, record)
+        return environment
+
+    executable = Path(probe["executable"])
+    if not executable.is_file():
+        environment["PLAYWRIGHT_BROWSERS_PATH"] = str(tool_root / "browsers")
+        probe = _probe_playwright(environment)
+        executable = Path(probe["executable"])
+        if record["playwright"]["source"] == "installed":
+            cli = package_cache / "node_modules" / "playwright" / "cli.js"
+        else:
+            cli = ROOT / "node_modules" / "playwright" / "cli.js"
+        if not cli.is_file() or cli.is_symlink():
+            raise EvaluationError("pinned Playwright CLI is missing or unsafe")
+        node = shutil.which("node")
+        if node is None:
+            raise EvaluationError("Node.js is unavailable for the pinned Playwright CLI")
+        attempts = _install_tool_with_retries(
+            args,
+            [node, str(cli), "install", "chromium"],
+            environment,
+            "Chromium",
+        )
+        probe = _probe_playwright(environment)
+        executable = Path(probe["executable"])
+        record["browser"] = {"source": "installed", "executable": str(executable), "attempts": attempts}
+    else:
+        record["browser"] = {"source": "existing", "executable": str(executable)}
+    if not executable.is_file() or executable.is_symlink():
+        raise EvaluationError("resolved Chromium executable is missing or unsafe")
+    _write_tool_record(tool_root, record)
+    return environment
+
+
 def _run_design_attempt(args: argparse.Namespace, generation_output: Path, design_output: Path) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment["npm_config_cache"] = str(_safe_tool_root(args) / "npm-cache")
+    environment["npm_config_ignore_scripts"] = "true"
     return matrix.run_isolated(
         [
             sys.executable,
@@ -423,6 +641,7 @@ def _run_design_attempt(args: argparse.Namespace, generation_output: Path, desig
             str(min(args.lint_timeout_seconds, 300)),
         ],
         args.lint_timeout_seconds,
+        environment=environment,
     )
 
 
@@ -432,6 +651,7 @@ def _run_visual_attempt(
     bases: list[str],
     visual_output: Path,
     screenshot_dir: Path,
+    tool_environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     command = [
         "node",
@@ -445,7 +665,7 @@ def _run_visual_attempt(
         raise EvaluationError("visual target/base counts disagree")
     for target, base in zip(targets, bases):
         command.extend(["--target", f"{target['case_id']}:{target['alias']}={base}"])
-    environment = os.environ.copy()
+    environment = dict(tool_environment or os.environ)
     if args.chrome_executable is not None:
         chrome = args.chrome_executable.expanduser().resolve()
         if not chrome.is_file() or chrome.is_symlink():
@@ -514,7 +734,11 @@ def main() -> int:
     else:
         target_root.mkdir(parents=True, mode=0o755)
     if _run_generation(args, generation_output) != 0:
-        print("product-flow evaluation incomplete: generation matrix failed after retries", file=sys.stderr)
+        print(
+            "product-flow generation incomplete after retries; completed artifacts and attempt history were preserved, "
+            "then rerun with --resume after resolving the recorded diagnostic",
+            file=sys.stderr,
+        )
         return 1
     try:
         targets = completed_targets(generation_output)
@@ -567,17 +791,25 @@ def main() -> int:
             blockers = blocking_visual_findings(visual_output)
             if blockers:
                 print(
-                    f"product-flow execution complete: {len(targets)} targets and {count} screenshots retained; "
-                    f"acceptance failed for {len(blockers)} target(s)",
+                    f"product-flow benchmark complete: {len(targets)} targets and {count} screenshots retained; "
+                    f"repair required for {len(blockers)} target(s): {repair_summary(blockers)}",
                     file=sys.stderr,
                 )
                 return 1
             print(f"product-flow execution complete and acceptance passed: {len(targets)} targets and {count} screenshots retained")
             return 0
+        tool_environment = resolve_visual_tools(args)
         with serve_targets(targets) as bases:
             for attempt in range(1, args.capture_max_attempts + 1):
                 try:
-                    completed = _run_visual_attempt(args, targets, bases, visual_output, screenshot_dir)
+                    completed = _run_visual_attempt(
+                        args,
+                        targets,
+                        bases,
+                        visual_output,
+                        screenshot_dir,
+                        tool_environment,
+                    )
                 except subprocess.TimeoutExpired as error:
                     completed = subprocess.CompletedProcess([], 124, "", f"timed out: {error}")
                 if completed.returncode == 0:
@@ -589,8 +821,8 @@ def main() -> int:
                         blockers = blocking_visual_findings(visual_output)
                         if blockers:
                             print(
-                                f"product-flow execution complete: {len(targets)} targets and {count} screenshots captured; "
-                                f"acceptance failed for {len(blockers)} target(s)",
+                                f"product-flow benchmark complete: {len(targets)} targets and {count} screenshots captured; "
+                                f"repair required for {len(blockers)} target(s): {repair_summary(blockers)}",
                                 file=sys.stderr,
                             )
                             return 1

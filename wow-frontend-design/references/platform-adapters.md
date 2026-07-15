@@ -81,6 +81,7 @@ requirement not met by current stack → candidate/version → size/runtime/lice
 - Pin or lock the chosen version through the project's existing package policy. Do not fetch mutable CDN code for production by default.
 - Review package, plugin, icon/data collection, editor/export, and commercial runtime licenses separately.
 - Use the repository's package manager and lockfile. Do not run an unpinned `npx ...@latest`, change lockfile family, enable lifecycle scripts, or query the network only because a third-party skill recommends its preferred tooling.
+- Missing verification-only tooling may be installed automatically when the task requires the check. Respect existing pins; otherwise resolve the official latest stable non-prerelease that passes runtime compatibility, freeze its exact version for the run, isolate it from product runtime dependencies, verify the executable, record provenance, and resume. CI/benchmark/baseline runs keep their pre-frozen exact toolchain. A transient download/registry error is retryable; an offline/read-only sandbox becomes a scoped evidence limit.
 - In utility-CSS systems, verify extraction against real source and production builds. Runtime-composed classes, CMS/AI strings, icon collections, shortcuts, attributify syntax, and variants may require explicit safe lists or may be unsuitable; do not hide missing production CSS with a development-only result.
 
 ## 6. Verify in the platform's own terms

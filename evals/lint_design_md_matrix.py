@@ -17,7 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LEDGER = ROOT / "evals" / "product-flow-v4-generation-results.json"
 DEFAULT_RETRY_LEDGER = ROOT / "evals" / "product-flow-v4-infrastructure-retry.json"
 DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v4-design-md-results.json"
-PACKAGE_VERSION = "0.2.0"
+
+
+def locked_package_version() -> str:
+    payload = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+    version = payload.get("packages", {}).get("node_modules/@google/design.md", {}).get("version")
+    if not isinstance(version, str) or not version or any(character.isspace() for character in version):
+        raise ValueError("package-lock.json has no exact @google/design.md version")
+    return version
 
 
 def digest(path: Path) -> str:
@@ -79,6 +86,7 @@ def write_report(path: Path, report: dict[str, object]) -> None:
 
 def main() -> int:
     args = parse_args()
+    package_version = locked_package_version()
     ledger_path = args.ledger.expanduser().resolve()
     output = args.output.expanduser().resolve()
     if output.exists():
@@ -102,7 +110,7 @@ def main() -> int:
         if isinstance(candidate, dict) and candidate.get("visual_evaluation_eligible") is True:
             supplemental = candidate
 
-    command_prefix = ["npx", "--yes", f"@google/design.md@{PACKAGE_VERSION}", "lint"]
+    command_prefix = ["npx", "--yes", f"@google/design.md@{package_version}", "lint"]
     report: dict[str, object] = {
         "schema_version": 1,
         "generated_at": utc_now(),
@@ -112,7 +120,7 @@ def main() -> int:
             if supplemental is not None and supplemental_path is not None
             else None
         ),
-        "linter": {"package": "@google/design.md", "version": PACKAGE_VERSION},
+        "linter": {"package": "@google/design.md", "version": package_version},
         "results": [],
     }
     clean = 0

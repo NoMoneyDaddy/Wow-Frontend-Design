@@ -13,9 +13,9 @@
     {
       "id": "deterministic-weak-model-guardrails",
       "status": "tested_in_repo",
-      "claim": "Project scan, model routing, evidence ledger, scorer and fail-closed schemas have automated tests.",
-      "artifacts": ["wow-frontend-design/scripts/project_scan.py", "wow-frontend-design/scripts/route_model.py", "wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/score_weak_model_output.py", "wow-frontend-design/scripts/test_evidence_workflow_smoke.py"],
-      "boundary": "Passing unit tests verifies implemented invariants only; it does not make a weak model truthful or visually capable."
+      "claim": "Project scan, model routing, evidence ledger, scorer, fail-closed schemas and the published v6 evidence-integrity gate have automated tests.",
+      "artifacts": ["wow-frontend-design/scripts/project_scan.py", "wow-frontend-design/scripts/route_model.py", "wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/score_weak_model_output.py", "wow-frontend-design/scripts/test_evidence_workflow_smoke.py", "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py", "wow-frontend-design/scripts/test_validate_product_flow_v6_evidence.py"],
+      "boundary": "Passing unit and evidence-integrity tests verifies encoded invariants only; it does not make a weak model truthful or generally visually capable."
     },
     {
       "id": "structured-site-planning",
@@ -27,16 +27,16 @@
     {
       "id": "traditional-chinese-showcase",
       "status": "browser_observed",
-      "claim": "Recorded Traditional Chinese browser evidence includes a real appearance-switching showcase and a nine-target Codex v4 product-flow cohort with true mobile capture settings.",
-      "artifacts": ["evals/weak-model-showcase/index.html", "evals/weak-model-showcase/styles.css", "evals/weak-model-showcase/app.js", "assets/screenshots.json", "evals/product-flow-v4-visual-results.json", "wow-frontend-design/scripts/validate_product_flow_evidence.py"],
-      "boundary": "Chrome/Playwright observations are bounded to recorded viewports and states; 7/9 v4 targets retained blockers. They are not cross-browser, assistive-technology, formal WCAG or universal visual-quality evidence."
+      "claim": "Eight distinct Traditional Chinese products completed the fixed gpt-5.4-mini v6 generation, DESIGN lint, browser diagnosis, self-repair and 64-screenshot device matrix.",
+      "artifacts": ["evals/product-flow-v6-repaired-v2-generation-results.json", "evals/product-flow-v6-repaired-v2-design-md-results.json", "evals/product-flow-v6-visual-results.json", "evals/product-flow-v6-repaired-v2-targets", "assets/product-flow-v6", "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py", "evals/TEST_PLAN.md"],
+      "boundary": "Evidence applies only to the exact gpt-5.4-mini cohort, frozen Chromium evaluator and tested routes/states. It is not physical-device, cross-browser, formal WCAG or universal visual-quality certification."
     },
     {
       "id": "claude-dashboard-pair",
       "status": "observed_failed_acceptance",
       "claim": "Claude Haiku and Opus requested aliases generated the same non-landing product-dashboard brief and were independently browser-audited.",
-      "artifacts": ["evals/claude-haiku-product-dashboard/run-manifest.json", "evals/claude-opus-product-dashboard/run-manifest.json", "evals/dashboard-browser-results.json", "evals/dashboard-playwright-acceptance.json", "evals/dashboard-playwright-replay.json", "evals/playwright_dashboard_audit.cjs", "package-lock.json"],
-      "boundary": "Both failed strict acceptance; exact resolved model IDs were not reported. One pair cannot establish a model ranking."
+      "artifacts": ["evals/claude-haiku-product-dashboard/run-manifest.json", "evals/claude-opus-product-dashboard/run-manifest.json", "evals/dashboard-playwright-acceptance.json", "evals/dashboard-playwright-replay.json", "evals/playwright_dashboard_audit.cjs", "package-lock.json"],
+      "boundary": "Both failed strict interaction acceptance; exact resolved model IDs were not reported. Screenshot-bound summary evidence was cleared, and one pair cannot establish a model ranking."
     },
     {
       "id": "haiku-remediation-remake",
@@ -47,10 +47,10 @@
     },
     {
       "id": "cross-product-coverage",
-      "status": "definition_only",
-      "claim": "Eight non-landing product cases define audience, surface, brand, mobile and hidden acceptance pressure.",
-      "artifacts": ["evals/product_cases.json", "evals/benchmark-matrix.md", "wow-frontend-design/scripts/validate_product_cases.py"],
-      "boundary": "Fixture schema and coverage are validated; the eight cases have not all been generated, browser-tested or scored."
+      "status": "browser_observed",
+      "claim": "Eight v6 products with different task, density, editorial, form, data, configuration and permission pressures were generated and browser-tested.",
+      "artifacts": ["evals/briefs/wind-maintenance-dispatch-v6.md", "evals/briefs/type-foundry-specimen-v6.md", "evals/briefs/repair-cafe-intake-v6.md", "evals/briefs/night-market-allergen-v6.md", "evals/briefs/royalty-statement-v6.md", "evals/briefs/packaging-configurator-v6.md", "evals/briefs/oral-history-archive-v6.md", "evals/briefs/grant-review-board-v6.md", "evals/product-flow-v6-repaired-v2-generation-results.json", "evals/product-flow-v6-visual-results.json", "assets/product-flow-v6"],
+      "boundary": "This is one exact model/cohort and one frozen browser matrix. Product diversity does not establish model ranking, every product category, user usability or production readiness."
     },
     {
       "id": "host-portability",
@@ -69,16 +69,16 @@
     {
       "id": "locale-portability",
       "status": "partially_tested",
-      "claim": "Traditional Chinese is first-class and localization plus typographic-layout rules cover CJK measure, wrapping, vertical writing, mixed scripts and RTL boundaries.",
-      "artifacts": ["wow-frontend-design/references/localization.md", "wow-frontend-design/references/typographic-layout.md", "evals/trigger_cases.json", "evals/weak-model-showcase/index.html", "evals/product-flow-v4-visual-results.json"],
-      "boundary": "zh-Hant has rendered evidence, but two v4 targets missed the brief's exact lang contract. RTL and broad locale expansion are documented checks, not completed integration coverage."
+      "claim": "Traditional Chinese horizontal prose, intentional vertical specimens, mixed Latin/numerals, browser-owned wrapping and true mobile-emulation layouts were exercised in the v6 browser cohort.",
+      "artifacts": ["wow-frontend-design/references/localization.md", "wow-frontend-design/references/typographic-layout.md", "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6", "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-oral-history-archive-v6", "evals/product-flow-v6-visual-results.json", "assets/product-flow-v6"],
+      "boundary": "RTL, additional locales, real font/platform variance, physical phones and all content extremes were not integration-tested; portability beyond this zh-Hant-heavy cohort remains a contract."
     },
     {
       "id": "accessibility",
       "status": "partially_tested",
-      "claim": "The skill defines WCAG 2.2 A/AA applicability, keyboard, zoom, focus, contrast and state gates.",
-      "artifacts": ["wow-frontend-design/references/wcag-aa-checklist.md", "wow-frontend-design/references/quality-gates.md", "evals/dashboard-browser-results.json"],
-      "boundary": "Sample browser checks found failures. The repository does not claim formal WCAG conformance or named screen-reader/browser support."
+      "claim": "The skill defines WCAG 2.2 A/AA applicability, and the v6 evaluator exercised bounded keyboard, focus, interaction, reduced-motion and rendered layout checks.",
+      "artifacts": ["wow-frontend-design/references/wcag-aa-checklist.md", "wow-frontend-design/references/quality-gates.md", "evals/playwright_visual_v6_audit.cjs", "evals/product-flow-v6-visual-results.json", "evals/TEST_PLAN.md"],
+      "boundary": "The browser cohort is not a formal WCAG audit and did not certify screen readers, 400% zoom, every contrast/state pair, forced colors on every route, Safari/Firefox or OS accessibility services."
     },
     {
       "id": "motion-svg-lottie",
@@ -111,9 +111,9 @@
     {
       "id": "anti-ai-slop",
       "status": "partially_tested",
-      "claim": "A centralized anti-slop contract defines truth, task-surface, product-swap, representation, silhouette, mobile, state and evidence gates.",
-      "artifacts": ["wow-frontend-design/references/anti-ai-slop.md", "evals/trigger_cases.json", "evals/claude-haiku-product-dashboard-remake/rejected-run.json"],
-      "boundary": "Routing fixture validity and one rejected remediation run do not prove the contract consistently improves visual quality across models. Subjective craft still needs blind rendered review."
+      "claim": "A centralized anti-slop contract defines truth, task-surface, product-swap, representation, silhouette, mobile, state and evidence gates; the v6 cohort produced eight visibly different product directions for manual review.",
+      "artifacts": ["wow-frontend-design/references/anti-ai-slop.md", "evals/product-flow-v6-repaired-v2-targets", "evals/product-flow-v6-visual-results.json", "assets/product-flow-v6", "evals/claude-haiku-product-dashboard-remake/rejected-run.json"],
+      "boundary": "One exact model/cohort and non-blind manual review do not prove consistent visual improvement across models or award quality. Subjective craft still needs repeated independent blind review."
     },
     {
       "id": "local-models",

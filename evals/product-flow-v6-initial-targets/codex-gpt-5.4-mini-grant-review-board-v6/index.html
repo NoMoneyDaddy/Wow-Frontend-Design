@@ -1,0 +1,1221 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>社區文化補助審查台</title>
+  <style>
+    :root {
+      --canvas: #efe7dc;
+      --surface: #f4f0e8;
+      --surface-strong: #fbf8f2;
+      --ink: #18231f;
+      --muted: #56645f;
+      --line: rgba(24, 35, 31, 0.12);
+      --primary: #23463e;
+      --primary-ink: #f7f3e9;
+      --primary-soft: rgba(35, 70, 62, 0.11);
+      --danger: #8e2f3b;
+      --danger-ink: #fff6f7;
+      --shadow: 0 18px 48px rgba(24, 35, 31, 0.08);
+      --radius-sm: 12px;
+      --radius-md: 18px;
+      --radius-lg: 28px;
+      --space-1: 0.375rem;
+      --space-2: 0.625rem;
+      --space-3: 1rem;
+      --space-4: 1.5rem;
+      --space-5: 2rem;
+      --space-6: 2.75rem;
+      --measure: 74rem;
+      --tap: 44px;
+      --font-display: "Baskerville", "Iowan Old Style", "Noto Serif TC", "Source Han Serif TC", serif;
+      --font-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+      --ease: cubic-bezier(.2, .8, .2, 1);
+      --dur: 180ms;
+    }
+
+    * { box-sizing: border-box; }
+    html { scrollbar-gutter: stable; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font: 400 16px/1.6 var(--font-body);
+      background:
+        radial-gradient(circle at top left, rgba(35, 70, 62, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(142, 47, 59, 0.08), transparent 22%),
+        linear-gradient(180deg, #f7f1e7 0%, var(--canvas) 100%);
+      min-height: 100vh;
+      text-rendering: optimizeLegibility;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(24, 35, 31, 0.02), rgba(24, 35, 31, 0.02)),
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 1.8rem,
+          rgba(24, 35, 31, 0.02) 1.8rem 1.9rem
+        );
+      mix-blend-mode: multiply;
+      opacity: 0.3;
+    }
+
+    img, svg { max-width: 100%; display: block; }
+    button, textarea {
+      font: inherit;
+      color: inherit;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.8rem 1rem;
+      min-height: var(--tap);
+      background: transparent;
+      cursor: pointer;
+      transition: transform var(--dur) var(--ease), background-color var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    button:not(:disabled):hover { transform: translateY(-1px); }
+    button:focus-visible,
+    textarea:focus-visible,
+    a:focus-visible {
+      outline: 3px solid rgba(35, 70, 62, 0.32);
+      outline-offset: 2px;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 1rem;
+      inset-block-start: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      background: var(--primary);
+      color: var(--primary-ink);
+      transform: translateY(-160%);
+      transition: transform var(--dur) var(--ease);
+      z-index: 30;
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .page {
+      width: min(100%, var(--measure));
+      margin: 0 auto;
+      padding: clamp(1rem, 2vw, 2rem);
+      position: relative;
+      isolation: isolate;
+    }
+
+    .masthead,
+    .panel,
+    .proposal-row,
+    .dialog-shell {
+      background: rgba(251, 248, 242, 0.82);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .masthead {
+      border-radius: var(--radius-lg);
+      padding: clamp(1.25rem, 2.5vw, 2rem);
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 0.9fr);
+      gap: var(--space-4);
+      align-items: end;
+      margin-block-end: var(--space-4);
+    }
+
+    .eyebrow {
+      margin: 0 0 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      font-size: 0.9rem;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-family: var(--font-display);
+      line-height: 1.08;
+      font-weight: 700;
+    }
+
+    h1 {
+      font-size: clamp(2.1rem, 4vw, 3.3rem);
+      letter-spacing: -0.01em;
+      max-width: 12ch;
+    }
+
+    .lede {
+      margin: 0.75rem 0 0;
+      max-width: 58ch;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .meta-strip {
+      display: grid;
+      gap: 0.75rem;
+      justify-items: stretch;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .pill,
+    .flag,
+    .tiny {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: 2.1rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(24, 35, 31, 0.05);
+      color: var(--muted);
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .flag.is-primary {
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+    .flag.is-danger {
+      background: var(--danger);
+      color: var(--danger-ink);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.85fr) minmax(20rem, 0.95fr);
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .panel {
+      border-radius: var(--radius-lg);
+      padding: clamp(1rem, 2vw, 1.5rem);
+    }
+
+    .panel + .panel { margin-block-start: var(--space-4); }
+
+    .board-head,
+    .proposal-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 0.9fr) auto;
+      gap: 0.875rem;
+      align-items: start;
+    }
+
+    .board-head {
+      padding: 0 1rem 0.75rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .board-head > span:last-child { text-align: end; }
+
+    .proposal-row {
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      margin-top: 0.75rem;
+      background: var(--surface-strong);
+    }
+
+    .proposal-row.is-shortlisted {
+      border-color: rgba(35, 70, 62, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(35, 70, 62, 0.25), var(--shadow);
+    }
+
+    .proposal-row[data-filter-value="discussion"] .status-chip {
+      color: var(--primary);
+      background: rgba(35, 70, 62, 0.08);
+    }
+
+    .proposal-title {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: baseline;
+    }
+
+    .proposal-title strong {
+      font-size: 1.02rem;
+    }
+
+    .proposal-title .code {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .proposal-copy {
+      margin: 0.45rem 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      max-width: 42ch;
+    }
+
+    .tag-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      border-radius: 999px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.86rem;
+      background: rgba(24, 35, 31, 0.05);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .status-chip.is-dim { color: var(--muted); }
+    .status-chip.is-note { color: var(--ink); }
+    .status-chip.is-primary {
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+
+    .score-block {
+      display: grid;
+      gap: 0.35rem;
+      align-content: start;
+      color: var(--ink);
+    }
+
+    .score-block strong {
+      font-size: 1.2rem;
+      letter-spacing: -0.01em;
+    }
+    .score-block span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .action-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      justify-content: flex-end;
+      align-self: start;
+    }
+
+    .button-primary {
+      background: var(--primary);
+      color: var(--primary-ink);
+      border: 1px solid transparent;
+      padding-inline: 1rem;
+    }
+    .button-secondary {
+      background: rgba(24, 35, 31, 0.04);
+      color: var(--ink);
+      border: 1px solid rgba(24, 35, 31, 0.09);
+      padding-inline: 0.95rem;
+    }
+    .button-ghost {
+      border: 1px solid rgba(24, 35, 31, 0.1);
+      background: transparent;
+      color: var(--muted);
+      padding-inline: 0.85rem;
+    }
+
+    .sidebar {
+      display: grid;
+      gap: var(--space-4);
+      position: sticky;
+      top: 1rem;
+    }
+
+    .sidebar h2,
+    .board-title,
+    .modal-title {
+      font-size: 1.5rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .subhead {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      max-width: 38ch;
+    }
+
+    .compare-panel {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .compare-summary {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.75rem;
+      align-items: stretch;
+    }
+
+    .compare-slot {
+      border-radius: var(--radius-md);
+      background: var(--surface-strong);
+      border: 1px solid rgba(24, 35, 31, 0.1);
+      padding: 0.9rem;
+      min-height: 8.75rem;
+      display: grid;
+      gap: 0.55rem;
+      align-content: start;
+    }
+    .compare-slot h3 {
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .compare-slot strong {
+      font-size: 1.02rem;
+    }
+    .compare-slot p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .compare-link {
+      display: grid;
+      align-items: center;
+      justify-items: center;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .compare-detail {
+      display: grid;
+      gap: 0.8rem;
+      padding-top: 0.25rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .compare-matrix {
+      display: grid;
+      gap: 0.55rem;
+    }
+    .matrix-row {
+      display: grid;
+      grid-template-columns: 7.5rem 1fr 1fr;
+      gap: 0.65rem;
+      align-items: start;
+    }
+    .matrix-row span:first-child {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .matrix-row span {
+      min-width: 0;
+    }
+    .matrix-row .a,
+    .matrix-row .b {
+      padding: 0.28rem 0.55rem;
+      border-radius: 0.8rem;
+      background: rgba(24, 35, 31, 0.04);
+    }
+
+    .decision-stack {
+      display: grid;
+      gap: 0.8rem;
+      padding-top: 0.25rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .decision-stack p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .status-banner {
+      display: none;
+      border-radius: var(--radius-md);
+      padding: 0.95rem 1rem;
+      background: rgba(24, 35, 31, 0.05);
+      color: var(--ink);
+      border: 1px solid rgba(24, 35, 31, 0.1);
+    }
+    .status-banner.is-success,
+    .status-banner.is-error {
+      display: block;
+    }
+    .status-banner.is-error {
+      background: var(--danger);
+      color: var(--danger-ink);
+      border-color: transparent;
+    }
+    .status-banner.is-success {
+      background: rgba(35, 70, 62, 0.1);
+      color: var(--ink);
+    }
+
+    .decision-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    dialog {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      max-width: min(42rem, calc(100vw - 2rem));
+      width: 100%;
+      color: var(--ink);
+    }
+    dialog::backdrop {
+      background: rgba(24, 35, 31, 0.44);
+      backdrop-filter: blur(2px);
+    }
+    .dialog-shell {
+      border-radius: calc(var(--radius-lg) + 2px);
+      padding: 1.25rem;
+    }
+    .dialog-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: start;
+      margin-bottom: 1rem;
+    }
+    .dialog-top .pill-row {
+      justify-content: flex-start;
+    }
+    .dialog-copy {
+      margin: 0 0 1rem;
+      color: var(--muted);
+    }
+    .dialog-grid {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .dialog-grid label {
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    textarea {
+      min-height: 8rem;
+      width: 100%;
+      resize: vertical;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line);
+      background: var(--surface-strong);
+      padding: 0.9rem 1rem;
+      color: var(--ink);
+    }
+    .dialog-error {
+      display: none;
+      border-radius: var(--radius-md);
+      padding: 0.95rem 1rem;
+      background: var(--danger);
+      color: var(--danger-ink);
+      margin-bottom: 1rem;
+    }
+    .dialog-error.is-visible { display: block; }
+    .dialog-footer {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+    }
+
+    .mobile-stepper {
+      display: none;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 980px) {
+      .masthead,
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .pill-row {
+        justify-content: flex-start;
+      }
+
+      .sidebar {
+        position: static;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page { padding: 0.75rem; }
+      .masthead { padding: 1rem; }
+      h1 { max-width: 10ch; }
+      .workspace { gap: 0.85rem; }
+
+      .mobile-stepper {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 0.95rem;
+      }
+
+      .panel {
+        padding: 0.95rem;
+      }
+
+      .board-head {
+        display: none;
+      }
+
+      .proposal-row,
+      .board-head,
+      .compare-summary,
+      .matrix-row {
+        grid-template-columns: 1fr;
+      }
+
+      .proposal-row {
+        gap: 0.7rem;
+      }
+
+      .proposal-row .score-block,
+      .proposal-row .action-group {
+        justify-content: flex-start;
+      }
+
+      .proposal-row .action-group {
+        flex-direction: row;
+      }
+
+      .compare-slot {
+        min-height: auto;
+      }
+
+      .compare-link {
+        padding-block: 0.2rem;
+      }
+
+      .matrix-row .a,
+      .matrix-row .b {
+        padding-inline: 0;
+        background: transparent;
+      }
+
+      .dialog-shell {
+        padding: 1rem;
+      }
+      dialog {
+        max-width: calc(100vw - 1rem);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到審查工作區</a>
+  <div class="page" id="app">
+    <header class="masthead panel" aria-label="工作台總覽">
+      <div>
+        <p class="eyebrow">社區文化補助審查 · 繁體中文單頁工作台</p>
+        <h1>從六件申請案，整理出可討論的兩案決策</h1>
+        <p class="lede">這是一個本機模擬的審查桌面：先把待討論案件加入 shortlist，再把兩案送入比較，最後在對話框內完成決策與重試。</p>
+        <div class="mobile-stepper" aria-label="流程">
+          <span class="pill">1 篩選</span>
+          <span class="pill">2 加入 shortlist</span>
+          <span class="pill">3 比較兩案</span>
+          <span class="pill">4 開啟決策</span>
+        </div>
+      </div>
+      <div class="meta-strip">
+        <div class="pill-row">
+          <span class="flag is-primary" data-status="discussion-count">待討論 6 件</span>
+          <span class="pill" data-status="shortlist-count">shortlist 0 件</span>
+          <span class="pill" data-status="compare-count">比較 0 / 2</span>
+        </div>
+        <div class="pill-row">
+          <span class="flag" data-status="local-sim">結果僅顯示本機模擬</span>
+          <span class="flag is-danger" data-status="error-state" hidden>尚未完成送出</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="workspace" data-eval="grant-board">
+      <section class="panel" aria-labelledby="board-title">
+        <div>
+          <p class="eyebrow">審查列表</p>
+          <h2 class="board-title" id="board-title">待討論案件</h2>
+          <p class="subhead">每列都是一件獨立申請案。先看主題、場域、預算與風險，再用 shortlist 決定哪些案子值得往比較面板移動。</p>
+        </div>
+        <div class="board-head" aria-hidden="true">
+          <span>申請案</span>
+          <span>核心主題</span>
+          <span>場域／預算</span>
+          <span>風險註記</span>
+          <span>動作</span>
+        </div>
+        <div class="board-list" aria-label="申請案清單">
+          <article class="proposal-row" data-eval="proposal-row" data-record-id="GR-01" data-filter-value="discussion">
+            <div>
+              <div class="proposal-title">
+                <strong>港邊舊倉聲景修復</strong>
+                <span class="code">GR-01 · 海港街區</span>
+              </div>
+              <p class="proposal-copy">把舊倉庫改成聲音採集與展演空間，結合居民口述與港埠工人記憶，適合討論公共性與保存界線。</p>
+              <div class="tag-stack">
+                <span class="status-chip status-chip is-note">場域轉譯</span>
+                <span class="status-chip">社區參與 78%</span>
+              </div>
+            </div>
+            <div class="score-block">
+              <strong>82 分</strong>
+              <span>聲音 / 展演</span>
+            </div>
+            <div class="score-block">
+              <strong>138 萬</strong>
+              <span>舊倉 2F + 前庭</span>
+            </div>
+            <div class="score-block">
+              <strong>修復優先</strong>
+              <span>保存與噪音控制</span>
+            </div>
+            <div class="action-group">
+              <button class="button-secondary" type="button" data-eval="shortlist-action" data-action="shortlist">加入 shortlist</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="a">送入 A</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="b">送入 B</button>
+            </div>
+          </article>
+
+          <article class="proposal-row" data-eval="proposal-row" data-record-id="GR-02" data-filter-value="discussion">
+            <div>
+              <div class="proposal-title">
+                <strong>老街布旗工作坊</strong>
+                <span class="code">GR-02 · 市中心老街</span>
+              </div>
+              <p class="proposal-copy">邀集店家與織品職人共作街區布旗，將節慶視覺與地方志整合成可巡迴的社區裝置。</p>
+              <div class="tag-stack">
+                <span class="status-chip is-note">視覺共作</span>
+                <span class="status-chip">店家協作 64%</span>
+              </div>
+            </div>
+            <div class="score-block">
+              <strong>76 分</strong>
+              <span>手作 / 展示</span>
+            </div>
+            <div class="score-block">
+              <strong>92 萬</strong>
+              <span>騎樓與巷道</span>
+            </div>
+            <div class="score-block">
+              <strong>低風險</strong>
+              <span>施工簡單</span>
+            </div>
+            <div class="action-group">
+              <button class="button-secondary" type="button" data-eval="shortlist-action" data-action="shortlist">加入 shortlist</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="a">送入 A</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="b">送入 B</button>
+            </div>
+          </article>
+
+          <article class="proposal-row" data-eval="proposal-row" data-record-id="GR-03" data-filter-value="discussion">
+            <div>
+              <div class="proposal-title">
+                <strong>河岸戲偶夜巡</strong>
+                <span class="code">GR-03 · 河岸聚落</span>
+              </div>
+              <p class="proposal-copy">以戲偶、燈陣與口白串起夜間巡遊，強調跨世代參與與河岸步道的安全動線。</p>
+              <div class="tag-stack">
+                <span class="status-chip is-note">巡演路線</span>
+                <span class="status-chip">親子參與 81%</span>
+              </div>
+            </div>
+            <div class="score-block">
+              <strong>88 分</strong>
+              <span>巡遊 / 戲偶</span>
+            </div>
+            <div class="score-block">
+              <strong>154 萬</strong>
+              <span>步道與碼頭</span>
+            </div>
+            <div class="score-block">
+              <strong>中風險</strong>
+              <span>動線與夜間照明</span>
+            </div>
+            <div class="action-group">
+              <button class="button-secondary" type="button" data-eval="shortlist-action" data-action="shortlist">加入 shortlist</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="a">送入 A</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="b">送入 B</button>
+            </div>
+          </article>
+
+          <article class="proposal-row" data-eval="proposal-row" data-record-id="GR-04" data-filter-value="discussion">
+            <div>
+              <div class="proposal-title">
+                <strong>巷口青年編舞站</strong>
+                <span class="code">GR-04 · 南區住宅帶</span>
+              </div>
+              <p class="proposal-copy">把一間閒置店面改為編舞與錄像工作站，讓青少年在短期駐留內完成社區動作檔案。</p>
+              <div class="tag-stack">
+                <span class="status-chip is-note">青年提案</span>
+                <span class="status-chip">場地轉換 59%</span>
+              </div>
+            </div>
+            <div class="score-block">
+              <strong>71 分</strong>
+              <span>編舞 / 錄像</span>
+            </div>
+            <div class="score-block">
+              <strong>67 萬</strong>
+              <span>店面 1 樓</span>
+            </div>
+            <div class="score-block">
+              <strong>需補件</strong>
+              <span>隔音與保險</span>
+            </div>
+            <div class="action-group">
+              <button class="button-secondary" type="button" data-eval="shortlist-action" data-action="shortlist">加入 shortlist</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="a">送入 A</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="b">送入 B</button>
+            </div>
+          </article>
+
+          <article class="proposal-row" data-eval="proposal-row" data-record-id="GR-05" data-filter-value="discussion">
+            <div>
+              <div class="proposal-title">
+                <strong>古圳說書路線</strong>
+                <span class="code">GR-05 · 水圳聚落</span>
+              </div>
+              <p class="proposal-copy">沿古圳步道安排說書與地方知識導覽，重點放在老人志工、地方學校與導覽內容共編。</p>
+              <div class="tag-stack">
+                <span class="status-chip is-note">知識導覽</span>
+                <span class="status-chip">跨校合作 86%</span>
+              </div>
+            </div>
+            <div class="score-block">
+              <strong>84 分</strong>
+              <span>導覽 / 敘事</span>
+            </div>
+            <div class="score-block">
+              <strong>111 萬</strong>
+              <span>步道與解說點</span>
+            </div>
+            <div class="score-block">
+              <strong>低風險</strong>
+              <span>內容可分段執行</span>
+            </div>
+            <div class="action-group">
+              <button class="button-secondary" type="button" data-eval="shortlist-action" data-action="shortlist">加入 shortlist</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="a">送入 A</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="b">送入 B</button>
+            </div>
+          </article>
+
+          <article class="proposal-row" data-eval="proposal-row" data-record-id="GR-06" data-filter-value="discussion">
+            <div>
+              <div class="proposal-title">
+                <strong>眷村食譜檔案室</strong>
+                <span class="code">GR-06 · 舊軍區宿舍</span>
+              </div>
+              <p class="proposal-copy">整理口述食譜、料理器具與家族照片，轉成可公開查閱的檔案室與工作坊空間。</p>
+              <div class="tag-stack">
+                <span class="status-chip is-note">檔案保存</span>
+                <span class="status-chip">口述蒐集 73%</span>
+              </div>
+            </div>
+            <div class="score-block">
+              <strong>90 分</strong>
+              <span>檔案 / 工作坊</span>
+            </div>
+            <div class="score-block">
+              <strong>126 萬</strong>
+              <span>宿舍 3 戶</span>
+            </div>
+            <div class="score-block">
+              <strong>中風險</strong>
+              <span>授權與隱私</span>
+            </div>
+            <div class="action-group">
+              <button class="button-secondary" type="button" data-eval="shortlist-action" data-action="shortlist">加入 shortlist</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="a">送入 A</button>
+              <button class="button-ghost" type="button" data-action="compare" data-slot="b">送入 B</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <aside class="sidebar" aria-label="比較與決策">
+        <section class="panel compare-panel" data-eval="compare-panel" aria-labelledby="compare-title">
+          <div>
+            <p class="eyebrow">比較面板</p>
+            <h2 id="compare-title">A / B 兩案對照</h2>
+            <p class="subhead">把 shortlist 之後真正需要討論的兩案放進來。面板會保持同一份資料來源，不複製另一套桌機或手機版本。</p>
+          </div>
+          <div class="compare-summary" aria-live="polite">
+            <div class="compare-slot" id="slot-a">
+              <h3>A 案</h3>
+              <strong data-slot-label="a">尚未選取</strong>
+              <p data-slot-copy="a">點任一 shortlist 申請案的「送入 A」按鈕。</p>
+            </div>
+            <div class="compare-link" aria-hidden="true">對照</div>
+            <div class="compare-slot" id="slot-b">
+              <h3>B 案</h3>
+              <strong data-slot-label="b">尚未選取</strong>
+              <p data-slot-copy="b">點任一 shortlist 申請案的「送入 B」按鈕。</p>
+            </div>
+          </div>
+
+          <div class="compare-detail">
+            <div class="compare-matrix">
+              <div class="matrix-row">
+                <span>場域</span>
+                <span class="a" data-compare-field="site-a">尚未選取</span>
+                <span class="b" data-compare-field="site-b">尚未選取</span>
+              </div>
+              <div class="matrix-row">
+                <span>主題</span>
+                <span class="a" data-compare-field="theme-a">尚未選取</span>
+                <span class="b" data-compare-field="theme-b">尚未選取</span>
+              </div>
+              <div class="matrix-row">
+                <span>預算</span>
+                <span class="a" data-compare-field="budget-a">尚未選取</span>
+                <span class="b" data-compare-field="budget-b">尚未選取</span>
+              </div>
+              <div class="matrix-row">
+                <span>風險</span>
+                <span class="a" data-compare-field="risk-a">尚未選取</span>
+                <span class="b" data-compare-field="risk-b">尚未選取</span>
+              </div>
+            </div>
+
+            <div class="status-banner" data-status-banner role="status" aria-live="polite"></div>
+
+            <div class="decision-stack">
+              <p>比較內容齊備後，開啟決策對話框。送出結果只會更新本機狀態。</p>
+              <div class="decision-actions">
+                <button class="button-primary" type="button" data-eval="decision-action" id="decisionAction">開啟決策 modal</button>
+                <button class="button-secondary" type="button" data-eval="retry-action" id="retryAction" hidden>重試送出</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="decisionModal" data-eval="decision-modal" aria-labelledby="decisionTitle">
+    <div class="dialog-shell">
+      <div class="dialog-top">
+        <div>
+          <p class="eyebrow">本機模擬決策</p>
+          <h2 class="modal-title" id="decisionTitle">送出比較後的決策</h2>
+        </div>
+        <div class="pill-row">
+          <span class="pill">只更新本機</span>
+          <span class="pill">可重試</span>
+        </div>
+      </div>
+      <p class="dialog-copy">此對話框會鎖定背景、保留焦點，並在首次送出時刻意回傳一次模擬失敗，方便驗證錯誤與重試流程。</p>
+      <div class="dialog-grid">
+        <label>
+          決策註記
+          <textarea id="decisionNote" placeholder="例如：A 案具保存價值，B 案執行風險低，需再確認授權條件。"></textarea>
+        </label>
+      </div>
+      <div class="dialog-error" id="dialogError" role="alert"></div>
+      <div class="dialog-footer">
+        <button class="button-secondary" type="button" id="closeModal">取消</button>
+        <button class="button-primary" type="button" id="confirmDecision">送出模擬決策</button>
+      </div>
+    </div>
+  </dialog>
+
+  <template id="status-template">
+    <span class="flag"></span>
+  </template>
+
+  <script>
+    (() => {
+      const app = document.getElementById('app');
+      const rows = [...document.querySelectorAll('.proposal-row')];
+      const shortlistCount = document.querySelector('[data-status="shortlist-count"]');
+      const compareCount = document.querySelector('[data-status="compare-count"]');
+      const errorState = document.querySelector('[data-status="error-state"]');
+      const statusBanner = document.querySelector('[data-status-banner]');
+      const decisionAction = document.getElementById('decisionAction');
+      const retryAction = document.getElementById('retryAction');
+      const modal = document.getElementById('decisionModal');
+      const dialogError = document.getElementById('dialogError');
+      const decisionNote = document.getElementById('decisionNote');
+      const closeModal = document.getElementById('closeModal');
+      const confirmDecision = document.getElementById('confirmDecision');
+      const state = {
+        shortlist: new Set(),
+        compare: { a: null, b: null },
+        lastTrigger: null,
+        firstFailureShown: false,
+        retryMode: false,
+        decision: 'idle',
+      };
+
+      const data = Object.fromEntries(rows.map((row) => {
+        const recordId = row.dataset.recordId;
+        return [recordId, {
+          id: recordId,
+          title: row.querySelector('.proposal-title strong').textContent,
+          code: row.querySelector('.proposal-title .code').textContent,
+          theme: row.querySelector('.proposal-copy').textContent,
+          site: row.querySelector('.score-block:nth-of-type(3) strong').textContent + ' · ' + row.querySelector('.score-block:nth-of-type(3) span').textContent,
+          budget: row.querySelector('.score-block:nth-of-type(2) strong').textContent,
+          risk: row.querySelector('.score-block:nth-of-type(4) strong').textContent + ' · ' + row.querySelector('.score-block:nth-of-type(4) span').textContent,
+        }];
+      }));
+
+      const fieldMap = {
+        a: {
+          label: document.querySelector('[data-slot-label="a"]'),
+          copy: document.querySelector('[data-slot-copy="a"]'),
+          site: document.querySelector('[data-compare-field="site-a"]'),
+          theme: document.querySelector('[data-compare-field="theme-a"]'),
+          budget: document.querySelector('[data-compare-field="budget-a"]'),
+          risk: document.querySelector('[data-compare-field="risk-a"]'),
+        },
+        b: {
+          label: document.querySelector('[data-slot-label="b"]'),
+          copy: document.querySelector('[data-slot-copy="b"]'),
+          site: document.querySelector('[data-compare-field="site-b"]'),
+          theme: document.querySelector('[data-compare-field="theme-b"]'),
+          budget: document.querySelector('[data-compare-field="budget-b"]'),
+          risk: document.querySelector('[data-compare-field="risk-b"]'),
+        },
+      };
+
+      function updateCounts() {
+        shortlistCount.textContent = `shortlist ${state.shortlist.size} 件`;
+        compareCount.textContent = `比較 ${[state.compare.a, state.compare.b].filter(Boolean).length} / 2`;
+        errorState.hidden = state.decision !== 'error';
+      }
+
+      function updateRows() {
+        rows.forEach((row) => {
+          const id = row.dataset.recordId;
+          const shortlisted = state.shortlist.has(id);
+          const compareSlot = state.compare.a === id ? 'A' : state.compare.b === id ? 'B' : null;
+
+          row.classList.toggle('is-shortlisted', shortlisted);
+
+          const shortlistButton = row.querySelector('[data-action="shortlist"]');
+          shortlistButton.textContent = shortlisted ? '已在 shortlist' : '加入 shortlist';
+          shortlistButton.setAttribute('aria-pressed', shortlisted ? 'true' : 'false');
+
+          row.querySelectorAll('[data-action="compare"]').forEach((button) => {
+            const slot = button.dataset.slot;
+            const targetTaken = state.compare[slot] && state.compare[slot] !== id;
+            const disabled = !shortlisted || targetTaken || compareSlot === slot.toUpperCase();
+            button.disabled = disabled;
+            if (compareSlot === slot.toUpperCase()) {
+              button.textContent = `已在 ${slot.toUpperCase()}`;
+            } else if (!shortlisted) {
+              button.textContent = `先 shortlist`;
+            } else {
+              button.textContent = `送入 ${slot.toUpperCase()}`;
+            }
+          });
+
+          const badge = row.querySelector('.status-chip.is-note');
+          badge.textContent = compareSlot ? `已入比較 ${compareSlot}` : '待討論';
+          badge.classList.toggle('is-primary', shortlisted);
+        });
+      }
+
+      function updateCompare() {
+        ['a', 'b'].forEach((slot) => {
+          const record = state.compare[slot];
+          const target = fieldMap[slot];
+          if (!record) {
+            target.label.textContent = '尚未選取';
+            target.copy.textContent = slot === 'a' ? '點任一 shortlist 申請案的「送入 A」按鈕。' : '點任一 shortlist 申請案的「送入 B」按鈕。';
+            target.site.textContent = '尚未選取';
+            target.theme.textContent = '尚未選取';
+            target.budget.textContent = '尚未選取';
+            target.risk.textContent = '尚未選取';
+            return;
+          }
+
+          const item = data[record];
+          target.label.textContent = item.title;
+          target.copy.textContent = item.code;
+          target.site.textContent = item.site;
+          target.theme.textContent = item.theme.slice(0, 34) + (item.theme.length > 34 ? '…' : '');
+          target.budget.textContent = item.budget;
+          target.risk.textContent = item.risk;
+        });
+
+        const count = [state.compare.a, state.compare.b].filter(Boolean).length;
+        decisionAction.disabled = count < 2;
+        decisionAction.textContent = count < 2 ? '比較兩案後才能開啟決策' : '開啟決策 modal';
+        retryAction.hidden = state.decision !== 'error';
+
+        if (state.decision === 'success') {
+          statusBanner.className = 'status-banner is-success';
+          statusBanner.textContent = '本機模擬已送出，決策狀態已更新。';
+          statusBanner.style.display = 'block';
+        } else if (state.decision === 'error') {
+          statusBanner.className = 'status-banner is-error';
+          statusBanner.textContent = '本機模擬回傳一次失敗，請使用重試送出。';
+          statusBanner.style.display = 'block';
+        } else {
+          statusBanner.className = 'status-banner';
+          statusBanner.textContent = '';
+          statusBanner.style.display = 'none';
+        }
+      }
+
+      function updateUI() {
+        updateCounts();
+        updateRows();
+        updateCompare();
+      }
+
+      function setCompare(slot, id) {
+        if (!state.shortlist.has(id)) return;
+        if (state.compare.a === id || state.compare.b === id) return;
+        state.compare[slot] = id;
+        state.decision = 'idle';
+        updateUI();
+      }
+
+      rows.forEach((row) => {
+        const id = row.dataset.recordId;
+        row.querySelector('[data-action="shortlist"]').addEventListener('click', () => {
+          state.shortlist.has(id) ? state.shortlist.delete(id) : state.shortlist.add(id);
+          if (!state.shortlist.has(id)) {
+            if (state.compare.a === id) state.compare.a = null;
+            if (state.compare.b === id) state.compare.b = null;
+          }
+          state.decision = 'idle';
+          state.retryMode = false;
+          updateUI();
+        });
+
+        row.querySelectorAll('[data-action="compare"]').forEach((button) => {
+          button.addEventListener('click', () => setCompare(button.dataset.slot, id));
+        });
+      });
+
+      function openModal(trigger) {
+        state.lastTrigger = trigger;
+        state.retryMode = trigger === retryAction;
+        modal.showModal();
+        app.inert = true;
+        document.body.style.overflow = 'hidden';
+        dialogError.classList.remove('is-visible');
+        dialogError.textContent = '';
+        confirmDecision.textContent = state.retryMode ? '重試送出' : '送出模擬決策';
+        requestAnimationFrame(() => decisionNote.focus());
+      }
+
+      function closeModalAndRestore() {
+        if (modal.open) modal.close();
+        app.inert = false;
+        document.body.style.overflow = '';
+        const returnTarget = state.lastTrigger && !state.lastTrigger.hidden ? state.lastTrigger : decisionAction;
+        returnTarget?.focus?.();
+      }
+
+      decisionAction.addEventListener('click', () => {
+        if (decisionAction.disabled) return;
+        openModal(decisionAction);
+      });
+
+      closeModal.addEventListener('click', () => closeModalAndRestore());
+
+      modal.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        closeModalAndRestore();
+      });
+
+      modal.addEventListener('close', () => {
+        app.inert = false;
+        document.body.style.overflow = '';
+      });
+
+      function failDecision() {
+        state.decision = 'error';
+        state.firstFailureShown = true;
+        dialogError.textContent = '本機模擬先回傳一次失敗，請按「重試送出」完成第二次提交。';
+        dialogError.classList.add('is-visible');
+        retryAction.hidden = false;
+        updateUI();
+        closeModalAndRestore();
+        retryAction.focus();
+      }
+
+      function succeedDecision() {
+        state.decision = 'success';
+        state.retryMode = false;
+        dialogError.classList.remove('is-visible');
+        dialogError.textContent = '';
+        retryAction.hidden = true;
+        updateUI();
+        closeModalAndRestore();
+      }
+
+      confirmDecision.addEventListener('click', () => {
+        if (!modal.open) return;
+        if (state.firstFailureShown) {
+          succeedDecision();
+        } else {
+          failDecision();
+        }
+      });
+
+      retryAction.addEventListener('click', () => {
+        if (state.decision !== 'error') return;
+        state.decision = 'idle';
+        updateUI();
+        openModal(retryAction);
+      });
+
+      modal.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && event.target === decisionNote) {
+          event.preventDefault();
+        }
+      });
+
+      updateUI();
+    })();
+  </script>
+</body>
+</html>

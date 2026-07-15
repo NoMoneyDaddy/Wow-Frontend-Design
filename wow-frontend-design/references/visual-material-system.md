@@ -78,6 +78,46 @@ Every effect needs a semantic job and fallback:
 
 Set an effect budget: affected area, layers, blur radius, animation, target devices, fallback, and evidence. Test `forced-colors`, reduced transparency where available, printing/export if relevant, low-power/mobile conditions, and effect-disabled rendering. Essential hierarchy cannot depend on backdrop filtering or compositing support.
 
+## Select effects; do not distribute them everywhere
+
+Run every proposed effect through this selector:
+
+```text
+product meaning → target role → semantic job → visual priority
+→ affected area/count → fallback → contrast/input/motion cost → rendered evidence
+```
+
+- Default to one signature effect and only the supporting effects needed to make it coherent. Repeating a special effect on every component destroys hierarchy and raises fallback cost.
+- Permit an effect only when its target role and job are named. A border may group, separate, show state, or express material; hollow display type may create one editorial/technical signature. “Looks premium” is not a job.
+- Keep body prose, form labels/values, errors, warnings, legal terms, prices, transaction data, and ordinary buttons solid and immediately readable.
+- Treat decorative `0.5px` hairlines as optical experiments only after target DPR/zoom inspection; never let them carry essential state or boundary meaning.
+
+Hollow/outlined type is opt-in display treatment, not a global typography mode. Start with a solid fallback, enable the stroke only when supported, and restore solid system text in forced colors:
+
+```css
+.outline-display {
+  color: var(--outline-fallback);
+}
+
+@supports (-webkit-text-stroke: 1px currentColor) {
+  .outline-display {
+    color: transparent;
+    -webkit-text-stroke: 1px var(--outline-stroke);
+  }
+}
+
+@media (forced-colors: active) {
+  .outline-display {
+    color: CanvasText;
+    -webkit-text-stroke: 0;
+  }
+}
+```
+
+Inspect actual Traditional Chinese and Latin glyphs at the target font, weight, size, browser, DPR, zoom, background, and fallback font. A stroke that works on a large Latin display word may close counters, thin radicals, or disappear on CJK. Never make a transparent fill the only declaration; unsupported rendering must remain readable.
+
+Visible assets have a stricter boundary than abstract surface geometry. Do not fake products, people, places, logos, evidence, photographs, illustrations, or icons with CSS/div art, handcrafted SVG, text symbols, or placeholder boxes. Use approved source assets, generated image assets when authorized, or a matching icon library. CSS may form non-factual structural geometry such as a bounded divider, grid, mask, or material field when it has a named job and fallback.
+
 ## Motion belongs to the same physics
 
 Use [motion-system.md](motion-system.md) for runtime and accessibility. Make motion agree with the material:
@@ -99,6 +139,7 @@ Inspect rendered desktop and mobile states, not tokens alone:
 4. Compare repeated edges, radii, icon strokes, baselines, numerals, shadows, highlights, and animation origins.
 5. Disable effects, custom fonts, images, and motion separately; core meaning and operation must remain.
 6. Capture the same route/content/state before and after; record browser, viewport, DPR, theme, locale, and preference media.
+7. Turn every optional effect off and verify that task hierarchy remains; then inspect the effect only on its selected roles to confirm it has not spread to all components.
 
 ## Weak-model freeze card
 
@@ -123,3 +164,5 @@ If two adjacent choices contradict this card, remove the less meaningful effect.
 - Blur/glow/media creates unbounded text or control contrast.
 - A continuous or expensive effect has no budget, pause/cleanup, reduced result, or static fallback.
 - Light/dark variants are mechanical inversions or are claimed without rendered inspection.
+- Hollow/outlined type is applied to required reading, form, error, legal, price, or transaction content; lacks a solid fallback; or becomes illegible in CJK, fallback fonts, forced colors, or supported DPR/zoom.
+- A visible factual or iconic asset is approximated with CSS/div art, text symbols, placeholder boxes, or handcrafted SVG.

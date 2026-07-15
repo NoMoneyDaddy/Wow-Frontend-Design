@@ -43,7 +43,7 @@ Every fix needs:
 4. an explicit claim boundary;
 5. the cost in context, false positives, runtime, bundle, or creative freedom.
 
-Run the narrow regression first, then the complete suite. Three identical failed repair attempts trigger the workflow fuse; preserve the evidence and escalate rather than guessing indefinitely.
+Run the narrow regression first, then the complete suite. The loop is automatic: the user must not relay diagnostics or restart the Skill between attempts. Three identical failed repair attempts trigger the workflow fuse; preserve the best working artifact, screenshots, and evidence, then hand off `PARTIALLY VERIFIED` with the next executable action rather than guessing indefinitely or returning an empty rejection.
 
 ## Promote research cautiously
 
@@ -72,15 +72,31 @@ Transfer these methods:
 - evaluate real interactions, focus/error recovery, touch behavior, motion and route consistency in addition to screenshots;
 - compare visual distinction and production acceptance as separate axes;
 - use negative constraints and deterministic preflight for known failure modes, but keep a positive product thesis and authored-detail requirement so bans do not merely raise the floor;
-- publish real artifacts in a task switcher or screenshot gallery, while linking every showcase to its blocker report and provenance.
+- publish real artifacts in a task switcher or screenshot gallery, while linking every showcase to its finding report and provenance.
 
 Do not inherit its conclusions directly. The site discloses one sample per variant/task, qualitative author scoring rather than multi-reviewer blind scoring, spot-checked rather than exhaustive interaction tests, and home-field advantage for the author's fused Skill. The evolving page also mixes older round-count wording with the current 80-page inventory. It does not expose the complete exact-model, prompt/context-hash, run-ledger, timeout, failure, or per-artifact hash provenance required by this Skill. Its scaled iframe previews are good discovery UI, not viewport or accessibility evidence. Recreate the useful task dimensions with evaluator-owned manifests, immutable attempt history, exact provider cohorts, automated browser assertions, decoded screenshot hashes, and an independent craft review.
+
+## r/UXDesign community signal
+
+Reviewed 2026-07-15: community discussions on [actual AI design workflows](https://www.reddit.com/r/UXDesign/comments/1tf2yea/actual_ai_design_workflows_in_2026/), [AI in enterprise design systems](https://www.reddit.com/r/UXDesign/comments/1tsy4sh/has_anyone_successfully_integrated_ai_into_a/), and [case-study length](https://www.reddit.com/r/UXDesign/comments/1uwdqj5/can_we_please_talk_about_case_study_length/). These are self-selected anecdotes, not representative research or normative evidence.
+
+Useful hypotheses are screenshot QA, requirement-coverage checks, localization/research synthesis, editable code prototypes, and a persistent design-system description. Repeated risks are generic output, design-system/component drift, false confidence, and one-way “handoff-ready” claims. Therefore:
+
+- frame AI work with exact task, route, state, locale, device, acceptance criteria, and editable artifact;
+- keep `DESIGN.md` ↔ runtime conformance plus independent browser evidence;
+- treat AI findings as hypotheses until a deterministic check or human review confirms them;
+- do not let model self-review certify production handoff;
+- preserve provenance and code that a designer/developer can inspect and revise.
+
+The case-study discussion disagrees on a universal word count. Its durable signal is layered editorial hierarchy: lead with outcome and decision, make evidence scannable, and let interested readers expand into process detail instead of forcing every reader through one long narrative.
 
 ## Close the loop
 
 ```text
 observe → preserve → classify → research → place control → add counterexamples
-        → fix → narrow test → full test → independent review → version/release note
+        → fix automatically → narrow test → full test → independent review
+        ↖──────────────── repair required ────────────────┘
+        → verified handoff / best-artifact partial handoff
 ```
 
 Mark the result `verified`, `partially verified`, `rejected`, or `unresolved`. Link the finding to the exact changed rule/test and the rerun evidence. If the result depends on a subjective rendered judgment, say so; a scanner exit code cannot close it.

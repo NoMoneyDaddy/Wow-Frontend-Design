@@ -12,7 +12,17 @@ from typing import Any
 
 
 PACKAGE = "@google/design.md"
-VERSION = "0.2.0"
+ROOT = Path(__file__).resolve().parents[1]
+LOCKFILE = ROOT / "package-lock.json"
+
+
+def locked_package_version(lockfile: Path = LOCKFILE) -> str:
+    payload = json.loads(lockfile.read_text(encoding="utf-8"))
+    package = payload.get("packages", {}).get("node_modules/@google/design.md", {})
+    version = package.get("version")
+    if not isinstance(version, str) or not version or any(character.isspace() for character in version):
+        raise ValueError("package-lock.json has no exact @google/design.md version")
+    return version
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,8 +56,9 @@ def main() -> int:
         print(f"DESIGN.md clean gate infrastructure failure: missing file: {design}", file=sys.stderr)
         return 2
     try:
+        version = locked_package_version()
         completed = subprocess.run(
-            ["npx", "--yes", f"{PACKAGE}@{VERSION}", "lint", str(design)],
+            ["npx", "--yes", f"{PACKAGE}@{version}", "lint", str(design)],
             cwd=design.parent,
             text=True,
             capture_output=True,

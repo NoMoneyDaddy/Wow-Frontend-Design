@@ -15,6 +15,7 @@ Use this reference for every interface containing user-facing language. Treat lo
 
 - Preserve the user's language and the product's established terminology.
 - Use valid BCP 47 tags such as `zh-Hant`, `zh-Hant-TW`, `en`, or `ar`; choose region only when behavior or vocabulary is region-specific.
+- Require an exact tag only when the brief or integration contract explicitly says exact. Otherwise, a valid more-specific regional tag is not a failure merely because a validator expected a shorter prefix.
 - Separate message identifiers from display strings in multilingual products.
 - Use locale-aware APIs for dates, times, numbers, currency, lists, plural rules, collation, and relative time.
 - Never concatenate translated sentence fragments. Use complete messages with named placeholders.
@@ -63,9 +64,34 @@ Choose brand fonts only after confirming Traditional Chinese glyph coverage and 
 - Keep body lines comfortable rather than stretching Chinese copy across wide screens.
 - Prevent punctuation from becoming visually stranded. Use browser line-breaking behavior and manual non-breaking spans only for essential names, dates, or short units.
 - Keep numbers and units together when necessary, but do not create large unbreakable blocks.
+- Let ordinary paragraphs fill an intentional content column with browser-owned wrapping. Use `white-space: normal` and `word-break: normal`; do not apply `keep-all`, `nowrap`, source newlines, or `<br>` to all Chinese body copy. When the reading measure is shorter than the surface, size or align the containing region instead of leaving a narrow paragraph stranded in an empty wide card.
+- Use start alignment for UI, short dynamic copy, forms, and tables. Extended Traditional Chinese editorial prose may use tested justification with the last line start-aligned; do not turn either left alignment or justification into a universal Chinese rule.
 - Use `text-wrap: balance` or `pretty` as progressive enhancement, then verify fallback wrapping.
+- Choose an explicit paragraph mode: product/UI, web editorial, book-like editorial, or fixed display/poetry. Do not inherit first-line indent, paragraph gaps, justification, or forced breaks globally across those modes.
+- Keep prose at normal breaking. Scope emergency breaking to raw URLs, hashes, identifiers, or similarly unbroken data; never use global `break-all`, `line-break: anywhere`, generated `<wbr>`, or per-character spaces to imitate a full right edge.
+- Treat `text-autospace` and `text-spacing-trim` as progressive enhancements. Do not combine them blindly with source spaces, punctuation-font substitution, or JavaScript DOM rewriting.
 - Use real vertical writing (`writing-mode: vertical-rl` with appropriate `text-orientation`) only when editorial meaning justifies it; never rotate the text container. Provide the same readable content horizontally for controls, dense product text, and constrained responsive modes.
 - Never bake text into images merely to control line breaks.
+
+### Traditional Chinese pronunciation annotations
+
+- Represent Bopomofo with semantic HTML `<ruby><rb>…</rb><rt>…</rt></ruby>` and real Unicode characters. Do not depend on a combined Han+Bopomofo glyph to carry the reading.
+- Use character-level mono ruby for ordinary Bopomofo unless the linguistic content explicitly requires an indivisible group. Keep the neutral-tone dot before the Mandarin Bopomofo sequence and second/third/fourth tone marks after it; first tone has no displayed mark. Preserve the declared Taiwanese/Hakka system rather than converting it silently, and separate standalone inline syllables.
+- Preserve spacing tone-mark code points in the source. Do not replace them with combining accents or historical horizontal glyph forms; use a tested OpenType feature for presentation while keeping the underlying reading portable.
+- Do not promise right-side vertical Bopomofo across browsers. `ruby-position: inter-character` remains progressive enhancement with materially different Blink, Gecko, and WebKit behavior; define the supported engine matrix and a semantic readable fallback.
+- Keep annotation strings, base text, language metadata, pronunciation source/version, and user edits separate. A dictionary lookup is a suggestion; polyphonic readings and teaching fixtures require explicit review.
+- Specialty Bopomofo fonts need exact provenance, OFL or other applicable license review, self-hosting/privacy checks, current browser rendering evidence, and a normal-font fallback. A repository's font license does not automatically license its documentation, sample code, or images. Keep annotation `letter-spacing` solid unless the exact font is designed and tested otherwise; GSUB-based placement can drift under tracking or justification.
+
+Horizontal and vertical Traditional Chinese are separate compositions, not translations of one box:
+
+| Concern | Horizontal | Vertical |
+| --- | --- | --- |
+| line/column progression | lines top to bottom | columns right to left with `vertical-rl` |
+| tables/forms | header row normally above; controls follow horizontal task order | dense controls usually remain horizontal; a true vertical table must place headers/captions for the vertical reading axis |
+| headings | phrase-aware horizontal wraps | column count, punctuation orientation, and mixed Latin/numerals need explicit design |
+| responsive fallback | adjust measure and region placement | switch to a semantically equivalent horizontal composition when constrained; never squeeze horizontal text into one-character columns |
+
+Use `lang` on mixed-language spans and `bdi`/scoped direction where needed. Measure each script by rendered behavior; English `ch` thresholds cannot validate Han line length, and a Chinese character-count heuristic cannot validate Arabic shaping or English word breaks.
 
 ## 4. Cross-language resilience
 
@@ -118,6 +144,7 @@ Check:
 - dates, prices, units, list punctuation, and sorting are correct;
 - navigation and breadcrumbs preserve direction and hierarchy;
 - font fallback does not create tofu, wrong glyph variants, fake weights, or large layout shifts;
+- ruby/Bopomofo keeps the correct base-to-reading mapping, tone order, line breaks, selection/copy behavior, and readable fallback in every declared browser; custom-font failure does not remove the pronunciation;
 - screenshots, SVG text, charts, canvas, and generated metadata are localized;
 - search and input accept the target script;
 - Chinese/Japanese/Korean IME composition completes without premature submit, filtering, validation, caret jumps, or lost characters;

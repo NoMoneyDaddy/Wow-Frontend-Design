@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-15T07:50:02Z",
+  "generation_ledger": {
+    "path": "evals/product-flow-v5-mini-generation-results.json",
+    "sha256": "dbfc768e44d715f6ba7984c27a8d78ffd5a04612009af119d476b94e2e730ba0"
+  },
+  "supplemental_retry_ledger": null,
+  "linter": {
+    "package": "@google/design.md",
+    "version": "0.3.0"
+  },
+  "results": [
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "rail-rebooking-v5",
+      "path": "evals/product-flow-v5-mini-targets/codex-gpt-5.4-mini-rail-rebooking-v5/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "e173cf4e2011f782479593aad050e685184d346e34e0f77b1bbb158d332c2995",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 11 colors, 4 typography scales, 3 rounding levels, 5 spacing tokens, 12 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "subscription-audit-v5",
+      "path": "evals/product-flow-v5-mini-targets/codex-gpt-5.4-mini-subscription-audit-v5/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "f5b7f99b9a0b51310f9759b3ba64c0a032e6d643f09c213d1785e70d7e82cfda",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 10 colors, 4 typography scales, 3 rounding levels, 6 spacing tokens, 5 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "community-translation-v5",
+      "path": "evals/product-flow-v5-mini-targets/codex-gpt-5.4-mini-community-translation-v5/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "0b92b0f1a4158d1f40bf4dc4c5010236532c0d4deb22895aacfa822271843b1f",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 10 colors, 5 typography scales, 5 rounding levels, 5 spacing tokens, 9 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "ceramics-festival-one-line-v5",
+      "path": "evals/product-flow-v5-mini-targets/codex-gpt-5.4-mini-ceramics-festival-one-line-v5/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "22c25ac4a2d663386197ca8409bef6d7702a4f15691bd84b0b72ba3d96a27f72",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 14 colors, 5 typography scales, 4 rounding levels, 4 spacing tokens, 8 components."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "checked": 4,
+    "clean": 4,
+    "with_findings": 0,
+    "infrastructure_failures": 0
+  }
+}

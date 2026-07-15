@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "run_id": "20260715T060141Z-70811-31111",
+  "status": "completed",
+  "started_at": "2026-07-15T06:01:41Z",
+  "finished_at": "2026-07-15T06:12:39Z",
+  "provider": "openai-first-party-chatgpt-oauth",
+  "authentication": {
+    "status": "Logged in using ChatGPT"
+  },
+  "case": {
+    "id": "subscription-audit-v5",
+    "target": "evals/product-flow-v5-mini-targets/codex-gpt-5.4-mini-subscription-audit-v5"
+  },
+  "cli": {
+    "path": "/opt/homebrew/bin/codex",
+    "version": "codex-cli 0.142.0"
+  },
+  "model": {
+    "requested_identifier": "gpt-5.4-mini",
+    "resolution_status": "requested_identifier_accepted_by_cli",
+    "resolved_backend_snapshot": null
+  },
+  "isolation": {
+    "sandbox": "workspace-write",
+    "ephemeral": true,
+    "user_config": "ignored",
+    "rules": "ignored",
+    "web_search": false,
+    "local_provider": false,
+    "builder_subagents": false,
+    "builder_browser_tools": false,
+    "builder_computer_tools": false,
+    "independent_visual_evaluator_required": true
+  },
+  "reasoning": {
+    "effort": "model_default",
+    "summary": "none",
+    "internal_reasoning_disable_supported": false
+  },
+  "runner": {
+    "path": "evals/run_codex_case.sh",
+    "sha256": "5d6207a10c5bd50d193fa6a75c10d673b4120963b7c39a700f9ab0ddf207bb8f"
+  },
+  "output_validator": {
+    "path": "evals/validate_visual_web_output.py",
+    "sha256": "598e8061011eb0af044379d19e83af630a972e1e9b2580ca7b88d9edcf6a4a28"
+  },
+  "design_linter_gate": {
+    "path": "evals/validate_design_md_clean.py",
+    "sha256": "bd2c6669e303778a5aa1c14548e3cd937ff45455477935766f107234d88838c6",
+    "package": "@google/design.md",
+    "version": "0.2.0",
+    "required_result": "zero_errors_zero_warnings"
+  },
+  "trace_policy_gate": {
+    "path": "evals/validate_codex_log_policy.py",
+    "sha256": "9daf52fc38c7914a90f0e45567e6946eed9f1e86e7ddb850695498401d358214",
+    "required_result": "no_forbidden_commands_or_tools"
+  },
+  "environment": {
+    "cleared_variable_names": [
+      "OPENAI_API_KEY",
+      "OPENAI_BASE_URL",
+      "OPENAI_API_BASE",
+      "OPENAI_ORG_ID",
+      "OPENAI_PROJECT_ID",
+      "CODEX_API_KEY",
+      "AZURE_OPENAI_API_KEY",
+      "AZURE_OPENAI_ENDPOINT",
+      "AZURE_OPENAI_BASE_URL"
+    ],
+    "auth_copied_to_ephemeral_codex_home": true,
+    "isolated_home": true,
+    "user_skills_hidden_by_isolated_home": true,
+    "path_sanitized": true,
+    "forbidden_host_path_audit": "passed"
+  },
+  "context": {
+    "brief": {
+      "path": "evals/briefs/subscription-audit-v5.md",
+      "sha256": "10afb25e63db41748a00ccfd341a5d72c6bd946b64a8a12d8b5f8518061dd347"
+    },
+    "trusted_files": [
+      {
+        "path": "wow-frontend-design/SKILL.md",
+        "sha256": "0e6337f3f4638c255908ca60b779782103aaecdc70d09001e0d4f2b44b919c47"
+      },
+      {
+        "path": "wow-frontend-design/references/creative-direction.md",
+        "sha256": "b168c4e8b3e1ed50237687fc22a827946c025b0bc8660c290da04954a80322b3"
+      },
+      {
+        "path": "wow-frontend-design/references/anti-ai-slop.md",
+        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+      },
+      {
+        "path": "wow-frontend-design/references/mobile-responsive.md",
+        "sha256": "8178fc04f660ef496d4d6a61467ea6b57a9061a2cd64536e6fb198cbf603c46c"
+      },
+      {
+        "path": "wow-frontend-design/references/localization.md",
+        "sha256": "2f236f256662dcb13bf41b7c1674ad6e3d5d5a86b6f98ce8a8b2096b83df75e8"
+      },
+      {
+        "path": "wow-frontend-design/references/typography-webfonts.md",
+        "sha256": "9d946351ad7a07c0a1eb9cfd3069387e9afa2fa4996b5616c82f8c11c1d30b5c"
+      },
+      {
+        "path": "wow-frontend-design/references/typographic-layout.md",
+        "sha256": "99476078746306e828403d57482609eb715f3d9a089ee65a89c07166a6c0fa38"
+      },
+      {
+        "path": "wow-frontend-design/references/implementation.md",
+        "sha256": "4474d1fbde8666c1342861b1b260e948d977eed018417c2873295739e09c22be"
+      },
+      {
+        "path": "wow-frontend-design/references/component-composition.md",
+        "sha256": "688cc24e5117eaaaa8037546cf73d9972af249b8bcecbd3bf180b22f4dadab78"
+      },
+      {
+        "path": "wow-frontend-design/references/quality-gates.md",
+        "sha256": "3d7dce6b45193229f08fb81403761b97c4a56bc0919f692081ef951566df8d0d"
+      },
+      {
+        "path": "wow-frontend-design/references/weak-model-playbook.md",
+        "sha256": "14ebaeb9c0097a9438d9d2c3da15565981bfe4f7f95d07ce120645d82982e285"
+      },
+      {
+        "path": "wow-frontend-design/references/color-system-psychology.md",
+        "sha256": "7c98dffb7bd1f952952cc6f4ffda0e9d6e3f985397d3930c1184e7d5849196ed"
+      },
+      {
+        "path": "wow-frontend-design/references/design-md-contract.md",
+        "sha256": "b31632f8be4e7ad3f25f7c5ab1062838e060d2e9f78e8ffbfa0865b30733ff04"
+      },
+      {
+        "path": "wow-frontend-design/assets/DESIGN.template.md",
+        "sha256": "b0151780e69ca8dcd2b83b8b2bbd265646d31c139ae9b9e54abc30f49ad7028d"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "path": "DESIGN.md",
+      "bytes": 6065,
+      "sha256": "f5b7f99b9a0b51310f9759b3ba64c0a032e6d643f09c213d1785e70d7e82cfda"
+    },
+    {
+      "path": "index.html",
+      "bytes": 34115,
+      "sha256": "6d3b949421827af806d77acfdaf2d8be444c78a3d2a12a0f3a3891fb3ff69fa6"
+    }
+  ]
+}

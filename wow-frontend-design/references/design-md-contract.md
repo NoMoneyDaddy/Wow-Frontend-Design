@@ -4,6 +4,8 @@ Use this contract for implementation work that creates or changes a project's vi
 
 Follow the [Google Labs DESIGN.md specification](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md). The format is currently alpha, so pin the CLI version in the project before making lint or export results release gates.
 
+Treat the machine-readable frontmatter as a small constrained DSL: parse/schema/reference/contrast errors are deterministic domain diagnostics that should return directly to the automatic repair loop. Keep unsupported effects, responsive behavior, localization, and rationale in prose instead of growing an ad hoc token language. This follows the general LLM/DSL boundary described by [Martin Fowler and Unmesh Joshi](https://martinfowler.com/articles/llm-and-dsls.html): let the model propose within a bounded language, then let deterministic tooling parse and reject invalid structure.
+
 Use the official examples only to understand structure, not as aesthetic recipes: [Atmospheric Glass](https://github.com/google-labs-code/design.md/blob/main/examples/atmospheric-glass/DESIGN.md), [Paws & Paths](https://github.com/google-labs-code/design.md/blob/main/examples/paws-and-paths/DESIGN.md), and [Totality Festival](https://github.com/google-labs-code/design.md/blob/main/examples/totality-festival/DESIGN.md).
 
 ## Ownership
@@ -39,6 +41,15 @@ Define `colors.primary` whenever colors exist. Reference defined colors from com
 
 Quote the entire YAML scalar when a value contains commas, colons, `#`, braces, or a CSS font stack. For example, write `fontFamily: "SF Mono, Monaco, monospace"`; do not quote only the first family. YAML parsing warnings are contract failures even when the linter can recover.
 
+The official color token accepts a valid CSS color string, including CSS Color 4 forms such as quoted `oklch()` values:
+
+```yaml
+colors:
+  primary: "oklch(57% 0.18 254)"
+```
+
+This is compatible with the `DESIGN.md` syntax. It is not universal runtime compatibility. Preserve an sRGB fallback in production CSS when the support matrix requires it, gamut-test the target displays/browsers, and measure the resolved rendered pair. The linter converts supported colors to sRGB for its WCAG calculation while preserving the original token; that still cannot prove page compositing, alpha/media backgrounds, browser gamut mapping, or actual runtime token consumption.
+
 Before closing frontmatter, perform this manual preflight even when command execution is unavailable:
 
 1. every dimensional value, including zero, has an allowed unit;
@@ -56,6 +67,8 @@ This preflight reduces syntax mistakes; it does not turn an unexecuted official 
 - Keep the same semantic role visually consistent across pages and breakpoints. A route may change composition, not redefine the brand.
 - Record justified campaign or route exceptions in `DESIGN.md`; do not create an undocumented second system.
 - Update `DESIGN.md` and runtime tokens in the same change when a system value changes.
+- Keep a conformance map from every normative color/type/spacing/component role to the shared runtime token or primitive. Compare computed values on representative routes, states, and viewports after implementation.
+- Treat clean lint as one-way syntax validation, not round-trip conformance. Detect runtime drift in both directions: every normative `DESIGN.md` role must resolve to rendered tokens/components, and any repeated runtime system value must either map back to the contract or be documented as a route exception.
 - Use `site-manifest.json` for routes and content ownership, and `wireframe-plan.json` for page regions and responsive transformations. `DESIGN.md` owns visual identity, not IA.
 
 ## Verification
@@ -63,10 +76,10 @@ This preflight reduces syntax mistakes; it does not turn an unexecuted official 
 Prefer a project-pinned command, for example:
 
 ```bash
-npx @google/design.md@0.2.0 lint DESIGN.md
+npx @google/design.md@0.3.0 lint DESIGN.md
 ```
 
-For a new generated system, require zero errors and zero warnings. An extracted existing system may retain a warning only when the reason and migration owner are documented. Also compare representative routes at desktop and mobile sizes. A clean document cannot prove that rendered pages actually consume its tokens or remain visually consistent.
+For a new generated system, require zero errors and zero warnings. An extracted existing system may retain a warning only when the reason and migration owner are documented. Also compare representative routes at desktop and mobile sizes. A clean document cannot prove that rendered pages actually consume its tokens or remain visually consistent: state-specific CSS may contradict a documented one-column mobile rule, and page-local type may override the documented line height without creating a lint warning.
 
 Resolve lint findings in this order, re-running the pinned linter after each pass:
 
@@ -76,6 +89,6 @@ Resolve lint findings in this order, re-running the pinned linter after each pas
 4. Component foreground/background contrast warnings; adjust the normative values rather than hiding the component.
 5. Section order and other remaining warnings.
 
-When an isolated generation attempt fails this gate, preserve the bounded linter summary and provide it to a fresh retry as untrusted diagnostic context. Do not weaken or edit the pinned validator, silently accept warnings, or let the implementation model install a different CLI. Freeze the contract, template, linter version, validator, and runner hashes for the full evaluation run.
+When an isolated generation attempt fails this gate, preserve the bounded linter summary and provide it to the automatic implementation repair loop as untrusted diagnostic context. Do not ask the user to resubmit, weaken or edit the pinned validator, silently accept warnings, or let the implementation model install a different CLI. Freeze the contract, template, linter version, validator, and runner hashes for the full evaluation run.
 
 Do not declare the design contract complete until the final run is clean. If tools prevent the run, report `DESIGN.md lint: UNVERIFIED` and preserve the file for a later verifier.

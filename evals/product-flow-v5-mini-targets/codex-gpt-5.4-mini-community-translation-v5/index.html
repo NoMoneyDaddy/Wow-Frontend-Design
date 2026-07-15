@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>社群翻譯審校工作台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --color-canvas: #f4f7fb;
+      --color-surface: #ffffff;
+      --color-ink: #10243d;
+      --color-muted: #5c6a84;
+      --color-primary: #1e4fd7;
+      --color-on-primary: #ffffff;
+      --color-success: #1f7a4d;
+      --color-on-success: #ffffff;
+      --color-danger: #b42318;
+      --color-on-danger: #ffffff;
+      --border: rgba(16, 36, 61, 0.12);
+      --border-strong: rgba(16, 36, 61, 0.18);
+      --shadow: 0 18px 40px rgba(15, 35, 60, 0.08);
+      --shadow-soft: 0 10px 22px rgba(15, 35, 60, 0.06);
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 22px;
+      --radius-pill: 999px;
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-5: 1.5rem;
+      --space-6: 2rem;
+      --space-7: 2.5rem;
+      --space-8: 3rem;
+      --measure: 72rem;
+      --font-sans: "Noto Sans TC", "PingFang TC", "Hiragino Sans", "Microsoft JhengHei", system-ui, sans-serif;
+      --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--color-canvas);
+      color: var(--color-ink);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      color: var(--color-ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(30, 79, 215, 0.08), transparent 28%),
+        radial-gradient(circle at 88% 14%, rgba(31, 122, 77, 0.08), transparent 20%),
+        linear-gradient(180deg, #f7f9fd 0%, #f4f7fb 42%, #eef3f9 100%);
+    }
+
+    img, svg, video, canvas {
+      display: block;
+      max-width: 100%;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 1rem;
+      inset-block-start: 1rem;
+      z-index: 20;
+      padding: 0.75rem 1rem;
+      border-radius: 999px;
+      background: var(--color-ink);
+      color: var(--color-on-primary);
+      text-decoration: none;
+      transform: translateY(-180%);
+      transition: transform 160ms ease;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .page {
+      width: min(var(--measure), calc(100% - 2rem));
+      margin: 0 auto;
+      padding-block: 1.25rem 2rem;
+    }
+
+    .hero {
+      padding: 1rem 0 1.5rem;
+    }
+
+    .hero-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(0, 1.2fr) minmax(15rem, 0.8fr);
+      align-items: end;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.5rem;
+      color: var(--color-primary);
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    h1, h2, h3, h4, p, dl {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4.2vw, 3.125rem);
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+      max-inline-size: 13ch;
+    }
+
+    .hero-copy {
+      margin-top: 0.85rem;
+      max-inline-size: 52ch;
+      color: var(--color-muted);
+      font-size: 1.02rem;
+    }
+
+    .hero-meta {
+      display: grid;
+      gap: 0.65rem;
+      justify-items: end;
+    }
+
+    .meta-card {
+      width: 100%;
+      padding: 1rem 1.1rem;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(8px);
+    }
+
+    .meta-card strong {
+      display: block;
+      font-size: 1.15rem;
+      letter-spacing: -0.01em;
+    }
+
+    .meta-card span {
+      color: var(--color-muted);
+      font-size: 0.925rem;
+    }
+
+    .summary-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+
+    .summary-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.8rem;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--border);
+      color: var(--color-muted);
+      font-size: 0.875rem;
+      backdrop-filter: blur(8px);
+    }
+
+    .summary-pill strong {
+      color: var(--color-ink);
+    }
+
+    .workspace {
+      display: grid;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .filter-group {
+      display: inline-flex;
+      gap: 0.5rem;
+      padding: 0.35rem;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .filter-group button,
+    .segment-action,
+    .panel-close {
+      border: 0;
+      cursor: pointer;
+      transition: transform 160ms ease, background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+
+    .filter-group button {
+      padding: 0.65rem 0.95rem;
+      border-radius: var(--radius-pill);
+      background: transparent;
+      color: var(--color-muted);
+      font-weight: 700;
+      min-inline-size: 5.75rem;
+    }
+
+    .filter-group button[aria-pressed="true"] {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      box-shadow: 0 8px 18px rgba(30, 79, 215, 0.22);
+    }
+
+    .filter-group button:hover,
+    .segment-action:hover,
+    .panel-close:hover {
+      transform: translateY(-1px);
+    }
+
+    .filter-group button:focus-visible,
+    .segment-action:focus-visible,
+    .panel-close:focus-visible,
+    .skip-link:focus-visible {
+      outline: 3px solid rgba(30, 79, 215, 0.28);
+      outline-offset: 3px;
+    }
+
+    .visible-count {
+      color: var(--color-muted);
+      font-size: 0.95rem;
+    }
+
+    .content-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .content-grid.review-open {
+      grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.85fr);
+    }
+
+    .segment-list {
+      display: grid;
+      gap: 1rem;
+      min-width: 0;
+    }
+
+    .segment {
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+      min-width: 0;
+    }
+
+    .segment[hidden] {
+      display: none;
+    }
+
+    .segment-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 0.75rem;
+      align-items: start;
+      margin-bottom: 0.9rem;
+    }
+
+    .segment-index {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--color-muted);
+      letter-spacing: 0.08em;
+      margin-block-start: 0.2rem;
+    }
+
+    .segment-title {
+      font-size: 1.15rem;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+    }
+
+    .segment-subtitle {
+      margin-top: 0.25rem;
+      color: var(--color-muted);
+      font-size: 0.94rem;
+    }
+
+    .segment-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.7rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .segment-status.ready {
+      background: var(--color-success);
+      color: var(--color-on-success);
+    }
+
+    .segment-status.needs-review {
+      background: var(--color-danger);
+      color: var(--color-on-danger);
+    }
+
+    .segment-action {
+      justify-self: end;
+      padding: 0.7rem 0.9rem;
+      border-radius: var(--radius-md);
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .segment-body {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      min-width: 0;
+    }
+
+    .language-block {
+      display: grid;
+      gap: 0.55rem;
+      min-width: 0;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .language-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      width: fit-content;
+      color: var(--color-muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .language-label::before {
+      content: "";
+      inline-size: 0.45rem;
+      block-size: 0.45rem;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.7;
+    }
+
+    .copy {
+      min-width: 0;
+      color: var(--color-ink);
+      font-size: 0.98rem;
+      line-height: 1.7;
+      overflow-wrap: break-word;
+      word-break: normal;
+      hyphens: auto;
+    }
+
+    :lang(zh-Hant) {
+      line-break: strict;
+      word-break: normal;
+    }
+
+    .copy[lang="en"] {
+      font-size: 0.97rem;
+    }
+
+    .copy[lang="ar"] {
+      text-align: start;
+      font-size: 1rem;
+    }
+
+    .review-panel {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      min-width: 0;
+      max-height: calc(100dvh - 2rem);
+      overflow: auto;
+    }
+
+    .review-panel[hidden] {
+      display: none;
+    }
+
+    .review-panel[data-open="true"] {
+      animation: panel-enter 180ms ease-out both;
+    }
+
+    .panel-head {
+      display: flex;
+      gap: 0.75rem;
+      align-items: start;
+      justify-content: space-between;
+      margin-bottom: 0.85rem;
+    }
+
+    .panel-kicker {
+      color: var(--color-primary);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .panel-title {
+      margin-top: 0.35rem;
+      font-size: 1.25rem;
+      line-height: 1.22;
+      letter-spacing: -0.01em;
+      text-wrap: balance;
+    }
+
+    .panel-close {
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--radius-md);
+      background: rgba(16, 36, 61, 0.06);
+      color: var(--color-ink);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .panel-summary {
+      margin-top: 0.6rem;
+      color: var(--color-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .term-list {
+      display: grid;
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+
+    .term-item {
+      padding: 0.9rem;
+      border-radius: var(--radius-md);
+      background: var(--color-canvas);
+      border: 1px solid var(--border);
+    }
+
+    .term-item dt {
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .term-item dd {
+      margin: 0;
+      color: var(--color-muted);
+      line-height: 1.6;
+    }
+
+    .note-grid {
+      display: grid;
+      gap: 0.7rem;
+      margin-top: 1rem;
+    }
+
+    .note-row {
+      display: grid;
+      grid-template-columns: 7rem minmax(0, 1fr);
+      gap: 0.75rem;
+      padding: 0.8rem 0.9rem;
+      border-radius: var(--radius-md);
+      background: rgba(30, 79, 215, 0.04);
+      border: 1px solid rgba(30, 79, 215, 0.08);
+    }
+
+    .note-row strong {
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .note-row span {
+      color: var(--color-muted);
+      line-height: 1.55;
+    }
+
+    .panel-foot {
+      margin-top: 1rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--border);
+      color: var(--color-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .rtl-copy {
+      direction: rtl;
+      unicode-bidi: isolate;
+    }
+
+    [lang="ar"] .language-label::before {
+      background: var(--color-danger);
+    }
+
+    @keyframes panel-enter {
+      from {
+        opacity: 0;
+        transform: translateY(0.5rem);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .hero-grid,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-meta {
+        justify-items: start;
+      }
+
+      .review-panel {
+        position: static;
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .page {
+        width: min(var(--measure), calc(100% - 1.25rem));
+        padding-block: 1rem 1.5rem;
+      }
+
+      .controls {
+        align-items: stretch;
+      }
+
+      .filter-group {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .filter-group button {
+        flex: 1 1 0;
+        min-inline-size: 0;
+      }
+
+      .segment-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .segment-head > .segment-index {
+        grid-column: 1 / -1;
+      }
+
+      .segment-action {
+        grid-column: 1 / -1;
+        justify-self: start;
+      }
+
+      .segment-body {
+        grid-template-columns: 1fr;
+      }
+
+      .note-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+
+  <div class="page">
+    <header class="hero">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">社群翻譯審校工作台</p>
+          <h1>把防災片段對齊到可交付之前</h1>
+          <p class="hero-copy">這是離線模擬資料。先比對繁體中文、英文與阿拉伯文的術語、方向性與數字混排，再決定是否送交。</p>
+          <div class="summary-strip" aria-live="polite">
+            <span class="summary-pill"><strong>6</strong> 個片段</span>
+            <span class="summary-pill"><strong>3</strong> 個需審校</span>
+            <span class="summary-pill" data-visible-count><strong>6</strong> 筆顯示中</span>
+          </div>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <strong>繁中 / English / العربية</strong>
+            <span>直譯、方向性與數字混排同時檢查</span>
+          </div>
+          <div class="meta-card">
+            <strong>無外部資產</strong>
+            <span>全部內容皆為本機靜態模擬</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="workspace" data-eval="translation-workbench">
+      <div class="controls">
+        <div class="filter-group" data-eval="issue-filter" role="group" aria-label="片段篩選">
+          <button type="button" data-filter-value="all" aria-pressed="true">全部</button>
+          <button type="button" data-filter-value="needs-review" aria-pressed="false">需審校</button>
+        </div>
+        <p class="visible-count" aria-live="polite">目前顯示 6 筆。</p>
+      </div>
+
+      <div class="content-grid" id="workspace-grid">
+        <section class="segment-list" aria-label="翻譯片段">
+          <article class="segment" data-eval="translation-segment" data-segment-id="shelter-address" data-status="ready">
+            <div class="segment-head">
+              <p class="segment-index">01</p>
+              <div>
+                <h2 class="segment-title">避難所地址</h2>
+                <p class="segment-subtitle">地址、樓層與入口說明保留在同一語句內。</p>
+              </div>
+              <span class="segment-status ready">可交付</span>
+            </div>
+            <div class="segment-body">
+              <section class="language-block">
+                <p class="language-label">繁體中文</p>
+                <p class="copy">請前往南區中山路 <bdi>18</bdi> 號 <bdi>3</bdi> 樓體育館，入口在東側坡道。</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="en">English</p>
+                <p class="copy" lang="en">Go to the third-floor gymnasium at No. <bdi>18</bdi>, Zhongshan Road, South District. Enter via the east ramp.</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="ar">العربية</p>
+                <p class="copy rtl-copy" data-eval="rtl-copy" lang="ar" dir="rtl">توجّه إلى صالة الألعاب في الطابق الثالث عند رقم <bdi>18</bdi>، طريق تشونغشان، المنطقة الجنوبية. ادخل من المنحدر الشرقي.</p>
+              </section>
+            </div>
+          </article>
+
+          <article class="segment" data-eval="translation-segment" data-segment-id="opening-hours" data-status="needs-review">
+            <div class="segment-head">
+              <p class="segment-index">02</p>
+              <div>
+                <h2 class="segment-title">開放時間</h2>
+                <p class="segment-subtitle">第一個需審校片段，提供開啟審校面板的固定掛鉤。</p>
+              </div>
+              <span class="segment-status needs-review">需審校</span>
+            </div>
+            <div class="segment-body">
+              <section class="language-block">
+                <p class="language-label">繁體中文</p>
+                <p class="copy">開放時間為 <bdi>09:00–21:00</bdi>；若發布風雨警報，暫停夜間入場。</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="en">English</p>
+                <p class="copy" lang="en">Open <bdi>09:00–21:00</bdi>. If a wind-and-rain alert is issued, night entry pauses.</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="ar">العربية</p>
+                <p class="copy rtl-copy" data-eval="rtl-copy" lang="ar" dir="rtl">ساعات الافتتاح <bdi>09:00–21:00</bdi>؛ إذا صدر تنبيه بالرياح والأمطار، يتوقف الدخول الليلي.</p>
+              </section>
+              <button
+                type="button"
+                class="segment-action"
+                data-eval="open-review"
+                aria-controls="review-panel"
+                aria-expanded="false"
+                data-review-target="opening-hours">
+                開啟審校面板
+              </button>
+            </div>
+          </article>
+
+          <article class="segment" data-eval="translation-segment" data-segment-id="emergency-phone" data-status="ready">
+            <div class="segment-head">
+              <p class="segment-index">03</p>
+              <div>
+                <h2 class="segment-title">緊急電話</h2>
+                <p class="segment-subtitle">數字保留獨立可讀，避免混入右向段落時失真。</p>
+              </div>
+              <span class="segment-status ready">可交付</span>
+            </div>
+            <div class="segment-body">
+              <section class="language-block">
+                <p class="language-label">繁體中文</p>
+                <p class="copy">如需立即協助，請撥打 <bdi>119</bdi> 或 <bdi>1999</bdi>，並說明所在里別。</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="en">English</p>
+                <p class="copy" lang="en">For immediate help, call <bdi>119</bdi> or <bdi>1999</bdi> and state your neighborhood.</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="ar">العربية</p>
+                <p class="copy rtl-copy" data-eval="rtl-copy" lang="ar" dir="rtl">للمساعدة الفورية، اتصل بـ <bdi>119</bdi> أو <bdi>1999</bdi> واذكر اسم الحي.</p>
+              </section>
+            </div>
+          </article>
+
+          <article class="segment" data-eval="translation-segment" data-segment-id="water-reminder" data-status="needs-review">
+            <div class="segment-head">
+              <p class="segment-index">04</p>
+              <div>
+                <h2 class="segment-title">用水提醒</h2>
+                <p class="segment-subtitle">保留節奏感，但要讓分時供水的語意更直接。</p>
+              </div>
+              <span class="segment-status needs-review">需審校</span>
+            </div>
+            <div class="segment-body">
+              <section class="language-block">
+                <p class="language-label">繁體中文</p>
+                <p class="copy">請節約用水，僅在洗手與補水時短暫開啟水龍頭，避難所將分時供水。</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="en">English</p>
+                <p class="copy" lang="en">Please conserve water. Open the tap only briefly for handwashing and refills; the shelter will provide water in shifts.</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="ar">العربية</p>
+                <p class="copy rtl-copy" data-eval="rtl-copy" lang="ar" dir="rtl">يرجى ترشيد استهلاك الماء. افتح الصنبور لفترة قصيرة فقط لغسل اليدين وإعادة التعبئة؛ سيُوفَّر الماء في أوقات محددة.</p>
+              </section>
+            </div>
+          </article>
+
+          <article class="segment" data-eval="translation-segment" data-segment-id="medicine-list" data-status="ready">
+            <div class="segment-head">
+              <p class="segment-index">05</p>
+              <div>
+                <h2 class="segment-title">藥物清單</h2>
+                <p class="segment-subtitle">清單與時間範圍一併保留，方便快速核對。</p>
+              </div>
+              <span class="segment-status ready">可交付</span>
+            </div>
+            <div class="segment-body">
+              <section class="language-block">
+                <p class="language-label">繁體中文</p>
+                <p class="copy">請把胰島素、吸入器、備用處方與近 <bdi>72</bdi> 小時用藥清單放在隨身袋。</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="en">English</p>
+                <p class="copy" lang="en">Keep insulin, inhalers, backup prescriptions, and a <bdi>72</bdi>-hour medication list in your carry bag.</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="ar">العربية</p>
+                <p class="copy rtl-copy" data-eval="rtl-copy" lang="ar" dir="rtl">احتفظ بالإنسولين، وبخاخات الاستنشاق، والوصفات الاحتياطية، وقائمة أدوية لآخر <bdi>72</bdi> ساعة في حقيبتك.</p>
+              </section>
+            </div>
+          </article>
+
+          <article class="segment" data-eval="translation-segment" data-segment-id="pet-placement" data-status="needs-review">
+            <div class="segment-head">
+              <p class="segment-index">06</p>
+              <div>
+                <h2 class="segment-title">寵物安置</h2>
+                <p class="segment-subtitle">安置語氣要保持溫和，但不能模糊攜帶要求。</p>
+              </div>
+              <span class="segment-status needs-review">需審校</span>
+            </div>
+            <div class="segment-body">
+              <section class="language-block">
+                <p class="language-label">繁體中文</p>
+                <p class="copy">寵物請留在攜帶籠內，並附上飼料、牽繩與主人聯絡卡。</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="en">English</p>
+                <p class="copy" lang="en">Keep pets in carriers and include food, a leash, and an owner contact card.</p>
+              </section>
+              <section class="language-block">
+                <p class="language-label" lang="ar">العربية</p>
+                <p class="copy rtl-copy" data-eval="rtl-copy" lang="ar" dir="rtl">أبقِ الحيوانات الأليفة داخل الحامل، وأرفق الطعام، والمقود، وبطاقة تواصل المالك.</p>
+              </section>
+            </div>
+          </article>
+        </section>
+
+        <aside class="review-panel" id="review-panel" data-eval="review-panel" aria-labelledby="review-panel-title" aria-hidden="true" hidden>
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">術語對照</p>
+              <h2 class="panel-title" id="review-panel-title">開放時間</h2>
+              <p class="panel-summary" id="review-panel-summary">查看術語說明與修訂建議，保持三種語言的語氣一致與數字格式穩定。</p>
+            </div>
+            <button type="button" class="panel-close" data-eval="close-review">關閉</button>
+          </div>
+
+          <dl class="term-list" id="review-panel-terms" aria-live="polite">
+            <div class="term-item">
+              <dt>術語說明</dt>
+              <dd>請維持時間格式與公告語氣，避免拆成兩句，讓讀者先看到可用時段，再看到例外條件。</dd>
+            </div>
+            <div class="term-item">
+              <dt>修訂建議</dt>
+              <dd>可保留「開放時間」，或在整份工作台中統一改為「開放時段」；請擇一，別讓同義詞分散在不同片段裡。</dd>
+            </div>
+            <div class="term-item">
+              <dt>方向性處理</dt>
+              <dd>阿拉伯文段落中的時間與數字維持獨立可讀，不要用字串翻轉或圖像替代。</dd>
+            </div>
+          </dl>
+
+          <div class="note-grid" id="review-panel-notes">
+            <div class="note-row">
+              <strong>繁中</strong>
+              <span>開放時間為 <bdi>09:00–21:00</bdi>；若發布風雨警報，暫停夜間入場。</span>
+            </div>
+            <div class="note-row">
+              <strong>English</strong>
+              <span>Open <bdi>09:00–21:00</bdi>. If a wind-and-rain alert is issued, night entry pauses.</span>
+            </div>
+            <div class="note-row">
+              <strong>العربية</strong>
+              <span class="rtl-copy" lang="ar" dir="rtl">ساعات الافتتاح <bdi>09:00–21:00</bdi>؛ إذا صدر تنبيه بالرياح والأمطار، يتوقف الدخول الليلي.</span>
+            </div>
+          </div>
+
+          <p class="panel-foot">這個面板只提供離線修訂參考，不會修改內容，也不會送出警報。</p>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const segments = Array.from(document.querySelectorAll('[data-eval="translation-segment"]'));
+    const filterButtons = Array.from(document.querySelectorAll('[data-filter-value]'));
+    const visibleCount = document.querySelector('[data-visible-count]');
+    const reviewPanel = document.querySelector('[data-eval="review-panel"]');
+    const reviewTitle = document.getElementById('review-panel-title');
+    const reviewSummary = document.getElementById('review-panel-summary');
+    const reviewTerms = document.getElementById('review-panel-terms');
+    const reviewNotes = document.getElementById('review-panel-notes');
+    const openButton = document.querySelector('[data-eval="open-review"]');
+    const closeButton = document.querySelector('[data-eval="close-review"]');
+    const workspaceGrid = document.getElementById('workspace-grid');
+
+    const reviewData = {
+      'opening-hours': {
+        title: '開放時間',
+        summary: '保持時間格式、例外條件與語氣一致，讓讀者先讀到可行動的時段，再讀到限制。',
+        terms: [
+          ['術語說明', '「開放時間」與「開放時段」可以二擇一，但整份工作台應固定同一詞，避免不同片段各自改寫。'],
+          ['修訂建議', '保留時間範圍 <bdi>09:00–21:00</bdi> 的單一數字流，不要拆成多段說明。'],
+          ['方向性處理', '阿拉伯文與英數值要維持原始可讀方向，使用獨立文字節點，不用變形或反向字串。'],
+        ],
+        notes: [
+          ['繁中', '開放時間為 <bdi>09:00–21:00</bdi>；若發布風雨警報，暫停夜間入場。'],
+          ['English', 'Open <bdi>09:00–21:00</bdi>. If a wind-and-rain alert is issued, night entry pauses.'],
+          ['العربية', 'ساعات الافتتاح <bdi>09:00–21:00</bdi>؛ إذا صدر تنبيه بالرياح والأمطار، يتوقف الدخول الليلي。']
+        ]
+      },
+      'water-reminder': {
+        title: '用水提醒',
+        summary: '把節約用水與分時供水拆成清楚的行動句，避免語意模糊。',
+        terms: [
+          ['術語說明', '「分時供水」比「有水就用」更精準，適合避難所公告語氣。'],
+          ['修訂建議', '可將「僅在洗手與補水時短暫開啟水龍頭」前移成行動指引，減少句中負擔。'],
+          ['方向性處理', '阿拉伯文段落中的補充說明保持在同一段內，避免與中文句型脫節。'],
+        ],
+        notes: [
+          ['繁中', '請節約用水，僅在洗手與補水時短暫開啟水龍頭，避難所將分時供水。'],
+          ['English', 'Please conserve water. Open the tap only briefly for handwashing and refills; the shelter will provide water in shifts.'],
+          ['العربية', 'يرجى ترشيد استهلاك الماء. افتح الصنبور لفترة قصيرة فقط لغسل اليدين وإعادة التعبئة؛ سيُوفَّر الماء في أوقات محددة。']
+        ]
+      },
+      'pet-placement': {
+        title: '寵物安置',
+        summary: '保留攜帶與聯絡資訊，讓飼主在壓力情境下也能快速理解要求。',
+        terms: [
+          ['術語說明', '「攜帶籠」比泛稱的「籠子」更貼近避難所公告語氣，也能對應英語 carrier。'],
+          ['修訂建議', '如果要加強可執行性，可把「飼料、牽繩與主人聯絡卡」改成條列，但目前版本先維持一句。'],
+          ['方向性處理', '阿拉伯文段落應保留物件清單的順序與標點節奏，避免右向閱讀時丟失條件。'],
+        ],
+        notes: [
+          ['繁中', '寵物請留在攜帶籠內，並附上飼料、牽繩與主人聯絡卡。'],
+          ['English', 'Keep pets in carriers and include food, a leash, and an owner contact card.'],
+          ['العربية', 'أبقِ الحيوانات الأليفة داخل الحامل، وأرفق الطعام، والمقود، وبطاقة تواصل المالك。']
+        ]
+      }
+    };
+
+    let activeFilter = 'all';
+    let lastTrigger = openButton;
+
+    function updateVisibleCount() {
+      const visible = segments.filter((segment) => !segment.hidden).length;
+      visibleCount.innerHTML = `<strong>${visible}</strong> 筆顯示中`;
+    }
+
+    function setActiveFilter(nextFilter) {
+      activeFilter = nextFilter;
+      filterButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.filterValue === nextFilter));
+      });
+
+      segments.forEach((segment) => {
+        const status = segment.dataset.status;
+        segment.hidden = nextFilter !== 'all' && status !== nextFilter;
+      });
+
+      updateVisibleCount();
+    }
+
+    function renderReview(key) {
+      const payload = reviewData[key];
+      if (!payload) return;
+
+      reviewTitle.textContent = payload.title;
+      reviewSummary.textContent = payload.summary;
+      reviewTerms.innerHTML = payload.terms.map(([label, text]) => `
+        <div class="term-item">
+          <dt>${label}</dt>
+          <dd>${text}</dd>
+        </div>
+      `).join('');
+
+      reviewNotes.innerHTML = payload.notes.map(([label, text]) => `
+        <div class="note-row">
+          <strong>${label}</strong>
+          <span>${text}</span>
+        </div>
+      `).join('');
+    }
+
+    function openReview(button) {
+      const target = button.dataset.reviewTarget;
+      lastTrigger = button;
+      renderReview(target);
+      reviewPanel.hidden = false;
+      reviewPanel.dataset.open = 'true';
+      reviewPanel.setAttribute('aria-hidden', 'false');
+      reviewPanel.inert = false;
+      workspaceGrid.classList.add('review-open');
+      openButton.setAttribute('aria-expanded', 'true');
+      closeButton.focus({ preventScroll: true });
+    }
+
+    function closeReview() {
+      reviewPanel.dataset.open = 'false';
+      reviewPanel.setAttribute('aria-hidden', 'true');
+      reviewPanel.inert = true;
+      reviewPanel.hidden = true;
+      workspaceGrid.classList.remove('review-open');
+      openButton.setAttribute('aria-expanded', 'false');
+      if (lastTrigger && document.contains(lastTrigger)) {
+        lastTrigger.focus({ preventScroll: true });
+      } else {
+        openButton.focus({ preventScroll: true });
+      }
+    }
+
+    filterButtons.forEach((button) => {
+      button.addEventListener('click', () => setActiveFilter(button.dataset.filterValue));
+    });
+
+    document.querySelectorAll('[data-eval="open-review"]').forEach((button) => {
+      button.addEventListener('click', () => openReview(button));
+    });
+
+    closeButton.addEventListener('click', closeReview);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !reviewPanel.hidden) {
+        closeReview();
+      }
+    });
+
+    setActiveFilter('all');
+    reviewPanel.inert = true;
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
-# Quality gates
+# Quality gates and self-repair
 
-Use this reference to verify a frontend before calling it complete. Award-level intent does not excuse fragile implementation.
+Use this reference to verify and automatically repair a frontend before calling it verified. These gates steer the implementation loop; they are not a rejection UI for the user. Award-level intent does not excuse fragile implementation.
 
 ## Contents
 
@@ -8,7 +8,7 @@ Use this reference to verify a frontend before calling it complete. Award-level 
 2. Three-pass review
 3. Viewport and state matrix
 4. Independent scorecard
-5. Release blockers
+5. Internal completion gates
 
 ## 1. Required evidence
 
@@ -36,7 +36,16 @@ For every audit tool, record the exact version, browser/runtime, configuration, 
 
 Record executable checks with an evaluator-initialized `scripts/evidence_ledger.py` run and frozen evidence policy when available. Use one evaluator-owned root containing sibling `ledger.json`, `policy.json`, `artifacts/`, and a child `workspace/`; the implementation model may write only `workspace/`. Every ledger `run` must pass `--cwd <evaluator-root>/workspace` (or a descendant), every policy command `cwd` must resolve inside that workspace, and observed artifacts must remain under the evaluator root but outside the workspace. Pass the same child to scorer `--workspace-root`; never place ledger or policy in the implementation checkout. In the handoff, mark every material claim `VERIFIED`, `OBSERVED`, `INFERRED`, or `UNVERIFIED`, plus its semantic `claim_type`. A self-issued score is never verification; subjective craft needs actual rendered review and benefits from an independent reviewer.
 
-Keep acceptance independent from implementation. Freeze evaluator-owned tests and schemas before asking a weak model to edit the product. Prefer browser outcomes over source keywords; pair unavoidable static assertions with behavior checks, strip comments first, and include separately owned or undisclosed checks. Any attempt to edit the gate, insert test-only keywords, fabricate an artifact, or weaken an assertion is a failed evaluation even when the command exits zero.
+Keep acceptance independent from implementation. Freeze evaluator-owned tests and schemas before asking a weak model to edit the product. Prefer browser outcomes over source keywords; pair unavoidable static assertions with behavior checks, strip comments first, and include separately owned or undisclosed checks. Any attempt to edit the gate, insert test-only keywords, fabricate an artifact, or weaken an assertion is a failed evaluation even when the command exits zero. A failed check returns structured evidence to the repair loop automatically; it does not require the user to resubmit the request.
+
+Preserve a usable preview after every attempt. Classify findings before acting:
+
+- `REPAIR REQUIRED`: deterministic task, runtime, accessibility, content, or layout failure; fix automatically, run the narrow check, then the affected regression matrix.
+- `MANUAL VISUAL`: rendered composition or craft judgment; repair automatically only when the evidence and intended direction are clear, otherwise retain it as an advisory note.
+- `ADVISORY`: optional refinement; never interrupts delivery.
+- `EVALUATOR DEFECT`: valid counterexample or faulty measurement; fix and test the evaluator before touching product code.
+
+Withhold only the `verified` claim while a repair-required finding remains. Do not hide, delete, or refuse to hand off the best working artifact. After three failed repairs of the same root cause, return the best artifact and screenshots as `PARTIALLY VERIFIED` with the exact unresolved evidence and next command. Use `BLOCKED` only for unavailable required infrastructure, missing authority, unsafe action, or unrecoverable build/runtime failure.
 
 Deduplicate repeated violations by root component, rule, and fix while retaining affected-route/instance counts. A scanner's severity is input, not release priority: order by user impact, reachability, task criticality, frequency, and confidence. Mark false-positive review and manual follow-up explicitly. Live-DOM source mappings, selectors, accessibility trees, and framework debug metadata are useful pointers, not proof that the proposed source edit is correct.
 
@@ -120,7 +129,7 @@ Adapt rows to the product. Record why a row/cell is applicable, sampled, or excl
 
 ## 4. Independent scorecard
 
-Only an evaluator independent from the implementation may calculate an acceptance score, and only after evidence collection. The implementation model may use the dimensions as a review prompt, but cannot total its own work, set missing evidence to full credit, or declare the threshold passed. If no independent evaluator is available, report the score as `UNVERIFIED` and use the Boolean release blockers.
+Only an evaluator independent from the implementation may calculate an acceptance score, and only after evidence collection. The implementation model may use the dimensions as a review prompt, but cannot total its own work, set missing evidence to full credit, or declare the threshold passed. If no independent evaluator is available, report the score as `UNVERIFIED` and use the Boolean internal completion gates.
 
 | Dimension | Weight | Passing evidence |
 | --- | ---: | --- |
@@ -142,19 +151,23 @@ For performance, freeze project-specific budgets before implementation: route/as
 
 This is an independent internal quality model spanning design, usability, creativity, content, responsive implementation, accessibility, semantics, animation, and performance. It is not mapped to Awwwards scoring or any other award system.
 
-## 5. Release blockers
+## 5. Internal completion gates
 
-Do not call the work complete with any of these:
+Do not call the work verified with any of these. Route each reachable, in-scope item back through automatic repair; these items do not by themselves justify a user-facing rejection:
 
 - core route, build, lint, type, or test failure introduced by the change;
 - inaccessible primary action or keyboard trap;
 - any applicable WCAG 2.2 A/AA failure when AA is required, including contrast below the exact applicable threshold, missing labels, or essential content hidden behind motion/JavaScript;
 - accidental horizontal scroll or clipped core content at a required viewport;
 - unintentionally wrapped or clipped short action labels, or hidden responsive DOM copies that duplicate IDs, state, focus targets, or evaluator identities;
+- forced `<br>` or source-newline composition in ordinary body/list copy; prose disabled from normal wrapping; or a narrow paragraph cap that leaves most of an otherwise empty wide content surface unused;
+- global `break-all`, `line-break: anywhere`, `keep-all`, generated `<wbr>`, per-character spacer markup, or DOM text rewriting used to fake CJK alignment; emergency breaking must be scoped to verified unbroken data and preserve copy/search/selection;
+- a paragraph region that accidentally combines incompatible UI, web-editorial, book-like, or fixed-display spacing/indent/wrapping rules; or centered display punctuation/anti-orphan `nowrap` that breaks another width, locale, zoom level, or fallback font;
 - mobile navigation, primary content, focused control, or form blocked by fixed/sticky UI or the virtual keyboard;
 - a brief-required exact locale, route, filename, visible content equivalent, semantic hook, or evaluator hook changed or missing at any required viewport;
 - modal/menu background scrolling, stale open state after navigation, lost focus on close, or contradictory form success/error announcements;
 - unintentional Simplified Chinese in product-owned `zh-Hant` UI copy or assets; preserve legitimate quotations, names, source data, and user content, marking `zh-Hans` parts when needed;
+- required ruby/Bopomofo whose base/annotation semantics, source code points, tone sequence, custom-font fallback, solid annotation tracking, line breaking, or declared browser placement is broken; `ruby-position: inter-character` without tested engine evidence is not a cross-browser pass;
 - broken asset, severe layout shift, uncaught runtime error, or hydration failure;
 - signature effect that ignores reduced motion or consumes unbounded resources;
 - fabricated verification results, fake user data, or unlicensed assets.
@@ -163,4 +176,4 @@ Do not call the work complete with any of these:
 - claims that attention, saliency, heatmaps, clicks, observational attribution, model preference, or self-score prove understanding, trust, incremental conversion, brand fidelity, award quality, or user wellbeing.
 - misleading or contradictory canonical/hreflang/robots/structured data; generated search spam; or claims that a validator, `llms.txt`, special AI markup, content chunking, SEO/AEO/GEO tactic, or crawler access guarantees indexing, rank, rich results, answer inclusion or citation.
 
-If tooling or access prevents a check, report it as unverified with the exact remaining risk.
+If tooling or access prevents a check, preserve the best artifact and report it as partially verified with the exact remaining risk and executable follow-up.

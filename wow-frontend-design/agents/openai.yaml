@@ -1,6 +1,6 @@
 interface:
   display_name: "WOW Frontend Design"
   short_description: "打造高辨識度、行動優先且跨語系的網站與產品介面設計"
-  default_prompt: "Use $wow-frontend-design for the requested audit, build, or refactor. Preserve scope: an audit reports evidence and does not modify files unless I explicitly ask for fixes."
+  default_prompt: "Use $wow-frontend-design for the requested audit, build, or refactor. Preserve scope. For implementation, resolve pinned local verification tools when safe, verify, repair findings automatically, and hand off the best working artifact with screenshots; an audit remains read-only unless fixes are requested."
 policy:
   allow_implicit_invocation: true

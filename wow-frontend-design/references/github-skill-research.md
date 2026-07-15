@@ -2,7 +2,7 @@
 
 Use this maintenance reference to understand what this skill borrows, rejects, and still needs to test. Do not load it for ordinary frontend work.
 
-Snapshot date: **2026-07-14**. Stars are volatile discovery signals, not quality scores. `Push` records the latest repository push observed during research. Licenses were checked at repository or skill level; unclear licenses remain unclear. Principles below are paraphrased, not copied.
+Snapshot date: **2026-07-15**. Stars are volatile discovery signals, not quality scores. `Push` records the latest repository push observed during research. Licenses were checked at repository or skill level; unclear licenses remain unclear. Principles below are paraphrased, not copied.
 
 ## Method
 
@@ -53,6 +53,20 @@ Representative source audit:
 
 Weak-model consequence: the registry is used as a candidate generator. The evaluator owns the rubric, fixtures, viewports, browser assertions, and score. The model being tested cannot declare its own design correct.
 
+## DESIGN.md ecosystem and constrained-language review
+
+These sources are inspiration and format experiments, not normative authority. The [official Google Labs specification](https://github.com/google-labs-code/design.md/blob/main/docs/spec.md) and the project's pinned validator own syntax.
+
+| Source | Useful signal | Boundary carried into this Skill |
+| --- | --- | --- |
+| [VoltAgent awesome-design-md](https://github.com/VoltAgent/awesome-design-md) | Broad gallery of real `DESIGN.md` examples and visual vocabularies | Samples can contain inconsistent, unverified, or tool-specific rules; use them to generate questions, never as a token preset or proof of quality. |
+| [designmd.app](https://designmd.app/) | Large browsable catalogue makes comparison and discovery efficient | Catalogue inclusion and self-description are not lint, runtime conformance, accessibility, license, or visual-verification evidence. |
+| [bergside awesome-design-skills](https://github.com/bergside/awesome-design-skills) | Pairs design documents and Agent Skills, exposing useful routing patterns | Many entries are shallow or schema-divergent; inspect source/license and independently validate every borrowed rule. |
+| [Refero DESIGN.md template](https://styles.refero.design/design-md/design-md-template) | Concise section ordering and specific material/type language | Decorative hairlines and style values remain contextual; a `0.5px` rule is not portable until DPR/zoom and semantic role are tested. |
+| [LLMs and DSLs](https://martinfowler.com/articles/llm-and-dsls.html) | Separates model-assisted abstraction from deterministic parsing/schema/typechecking | Keep official frontmatter small and strict; route parser diagnostics into automatic repair, and put unsupported effects/responsive rationale in prose instead of inventing YAML. |
+
+Adopted boundary: a clean `DESIGN.md` is necessary contract evidence, not runtime proof. Maintain a role-to-runtime-token map and compare computed values in default and interaction states at mobile and desktop widths. A state selector can violate a documented mobile column rule, and a local paragraph rule can violate documented leading while official lint remains clean.
+
 ## Evidence from model-tier testing
 
 [Anthropic Skills PR #210](https://github.com/anthropics/skills/pull/210) describes a community A/B study across 50 prompts and three model tiers using anonymized screenshots and a blind judge. Its reported direction—explicit guidance helping the smaller model most—is useful, but the judge was still a model and the change was not a universal benchmark.
@@ -93,6 +107,7 @@ Adopted synthesis: pin the Three minor; capability-test; keep a semantic static 
 10. External dynamic rules record a commit/version; external skill and runtime licenses are separate.
 11. Audit findings use `file:line — failure — fix`, followed by browser proof for rendered behavior.
 12. A weak model cannot accept its own output. Freeze evaluator-owned checks and reconcile every verified claim with evidence.
+13. Validation is an internal self-repair loop. Repair-required findings return structured evidence to the implementation model automatically; users receive the best artifact, not an intermediate rejection.
 
 ## Explicit rejections
 

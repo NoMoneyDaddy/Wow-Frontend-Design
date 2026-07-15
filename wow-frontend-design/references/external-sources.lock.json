@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "retrieved_at": "2026-07-14",
+  "retrieved_at": "2026-07-15",
   "policy": "Research coordinates only. Re-fetch by the full content-addressed Git revision; verify the selected path and applicable license before copying or executing content.",
   "sources": [
     {"repository":"zeke/swiss-design-skill","revision":"d4e8daee5d051d81271b2a561d1a582e7d0e2d40","license":"MIT","paths":["swiss-design/SKILL.md"]},
@@ -30,6 +30,7 @@
     {"repository":"PlayableIntelligence/game-creator","revision":"4e64b83b5fe400b34ad3a484d9b4a6090b26d512","license":"NOASSERTION","paths":["skills/threejs-perf/SKILL.md"]},
     {"repository":"scottstts/Threejs-Awesome-Graphics-Agent-Skills","revision":"40137219958c88a7413b9417ceae3f893a1518e8","license":"NOASSERTION","paths":["LICENSE","package.json","skills/threejs-image-pipeline/SKILL.md","skills/threejs-visual-validation/SKILL.md"]},
     {"repository":"TerminalSkills/skills","revision":"dbbb6f0c4b4b480f38c0ede5efb6d718770ae1ef","license":"Apache-2.0","paths":["LICENSE","skills/threejs/SKILL.md","skills/webgl/SKILL.md"]},
-    {"repository":"zz41354899/goodux-skills","revision":"c1a1fc9ae9c275abb0c86d114ab654285fd68bff","license":"MIT","paths":[".agents/skills/LICENSE",".agents/skills/references/user-interview/SKILL.md",".agents/skills/references/persona-creation/SKILL.md",".agents/skills/references/information-architecture/SKILL.md",".agents/skills/references/usability-testing/SKILL.md"]}
+    {"repository":"zz41354899/goodux-skills","revision":"c1a1fc9ae9c275abb0c86d114ab654285fd68bff","license":"MIT","paths":[".agents/skills/LICENSE",".agents/skills/references/user-interview/SKILL.md",".agents/skills/references/persona-creation/SKILL.md",".agents/skills/references/information-architecture/SKILL.md",".agents/skills/references/usability-testing/SKILL.md"]},
+    {"repository":"cmex-30/Bopomofo_on_Web","revision":"f86d793b7995c276bd30a2b7146e9b6dfb34d1fc","license":"NOASSERTION","paths":["BOPOMOFO TYPOGRAPHY.pdf","README.md","font/feature.txt","font_license.html","testpage/index.html","數位排版中注音符號調號定位方式.pdf"]}
   ]
 }
