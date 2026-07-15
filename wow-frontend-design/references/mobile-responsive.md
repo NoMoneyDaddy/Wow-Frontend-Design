@@ -51,6 +51,8 @@ Keep one logical record and state source across responsive modes. A desktop tabl
 - For modal sheets, lock background scroll correctly, move focus into the sheet, contain focus only while open, return focus logically on close, support Escape, expose expanded state, and close after a navigation choice when the destination does not replace the page.
 - Keep persistent bottom navigation in the normal tab sequence. Never trap focus inside it.
 - Respect `env(safe-area-inset-*)` for edge-fixed controls.
+- Render menus and sheets closed by default. Capture the default viewport before exercising the open state, then verify open, close, Escape, selection, background scroll, and focus return separately.
+- When a fixed or sticky bar is justified, reserve matching content and safe-area space. Test its rectangle against the first heading, primary action, focused field, validation message, and final content; a bar that visually covers them fails even when the document can still scroll.
 
 ### Hero
 
@@ -87,6 +89,7 @@ Keep one logical record and state source across responsive modes. A desktop tabl
 - Prefer fluid tokens with `clamp()` for type, spacing, and gaps; constrain line length separately.
 - Use Grid/Flexbox intrinsic sizing, `minmax()`, `min()`, `max()`, and container queries where component context matters.
 - Add `min-width: 0` to flexible children that contain long text.
+- Apply `box-sizing: border-box` to bounded layout primitives. Audit the sum of shell offsets, gaps, padding, and percentage/viewport widths; never use `overflow-x: hidden` as the fix for a child that exceeds the viewport.
 - Use logical properties (`margin-inline`, `padding-block`, `inset-inline-end`) to support RTL and writing modes.
 - Reserve media dimensions with `aspect-ratio` or explicit sizes to prevent layout shift.
 - Avoid fixed heights for text containers.
@@ -119,6 +122,8 @@ At every size verify:
 - loading, empty, error, and success states;
 - no unexpected overflow.
 - short command labels remain intentionally one line unless the component contract explicitly allows wrapping; verify rendered line boxes and clipping, not only page overflow.
+- fixed/sticky UI leaves the current primary content and focused control unobscured, including safe areas and the virtual keyboard.
+- responsive alternatives preserve the same required content, semantics, and declared test/evaluator hook; only the presentation and interaction mode change.
 
 For every modal menu, run this exact sequence: record page scroll → open → attempt background scroll and confirm it is locked → activate an internal destination and confirm the sheet closes with coherent focus → reopen → press Escape and confirm focus returns to the opener. Source presence is not evidence.
 

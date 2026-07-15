@@ -2,6 +2,8 @@
 
 Use this reference when typography, font selection, custom/open-source fonts, CJK coverage, variable fonts, subsetting, or font loading is material. Typography is part of information architecture and product voice; a font gallery is only discovery.
 
+Pair this with [typographic-layout.md](typographic-layout.md) when choosing rendered size, measure, leading, wrapping, vertical writing, spacing rhythm, or optical fit.
+
 ## 1. Write the type contract
 
 ```text

@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>島嶼聲音檔案館</title>
+  <meta name="description" content="以繁體中文探索島嶼口述記憶、田野錄音脈絡與授權狀態的聲音檔案網站。">
+  <style>
+    :root {
+      --color-primary: #173B3F;
+      --color-on-primary: #FFFFFF;
+      --color-canvas: #F8F4EA;
+      --color-on-canvas: #18211F;
+      --color-surface: #FFFDF7;
+      --color-on-surface: #18211F;
+      --color-field: #E7DCC8;
+      --color-on-field: #18211F;
+      --color-accent: #8A3F2A;
+      --color-on-accent: #FFFFFF;
+      --color-line: #8D806A;
+      --color-soft-line: rgba(24, 33, 31, .18);
+      --font-display: Georgia, "Times New Roman", "PingFang TC", "Noto Serif TC", serif;
+      --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --font-meta: ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang TC", monospace;
+      --space-1: .5rem;
+      --space-2: 1rem;
+      --space-3: 1.5rem;
+      --space-4: 2rem;
+      --space-5: 3rem;
+      --radius-small: 4px;
+      --radius-medium: 8px;
+      --shadow-float: 0 18px 40px rgba(24, 33, 31, .18);
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--color-canvas);
+    }
+
+    body {
+      margin: 0;
+      color: var(--color-on-canvas);
+      background:
+        linear-gradient(90deg, rgba(23, 59, 63, .08) 1px, transparent 1px) 0 0 / 58px 58px,
+        linear-gradient(180deg, rgba(141, 128, 106, .18) 1px, transparent 1px) 0 0 / 100% 29px,
+        var(--color-canvas);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      letter-spacing: 0;
+      overflow-x: hidden;
+    }
+
+    body.menu-open {
+      overflow: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration-thickness: .08em;
+      text-underline-offset: .22em;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--color-accent);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      inset-block-start: .75rem;
+      inset-inline-start: .75rem;
+      z-index: 50;
+      transform: translateY(-160%);
+      background: var(--color-on-canvas);
+      color: var(--color-canvas);
+      padding: .6rem .85rem;
+      border-radius: var(--radius-small);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .site-shell {
+      width: min(100% - clamp(1rem, 4vw, 4rem), 1500px);
+      margin-inline: auto;
+    }
+
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(10rem, 1fr) auto minmax(10rem, 1fr);
+      align-items: center;
+      gap: var(--space-2);
+      padding-block: 1.1rem;
+      border-block-end: 1px solid var(--color-on-canvas);
+    }
+
+    .brand {
+      display: inline-grid;
+      gap: .1rem;
+      text-decoration: none;
+      min-width: 0;
+    }
+
+    .brand strong {
+      font-family: var(--font-display);
+      font-size: clamp(1.25rem, 2.4vw, 2rem);
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .brand span,
+    .context-pill,
+    .meta,
+    .nav-link,
+    .filter-button,
+    .status,
+    .record-id,
+    .field-label,
+    .rights {
+      font-family: var(--font-meta);
+      font-size: .78rem;
+      line-height: 1.35;
+    }
+
+    .brand span {
+      color: rgba(24, 33, 31, .72);
+    }
+
+    .context-pill {
+      justify-self: center;
+      border: 1px solid var(--color-line);
+      background: var(--color-field);
+      color: var(--color-on-field);
+      padding: .45rem .7rem;
+      border-radius: var(--radius-small);
+      white-space: nowrap;
+    }
+
+    .global-nav {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+
+    .nav-link {
+      display: inline-flex;
+      min-block-size: 44px;
+      align-items: center;
+      padding-inline: .7rem;
+      border-radius: var(--radius-small);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .nav-link:hover {
+      background: rgba(23, 59, 63, .1);
+    }
+
+    .nav-link.primary {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .mobile-nav-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-inline-size: 44px;
+      min-block-size: 44px;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-small);
+      background: var(--color-surface);
+      color: var(--color-on-surface);
+    }
+
+    main {
+      padding-block-end: var(--space-5);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.16fr) minmax(16rem, .84fr);
+      gap: clamp(1rem, 4vw, 4rem);
+      min-block-size: min(74svh, 760px);
+      padding-block: clamp(2rem, 5vw, 5rem) clamp(1.4rem, 3vw, 3rem);
+      border-block-end: 1px solid var(--color-on-canvas);
+    }
+
+    .hero-copy {
+      display: grid;
+      align-content: space-between;
+      min-block-size: 100%;
+      gap: var(--space-4);
+    }
+
+    h1 {
+      max-width: 12ch;
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(3rem, 9vw, 8.8rem);
+      line-height: .92;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+
+    .lead {
+      max-width: 44rem;
+      margin: 0;
+      font-size: clamp(1.08rem, 1.8vw, 1.45rem);
+      line-height: 1.72;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      align-items: center;
+    }
+
+    .button {
+      display: inline-flex;
+      min-block-size: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      padding: .7rem 1rem;
+      border: 1px solid var(--color-on-canvas);
+      border-radius: var(--radius-small);
+      background: var(--color-surface);
+      color: var(--color-on-surface);
+      text-decoration: none;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .button.primary {
+      border-color: var(--color-primary);
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .button[aria-pressed="true"] {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      border-color: var(--color-primary);
+    }
+
+    .vertical-panel {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-3);
+      align-items: stretch;
+      min-block-size: 31rem;
+    }
+
+    .vertical-index {
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      display: flex;
+      align-items: flex-start;
+      gap: 1.2rem;
+      padding: 1rem .75rem;
+      background: var(--color-surface);
+      border-inline: 1px solid var(--color-on-canvas);
+      font-family: var(--font-display);
+      font-size: clamp(1.3rem, 2.2vw, 2rem);
+      line-height: 1.35;
+      min-inline-size: 6.6rem;
+    }
+
+    .vertical-index .mark {
+      color: var(--color-accent);
+    }
+
+    .field-note {
+      display: grid;
+      align-content: end;
+      gap: var(--space-2);
+      border-block-start: 8px solid var(--color-primary);
+      background: linear-gradient(180deg, rgba(255, 253, 247, .72), rgba(255, 253, 247, .95));
+      padding: var(--space-3);
+      min-width: 0;
+    }
+
+    .field-note p {
+      margin: 0;
+    }
+
+    .field-note .note-title {
+      font-family: var(--font-meta);
+      font-weight: 700;
+      color: var(--color-accent);
+    }
+
+    .mobile-vertical-equivalent {
+      display: none;
+      margin-block-start: var(--space-2);
+      padding: var(--space-2);
+      border-inline-start: 5px solid var(--color-primary);
+      background: var(--color-surface);
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: var(--space-2);
+      padding-block: var(--space-4) var(--space-2);
+      border-block-end: 1px solid var(--color-on-canvas);
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 4.25rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .section-heading p {
+      max-width: 34rem;
+      margin: 0;
+    }
+
+    .archive-workspace {
+      display: grid;
+      grid-template-columns: minmax(13rem, .68fr) minmax(0, 1.52fr) minmax(18rem, .8fr);
+      gap: var(--space-3);
+      align-items: start;
+      padding-block: var(--space-3);
+    }
+
+    .filters,
+    .detail-pane {
+      position: sticky;
+      inset-block-start: 1rem;
+    }
+
+    .filters {
+      display: grid;
+      gap: var(--space-2);
+      padding-block-start: .2rem;
+    }
+
+    .filter-group {
+      display: grid;
+      gap: .45rem;
+    }
+
+    .filter-button {
+      width: 100%;
+      min-block-size: 44px;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-small);
+      background: var(--color-surface);
+      color: var(--color-on-surface);
+      text-align: start;
+      padding: .75rem;
+      cursor: pointer;
+    }
+
+    .filter-button:hover {
+      border-color: var(--color-primary);
+    }
+
+    .archive-count {
+      padding: .65rem .75rem;
+      background: var(--color-field);
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-small);
+      font-family: var(--font-meta);
+      font-size: .78rem;
+    }
+
+    .record-list {
+      display: grid;
+      gap: 0;
+      border-block-start: 2px solid var(--color-on-canvas);
+    }
+
+    .record {
+      display: grid;
+      grid-template-columns: minmax(5.4rem, .55fr) minmax(0, 1.45fr) minmax(10rem, .8fr);
+      gap: var(--space-2);
+      padding: clamp(1rem, 2vw, 1.45rem) .1rem;
+      border-block-end: 1px solid var(--color-line);
+      min-width: 0;
+    }
+
+    .record.is-featured {
+      grid-template-columns: minmax(7rem, .58fr) minmax(0, 1.75fr) minmax(11rem, .72fr);
+      padding-block: clamp(1.35rem, 3vw, 2.4rem);
+      background: linear-gradient(90deg, rgba(231, 220, 200, .58), transparent 70%);
+    }
+
+    .record-meta {
+      display: grid;
+      align-content: start;
+      gap: .45rem;
+    }
+
+    .record-id {
+      display: inline-flex;
+      width: fit-content;
+      padding: .18rem .42rem;
+      border: 1px solid var(--color-on-canvas);
+      background: var(--color-field);
+      white-space: nowrap;
+    }
+
+    .record h3 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(1.35rem, 2.5vw, 2.55rem);
+      line-height: 1.12;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+
+    .record p {
+      margin: .55rem 0 0;
+    }
+
+    .speaker {
+      margin-block-start: .5rem;
+      font-weight: 700;
+    }
+
+    .record-facts {
+      display: grid;
+      gap: .5rem;
+      align-content: start;
+    }
+
+    .fact-row {
+      display: grid;
+      grid-template-columns: 4.5rem minmax(0, 1fr);
+      gap: .45rem;
+      padding-block: .25rem;
+      border-block-end: 1px dotted var(--color-line);
+    }
+
+    .field-label {
+      color: rgba(24, 33, 31, .68);
+    }
+
+    .status {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: .35rem;
+      padding: .28rem .45rem;
+      border-radius: var(--radius-small);
+      border: 1px solid currentColor;
+      white-space: nowrap;
+    }
+
+    .status.is-open {
+      color: var(--color-primary);
+    }
+
+    .status.is-restricted,
+    .status.is-preview {
+      color: var(--color-accent);
+    }
+
+    .select-record {
+      justify-self: start;
+      margin-block-start: .6rem;
+      min-block-size: 44px;
+      border: 1px solid var(--color-primary);
+      border-radius: var(--radius-small);
+      background: transparent;
+      color: var(--color-primary);
+      padding: .55rem .75rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .select-record:hover,
+    .record[aria-current="true"] .select-record {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .detail-pane {
+      background: var(--color-surface);
+      border: 1px solid var(--color-on-canvas);
+      border-radius: var(--radius-medium);
+      padding: var(--space-2);
+      box-shadow: 7px 7px 0 var(--color-field);
+    }
+
+    .detail-pane h2 {
+      margin: 0 0 .35rem;
+      font-family: var(--font-display);
+      font-size: clamp(1.5rem, 2.6vw, 2.3rem);
+      line-height: 1.1;
+    }
+
+    .detail-pane p {
+      margin: .75rem 0 0;
+    }
+
+    .preview-control {
+      display: grid;
+      gap: .55rem;
+      margin-block: var(--space-2);
+      padding: .85rem;
+      border: 1px dashed var(--color-line);
+      background: var(--color-field);
+    }
+
+    .preview-control button {
+      min-block-size: 44px;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-small);
+      background: rgba(255, 255, 255, .42);
+      color: var(--color-on-field);
+      cursor: not-allowed;
+    }
+
+    .transcript {
+      padding-inline-start: var(--space-2);
+      border-inline-start: 5px solid var(--color-accent);
+      font-size: .97rem;
+    }
+
+    .rights {
+      display: block;
+      margin-block-start: var(--space-2);
+      color: rgba(24, 33, 31, .75);
+    }
+
+    .process-band {
+      margin-block-start: var(--space-4);
+      padding-block: var(--space-4);
+      border-block: 1px solid var(--color-on-canvas);
+    }
+
+    .process-grid {
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .process-grid h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4.6vw, 5rem);
+      line-height: .98;
+    }
+
+    .steps {
+      display: grid;
+      gap: var(--space-2);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .steps li {
+      display: grid;
+      grid-template-columns: 3.2rem minmax(0, 1fr);
+      gap: var(--space-2);
+      padding-block: var(--space-2);
+      border-block-end: 1px solid var(--color-line);
+    }
+
+    .step-no {
+      font-family: var(--font-meta);
+      color: var(--color-accent);
+    }
+
+    .site-footer {
+      padding-block: var(--space-3);
+      border-block-start: 1px solid var(--color-on-canvas);
+      font-size: .92rem;
+    }
+
+    .site-footer p {
+      margin: 0;
+      max-width: 58rem;
+    }
+
+    @media (max-width: 1100px) {
+      .archive-workspace {
+        grid-template-columns: minmax(12rem, .62fr) minmax(0, 1.38fr);
+      }
+
+      .detail-pane {
+        position: static;
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 760px) {
+      body {
+        background:
+          linear-gradient(180deg, rgba(141, 128, 106, .18) 1px, transparent 1px) 0 0 / 100% 31px,
+          var(--color-canvas);
+      }
+
+      .site-shell {
+        width: min(100% - 1rem, 44rem);
+      }
+
+      .masthead {
+        grid-template-columns: minmax(0, 1fr) auto;
+        position: relative;
+        gap: .75rem;
+      }
+
+      .context-pill {
+        grid-column: 1 / -1;
+        justify-self: start;
+        white-space: normal;
+      }
+
+      .mobile-nav-toggle {
+        display: inline-flex;
+      }
+
+      .global-nav {
+        position: fixed;
+        inset-inline: .75rem;
+        inset-block-start: .75rem;
+        z-index: 40;
+        display: none;
+        grid-template-columns: 1fr;
+        gap: .3rem;
+        padding: 4.25rem .75rem .75rem;
+        background: var(--color-surface);
+        border: 1px solid var(--color-on-canvas);
+        border-radius: var(--radius-medium);
+        box-shadow: var(--shadow-float);
+      }
+
+      .global-nav.is-open {
+        display: grid;
+      }
+
+      .nav-link {
+        justify-content: center;
+        border: 1px solid var(--color-line);
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        min-block-size: auto;
+        padding-block: 1.6rem 1.2rem;
+      }
+
+      h1 {
+        max-width: 8.8ch;
+        font-size: clamp(2.8rem, 18vw, 5.8rem);
+      }
+
+      .lead {
+        font-size: 1.02rem;
+      }
+
+      .vertical-panel {
+        display: none;
+      }
+
+      .mobile-vertical-equivalent {
+        display: block;
+      }
+
+      .section-heading {
+        display: grid;
+        align-items: start;
+      }
+
+      .archive-workspace {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-2);
+      }
+
+      .filters {
+        position: static;
+      }
+
+      .filter-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .filter-button {
+        text-align: center;
+        padding-inline: .45rem;
+      }
+
+      .record,
+      .record.is-featured {
+        grid-template-columns: 1fr;
+        gap: .65rem;
+        padding: 1.15rem .05rem;
+        background: transparent;
+      }
+
+      .record h3 {
+        font-size: clamp(1.55rem, 8vw, 2.25rem);
+      }
+
+      .record-facts {
+        gap: .25rem;
+      }
+
+      .fact-row {
+        grid-template-columns: 4rem minmax(0, 1fr);
+      }
+
+      .select-record {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .process-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-2);
+      }
+
+      .steps li {
+        grid-template-columns: 2.4rem minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 360px) {
+      .filter-group {
+        grid-template-columns: 1fr;
+      }
+
+      .brand strong {
+        font-size: 1.08rem;
+      }
+
+      .hero-actions {
+        display: grid;
+      }
+
+      .button {
+        width: 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#archive">跳到檔案列表</a>
+  <header class="site-shell masthead">
+    <a class="brand" href="#top" aria-label="島嶼聲音檔案館首頁">
+      <strong>島嶼聲音檔案館</strong>
+      <span>field recordings / oral memory</span>
+    </a>
+    <div class="context-pill" aria-live="polite">目前脈絡：八筆口述與環境聲採集索引</div>
+    <button class="mobile-nav-toggle" type="button" data-eval="mobile-nav-toggle" aria-label="開啟導覽" aria-expanded="false" aria-controls="global-nav">目錄</button>
+    <nav class="global-nav" id="global-nav" data-eval="global-nav" aria-label="全域導覽">
+      <a class="nav-link" href="#archive">檔案索引</a>
+      <a class="nav-link" href="#selected">逐字節錄</a>
+      <a class="nav-link" href="#method">採集方法</a>
+      <a class="nav-link primary" data-eval="global-action" href="#archive">開始探索</a>
+    </nav>
+  </header>
+
+  <main id="top" class="site-shell">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div>
+          <h1 id="hero-title">聽見島嶼的留白</h1>
+          <p class="lead">這裡整理口述記憶、潮間帶環境聲與遷徙故事。每一筆錄音先呈現題名、講者、年代、採集脈絡與權利狀態；沒有真實音訊檔時，文字仍是完整入口。</p>
+        </div>
+        <div class="hero-actions" aria-label="主要探索入口">
+          <a class="button primary" href="#archive">瀏覽八筆錄音</a>
+          <a class="button" href="#selected">閱讀目前節錄</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="vertical-panel" aria-label="島嶼地名與節錄直排索引">
+          <div class="vertical-index" data-eval="vertical-type">
+            <span>蘭嶼</span>
+            <span class="mark">澎湖</span>
+            <span>金門</span>
+            <span>馬祖</span>
+            <span>琉球嶼</span>
+            <span>綠島</span>
+          </div>
+          <aside class="field-note">
+            <p class="note-title">田野筆記 2026 / 編輯摘記</p>
+            <p>聲音檔案不是一串播放清單。島名、潮汐、語言、採集者與授權邊界都會改變一段記憶被理解的方式。</p>
+            <p>桌機版保留直排地名索引，讓橫排資料表與島嶼縱向閱讀形成對照。</p>
+          </aside>
+        </div>
+        <aside class="mobile-vertical-equivalent">
+          <strong>地名索引摘要：</strong>蘭嶼、澎湖、金門、馬祖、琉球嶼、綠島。手機版改為水平摘要，保留同一批探索入口。
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-heading" id="archive" aria-labelledby="archive-title">
+      <h2 id="archive-title">檔案索引</h2>
+      <p>以地點、語言、年代、長度、主題與權利狀態建立閱讀順序。篩選只改變本頁顯示，不代表遠端查詢或真實館藏狀態。</p>
+    </section>
+
+    <section class="archive-workspace" aria-label="聲音檔案探索工作區">
+      <aside class="filters" aria-label="檔案篩選">
+        <div class="archive-count" id="archive-count">顯示 8 / 8 筆錄音</div>
+        <div class="filter-group" role="group" aria-label="主題篩選">
+          <button class="filter-button" type="button" data-filter="all" aria-pressed="true">全部錄音</button>
+          <button class="filter-button" type="button" data-filter="migration" aria-pressed="false">遷徙與返鄉</button>
+          <button class="filter-button" type="button" data-filter="labor" aria-pressed="false">工作與技藝</button>
+          <button class="filter-button" type="button" data-filter="ritual" aria-pressed="false">祭儀與語言</button>
+          <button class="filter-button" type="button" data-filter="coast" aria-pressed="false">潮線與環境</button>
+        </div>
+      </aside>
+
+      <div class="record-list" id="record-list" aria-live="polite"></div>
+
+      <aside class="detail-pane" id="selected" aria-live="polite" aria-labelledby="detail-title">
+        <span class="record-id" id="detail-id">ISL-001</span>
+        <h2 id="detail-title">載入中</h2>
+        <p id="detail-summary"></p>
+        <div class="preview-control" aria-label="音訊預覽狀態">
+          <button type="button" disabled>預覽不可播放</button>
+          <span class="meta" id="detail-audio-note">本頁未提供真實音訊檔。</span>
+        </div>
+        <p class="transcript" id="detail-transcript"></p>
+        <span class="rights" id="detail-rights"></span>
+      </aside>
+    </section>
+
+    <section class="process-band" id="method" aria-labelledby="method-title">
+      <div class="process-grid">
+        <h2 id="method-title">如何閱讀一段聲音</h2>
+        <ol class="steps">
+          <li><span class="step-no">01</span><span><strong>先看題名與地點。</strong>題名保留口述情境，不把聲音壓成演算法分類。</span></li>
+          <li><span class="step-no">02</span><span><strong>再看採集資訊。</strong>年代、語言、長度與採集者決定這筆材料可被如何引用。</span></li>
+          <li><span class="step-no">03</span><span><strong>最後確認權利。</strong>開放聆聽、館內閱覽與待授權有不同使用邊界。</span></li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-shell site-footer">
+    <p>本頁為 isolated build evaluation 的靜態原型；所有館藏資料為示意編輯內容，未連接真實音訊、遠端資料庫或授權系統。</p>
+  </footer>
+
+  <script>
+    const records = [
+      {
+        id: "ISL-001",
+        tag: "ritual",
+        title: "飛魚季前夜的火光與禁語",
+        place: "蘭嶼 / Pongso no Tao",
+        speaker: "夏曼・阿雲，族語教師",
+        language: "達悟語、繁中口述",
+        year: "1989",
+        length: "18:42",
+        topic: "祭儀與語言",
+        status: "館內預覽",
+        statusType: "preview",
+        rights: "權利狀態：講者家屬同意研究閱覽；公開播放仍需另行授權。",
+        collection: "採集資訊：東清灣岸，手持卡帶錄音，採集者林秋帆。",
+        summary: "記錄祭期前一晚的準備聲、火堆旁的低聲提醒，以及族語詞彙如何界定可說與不可說。",
+        transcript: "「海上還沒有亮起來，老人先聽風，再決定今天能不能把船推出去。」"
+      },
+      {
+        id: "ISL-002",
+        tag: "labor",
+        title: "補網的人說午後潮聲比較細",
+        place: "澎湖望安 / Wangan",
+        speaker: "許玉枝，漁網修補工",
+        language: "台語海口腔",
+        year: "1976",
+        length: "12:08",
+        topic: "工作與技藝",
+        status: "開放聆聽摘要",
+        statusType: "open",
+        rights: "權利狀態：摘要文字開放引用，完整錄音僅限教育非營利使用申請。",
+        collection: "採集資訊：望安港邊倉庫，Reel-to-reel 轉錄自卡帶副本。",
+        summary: "講者以補網節奏描述潮聲變化，並談到婦女在漁業分工裡不被記名的勞動。",
+        transcript: "「破洞不是一下子看見，是手指頭摸過去，線忽然變得輕。」"
+      },
+      {
+        id: "ISL-003",
+        tag: "migration",
+        title: "從金門到高雄：一只鐵箱的回聲",
+        place: "金門烈嶼 / Lieyu",
+        speaker: "陳進福，退休船務員",
+        language: "閩南語、國語混合",
+        year: "1994",
+        length: "24:31",
+        topic: "遷徙與返鄉",
+        status: "逐字節錄公開",
+        statusType: "open",
+        rights: "權利狀態：逐字節錄採 CC BY-NC 4.0 示意標示；音訊未公開。",
+        collection: "採集資訊：烈嶼家屋客廳，DAT 錄音，含家人插話。",
+        summary: "一只鐵箱承載退伍、遷居與返鄉記憶，背景可聽見杯盤與港口廣播。",
+        transcript: "「箱子搬上船時很響，像把整個家都敲醒了。」"
+      },
+      {
+        id: "ISL-004",
+        tag: "coast",
+        title: "東莒燈塔霧號後的三十秒",
+        place: "馬祖東莒 / Dongju",
+        speaker: "無名守燈員與環境聲",
+        language: "福州話片段、環境聲",
+        year: "1968",
+        length: "07:16",
+        topic: "潮線與環境",
+        status: "待整理",
+        statusType: "restricted",
+        rights: "權利狀態：來源與講者身分待釐清，僅提供編輯摘要。",
+        collection: "採集資訊：舊卷標記為燈塔值班室，盤帶有霉斑與轉速不穩。",
+        summary: "霧號之後短暫空白被潮聲填滿，偶有值班員以福州話報時。",
+        transcript: "「霧號停了，紙頁翻動，接著才聽見窗外的浪。」"
+      },
+      {
+        id: "ISL-005",
+        tag: "migration",
+        title: "小琉球婚宴桌邊的返鄉歌",
+        place: "琉球嶼 / Lambai Island",
+        speaker: "蔡美蘭，返鄉移工家屬",
+        language: "台語、印尼語問候",
+        year: "2003",
+        length: "15:55",
+        topic: "遷徙與返鄉",
+        status: "館內預覽",
+        statusType: "preview",
+        rights: "權利狀態：涉及家庭成員姓名，公開前需完成去識別化。",
+        collection: "採集資訊：婚宴現場 MD 錄音，含音樂與群眾談話。",
+        summary: "婚宴桌邊的合唱串起遠洋漁船、移工家庭與返鄉節奏。",
+        transcript: "「歌唱到一半，阿姨用印尼語問好，大家笑了，鼓聲把話接走。」"
+      },
+      {
+        id: "ISL-006",
+        tag: "coast",
+        title: "綠島潮池裡辨認風向的人",
+        place: "綠島 / Lyudao",
+        speaker: "林芳儀，潮間帶解說員",
+        language: "國語、阿美語地名",
+        year: "2017",
+        length: "21:03",
+        topic: "潮線與環境",
+        status: "開放聆聽摘要",
+        statusType: "open",
+        rights: "權利狀態：講者同意摘要與節錄公開；生態敏感點位不揭露。",
+        collection: "採集資訊：柴口潮間帶，數位錄音，風切聲經低度整理。",
+        summary: "以潮池生物、風向與地名談觀察倫理，提醒聽者不要把聲音當成獵奇標本。",
+        transcript: "「你聽到小石頭滾動，就知道浪不是只有白色那一條。」"
+      },
+      {
+        id: "ISL-007",
+        tag: "labor",
+        title: "鹽埕倉庫裡的海圖摺痕",
+        place: "高雄旗津 / Cijin",
+        speaker: "吳世傑，退休報關行職員",
+        language: "國語、台語術語",
+        year: "1982",
+        length: "19:27",
+        topic: "工作與技藝",
+        status: "逐字節錄公開",
+        statusType: "open",
+        rights: "權利狀態：節錄可供研究引用；商業使用須另行洽詢。",
+        collection: "採集資訊：旗津倉庫二樓，桌面麥克風，伴隨紙張翻動聲。",
+        summary: "以海圖摺痕回憶港口貨運與人工登記時代，呈現紙本航線如何成為工作記憶。",
+        transcript: "「你不要只看紅線，真正記得路的是摺痕，手會自己找到那一頁。」"
+      },
+      {
+        id: "ISL-008",
+        tag: "ritual",
+        title: "月光海祭後留下的三種沉默",
+        place: "花蓮港口部落 / Makotaay",
+        speaker: "Futing，青年記錄者",
+        language: "阿美語、繁中旁白",
+        year: "2021",
+        length: "09:44",
+        topic: "祭儀與語言",
+        status: "待授權",
+        statusType: "restricted",
+        rights: "權利狀態：部落審議中；目前僅公開題名與編輯摘要。",
+        collection: "採集資訊：祭典後清晨，手機錄音，保留環境噪音。",
+        summary: "青年記錄者描述祭典後的空場、海面與未被錄下的歌，提醒檔案也包含選擇不公開的部分。",
+        transcript: "「有些歌不在檔案裡，因為它們本來就要回到海邊。」"
+      }
+    ];
+
+    const list = document.querySelector("#record-list");
+    const count = document.querySelector("#archive-count");
+    const filterButtons = Array.from(document.querySelectorAll("[data-filter]"));
+    const detail = {
+      id: document.querySelector("#detail-id"),
+      title: document.querySelector("#detail-title"),
+      summary: document.querySelector("#detail-summary"),
+      transcript: document.querySelector("#detail-transcript"),
+      rights: document.querySelector("#detail-rights"),
+      note: document.querySelector("#detail-audio-note")
+    };
+    const nav = document.querySelector("#global-nav");
+    const navToggle = document.querySelector("[data-eval='mobile-nav-toggle']");
+    let activeFilter = "all";
+    let selectedId = records[0].id;
+    let lastFocusedBeforeMenu = null;
+
+    function statusClass(record) {
+      return record.statusType === "open" ? "is-open" : record.statusType === "preview" ? "is-preview" : "is-restricted";
+    }
+
+    function renderRecords() {
+      const visible = activeFilter === "all" ? records : records.filter((record) => record.tag === activeFilter);
+      count.textContent = `顯示 ${visible.length} / ${records.length} 筆錄音`;
+      list.innerHTML = visible.map((record, index) => `
+        <article class="record ${index === 0 && activeFilter === "all" ? "is-featured" : ""}" data-eval="record" data-record-id="${record.id}" aria-current="${record.id === selectedId ? "true" : "false"}">
+          <div class="record-meta">
+            <span class="record-id">${record.id}</span>
+            <span class="meta">${record.year} · ${record.length}</span>
+            <span class="status ${statusClass(record)}">${record.status}</span>
+          </div>
+          <div>
+            <h3>${record.title}</h3>
+            <p class="speaker">${record.speaker}</p>
+            <p>${record.summary}</p>
+            <button class="select-record" type="button" data-select-record="${record.id}">查看節錄</button>
+          </div>
+          <dl class="record-facts">
+            <div class="fact-row"><dt class="field-label">地點</dt><dd>${record.place}</dd></div>
+            <div class="fact-row"><dt class="field-label">語言</dt><dd>${record.language}</dd></div>
+            <div class="fact-row"><dt class="field-label">主題</dt><dd>${record.topic}</dd></div>
+            <div class="fact-row"><dt class="field-label">採集</dt><dd>${record.collection}</dd></div>
+          </dl>
+        </article>
+      `).join("");
+    }
+
+    function renderDetail(record) {
+      detail.id.textContent = record.id;
+      detail.title.textContent = record.title;
+      detail.summary.textContent = `${record.place}｜${record.speaker}｜${record.summary}`;
+      detail.transcript.textContent = record.transcript;
+      detail.rights.textContent = record.rights;
+      detail.note.textContent = `${record.status}；本頁未提供真實音訊檔，內容理解不依賴音訊播放。`;
+    }
+
+    function selectRecord(id, shouldScroll = false) {
+      selectedId = id;
+      const record = records.find((item) => item.id === id) || records[0];
+      renderDetail(record);
+      renderRecords();
+      if (shouldScroll) {
+        document.querySelector("#selected").scrollIntoView({ block: "start", behavior: "smooth" });
+      }
+    }
+
+    function setFilter(filter) {
+      activeFilter = filter;
+      filterButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.filter === filter));
+      });
+      const visible = filter === "all" ? records : records.filter((record) => record.tag === filter);
+      if (!visible.some((record) => record.id === selectedId) && visible.length > 0) {
+        selectedId = visible[0].id;
+        renderDetail(visible[0]);
+      }
+      renderRecords();
+    }
+
+    function closeMenu() {
+      nav.classList.remove("is-open");
+      document.body.classList.remove("menu-open");
+      navToggle.setAttribute("aria-expanded", "false");
+      navToggle.setAttribute("aria-label", "開啟導覽");
+      if (lastFocusedBeforeMenu && typeof lastFocusedBeforeMenu.focus === "function") {
+        lastFocusedBeforeMenu.focus();
+      }
+    }
+
+    function openMenu() {
+      lastFocusedBeforeMenu = document.activeElement;
+      nav.classList.add("is-open");
+      document.body.classList.add("menu-open");
+      navToggle.setAttribute("aria-expanded", "true");
+      navToggle.setAttribute("aria-label", "關閉導覽");
+      const firstLink = nav.querySelector("a");
+      if (firstLink) firstLink.focus();
+    }
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", () => setFilter(button.dataset.filter));
+    });
+
+    list.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-select-record]");
+      if (button) {
+        selectRecord(button.dataset.selectRecord, true);
+      }
+    });
+
+    navToggle.addEventListener("click", () => {
+      if (nav.classList.contains("is-open")) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+
+    nav.addEventListener("click", (event) => {
+      if (event.target.closest("a") && nav.classList.contains("is-open")) {
+        closeMenu();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && nav.classList.contains("is-open")) {
+        closeMenu();
+      }
+    });
+
+    renderRecords();
+    renderDetail(records[0]);
+  </script>
+</body>
+</html>

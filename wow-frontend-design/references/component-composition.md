@@ -2,6 +2,8 @@
 
 Use this reference for design systems, component libraries, product applications, dashboards, data-heavy tools, commerce flows, settings, and any interface where primitives must compose across states. Components are behavior contracts, not a gallery of styled rectangles.
 
+Use [typographic-layout.md](typographic-layout.md) for relationship-based component/card gaps, density calibration, measure, wrapping, and optical alignment.
+
 ## 1. Separate the layers
 
 ```text

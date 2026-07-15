@@ -11,9 +11,9 @@ EXPECTED_BY_CASE = {
     "showcase": ("index.html",),
     "product-dashboard": ("index.html",),
     "product-dashboard-remake": ("index.html",),
-    "mountain-rescue-flow-v3": ("DESIGN.md", "index.html"),
-    "city-poetry-festival-v3": ("DESIGN.md", "index.html"),
-    "bookstore-one-line-v3": ("DESIGN.md", "index.html", "catalog.html", "book.html"),
+    "harbor-cold-chain-v4": ("DESIGN.md", "index.html"),
+    "island-sound-archive-v4": ("DESIGN.md", "index.html"),
+    "plant-swap-one-line-v4": ("DESIGN.md", "index.html", "browse.html", "listing.html"),
 }
 
 

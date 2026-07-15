@@ -33,6 +33,7 @@ Read only the references needed for the current request:
 - Always read [mobile-responsive.md](references/mobile-responsive.md) when the interface has a viewport.
 - Read [localization.md](references/localization.md) for any user-facing text, multilingual product, CJK content, RTL support, or locale-sensitive layout.
 - Read [typography-webfonts.md](references/typography-webfonts.md) when selecting, loading, subsetting, self-hosting, or auditing custom/open-source fonts and typography.
+- Read [typographic-layout.md](references/typographic-layout.md) when reading measure, line height, wrapping, vertical writing, component/card spacing, density, or optical font choice is material.
 - Read [color-system-psychology.md](references/color-system-psychology.md) when selecting or auditing color, contrast, semantic states, light/dark/high-contrast appearances, or any color-emotion/conversion claim.
 - Read [visual-material-system.md](references/visual-material-system.md) when borders, typography, component colors, light, depth, texture, effects, and motion must form a coherent craft system.
 - Read [brand-system-fidelity.md](references/brand-system-fidelity.md) when extracting an existing brand, extending a design system, separating campaign treatment, or preserving brand voice/assets across product surfaces.
@@ -91,6 +92,10 @@ Respect the mutation boundary. An `AUDIT` or review request is read-only and rep
 
 Inventory what must stay, what may change, and what evidence will prove success.
 
+At the start of a local or remote sandbox run, inventory the actual capability boundary: readable/writable workspace roots, shell and project commands, pinned dependencies, browser/screenshot access, loopback serving, and network policy. Keep generated code and evidence inside caller-authorized workspace roots; do not rely on a writable home directory, global installs, nested agent CLIs, or outbound network. If a required verifier is unavailable, continue only within the safe implementation scope, route through [no-visual-first-pass.md](references/no-visual-first-pass.md), and label the missing check `UNVERIFIED` with an exact handoff command.
+
+For long generation or verification commands, distinguish inactivity from elapsed wall time. While logs or evaluator-owned artifacts continue to advance, extend the bounded wall allowance; stop on a declared inactivity limit or hard ceiling, terminate the whole process group, preserve the attempt diagnostic, and retry only retryable failures. Freeze the runner, brief, Skill, validators, and their hashes before the first attempt; never edit an active gate. Feed the prior bounded diagnostic into a fresh retry as untrusted repair context instead of repeating the same blind attempt.
+
 When framework or runtime behavior is version-sensitive, inspect the installed version and local project conventions before using remembered syntax. “Framework-agnostic” means adapting the contract to the detected stack, not emitting the same React-shaped implementation everywhere.
 
 ### 2. Form a design thesis
@@ -111,6 +116,8 @@ If the user supplied a brand system, derive the thesis from it. For an empty bui
 For implementation work that creates or changes the visual system, create or update repository-root `DESIGN.md` after selecting the thesis and before composing pages. Extract existing code and approved brand evidence instead of inventing a parallel system. For a new document, use `assets/DESIGN.template.md` only as a structural starting point and replace every example name, value, and rationale with project-derived decisions. Keep the document proportionate, but preserve the official token frontmatter and human-readable section order described in [design-md-contract.md](references/design-md-contract.md).
 
 Before composing pages, manually preflight new `DESIGN.md` frontmatter: unit-bearing dimensional zeros such as `0em`/`0px`, wholly quoted font stacks, required `colors.primary`, no orphan colors, 4.5:1 component foreground/background pairs, resolved references, and only whitelisted properties. Do this even when the official CLI cannot run; still label the lint result `UNVERIFIED` until the pinned CLI actually executes.
+
+When the repository-pinned official CLI is already available, lint a new `DESIGN.md` immediately after the preflight and do not begin page composition until it has zero errors and zero warnings. Re-run the same pinned lint after any later token change. This early gate prevents invalid normative tokens from being copied into otherwise finished pages; the final verification remains required.
 
 ### 2.5. Plan routes and wireflows when structure is uncertain
 
@@ -139,8 +146,12 @@ Design the content hierarchy once, then compose it for each context:
 - Desktop may use simultaneity, wide comparison, peripheral context, hover detail, and spatial tension.
 - Mobile should use priority, progressive disclosure, thumb-reachable actions, intentional cropping, concise navigation, and shorter decision paths.
 - Preserve identity across both while allowing different order, controls, density, and motion.
+- Keep the primary task and next action discoverable in the initial mobile viewport. Do not let an oversized introduction, decorative panel, or navigation that defaults open displace or cover the working surface.
+- Keep menus, dialogs, sheets, and other overlays closed on first paint unless the product explicitly requires an open state. A responsive replacement must retain any brief-required semantic or evaluator hook on the visible equivalent; hiding the hooked desktop node and showing an unrelated mobile substitute does not satisfy the contract.
+- Reserve layout space for fixed or sticky controls, including safe-area padding. At each required mobile viewport, prove that they do not cover headings, controls, validation, focused fields, or the primary task.
 - Preserve one logical interactive identity per record across breakpoints. Do not render hidden desktop and mobile copies with duplicate IDs, evaluator hooks, accessible names, or competing state; recompose one source of truth or render mutually exclusive templates with equivalent focus and state behavior.
 - Treat writing-mode changes, oversized type, sticky rails, and absolute overlays as collision-prone: measure their rendered boxes at every target breakpoint and ensure the horizontal replacement is the same readable content, not a hidden vertical element plus an unrelated substitute.
+- Contain wide layouts structurally: use `box-sizing: border-box`, `minmax(0, 1fr)`, `min-width: 0`, and bounded inline sizes where appropriate. Do not hide body overflow to mask a shell, grid, table, or `100vw` calculation that extends past the required viewport.
 
 Create a transformation table for major regions: `region → desktop role → mobile equivalent → order → interaction → deferred/removed content`. Use [mobile-responsive.md](references/mobile-responsive.md) for the required checks.
 
@@ -170,7 +181,7 @@ For the identity pass, run the truth, task-surface, product-swap, representation
 
 ### 7. Verify with evidence
 
-Run the project's available tests, lint, typecheck, and build. Use a real browser when available. Check representative routes and states at narrow mobile, common mobile, tablet portrait, tablet landscape, desktop, and wide desktop sizes. Also check keyboard navigation, 200% text resize/zoom, 400% zoom or 320 CSS px equivalent reflow, reduced motion, long text, and console errors. Treat an unintentionally wrapped or clipped short action label as a layout failure; measure rendered text instead of trusting source length. Exercise modal/menu background scroll, link selection, Escape, focus return, valid→invalid form recovery, dynamic accessible names/counts, and repeated desktop/mobile navigation visibility instead of trusting source keywords.
+Run the project's available tests, lint, typecheck, and build. Use a real browser when available. Check representative routes and states at narrow mobile, common mobile, tablet portrait, tablet landscape, desktop, and wide desktop sizes. Also check keyboard navigation, 200% text resize/zoom, 400% zoom or 320 CSS px equivalent reflow, reduced motion, long text, and console errors. Require one visible `main` landmark and a valid BCP 47 document language matching the product locale. When the brief or repository contract declares an exact locale tag, route, filename, test hook, or output set, preserve that literal contract even when a more specific valid alternative exists. Treat unintended wrapping, clipping, or collision in short actions, brand names, cover titles, headings, and other identity-bearing copy as a layout failure; measure rendered text boxes instead of trusting source length, and do not use `overflow: hidden` to conceal a text-sizing defect. Exercise modal/menu default-closed state, background scroll, link selection, Escape, focus return, fixed/sticky obstruction, valid→invalid form recovery, dynamic accessible names/counts, and repeated desktop/mobile navigation visibility instead of trusting source keywords.
 
 When `DESIGN.md` exists and the official CLI is locally available, lint it with the repository-pinned CLI version. Resolve every error. For a new generated system, also resolve every warning; for an extracted existing system, document any warning that must remain. If the CLI is unavailable, report the check as unverified rather than installing or fetching a mutable latest version without permission.
 

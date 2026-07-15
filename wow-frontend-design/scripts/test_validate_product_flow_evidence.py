@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the v3 product-flow evidence validator."""
+"""Tests for the published Codex v4 evidence validator."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ import validate_product_flow_evidence
 class ProductFlowEvidenceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.root = Path(__file__).resolve().parents[2]
-        self.visual = self.root / "evals" / "product-flow-v3-visual-results.json"
-        self.generation = self.root / "evals" / "product-flow-v3-generation-results.json"
+        self.visual = self.root / "evals" / "product-flow-v4-visual-results.json"
+        self.generation = self.root / "evals" / "product-flow-v4-generation-results.json"
 
     @staticmethod
     def _write(data: dict[str, object], directory: str, name: str) -> Path:
@@ -26,26 +26,8 @@ class ProductFlowEvidenceTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         return path
 
-    def test_repository_v3_evidence_is_integrity_bound(self) -> None:
-        self.assertEqual(18, validate_product_flow_evidence.validate(self.visual, self.root))
-
-    def test_formal_sonnet_failure_cannot_be_upgraded(self) -> None:
-        data = json.loads(self.generation.read_text(encoding="utf-8"))
-        run = next(item for item in data["results"] if item["model"] == "sonnet" and item["case_id"] == "city-poetry-festival-v3")
-        run["status"] = "completed"
-        with tempfile.TemporaryDirectory() as directory:
-            path = self._write(data, directory, "generation.json")
-            with self.assertRaisesRegex(validate_product_flow_evidence.ProductFlowEvidenceError, "cannot be removed"):
-                validate_product_flow_evidence.validate(self.visual, self.root, generation_path=path)
-
-    def test_unknown_model_cannot_enter_the_model_set(self) -> None:
-        data = json.loads(self.generation.read_text(encoding="utf-8"))
-        run = next(item for item in data["results"] if item["model"] == "gpt-5.5")
-        run["model"] = "gpt-unknown"
-        with tempfile.TemporaryDirectory() as directory:
-            path = self._write(data, directory, "generation.json")
-            with self.assertRaisesRegex(validate_product_flow_evidence.ProductFlowEvidenceError, "model/case set"):
-                validate_product_flow_evidence.validate(self.visual, self.root, generation_path=path)
+    def test_repository_v4_evidence_is_integrity_bound(self) -> None:
+        self.assertEqual(9, validate_product_flow_evidence.validate(self.visual, self.root))
 
     def test_stale_screenshot_hash_is_rejected(self) -> None:
         data = json.loads(self.visual.read_text(encoding="utf-8"))
@@ -55,13 +37,15 @@ class ProductFlowEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(validate_product_flow_evidence.ProductFlowEvidenceError, "hash is stale"):
                 validate_product_flow_evidence.validate(path, self.root)
 
-    def test_missing_screenshot_result_is_rejected(self) -> None:
-        data = json.loads(self.visual.read_text(encoding="utf-8"))
-        data["results"].pop()
+    def test_generation_retry_history_cannot_be_hidden(self) -> None:
+        data = json.loads(self.generation.read_text(encoding="utf-8"))
+        retried = next(item for item in data["results"] if item["attempt_count"] > 1)
+        retried["attempts"] = retried["attempts"][-1:]
+        retried["attempt_count"] = 1
         with tempfile.TemporaryDirectory() as directory:
-            path = self._write(data, directory, "visual.json")
-            with self.assertRaisesRegex(validate_product_flow_evidence.ProductFlowEvidenceError, "exactly 60"):
-                validate_product_flow_evidence.validate(path, self.root)
+            path = self._write(data, directory, "generation.json")
+            with self.assertRaisesRegex(validate_product_flow_evidence.ProductFlowEvidenceError, "retry inventory"):
+                validate_product_flow_evidence.validate(self.visual, self.root, generation_path=path)
 
 
 if __name__ == "__main__":

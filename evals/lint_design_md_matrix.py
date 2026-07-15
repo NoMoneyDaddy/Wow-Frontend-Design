@@ -14,9 +14,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LEDGER = ROOT / "evals" / "product-flow-v3-generation-results.json"
-DEFAULT_RETRY_LEDGER = ROOT / "evals" / "product-flow-v3-infrastructure-retry.json"
-DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v3-design-md-results.json"
+DEFAULT_LEDGER = ROOT / "evals" / "product-flow-v4-generation-results.json"
+DEFAULT_RETRY_LEDGER = ROOT / "evals" / "product-flow-v4-infrastructure-retry.json"
+DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v4-design-md-results.json"
 PACKAGE_VERSION = "0.2.0"
 
 
@@ -31,7 +31,15 @@ def utc_now() -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
-    parser.add_argument("--supplemental-retry", type=Path, default=DEFAULT_RETRY_LEDGER)
+    supplemental = parser.add_mutually_exclusive_group()
+    supplemental.add_argument("--supplemental-retry", type=Path, default=DEFAULT_RETRY_LEDGER)
+    supplemental.add_argument(
+        "--no-supplemental-retry",
+        action="store_const",
+        const=None,
+        default=argparse.SUPPRESS,
+        dest="supplemental_retry",
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--timeout-seconds", type=int, default=60)
     args = parser.parse_args()
@@ -40,14 +48,20 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def safe_target(relative: str) -> Path:
-    target = (ROOT / relative).resolve()
+def display_path(path: Path) -> str:
     try:
-        target.relative_to((ROOT / "evals").resolve())
-    except ValueError as error:
-        raise ValueError(f"target escapes evals: {relative}") from error
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def safe_target(value: str, artifact_root: Path) -> Path:
+    candidate = Path(value)
+    target = (candidate if candidate.is_absolute() else ROOT / candidate).resolve()
+    if target.parent != artifact_root:
+        raise ValueError(f"target escapes artifact root: {value}")
     if target.is_symlink() or not target.is_dir():
-        raise ValueError(f"target is missing or unsafe: {relative}")
+        raise ValueError(f"target is missing or unsafe: {value}")
     return target
 
 
@@ -74,9 +88,15 @@ def main() -> int:
     if not isinstance(results, list):
         raise SystemExit("generation ledger has no results list")
 
-    supplemental_path = args.supplemental_retry.expanduser().resolve()
+    contract = ledger.get("contract")
+    configured_root = contract.get("artifact_root") if isinstance(contract, dict) else None
+    artifact_root = Path(configured_root).resolve() if isinstance(configured_root, str) else (ROOT / "evals").resolve()
+    if not artifact_root.is_dir() or artifact_root.is_symlink():
+        raise SystemExit("generation artifact root is missing or unsafe")
+
+    supplemental_path = args.supplemental_retry.expanduser().resolve() if args.supplemental_retry else None
     supplemental: dict[str, object] | None = None
-    if supplemental_path.is_file():
+    if supplemental_path is not None and supplemental_path.is_file():
         supplemental_ledger = json.loads(supplemental_path.read_text(encoding="utf-8"))
         candidate = supplemental_ledger.get("retry")
         if isinstance(candidate, dict) and candidate.get("visual_evaluation_eligible") is True:
@@ -86,10 +106,10 @@ def main() -> int:
     report: dict[str, object] = {
         "schema_version": 1,
         "generated_at": utc_now(),
-        "generation_ledger": {"path": str(ledger_path.relative_to(ROOT)), "sha256": digest(ledger_path)},
+        "generation_ledger": {"path": display_path(ledger_path), "sha256": digest(ledger_path)},
         "supplemental_retry_ledger": (
-            {"path": str(supplemental_path.relative_to(ROOT)), "sha256": digest(supplemental_path)}
-            if supplemental is not None
+            {"path": display_path(supplemental_path), "sha256": digest(supplemental_path)}
+            if supplemental is not None and supplemental_path is not None
             else None
         ),
         "linter": {"package": "@google/design.md", "version": PACKAGE_VERSION},
@@ -104,13 +124,13 @@ def main() -> int:
     for item, evidence_source in candidates:
         if not isinstance(item, dict) or item.get("status") not in {"completed", "existing_completed"}:
             continue
-        target = safe_target(str(item.get("target", "")))
+        target = safe_target(str(item.get("target", "")), artifact_root)
         design = target / "DESIGN.md"
         record: dict[str, object] = {
             "provider": item.get("provider"),
             "model": item.get("model"),
             "case_id": item.get("case_id"),
-            "path": str(design.relative_to(ROOT)),
+            "path": display_path(design),
             "evidence_source": evidence_source,
         }
         if design.is_symlink() or not design.is_file():

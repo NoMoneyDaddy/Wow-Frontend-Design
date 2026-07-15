@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>瀏覽植栽｜綠巷交換所</title>
+  <style>
+:root {
+  --color-primary: #2F6B4F;
+  --color-on-primary: #FFFFFF;
+  --color-canvas: #FAF7EF;
+  --color-on-canvas: #1F2B24;
+  --color-surface: #FFFFFF;
+  --color-on-surface: #1F2B24;
+  --color-secondary: #6E4F2E;
+  --color-on-secondary: #FFFFFF;
+  --color-accent: #A94F2D;
+  --color-on-accent: #FFFFFF;
+  --color-muted: #E7DED1;
+  --color-on-muted: #3D473F;
+  --color-focus: #184E77;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --text-headline: clamp(2rem, 6vw, 4.6rem);
+  --text-title: clamp(1.35rem, 2.6vw, 2.2rem);
+  --text-body: 1rem;
+  --text-label: .9rem;
+  --line-body: 1.65;
+  --space-xs: .375rem;
+  --space-sm: .625rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: clamp(2rem, 6vw, 5rem);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-paper: 0 12px 28px rgba(47, 42, 34, .10);
+  --measure: 66ch;
+  --content: min(1120px, calc(100% - 2rem));
+  --duration-fast: 140ms;
+  --duration-base: 240ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; font-family: var(--font-sans); color: var(--color-on-canvas); background: var(--color-canvas); line-height: var(--line-body); }
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(31,43,36,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(31,43,36,.035) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, black, transparent 75%); }
+a { color: inherit; text-underline-offset: .18em; }
+a:hover { color: var(--color-primary); }
+img, svg { max-width: 100%; height: auto; }
+button, input, textarea, select { font: inherit; }
+:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.skip-link { position: absolute; inset-block-start: .5rem; inset-inline-start: .5rem; transform: translateY(-150%); background: var(--color-focus); color: var(--color-on-primary); padding: .65rem .85rem; border-radius: var(--radius-sm); z-index: 10; }
+.skip-link:focus { transform: translateY(0); }
+.site-header { position: sticky; inset-block-start: 0; z-index: 4; background: rgba(250,247,239,.94); border-block-end: 1px solid rgba(31,43,36,.14); backdrop-filter: blur(10px); }
+.nav-shell { width: var(--content); margin-inline: auto; min-block-size: 68px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-block: .75rem; }
+.brand { display: inline-flex; align-items: center; gap: .7rem; font-weight: 800; text-decoration: none; min-block-size: 44px; }
+.brand-mark { inline-size: 38px; block-size: 38px; border: 2px solid var(--color-primary); border-radius: var(--radius-md); display: grid; place-items: center; background: var(--color-surface); }
+.brand-mark svg { inline-size: 26px; block-size: 26px; }
+.site-nav { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+.site-nav a { min-block-size: 44px; display: inline-flex; align-items: center; padding-inline: .75rem; border-radius: var(--radius-sm); text-decoration: none; font-weight: 650; }
+.site-nav a[aria-current="page"] { background: var(--color-primary); color: var(--color-on-primary); }
+.section { width: var(--content); margin-inline: auto; padding-block: var(--space-xl); }
+.section.tight { padding-block: clamp(1.25rem, 4vw, 3rem); }
+.eyebrow { display: inline-flex; width: fit-content; align-items: center; gap: .45rem; background: var(--color-accent); color: var(--color-on-accent); border-radius: var(--radius-sm); padding: .25rem .5rem; font-size: var(--text-label); font-weight: 750; }
+h1, h2, h3, p { margin-block-start: 0; }
+h1 { max-width: 11ch; font-size: var(--text-headline); line-height: 1.05; letter-spacing: 0; margin-block-end: 1rem; }
+h2 { font-size: var(--text-title); line-height: 1.2; margin-block-end: .85rem; }
+h3 { font-size: 1.1rem; line-height: 1.3; margin-block-end: .45rem; }
+p { max-width: var(--measure); }
+.lead { font-size: clamp(1.05rem, 1.6vw, 1.24rem); color: var(--color-on-muted); }
+.button-row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; margin-block-start: 1.3rem; }
+.btn { min-block-size: 44px; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; padding: .7rem .95rem; border: 1px solid transparent; border-radius: var(--radius-sm); font-weight: 750; text-decoration: none; cursor: pointer; transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out); }
+.btn:hover { transform: translateY(-1px); }
+.btn.primary { background: var(--color-primary); color: var(--color-on-primary); }
+.btn.secondary { background: var(--color-secondary); color: var(--color-on-secondary); }
+.btn.ghost { background: transparent; color: var(--color-on-canvas); border-color: rgba(31,43,36,.28); }
+.panel { background: var(--color-surface); color: var(--color-on-surface); border: 1px solid rgba(31,43,36,.14); border-radius: var(--radius-md); box-shadow: var(--shadow-paper); }
+.tag { display: inline-flex; width: fit-content; align-items: center; gap: .35rem; padding: .25rem .5rem; border-radius: var(--radius-sm); font-size: var(--text-label); font-weight: 750; background: var(--color-muted); color: var(--color-on-muted); }
+.tag.green { background: var(--color-primary); color: var(--color-on-primary); }
+.tag.clay { background: var(--color-accent); color: var(--color-on-accent); }
+.grid-two { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr); gap: clamp(1rem, 4vw, 3rem); align-items: center; }
+.grid-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.list { display: grid; gap: .75rem; padding: 0; margin: 0; list-style: none; }
+.list li { display: grid; gap: .25rem; padding-block: .85rem; border-block-end: 1px solid rgba(31,43,36,.14); }
+.record-card { padding: 1rem; display: grid; gap: .75rem; }
+.plant-visual { min-block-size: 320px; position: relative; overflow: hidden; background: linear-gradient(135deg, #D8E5D5, #F2D9C9); border: 1px solid rgba(31,43,36,.16); border-radius: var(--radius-md); }
+.plant-visual svg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; }
+.plant-visual .note { position: absolute; inset-inline-start: 1rem; inset-block-end: 1rem; max-width: 18rem; background: rgba(255,255,255,.88); border: 1px solid rgba(31,43,36,.18); border-radius: var(--radius-sm); padding: .75rem; }
+.band { background: var(--color-muted); border-block: 1px solid rgba(31,43,36,.12); }
+.split-row { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); gap: clamp(1rem, 4vw, 3rem); align-items: start; }
+.footer { border-block-start: 1px solid rgba(31,43,36,.14); padding-block: 2rem; color: var(--color-on-muted); }
+.footer .section { padding-block: 0; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .nav-shell { align-items: flex-start; flex-direction: column; }
+  .site-nav { justify-content: flex-start; inline-size: 100%; }
+  .site-nav a { padding-inline: .55rem; }
+  .section { width: min(100% - 1rem, 680px); }
+  .grid-two, .grid-three, .split-row { grid-template-columns: 1fr; }
+  .hero-copy { order: 1; }
+  .hero-art { order: 2; }
+  .plant-visual { min-block-size: 260px; }
+  h1 { max-width: 9ch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+  .filters { display: flex; flex-wrap: wrap; gap: .5rem; margin-block-start: 1.25rem; }
+  .filters button[aria-pressed="true"] { background: var(--color-primary); color: var(--color-on-primary); }
+  .browse-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: clamp(1rem, 3vw, 2rem); align-items: start; }
+  .summary-box { padding: 1rem; position: sticky; inset-block-start: 92px; }
+  .plant-list { display: grid; gap: .85rem; }
+  .swap-item { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 1rem; align-items: start; padding: 1rem; }
+  .thumb { inline-size: 112px; aspect-ratio: 1; border-radius: var(--radius-md); border: 1px solid rgba(31,43,36,.16); background: var(--color-muted); display: grid; place-items: center; overflow: hidden; }
+  .meta { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .hidden { display: none !important; }
+  @media (max-width: 860px) {
+    .browse-layout { grid-template-columns: 1fr; }
+    .summary-box { position: static; }
+    .swap-item { grid-template-columns: 82px minmax(0, 1fr); }
+    .swap-item .btn { grid-column: 1 / -1; }
+    .thumb { inline-size: 82px; }
+  }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="index.html" aria-label="綠巷交換所首頁">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img"><path d="M24 39V19" fill="none" stroke="#2F6B4F" stroke-width="4" stroke-linecap="round"/><path d="M24 22C12 21 10 11 10 8c10 0 16 4 17 12" fill="#D8E5D5" stroke="#2F6B4F" stroke-width="3"/><path d="M25 29c12 0 15-8 15-14-10 0-16 4-18 12" fill="#F2D9C9" stroke="#2F6B4F" stroke-width="3"/></svg>
+        </span>
+        <span>綠巷交換所</span>
+      </a>
+      <nav class="site-nav" aria-label="主要導覽">
+        <a href="index.html">交換所</a>
+        <a href="browse.html" aria-current="page">瀏覽植栽</a>
+        <a href="listing.html">刊登詳情</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main">
+    <section class="section tight">
+      <span class="eyebrow">交換清單</span>
+      <h1>找一株適合你窗邊的植物。</h1>
+      <p class="lead">以下為示範刊登，所有項目都以交換為前提，不顯示價格、不提供付款流程。</p>
+      <div class="filters" aria-label="植栽分類篩選">
+        <button class="btn ghost" type="button" data-filter="all" aria-pressed="true">全部</button>
+        <button class="btn ghost" type="button" data-filter="shade" aria-pressed="false">耐陰</button>
+        <button class="btn ghost" type="button" data-filter="sun" aria-pressed="false">明亮窗邊</button>
+        <button class="btn ghost" type="button" data-filter="cutting" aria-pressed="false">插枝</button>
+      </div>
+    </section>
+    <section class="section browse-layout">
+      <aside class="panel summary-box" aria-labelledby="browse-note">
+        <span class="tag clay">不販售提醒</span>
+        <h2 id="browse-note">篩選時先看照護條件</h2>
+        <p>若你想用金錢購買，這裡不是合適的地方。請準備可交換的植物、盆器、介質或照護協助。</p>
+        <p id="count" aria-live="polite">目前顯示 4 則示範刊登。</p>
+      </aside>
+      <div class="plant-list" id="plant-list">
+        <article class="panel swap-item" data-tags="shade cutting">
+          <div class="thumb" aria-hidden="true"><svg viewBox="0 0 96 96"><path d="M50 82V29" stroke="#2F6B4F" stroke-width="7" stroke-linecap="round"/><path d="M48 38C25 36 19 20 19 12c28 1 39 12 33 28" fill="#D8E5D5" stroke="#2F6B4F" stroke-width="4"/><path d="M50 54c22-16 34-18 43-8-9 21-27 26-43 8Z" fill="#F2D9C9" stroke="#2F6B4F" stroke-width="4"/></svg></div>
+          <div>
+            <span class="tag green">可交換</span>
+            <h2>龜背芋插枝</h2>
+            <p>適合明亮散射光，已發根。希望交換耐陰小苗或 4 吋素燒盆。</p>
+            <div class="meta"><span class="tag">里民中心</span><span class="tag">週末午後</span><span class="tag">示範刊登</span></div>
+          </div>
+          <a class="btn primary" href="listing.html">查看詳情</a>
+        </article>
+        <article class="panel swap-item" data-tags="sun">
+          <div class="thumb" aria-hidden="true"><svg viewBox="0 0 96 96"><path d="M49 82c0-31 4-48 19-65" stroke="#A94F2D" stroke-width="7" stroke-linecap="round"/><path d="M51 48c-28-3-39-15-38-32 26-1 43 8 38 32Z" fill="#D8E5D5" stroke="#2F6B4F" stroke-width="4"/><path d="M56 58c18-17 31-19 39-8-10 18-25 21-39 8Z" fill="#F2D9C9" stroke="#A94F2D" stroke-width="4"/></svg></div>
+          <div>
+            <span class="tag green">可交換</span>
+            <h2>香草盆栽組</h2>
+            <p>迷迭香與薄荷分盆，需半日照。希望交換珍珠岩或多餘育苗盤。</p>
+            <div class="meta"><span class="tag">市場側門</span><span class="tag">平日傍晚</span><span class="tag">示範刊登</span></div>
+          </div>
+          <a class="btn primary" href="listing.html">查看詳情</a>
+        </article>
+        <article class="panel swap-item" data-tags="shade">
+          <div class="thumb" aria-hidden="true"><svg viewBox="0 0 96 96"><path d="M48 82V20" stroke="#2F6B4F" stroke-width="7" stroke-linecap="round"/><ellipse cx="31" cy="36" rx="19" ry="28" fill="#D8E5D5" stroke="#2F6B4F" stroke-width="4"/><ellipse cx="63" cy="44" rx="20" ry="30" fill="#F2D9C9" stroke="#2F6B4F" stroke-width="4"/></svg></div>
+          <div>
+            <span class="tag green">可交換</span>
+            <h2>白鶴芋分株</h2>
+            <p>耐陰、需保持微濕。希望交換乾淨介質或協助澆水一次。</p>
+            <div class="meta"><span class="tag">圖書館前</span><span class="tag">週三</span><span class="tag">示範刊登</span></div>
+          </div>
+          <a class="btn primary" href="listing.html">查看詳情</a>
+        </article>
+        <article class="panel swap-item" data-tags="sun cutting">
+          <div class="thumb" aria-hidden="true"><svg viewBox="0 0 96 96"><path d="M48 82C40 50 45 31 63 15" stroke="#6E4F2E" stroke-width="7" stroke-linecap="round"/><path d="M49 51c-20-2-32-13-34-31 24-2 39 8 34 31Z" fill="#D8E5D5" stroke="#2F6B4F" stroke-width="4"/><path d="M55 61c17-16 30-18 38-8-9 18-24 21-38 8Z" fill="#F2D9C9" stroke="#A94F2D" stroke-width="4"/></svg></div>
+          <div>
+            <span class="tag green">可交換</span>
+            <h2>虎尾蘭側芽</h2>
+            <p>耐旱、需排水佳。希望交換陶粒、空盆或其他多肉側芽。</p>
+            <div class="meta"><span class="tag">公園涼亭</span><span class="tag">週六上午</span><span class="tag">示範刊登</span></div>
+          </div>
+          <a class="btn primary" href="listing.html">查看詳情</a>
+        </article>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="section">
+      <span>綠巷交換所，社區植栽交換原型。</span>
+      <span>不處理付款，不撮合販售。</span>
+    </div>
+  </footer>
+  <script>
+    const buttons = Array.from(document.querySelectorAll('[data-filter]'));
+    const items = Array.from(document.querySelectorAll('.swap-item'));
+    const count = document.getElementById('count');
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const filter = button.dataset.filter;
+        buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+        let shown = 0;
+        items.forEach((item) => {
+          const match = filter === 'all' || item.dataset.tags.split(' ').includes(filter);
+          item.classList.toggle('hidden', !match);
+          if (match) shown += 1;
+        });
+        count.textContent = `目前顯示 ${shown} 則示範刊登。`;
+      });
+    });
+  </script>
+</body>
+</html>

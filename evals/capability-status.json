@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "snapshot_at": "2026-07-14",
+  "snapshot_at": "2026-07-15",
   "semantics": "Status describes repository evidence, not marketing scope. The validator proves schema, fixed inventory and artifact-path integrity only; semantic truth remains human-reviewed and each boundary controls the claim.",
   "capabilities": [
     {
@@ -27,9 +27,9 @@
     {
       "id": "traditional-chinese-showcase",
       "status": "browser_observed",
-      "claim": "A real zh-Hant showcase implements light/dark/system appearance and materially different desktop/mobile composition.",
-      "artifacts": ["evals/weak-model-showcase/index.html", "evals/weak-model-showcase/styles.css", "evals/weak-model-showcase/app.js", "assets/screenshots.json"],
-      "boundary": "Chrome/Playwright observations are bounded to recorded viewports and states; they are not cross-browser, assistive-technology, formal WCAG or universal visual-quality evidence."
+      "claim": "Recorded Traditional Chinese browser evidence includes a real appearance-switching showcase and a nine-target Codex v4 product-flow cohort with true mobile capture settings.",
+      "artifacts": ["evals/weak-model-showcase/index.html", "evals/weak-model-showcase/styles.css", "evals/weak-model-showcase/app.js", "assets/screenshots.json", "evals/product-flow-v4-visual-results.json", "wow-frontend-design/scripts/validate_product_flow_evidence.py"],
+      "boundary": "Chrome/Playwright observations are bounded to recorded viewports and states; 7/9 v4 targets retained blockers. They are not cross-browser, assistive-technology, formal WCAG or universal visual-quality evidence."
     },
     {
       "id": "claude-dashboard-pair",
@@ -69,9 +69,9 @@
     {
       "id": "locale-portability",
       "status": "partially_tested",
-      "claim": "Traditional Chinese is first-class and localization rules cover CJK, long text, mixed scripts and RTL boundaries.",
-      "artifacts": ["wow-frontend-design/references/localization.md", "evals/trigger_cases.json", "evals/weak-model-showcase/index.html"],
-      "boundary": "zh-Hant has rendered evidence and English appears in fixtures. RTL and broad locale expansion are documented checks, not completed integration coverage."
+      "claim": "Traditional Chinese is first-class and localization plus typographic-layout rules cover CJK measure, wrapping, vertical writing, mixed scripts and RTL boundaries.",
+      "artifacts": ["wow-frontend-design/references/localization.md", "wow-frontend-design/references/typographic-layout.md", "evals/trigger_cases.json", "evals/weak-model-showcase/index.html", "evals/product-flow-v4-visual-results.json"],
+      "boundary": "zh-Hant has rendered evidence, but two v4 targets missed the brief's exact lang contract. RTL and broad locale expansion are documented checks, not completed integration coverage."
     },
     {
       "id": "accessibility",

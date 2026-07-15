@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>港口冷鏈異常交接台</title>
+  <style>
+    :root {
+      --color-primary: #234a46;
+      --color-on-primary: #ffffff;
+      --color-canvas: #f3f1ea;
+      --color-on-canvas: #16201f;
+      --color-surface: #ffffff;
+      --color-on-surface: #16201f;
+      --color-surface-rail: #e6e1d2;
+      --color-muted: #5d6864;
+      --color-border: #b9b5a8;
+      --color-action: #234a46;
+      --color-action-ink: #ffffff;
+      --color-urgent: #8b2f28;
+      --color-urgent-ink: #ffffff;
+      --color-due: #765019;
+      --color-due-ink: #ffffff;
+      --color-food-risk: #6f315f;
+      --color-food-risk-ink: #ffffff;
+      --color-sensor: #315e78;
+      --color-sensor-ink: #ffffff;
+      --color-disconnected: #4f3b2f;
+      --color-disconnected-ink: #ffffff;
+      --color-stale: #5d6864;
+      --color-stale-ink: #ffffff;
+      --color-due-normal: #efe8d5;
+      --color-due-normal-ink: #3e311a;
+      --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 18px;
+      --space-xl: 28px;
+      --radius-xs: 2px;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --shadow-float: 0 18px 44px rgba(22, 32, 31, .16);
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      line-break: strict;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-inline-size: 320px;
+      color: var(--color-on-canvas);
+      background:
+        linear-gradient(90deg, rgba(35, 74, 70, .08) 0 1px, transparent 1px 24px),
+        linear-gradient(180deg, rgba(118, 80, 25, .08) 0 1px, transparent 1px 24px),
+        var(--color-canvas);
+      font-family: var(--font-ui);
+      font-size: 16px;
+      line-height: 1.62;
+    }
+
+    body.nav-open {
+      overflow: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    :focus-visible {
+      outline: 3px solid #0f766e;
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      inset-block-start: 10px;
+      inset-inline-start: 10px;
+      z-index: 20;
+      transform: translateY(-160%);
+      background: var(--color-on-canvas);
+      color: #fff;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .app-shell {
+      min-block-size: 100svh;
+      display: grid;
+      grid-template-columns: 264px minmax(0, 1fr);
+    }
+
+    .rail {
+      position: sticky;
+      inset-block-start: 0;
+      block-size: 100svh;
+      padding: var(--space-lg);
+      background: var(--color-surface-rail);
+      border-inline-end: 1px solid var(--color-border);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: var(--space-lg);
+    }
+
+    .brand {
+      display: grid;
+      gap: var(--space-sm);
+      padding-block-end: var(--space-md);
+      border-block-end: 2px solid rgba(35, 74, 70, .25);
+    }
+
+    .brand-mark {
+      inline-size: 54px;
+      block-size: 34px;
+      display: grid;
+      place-items: center;
+      color: var(--color-on-primary);
+      background:
+        repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, .18) 6px 10px),
+        var(--color-primary);
+      border-radius: var(--radius-xs);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .brand p,
+    .rail-note,
+    .muted {
+      margin: 0;
+      color: var(--color-muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .nav {
+      display: grid;
+      align-content: start;
+      gap: var(--space-sm);
+    }
+
+    .nav a,
+    .nav button {
+      min-block-size: 44px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-on-canvas);
+      text-align: start;
+      white-space: nowrap;
+    }
+
+    .nav a[aria-current="page"] {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .nav a:not([aria-current="page"]):hover,
+    .nav button:hover {
+      border-color: var(--color-border);
+      background: rgba(255, 255, 255, .42);
+    }
+
+    .rail-footer {
+      display: grid;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      border: 1px dashed rgba(35, 74, 70, .35);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, .36);
+    }
+
+    .mobile-topbar {
+      display: none;
+    }
+
+    .workspace {
+      min-inline-size: 0;
+      padding: clamp(16px, 2.4vw, 30px);
+      display: grid;
+      gap: var(--space-lg);
+      align-content: start;
+    }
+
+    .handoff-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-lg);
+      align-items: start;
+      padding-block-end: var(--space-md);
+      border-block-end: 3px solid var(--color-primary);
+    }
+
+    .eyebrow {
+      margin: 0 0 var(--space-xs);
+      color: var(--color-muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .handoff-head h2 {
+      margin: 0;
+      max-inline-size: 760px;
+      font-size: clamp(25px, 3vw, 40px);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .shift-box {
+      min-inline-size: 240px;
+      padding: var(--space-md);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+    }
+
+    .shift-box strong {
+      display: block;
+      font-size: 17px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: minmax(230px, 1.15fr) repeat(4, minmax(130px, 1fr));
+      gap: var(--space-md);
+      align-items: stretch;
+    }
+
+    .summary-ledger {
+      position: relative;
+      display: grid;
+      gap: var(--space-sm);
+      min-block-size: 120px;
+      padding: var(--space-lg);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      overflow: hidden;
+    }
+
+    .summary-ledger::before {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 0;
+      inline-size: 8px;
+      background: var(--stripe, var(--color-primary));
+    }
+
+    .summary-ledger strong {
+      font-family: var(--font-mono);
+      font-size: clamp(25px, 3vw, 34px);
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .summary-ledger span {
+      color: var(--color-muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .summary-ledger p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .summary-ledger.urgent {
+      --stripe: var(--color-urgent);
+    }
+
+    .summary-ledger.due {
+      --stripe: var(--color-due);
+    }
+
+    .summary-ledger.sensor {
+      --stripe: var(--color-sensor);
+    }
+
+    .summary-ledger.stale {
+      --stripe: var(--color-stale);
+    }
+
+    .action-strip,
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-md);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+    }
+
+    .action-strip {
+      border-inline-start: 8px solid var(--color-sensor);
+    }
+
+    .action-copy {
+      min-inline-size: min(100%, 520px);
+    }
+
+    .action-copy strong {
+      display: block;
+      line-height: 1.35;
+    }
+
+    .action-copy span {
+      display: block;
+      color: var(--color-muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .button,
+    .select-wrap select {
+      min-block-size: 44px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-primary);
+      padding: var(--space-sm) var(--space-md);
+      white-space: nowrap;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      background: var(--color-action);
+      color: var(--color-action-ink);
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    .button.secondary {
+      background: #fff;
+      color: var(--color-primary);
+    }
+
+    .button[disabled] {
+      cursor: not-allowed;
+      opacity: .65;
+    }
+
+    .select-wrap {
+      display: inline-grid;
+      gap: 2px;
+    }
+
+    .select-wrap label {
+      color: var(--color-muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .select-wrap select {
+      background: #fff;
+      color: var(--color-on-surface);
+      min-inline-size: 150px;
+    }
+
+    .records-panel {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .records-title {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-md);
+      align-items: center;
+      padding: var(--space-md) var(--space-lg);
+      border-block-end: 1px solid var(--color-border);
+      background: #fbfaf6;
+    }
+
+    .records-title h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+
+    .record-list {
+      display: grid;
+    }
+
+    .record {
+      --priority-color: var(--color-muted);
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(156px, 1.1fr) minmax(150px, .9fr) minmax(122px, .7fr) minmax(142px, .8fr) minmax(130px, .75fr) minmax(118px, .7fr);
+      gap: var(--space-md);
+      align-items: center;
+      min-inline-size: 0;
+      padding: var(--space-md) var(--space-lg) var(--space-md) calc(var(--space-lg) + 8px);
+      border-block-end: 1px solid var(--color-border);
+      background: var(--color-surface);
+    }
+
+    .record::before {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 0;
+      inline-size: 8px;
+      background: var(--priority-color);
+    }
+
+    .record[data-priority="now"] {
+      --priority-color: var(--color-urgent);
+    }
+
+    .record[data-priority="document"] {
+      --priority-color: var(--color-due);
+    }
+
+    .record[data-priority="observe"] {
+      --priority-color: var(--color-sensor);
+    }
+
+    .record:last-child {
+      border-block-end: 0;
+    }
+
+    .record.is-hidden {
+      display: none;
+    }
+
+    .record-id {
+      display: grid;
+      gap: var(--space-xs);
+      min-inline-size: 0;
+    }
+
+    .container-no {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 750;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .item {
+      overflow: hidden;
+      color: var(--color-muted);
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .terminal,
+    .temp,
+    .due-time,
+    .last-report {
+      min-inline-size: 0;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 650;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+
+    .temp small,
+    .last-report small,
+    .due-time small {
+      display: block;
+      color: var(--color-muted);
+      font-family: var(--font-ui);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .chip-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      min-inline-size: 0;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 28px;
+      max-inline-size: 100%;
+      padding: 3px 7px;
+      border-radius: var(--radius-xs);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .chip.priority-now {
+      background: var(--color-urgent);
+      color: var(--color-urgent-ink);
+    }
+
+    .chip.priority-document,
+    .chip.due-soon,
+    .chip.due-overdue {
+      background: var(--color-due);
+      color: var(--color-due-ink);
+    }
+
+    .chip.priority-observe,
+    .chip.sensor-ok {
+      background: var(--color-sensor);
+      color: var(--color-sensor-ink);
+    }
+
+    .chip.due-normal {
+      border: 1px solid var(--color-due);
+      background: var(--color-due-normal);
+      color: var(--color-due-normal-ink);
+    }
+
+    .chip.food-risk {
+      background: var(--color-food-risk);
+      color: var(--color-food-risk-ink);
+    }
+
+    .chip.status {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+
+    .chip.sensor-fail {
+      background: var(--color-disconnected);
+      color: var(--color-disconnected-ink);
+    }
+
+    .chip.sensor-stale {
+      background: var(--color-stale);
+      color: var(--color-stale-ink);
+    }
+
+    .retry-cell {
+      display: grid;
+      gap: var(--space-xs);
+      align-content: center;
+    }
+
+    .retry-state {
+      color: var(--color-muted);
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    .mini-button {
+      min-block-size: 36px;
+      justify-self: start;
+      padding: 5px 9px;
+      border: 1px solid var(--color-sensor);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--color-sensor);
+      font-size: 12px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      display: none;
+      padding: var(--space-xl);
+      color: var(--color-muted);
+      text-align: center;
+    }
+
+    .empty-state.is-visible {
+      display: block;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      border-block-start: 1px solid var(--color-border);
+      background: #fbfaf6;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--color-muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .legend i {
+      inline-size: 14px;
+      block-size: 14px;
+      border-radius: var(--radius-xs);
+      background: var(--legend-color);
+    }
+
+    .mobile-backdrop {
+      display: none;
+    }
+
+    @media (max-width: 1120px) {
+      .app-shell {
+        grid-template-columns: 230px minmax(0, 1fr);
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .record {
+        grid-template-columns: minmax(160px, 1.1fr) minmax(132px, .8fr) minmax(112px, .65fr) minmax(136px, .8fr);
+      }
+
+      .retry-cell,
+      .last-report {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 820px) {
+      body {
+        background:
+          linear-gradient(180deg, rgba(35, 74, 70, .08) 0 1px, transparent 1px 22px),
+          var(--color-canvas);
+      }
+
+      .app-shell {
+        display: block;
+      }
+
+      .mobile-topbar {
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 10;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: var(--space-sm);
+        align-items: center;
+        min-block-size: 62px;
+        padding: max(10px, env(safe-area-inset-top)) var(--space-md) 10px;
+        background: rgba(243, 241, 234, .96);
+        border-block-end: 1px solid var(--color-border);
+        backdrop-filter: blur(10px);
+      }
+
+      .mobile-topbar .brand-title {
+        min-inline-size: 0;
+      }
+
+      .mobile-topbar strong,
+      .mobile-topbar span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mobile-topbar span {
+        color: var(--color-muted);
+        font-size: 12px;
+      }
+
+      .nav-toggle {
+        inline-size: 44px;
+        block-size: 44px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--color-primary);
+        border-radius: var(--radius-sm);
+        background: var(--color-primary);
+        color: var(--color-on-primary);
+        font-size: 22px;
+        line-height: 1;
+      }
+
+      .mobile-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 11;
+        display: none;
+        background: rgba(22, 32, 31, .32);
+      }
+
+      body.nav-open .mobile-backdrop {
+        display: block;
+      }
+
+      .rail {
+        position: fixed;
+        inset-block: 0;
+        inset-inline-start: 0;
+        z-index: 12;
+        inline-size: min(82vw, 314px);
+        block-size: 100dvh;
+        transform: translateX(-105%);
+        transition: transform 180ms ease;
+        box-shadow: var(--shadow-float);
+      }
+
+      body.nav-open .rail {
+        transform: translateX(0);
+      }
+
+      .workspace {
+        padding: var(--space-md);
+        gap: var(--space-md);
+      }
+
+      .handoff-head {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+        padding-block-start: var(--space-sm);
+      }
+
+      .handoff-head h2 {
+        font-size: clamp(23px, 7vw, 31px);
+      }
+
+      .shift-box {
+        min-inline-size: 0;
+      }
+
+      .summary-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .summary-ledger:not(.urgent):not(.sensor) {
+        display: none;
+      }
+
+      .summary-ledger {
+        min-block-size: 96px;
+      }
+
+      .action-strip,
+      .controls {
+        align-items: stretch;
+      }
+
+      .action-strip .button,
+      .controls .button,
+      .select-wrap,
+      .select-wrap select {
+        inline-size: 100%;
+      }
+
+      .records-title {
+        grid-template-columns: 1fr;
+        gap: var(--space-xs);
+      }
+
+      .record-list {
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+        background: #ded9c9;
+      }
+
+      .record {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-sm);
+        padding: var(--space-md) var(--space-md) var(--space-md) calc(var(--space-md) + 8px);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+      }
+
+      .record[data-priority="now"] {
+        order: 1;
+      }
+
+      .record[data-priority="document"] {
+        order: 2;
+      }
+
+      .record[data-priority="observe"] {
+        order: 3;
+      }
+
+      .terminal,
+      .due-time,
+      .last-report,
+      .retry-cell {
+        grid-column: auto;
+      }
+
+      .record-id {
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: var(--space-sm);
+      }
+
+      .item {
+        grid-column: 1 / -1;
+      }
+
+      .temp {
+        justify-self: end;
+        text-align: end;
+      }
+
+      .chip-stack {
+        order: -1;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 360px) {
+      .workspace {
+        padding-inline: 10px;
+      }
+
+      .record-id {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .temp {
+        justify-self: start;
+        text-align: start;
+      }
+
+      .legend {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">跳到批次工作面</a>
+  <div class="mobile-topbar">
+    <button class="nav-toggle" type="button" data-eval="mobile-nav-toggle" aria-controls="global-nav" aria-expanded="false" aria-label="開啟全域導覽">☰</button>
+    <div class="brand-title">
+      <strong>冷鏈交接台</strong>
+      <span>北五碼頭・夜班 N3</span>
+    </div>
+    <div class="brand-mark" aria-hidden="true">COLD</div>
+  </div>
+  <div class="mobile-backdrop" data-close-nav></div>
+  <div class="app-shell">
+    <aside class="rail" aria-label="產品導覽">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">COLD</div>
+        <div>
+          <h1>港口冷鏈<br>異常交接台</h1>
+          <p>登入後工作台・靜態 demo</p>
+        </div>
+      </div>
+      <nav class="nav" id="global-nav" data-eval="global-nav" aria-label="全域導覽">
+        <a href="#workspace" aria-current="page">交接總覽</a>
+        <a href="#records">批次工作面</a>
+        <a href="#sensor-retry">感測讀取</a>
+        <button type="button" data-close-nav>關閉導覽</button>
+      </nav>
+      <div class="rail-footer">
+        <strong>目前範圍</strong>
+        <p class="rail-note">北五碼頭冷藏區，夜班 N3，資料為本機靜態示範，不代表港務或 IoT 連線。</p>
+      </div>
+    </aside>
+
+    <main class="workspace" id="workspace">
+      <header class="handoff-head">
+        <div>
+          <p class="eyebrow">夜班交接・30 秒辨識</p>
+          <h2>先處理溫控偏移與斷訊，再追文件等待與可觀察批次。</h2>
+        </div>
+        <div class="shift-box" aria-label="目前班別">
+          <strong>北五碼頭｜N3 夜班</strong>
+          <p class="muted">交接窗口 23:40 - 00:10</p>
+          <p class="muted">資料新鮮度：多數 6 分內，含 1 筆過期示範</p>
+        </div>
+      </header>
+
+      <section class="summary-grid" aria-label="交接摘要">
+        <article class="summary-ledger urgent">
+          <span>需要現在處理</span>
+          <strong id="count-now">0</strong>
+          <p>溫度偏差、食安風險或放行期限已逼近。</p>
+        </article>
+        <article class="summary-ledger due">
+          <span>等待文件</span>
+          <strong id="count-doc">0</strong>
+          <p>需補齊檢疫、封條或倉單後才能放行。</p>
+        </article>
+        <article class="summary-ledger sensor">
+          <span>可持續觀察</span>
+          <strong id="count-observe">0</strong>
+          <p>溫控仍在界線內，維持監看即可。</p>
+        </article>
+        <article class="summary-ledger stale">
+          <span>資料過期</span>
+          <strong id="count-stale">0</strong>
+          <p>過期代表可信度下降，不等於已判定食安失效。</p>
+        </article>
+        <article class="summary-ledger sensor" id="sensor-retry">
+          <span>局部讀取失敗</span>
+          <strong id="count-fail">0</strong>
+          <p>可重試感測讀取；demo 僅切換本機狀態。</p>
+        </article>
+      </section>
+
+      <section class="action-strip" aria-live="polite">
+        <div class="action-copy">
+          <strong id="next-action">下一步：查看需要現在處理的批次</strong>
+          <span id="next-action-detail">篩選會改變工作面顯示，但不連線、不送出、不更新真實資料。</span>
+        </div>
+        <button class="button" type="button" data-eval="global-action" id="focus-now">只看現在處理</button>
+      </section>
+
+      <section class="controls" aria-label="篩選與排序">
+        <div class="select-wrap">
+          <label for="priority-filter">處理分類</label>
+          <select id="priority-filter">
+            <option value="all">全部批次</option>
+            <option value="now">需要現在處理</option>
+            <option value="document">等待文件</option>
+            <option value="observe">可持續觀察</option>
+          </select>
+        </div>
+        <div class="select-wrap">
+          <label for="sort-mode">排序</label>
+          <select id="sort-mode">
+            <option value="priority">急迫優先</option>
+            <option value="due">放行期限</option>
+            <option value="freshness">回報新鮮度</option>
+          </select>
+        </div>
+        <button class="button secondary" type="button" id="reset-view">重設工作面</button>
+      </section>
+
+      <section class="records-panel" id="records" aria-label="主要批次工作面">
+        <div class="records-title">
+          <div>
+            <h3>批次工作面</h3>
+            <p class="muted">每筆記錄分開呈現急迫度、階段、期限、感測狀態與最後回報。</p>
+          </div>
+          <p class="muted" id="visible-count">顯示 0 筆</p>
+        </div>
+        <div class="record-list" id="record-list"></div>
+        <p class="empty-state" id="empty-state">目前篩選沒有符合批次。</p>
+        <div class="legend" aria-label="語意圖例">
+          <span><i style="--legend-color: var(--color-urgent)"></i>急迫處理</span>
+          <span><i style="--legend-color: var(--color-due)"></i>期限／文件</span>
+          <span><i style="--legend-color: var(--color-food-risk)"></i>食安風險</span>
+          <span><i style="--legend-color: var(--color-sensor)"></i>感測可信度</span>
+          <span><i style="--legend-color: var(--color-disconnected)"></i>感測斷訊</span>
+          <span><i style="--legend-color: var(--color-stale)"></i>資料過期</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const records = [
+      {
+        id: "BX-2391", container: "TCNU-482913-7", item: "鮭魚冷藏箱 18 板",
+        terminal: "北五 A12", temp: "+2.8°C", drift: "+1.6°C / 12 分",
+        priority: "now", priorityLabel: "現在處理", status: "隔離複核", due: "00:05", dueState: "overdue",
+        dueLabel: "已逾期", sensor: "ok", sensorLabel: "雙探頭可信", last: "2 分前",
+        freshness: 2, foodRisk: true, fail: false
+      },
+      {
+        id: "BX-2392", container: "OOLU-771540-2", item: "冷凍蝦仁 24 板",
+        terminal: "北五 B03", temp: "-16.4°C", drift: "+3.2°C / 8 分",
+        priority: "now", priorityLabel: "現在處理", status: "待調度確認", due: "00:18", dueState: "soon",
+        dueLabel: "期限逼近", sensor: "fail", sensorLabel: "讀取失敗", last: "失敗於 4 分前",
+        freshness: 4, foodRisk: false, fail: true
+      },
+      {
+        id: "BX-2393", container: "SEGU-118420-8", item: "疫苗輔料保冷箱 6 板",
+        terminal: "北五 C21", temp: "+5.7°C", drift: "+0.9°C / 19 分",
+        priority: "document", priorityLabel: "等待文件", status: "待檢疫文件", due: "00:42", dueState: "soon",
+        dueLabel: "文件卡關", sensor: "ok", sensorLabel: "單探頭穩定", last: "5 分前",
+        freshness: 5, foodRisk: true, fail: false
+      },
+      {
+        id: "BX-2394", container: "WHLU-339801-1", item: "奶油乳酪 20 板",
+        terminal: "北五 A08", temp: "+3.1°C", drift: "+0.4°C / 31 分",
+        priority: "document", priorityLabel: "等待文件", status: "封條號待核", due: "01:15", dueState: "normal",
+        dueLabel: "期限正常", sensor: "stale", sensorLabel: "資料過期", last: "22 分前",
+        freshness: 22, foodRisk: false, fail: false
+      },
+      {
+        id: "BX-2395", container: "EISU-640219-5", item: "冷凍莓果 15 板",
+        terminal: "北五 D14", temp: "-19.8°C", drift: "-0.3°C / 17 分",
+        priority: "observe", priorityLabel: "持續觀察", status: "等候放行", due: "01:40", dueState: "normal",
+        dueLabel: "期限正常", sensor: "ok", sensorLabel: "雙探頭可信", last: "3 分前",
+        freshness: 3, foodRisk: false, fail: false
+      },
+      {
+        id: "BX-2396", container: "FSCU-902671-4", item: "生鮮雞肉 16 板",
+        terminal: "北五 B17", temp: "+4.4°C", drift: "+1.1°C / 10 分",
+        priority: "now", priorityLabel: "現在處理", status: "需改派冷位", due: "00:28", dueState: "soon",
+        dueLabel: "期限逼近", sensor: "ok", sensorLabel: "探頭偏移已校", last: "1 分前",
+        freshness: 1, foodRisk: true, fail: false
+      },
+      {
+        id: "BX-2397", container: "TLLU-553210-9", item: "巧克力原料 12 板",
+        terminal: "北五 C09", temp: "+10.2°C", drift: "+0.2°C / 45 分",
+        priority: "observe", priorityLabel: "持續觀察", status: "碼頭等待", due: "02:05", dueState: "normal",
+        dueLabel: "期限正常", sensor: "ok", sensorLabel: "單探頭可信", last: "6 分前",
+        freshness: 6, foodRisk: false, fail: false
+      },
+      {
+        id: "BX-2398", container: "NYKU-004871-6", item: "冷藏牛肉 22 板",
+        terminal: "北五 A19", temp: "+1.5°C", drift: "+0.7°C / 14 分",
+        priority: "document", priorityLabel: "等待文件", status: "倉單待補", due: "00:55", dueState: "soon",
+        dueLabel: "文件卡關", sensor: "ok", sensorLabel: "雙探頭可信", last: "4 分前",
+        freshness: 4, foodRisk: true, fail: false
+      }
+    ];
+
+    const priorityOrder = { now: 0, document: 1, observe: 2 };
+    const dueOrder = { overdue: 0, soon: 1, normal: 2 };
+    const list = document.querySelector("#record-list");
+    const emptyState = document.querySelector("#empty-state");
+    const filter = document.querySelector("#priority-filter");
+    const sortMode = document.querySelector("#sort-mode");
+    const visibleCount = document.querySelector("#visible-count");
+    const nextAction = document.querySelector("#next-action");
+    const nextDetail = document.querySelector("#next-action-detail");
+    const navToggle = document.querySelector("[data-eval='mobile-nav-toggle']");
+    const navLinks = document.querySelectorAll("#global-nav a, [data-close-nav]");
+
+    function chipClass(record, type) {
+      if (type === "priority") return `priority-${record.priority === "now" ? "now" : record.priority}`;
+      if (type === "due") return record.dueState === "normal" ? "due-normal" : `due-${record.dueState}`;
+      if (type === "sensor") return `sensor-${record.sensor}`;
+      return "status";
+    }
+
+    function renderRecords() {
+      list.innerHTML = "";
+      const sorted = [...records].sort((a, b) => {
+        if (sortMode.value === "due") return dueOrder[a.dueState] - dueOrder[b.dueState] || a.due.localeCompare(b.due);
+        if (sortMode.value === "freshness") return b.freshness - a.freshness;
+        return priorityOrder[a.priority] - priorityOrder[b.priority] || dueOrder[a.dueState] - dueOrder[b.dueState];
+      });
+
+      sorted.forEach((record) => {
+        const article = document.createElement("article");
+        article.className = "record";
+        article.setAttribute("data-eval", "record");
+        article.setAttribute("data-record-id", record.id);
+        article.dataset.priority = record.priority;
+        article.setAttribute("record-priority", record.priorityLabel);
+        article.setAttribute("record-status", record.status);
+        article.setAttribute("record-due", record.dueLabel);
+        article.innerHTML = `
+          <div class="record-id">
+            <div>
+              <div class="container-no">${record.container}</div>
+              <div class="item">${record.id}｜${record.item}</div>
+            </div>
+            <div class="temp">${record.temp}<small>${record.drift}</small></div>
+          </div>
+          <div class="terminal">${record.terminal}<small>目前碼頭</small></div>
+          <div class="chip-stack" aria-label="批次狀態">
+            <span class="chip ${chipClass(record, "priority")}">${record.priorityLabel}</span>
+            <span class="chip status">${record.status}</span>
+            <span class="chip ${chipClass(record, "due")}">${record.dueLabel}</span>
+            ${record.foodRisk ? '<span class="chip food-risk">食安複核</span>' : ""}
+          </div>
+          <div class="due-time">${record.due}<small>放行期限</small></div>
+          <div class="last-report">${record.last}<small>最後回報</small></div>
+          <div class="retry-cell">
+            <span class="chip ${chipClass(record, "sensor")}">${record.sensorLabel}</span>
+            ${record.fail ? '<button class="mini-button" type="button" data-retry>重試讀取</button>' : '<span class="retry-state">無需重試</span>'}
+          </div>
+        `;
+        list.appendChild(article);
+      });
+      applyFilters();
+    }
+
+    function updateCounts() {
+      document.querySelector("#count-now").textContent = records.filter((r) => r.priority === "now").length;
+      document.querySelector("#count-doc").textContent = records.filter((r) => r.priority === "document").length;
+      document.querySelector("#count-observe").textContent = records.filter((r) => r.priority === "observe").length;
+      document.querySelector("#count-stale").textContent = records.filter((r) => r.sensor === "stale").length;
+      document.querySelector("#count-fail").textContent = records.filter((r) => r.fail).length;
+    }
+
+    function applyFilters() {
+      const wanted = filter.value;
+      let shown = 0;
+      document.querySelectorAll("[data-eval='record']").forEach((recordNode) => {
+        const show = wanted === "all" || recordNode.dataset.priority === wanted;
+        recordNode.classList.toggle("is-hidden", !show);
+        if (show) shown += 1;
+      });
+      visibleCount.textContent = `顯示 ${shown} 筆`;
+      emptyState.classList.toggle("is-visible", shown === 0);
+      if (wanted === "now") {
+        nextAction.textContent = "下一步：處理溫控偏移與斷訊批次";
+        nextDetail.textContent = "先看左側紅色語意條與感測欄，確認需改派冷位或重試讀取。";
+      } else if (wanted === "document") {
+        nextAction.textContent = "下一步：追補文件與封條核對";
+        nextDetail.textContent = "期限與工作階段分開顯示，避免把文件等待誤判為食安失效。";
+      } else if (wanted === "observe") {
+        nextAction.textContent = "下一步：維持觀察並留意資料新鮮度";
+        nextDetail.textContent = "可觀察不代表安全結案，仍需確認最後回報時間。";
+      } else {
+        nextAction.textContent = "下一步：查看需要現在處理的批次";
+        nextDetail.textContent = "篩選會改變工作面顯示，但不連線、不送出、不更新真實資料。";
+      }
+    }
+
+    function closeNav() {
+      document.body.classList.remove("nav-open");
+      navToggle.setAttribute("aria-expanded", "false");
+      navToggle.focus({ preventScroll: true });
+    }
+
+    filter.addEventListener("change", applyFilters);
+    sortMode.addEventListener("change", renderRecords);
+    document.querySelector("#focus-now").addEventListener("click", () => {
+      filter.value = "now";
+      applyFilters();
+      document.querySelector("#records").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    document.querySelector("#reset-view").addEventListener("click", () => {
+      filter.value = "all";
+      sortMode.value = "priority";
+      renderRecords();
+    });
+    list.addEventListener("click", (event) => {
+      const retry = event.target.closest("[data-retry]");
+      if (!retry) return;
+      const cell = retry.closest(".retry-cell");
+      retry.disabled = true;
+      retry.textContent = "已重試";
+      const status = cell.querySelector(".chip");
+      status.textContent = "本機重試完成";
+      status.className = "chip sensor-ok";
+      const note = document.createElement("span");
+      note.className = "retry-state";
+      note.textContent = "demo 狀態，未連線更新。";
+      cell.appendChild(note);
+    });
+    navToggle.addEventListener("click", () => {
+      const open = !document.body.classList.contains("nav-open");
+      document.body.classList.toggle("nav-open", open);
+      navToggle.setAttribute("aria-expanded", String(open));
+      if (open) document.querySelector("#global-nav a").focus({ preventScroll: true });
+    });
+    navLinks.forEach((item) => item.addEventListener("click", closeNav));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && document.body.classList.contains("nav-open")) closeNav();
+    });
+
+    updateCounts();
+    renderRecords();
+  </script>
+</body>
+</html>

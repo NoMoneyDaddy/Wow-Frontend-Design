@@ -23,14 +23,14 @@ class VisualWebOutputValidatorTests(unittest.TestCase):
             root = Path(directory)
             (root / "DESIGN.md").write_text("# Design\n", encoding="utf-8")
             (root / "index.html").write_text("<main></main>", encoding="utf-8")
-            self.assertEqual([], validator.validate("mountain-rescue-flow-v3", root))
+            self.assertEqual([], validator.validate("harbor-cold-chain-v4", root))
 
-    def test_bookstore_requires_all_three_pages(self) -> None:
+    def test_plant_swap_requires_all_three_pages(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ("DESIGN.md", "index.html", "catalog.html"):
+            for name in ("DESIGN.md", "index.html", "browse.html"):
                 (root / name).write_text("content\n", encoding="utf-8")
-            self.assertTrue(any("output set" in issue for issue in validator.validate("bookstore-one-line-v3", root)))
+            self.assertTrue(any("output set" in issue for issue in validator.validate("plant-swap-one-line-v4", root)))
 
 
 if __name__ == "__main__":

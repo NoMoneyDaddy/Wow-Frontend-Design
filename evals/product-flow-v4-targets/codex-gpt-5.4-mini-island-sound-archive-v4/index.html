@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>島嶼聲音檔案館</title>
+  <meta name="description" content="面向一般讀者與研究者的繁體中文島嶼聲音檔案探索網站，提供錄音索引、採集脈絡與逐字節錄。">
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f5efe8;
+      --surface: #fff9f1;
+      --surface-2: #f2e9dc;
+      --ink: #1f2629;
+      --muted: #566168;
+      --primary: #8a4e34;
+      --primary-soft: rgba(138, 78, 52, 0.12);
+      --primary-strong: rgba(138, 78, 52, 0.18);
+      --shadow: 0 18px 40px rgba(31, 38, 41, 0.08);
+      --radius-sm: 0.5rem;
+      --radius-md: 0.875rem;
+      --radius-lg: 1.25rem;
+      --radius-pill: 999px;
+      --space-xs: 0.375rem;
+      --space-sm: 0.625rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --measure: 72rem;
+      --top-offset: 5.5rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(138, 78, 52, 0.12), transparent 24%),
+        radial-gradient(circle at 82% 14%, rgba(31, 38, 41, 0.06), transparent 20%),
+        linear-gradient(180deg, #fbf7f0 0%, var(--canvas) 34%, #efe6d8 100%);
+      color: var(--ink);
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      line-height: 1.7;
+      letter-spacing: 0;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(
+          180deg,
+          rgba(31, 38, 41, 0.02) 0,
+          rgba(31, 38, 41, 0.02) 1px,
+          transparent 1px,
+          transparent 28px
+        );
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 80%);
+      opacity: 0.65;
+    }
+
+    a { color: inherit; text-decoration-thickness: 0.08em; text-underline-offset: 0.18em; }
+    button, input { font: inherit; }
+    button {
+      appearance: none;
+      border: 0;
+      background: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: 1rem;
+      z-index: 20;
+      transform: translateY(-180%);
+      padding: 0.7rem 1rem;
+      border-radius: var(--radius-pill);
+      background: var(--ink);
+      color: var(--surface);
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .page {
+      width: min(100% - 1.25rem, var(--measure));
+      margin: 0 auto;
+      padding: 1rem 0 2rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0.75rem;
+      z-index: 10;
+      display: grid;
+      gap: 1rem;
+      align-items: center;
+      grid-template-columns: auto 1fr auto;
+      margin-bottom: 1rem;
+      padding: 0.85rem 1rem;
+      border: 1px solid rgba(31, 38, 41, 0.1);
+      border-radius: var(--radius-lg);
+      background: rgba(255, 249, 241, 0.8);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 26px rgba(31, 38, 41, 0.05);
+    }
+
+    .brand {
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .brand__eyebrow {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.83rem;
+      letter-spacing: 0.08em;
+      text-transform: none;
+    }
+
+    .brand__title {
+      margin: 0;
+      font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+      line-height: 1.1;
+      font-weight: 800;
+    }
+
+    .brand__status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .topnav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .topnav a {
+      padding: 0.45rem 0.72rem;
+      border-radius: var(--radius-pill);
+      background: rgba(242, 233, 220, 0.85);
+      color: var(--muted);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .topnav a:hover,
+    .topnav a:focus-visible {
+      color: var(--ink);
+      background: rgba(138, 78, 52, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .topbar__action {
+      justify-self: end;
+      padding: 0.68rem 1rem;
+      border-radius: var(--radius-pill);
+      background: var(--primary);
+      color: var(--surface);
+      box-shadow: 0 12px 24px rgba(138, 78, 52, 0.18);
+      transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+    }
+
+    .topbar__action:hover,
+    .topbar__action:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px rgba(138, 78, 52, 0.22);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(14rem, 0.8fr);
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .hero__panel,
+    .hero__ribbon,
+    .controls,
+    .archive,
+    .empty-state,
+    .detail-panel,
+    .footer-note {
+      border: 1px solid rgba(31, 38, 41, 0.1);
+      background: rgba(255, 249, 241, 0.82);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+    }
+
+    .hero__panel {
+      border-radius: calc(var(--radius-lg) + 0.2rem);
+      padding: 1.2rem 1.2rem 1.15rem;
+    }
+
+    .hero__kicker {
+      margin: 0 0 0.45rem;
+      color: var(--primary);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      font-size: 0.84rem;
+    }
+
+    .hero__headline {
+      margin: 0;
+      font-size: clamp(2rem, 4.2vw, 3.55rem);
+      line-height: 1.03;
+      letter-spacing: -0.02em;
+      max-width: 11ch;
+    }
+
+    .hero__lede {
+      margin: 0.85rem 0 0;
+      max-width: 58ch;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .hero__chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.8rem;
+      border-radius: var(--radius-pill);
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .chip strong { color: var(--ink); font-weight: 700; }
+
+    .hero__ribbon {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      border-radius: var(--radius-lg);
+      min-height: 100%;
+      padding: 0.9rem;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(138, 78, 52, 0.08), rgba(255, 249, 241, 0.78)),
+        var(--surface);
+    }
+
+    [data-eval="vertical-type"] {
+      display: grid;
+      gap: 0.75rem;
+      align-content: space-between;
+      color: var(--primary);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      min-height: 12rem;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .vertical__mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--radius-pill);
+      background: rgba(138, 78, 52, 0.08);
+      color: var(--primary);
+      font-size: 0.95rem;
+    }
+
+    .vertical__text {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.3;
+    }
+
+    .controls {
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .controls__row {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+    }
+
+    .field {
+      min-width: 0;
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .field input {
+      width: 100%;
+      border: 1px solid rgba(31, 38, 41, 0.14);
+      border-radius: var(--radius-md);
+      padding: 0.86rem 0.95rem;
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink);
+      min-width: 0;
+    }
+
+    .field input::placeholder { color: rgba(86, 97, 104, 0.78); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .toolbar__label {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-right: 0.25rem;
+    }
+
+    .filter {
+      padding: 0.55rem 0.85rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(31, 38, 41, 0.1);
+      background: rgba(242, 233, 220, 0.72);
+      color: var(--muted);
+      white-space: nowrap;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms ease, border-color 160ms ease;
+    }
+
+    .filter[aria-pressed="true"] {
+      background: var(--primary);
+      color: var(--surface);
+      border-color: transparent;
+    }
+
+    .filter:hover,
+    .filter:focus-visible {
+      transform: translateY(-1px);
+      color: var(--ink);
+      border-color: rgba(138, 78, 52, 0.3);
+    }
+
+    .archive {
+      border-radius: calc(var(--radius-lg) + 0.2rem);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .archive__summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .archive__title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 800;
+    }
+
+    .archive__count {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .archive__grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+      align-items: start;
+    }
+
+    .record-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .record {
+      display: grid;
+      gap: 0.55rem;
+      text-align: left;
+      align-content: start;
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(31, 38, 41, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(242, 233, 220, 0.45));
+      min-width: 0;
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    }
+
+    .record:hover,
+    .record:focus-visible {
+      transform: translateY(-2px);
+      border-color: rgba(138, 78, 52, 0.28);
+      box-shadow: 0 12px 28px rgba(31, 38, 41, 0.08);
+    }
+
+    .record[aria-pressed="true"] {
+      background: linear-gradient(180deg, rgba(138, 78, 52, 0.08), rgba(255, 249, 241, 0.95));
+      border-color: rgba(138, 78, 52, 0.32);
+      box-shadow: 0 14px 26px rgba(138, 78, 52, 0.12);
+    }
+
+    .record[data-featured="true"] {
+      grid-column: 1 / -1;
+      padding: 1.1rem;
+    }
+
+    .record__top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.5rem;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .record__index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.25rem;
+      height: 2.25rem;
+      padding: 0 0.5rem;
+      border-radius: var(--radius-pill);
+      background: rgba(138, 78, 52, 0.08);
+      color: var(--primary);
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .record__title {
+      margin: 0;
+      font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+      line-height: 1.15;
+      font-weight: 800;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .record__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .record__tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--muted);
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+
+    .record__summary {
+      display: block;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .record__foot {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.1rem;
+    }
+
+    .record__state {
+      color: var(--primary);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .record__rights {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .detail-panel {
+      position: sticky;
+      top: calc(var(--top-offset) + 0.25rem);
+      border-radius: calc(var(--radius-lg) + 0.1rem);
+      padding: 1rem;
+      overflow: hidden;
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .detail-panel.is-loading::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(138, 78, 52, 0.08), transparent);
+      animation: shimmer 1.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes shimmer {
+      from { transform: translateX(-70%); }
+      to { transform: translateX(70%); }
+    }
+
+    .detail-panel__kicker {
+      margin: 0;
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .detail-panel__title {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.5vw, 2rem);
+      line-height: 1.08;
+      letter-spacing: -0.01em;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-panel__summary {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .detail-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem 1rem;
+      margin: 0;
+    }
+
+    .detail-meta div {
+      min-width: 0;
+      padding: 0.72rem 0.8rem;
+      border-radius: var(--radius-md);
+      background: rgba(242, 233, 220, 0.58);
+    }
+
+    .detail-meta dt {
+      margin: 0 0 0.2rem;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .detail-meta dd {
+      margin: 0;
+      font-size: 0.96rem;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-notes {
+      display: grid;
+      gap: 0.55rem;
+      padding: 0.9rem;
+      border-radius: var(--radius-md);
+      background: rgba(138, 78, 52, 0.06);
+    }
+
+    .detail-notes__row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.42rem 0.68rem;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink);
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+
+    .status--accent {
+      background: rgba(138, 78, 52, 0.12);
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .detail-quote {
+      margin: 0;
+      padding: 0.95rem 1rem;
+      border-left: 4px solid var(--primary);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--ink);
+    }
+
+    .detail-collection {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      align-items: center;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.72rem 1rem;
+      border-radius: var(--radius-pill);
+      background: var(--primary);
+      color: var(--surface);
+      box-shadow: 0 12px 24px rgba(138, 78, 52, 0.17);
+      transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px rgba(138, 78, 52, 0.22);
+    }
+
+    .button[disabled] {
+      cursor: not-allowed;
+      opacity: 0.62;
+      box-shadow: none;
+    }
+
+    .button--ghost {
+      background: rgba(242, 233, 220, 0.95);
+      color: var(--ink);
+      box-shadow: none;
+      border: 1px solid rgba(31, 38, 41, 0.1);
+    }
+
+    .empty-state {
+      display: none;
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      margin-top: 1rem;
+    }
+
+    .empty-state.is-visible { display: grid; gap: 0.85rem; }
+
+    .empty-state h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .empty-state p { margin: 0; color: var(--muted); }
+
+    .footer-note {
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.1rem;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 54rem) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .topnav {
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 0.15rem;
+      }
+
+      .topbar__action { justify-self: start; }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      [data-eval="vertical-type"] {
+        writing-mode: horizontal-tb;
+        min-height: 0;
+        gap: 0.4rem;
+      }
+
+      .vertical__mark {
+        justify-content: flex-start;
+      }
+
+      .controls__row,
+      .archive__grid {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 0.15rem;
+      }
+
+      .record-list {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-panel {
+        position: static;
+      }
+
+      .detail-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 28rem) {
+      .page {
+        width: min(100% - 0.9rem, var(--measure));
+        padding-top: 0.6rem;
+      }
+
+      .topbar,
+      .hero__panel,
+      .controls,
+      .archive,
+      .detail-panel,
+      .footer-note {
+        padding-inline: 0.85rem;
+      }
+
+      .hero__headline {
+        max-width: 100%;
+      }
+
+      .record {
+        padding: 0.9rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+      .detail-panel.is-loading::after {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+
+  <div class="page">
+    <header class="topbar" data-eval="global-nav" aria-label="全域導覽">
+      <div class="brand">
+        <p class="brand__eyebrow">島嶼聲音檔案館</p>
+        <h1 class="brand__title">聽見地名，也聽見採集的路徑。</h1>
+        <p class="brand__status" id="archiveStatus">共 8 筆示意錄音，皆為可讀節錄、無真實音訊。</p>
+      </div>
+
+      <nav class="topnav" aria-label="頁面區段">
+        <a href="#archive">錄音索引</a>
+        <a href="#detail">目前選取</a>
+        <a href="#notes">權利與說明</a>
+      </nav>
+
+      <button class="topbar__action" type="button" data-eval="global-action" id="randomPick">
+        隨機一筆
+      </button>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__panel">
+          <p class="hero__kicker">編輯脈絡</p>
+          <h2 class="hero__headline" id="hero-title">島嶼聲音檔案，從索引走到口述記憶。</h2>
+          <p class="hero__lede">
+            這是一個內容先行的繁體中文檔案探索頁：桌機同時看見錄音索引、採集資訊與逐字節錄，手機則以較短的水平等價版本保留相同入口，不把長直排硬塞進窄螢幕。
+          </p>
+
+          <div class="hero__chips" aria-label="網站重點">
+            <span class="chip"><strong>8</strong>筆錄音</span>
+            <span class="chip"><strong>1</strong>個目前選取</span>
+            <span class="chip"><strong>8</strong>種權利／可見狀態</span>
+            <span class="chip"><strong>0</strong>真實音檔</span>
+          </div>
+        </div>
+
+        <aside class="hero__ribbon" data-eval="vertical-type" aria-label="直排索引">
+          <span class="vertical__mark">直排索引</span>
+          <p class="vertical__text">東經 121° · 北緯 22° · 潮線與口述記憶 · 案卷 07</p>
+        </aside>
+      </section>
+
+      <section class="controls" aria-labelledby="controls-title">
+        <h2 class="visually-hidden" id="controls-title">搜尋與篩選</h2>
+        <div class="controls__row">
+          <div class="field">
+            <label for="search">搜尋島名、講者、語言、主題或年份</label>
+            <input id="search" name="search" type="search" placeholder="例如：蘭嶼、海事、客語、1981">
+          </div>
+
+          <div class="toolbar" aria-label="主題篩選">
+            <span class="toolbar__label">主題：</span>
+            <button class="filter" type="button" data-filter="全部" aria-pressed="true">全部</button>
+            <button class="filter" type="button" data-filter="航海" aria-pressed="false">航海</button>
+            <button class="filter" type="button" data-filter="祭儀" aria-pressed="false">祭儀</button>
+            <button class="filter" type="button" data-filter="勞作" aria-pressed="false">勞作</button>
+            <button class="filter" type="button" data-filter="防衛" aria-pressed="false">防衛</button>
+            <button class="filter" type="button" data-filter="生態" aria-pressed="false">生態</button>
+            <button class="filter" type="button" data-filter="記憶" aria-pressed="false">記憶</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="archive" id="archive" aria-labelledby="archive-title">
+        <div class="archive__summary">
+          <div>
+            <h2 class="archive__title" id="archive-title">錄音索引</h2>
+            <p class="archive__count" id="resultCount" aria-live="polite">目前顯示 8 筆。</p>
+          </div>
+          <span class="chip">點選一筆，即可查看採集脈絡與節錄</span>
+        </div>
+
+        <div class="archive__grid">
+          <div>
+            <div class="record-list" id="recordList" aria-label="錄音列表">
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-01"
+                data-featured="true"
+                data-title="颱風後的修船聲"
+                data-island="綠島・龜灣"
+                data-speaker="林阿嬤"
+                data-language="臺語"
+                data-year="1978"
+                data-duration="06:14"
+                data-topic="航海、記憶"
+                data-rights="館內預覽，研究引用須註明"
+                data-listen="預覽不可播放"
+                data-summary="一段從潮線開始的口述，談的是颱風過後如何判斷木板還能不能補、船還能不能下水。"
+                data-collection="採集者：陳淑媛；地點：綠島龜灣；節錄：2024 年整理。"
+                data-excerpt="「海還沒退盡，大家就先看木紋有沒有裂。不是急著修，是先聽風有沒有收。」"
+                data-search="颱風後的修船聲 綠島 龜灣 林阿嬤 臺語 1978 06:14 航海 記憶 館內預覽 預覽不可播放 修船 潮線"
+                data-tags="航海,記憶"
+              >
+                <span class="record__top">
+                  <span class="record__index">01</span>
+                  <span class="record__title">颱風後的修船聲</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">綠島・龜灣</span>
+                  <span class="record__tag">林阿嬤</span>
+                  <span class="record__tag">臺語</span>
+                  <span class="record__tag">1978</span>
+                </span>
+                <span class="record__summary">一段從潮線開始的口述，談的是颱風過後如何判斷木板還能不能補、船還能不能下水。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">館內預覽，研究引用須註明</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-02"
+                data-title="飛魚季前的禁忌筆記"
+                data-island="蘭嶼・朗島"
+                data-speaker="杜南"
+                data-language="達悟語／華語"
+                data-year="1986"
+                data-duration="09:42"
+                data-topic="祭儀、航海"
+                data-rights="研究引用需註明，館內預覽"
+                data-listen="預覽不可播放"
+                data-summary="講者用雙語交替描述飛魚季前的準備，哪些話能說、哪些事要先放回海邊。"
+                data-collection="採集者：葉芷瑄；地點：蘭嶼朗島；節錄：2019 年校訂。"
+                data-excerpt="「先不要問魚要來幾尾，先問海有沒有開口。禁忌不是規矩，是在等時間對上。」"
+                data-search="飛魚季前的禁忌筆記 蘭嶼 朗島 杜南 達悟語 華語 1986 09:42 祭儀 航海 研究引用需註明 預覽不可播放 飛魚"
+                data-tags="祭儀,航海"
+              >
+                <span class="record__top">
+                  <span class="record__index">02</span>
+                  <span class="record__title">飛魚季前的禁忌筆記</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">蘭嶼・朗島</span>
+                  <span class="record__tag">杜南</span>
+                  <span class="record__tag">達悟語／華語</span>
+                  <span class="record__tag">1986</span>
+                </span>
+                <span class="record__summary">講者用雙語交替描述飛魚季前的準備，哪些話能說、哪些事要先放回海邊。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">研究引用需註明，館內預覽</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-03"
+                data-title="鹽田與風向表"
+                data-island="澎湖・西嶼"
+                data-speaker="陳秋風"
+                data-language="澎湖話"
+                data-year="1969"
+                data-duration="04:27"
+                data-topic="勞作、生態"
+                data-rights="可公開閱讀，未提供音訊"
+                data-listen="預覽不可播放"
+                data-summary="關於鹽場、風口與曬鹽時機的短篇訪談，句子短，訊息密，像一張人工風向表。"
+                data-collection="採集者：李佩蓉；地點：澎湖西嶼；節錄：2022 年重錄。"
+                data-excerpt="「風從南邊斜過來，鹽就不能攤太厚。眼睛看天，手要快一點。」"
+                data-search="鹽田與風向表 澎湖 西嶼 陳秋風 澎湖話 1969 04:27 勞作 生態 可公開閱讀 預覽不可播放 鹽田 風向"
+                data-tags="勞作,生態"
+              >
+                <span class="record__top">
+                  <span class="record__index">03</span>
+                  <span class="record__title">鹽田與風向表</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">澎湖・西嶼</span>
+                  <span class="record__tag">陳秋風</span>
+                  <span class="record__tag">澎湖話</span>
+                  <span class="record__tag">1969</span>
+                </span>
+                <span class="record__summary">關於鹽場、風口與曬鹽時機的短篇訪談，句子短，訊息密，像一張人工風向表。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">可公開閱讀，未提供音訊</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-04"
+                data-title="防空洞裡的唱歌"
+                data-island="金門・烈嶼"
+                data-speaker="洪清妹"
+                data-language="閩南語"
+                data-year="1992"
+                data-duration="11:05"
+                data-topic="防衛、記憶"
+                data-rights="館內預覽，僅限學術用途"
+                data-listen="預覽不可播放"
+                data-summary="從地下空間談到地上生活，講者以歌聲片段串起防衛年代的日常節拍。"
+                data-collection="採集者：周以安；地點：金門烈嶼；節錄：2021 年完成。"
+                data-excerpt="「洞裡很暗，可是人一唱，聲音就先把自己叫回來了。」"
+                data-search="防空洞裡的唱歌 金門 烈嶼 洪清妹 閩南語 1992 11:05 防衛 記憶 館內預覽 預覽不可播放 防空洞"
+                data-tags="防衛,記憶"
+              >
+                <span class="record__top">
+                  <span class="record__index">04</span>
+                  <span class="record__title">防空洞裡的唱歌</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">金門・烈嶼</span>
+                  <span class="record__tag">洪清妹</span>
+                  <span class="record__tag">閩南語</span>
+                  <span class="record__tag">1992</span>
+                </span>
+                <span class="record__summary">從地下空間談到地上生活，講者以歌聲片段串起防衛年代的日常節拍。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">館內預覽，僅限學術用途</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-05"
+                data-title="夜航與燈塔的收信聲"
+                data-island="馬祖・東莒"
+                data-speaker="陳春枝"
+                data-language="馬祖話"
+                data-year="1981"
+                data-duration="07:33"
+                data-topic="航海、防衛"
+                data-rights="需申請後閱讀節錄"
+                data-listen="預覽不可播放"
+                data-summary="關於夜裡收信、看燈與辨方向的記憶，文字裡有海風，也有軍郵的秩序。"
+                data-collection="採集者：林子涵；地點：馬祖東莒；節錄：2018 年整理。"
+                data-excerpt="「燈塔一閃，先聽到的是紙張磨過桌面的聲音，接著才知道船來了沒有。」"
+                data-search="夜航與燈塔的收信聲 馬祖 東莒 陳春枝 馬祖話 1981 07:33 航海 防衛 需申請 預覽不可播放 燈塔"
+                data-tags="航海,防衛"
+              >
+                <span class="record__top">
+                  <span class="record__index">05</span>
+                  <span class="record__title">夜航與燈塔的收信聲</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">馬祖・東莒</span>
+                  <span class="record__tag">陳春枝</span>
+                  <span class="record__tag">馬祖話</span>
+                  <span class="record__tag">1981</span>
+                </span>
+                <span class="record__summary">關於夜裡收信、看燈與辨方向的記憶，文字裡有海風，也有軍郵的秩序。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">需申請後閱讀節錄</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-06"
+                data-title="潮間帶採集日誌"
+                data-island="小琉球・杉福"
+                data-speaker="許進財"
+                data-language="臺語"
+                data-year="2004"
+                data-duration="05:58"
+                data-topic="生態、勞作"
+                data-rights="可公開閱讀，授權保留"
+                data-listen="預覽不可播放"
+                data-summary="從退潮後的石縫開始，講者記下採集順序、回家清洗的步驟，以及哪些聲音最容易被海浪蓋掉。"
+                data-collection="採集者：王姿婷；地點：小琉球杉福；節錄：2023 年補錄。"
+                data-excerpt="「潮先退一格，手才有位子。不是誰跑得快，是誰看得懂海在讓位。」"
+                data-search="潮間帶採集日誌 小琉球 杉福 許進財 臺語 2004 05:58 生態 勞作 可公開閱讀 預覽不可播放 潮間帶"
+                data-tags="生態,勞作"
+              >
+                <span class="record__top">
+                  <span class="record__index">06</span>
+                  <span class="record__title">潮間帶採集日誌</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">小琉球・杉福</span>
+                  <span class="record__tag">許進財</span>
+                  <span class="record__tag">臺語</span>
+                  <span class="record__tag">2004</span>
+                </span>
+                <span class="record__summary">從退潮後的石縫開始，講者記下採集順序、回家清洗的步驟，以及哪些聲音最容易被海浪蓋掉。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">可公開閱讀，授權保留</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-07"
+                data-title="軍郵與收音機的清晨"
+                data-island="東引・中柱"
+                data-speaker="李秋雲"
+                data-language="客語／臺語"
+                data-year="1973"
+                data-duration="08:18"
+                data-topic="防衛、記憶"
+                data-rights="館內預覽，需註明來源"
+                data-listen="預覽不可播放"
+                data-summary="一段交疊語言的清晨敘事，從收音機調頻談到軍郵送達，再談到島上怎麼等消息。"
+                data-collection="採集者：張芷妤；地點：東引中柱；節錄：2020 年修訂。"
+                data-excerpt="「先聽到雜訊，才知道頻道還在。人也是，先有聲音，才知道彼此還在。」"
+                data-search="軍郵與收音機的清晨 東引 中柱 李秋雲 客語 臺語 1973 08:18 防衛 記憶 館內預覽 預覽不可播放 軍郵 收音機"
+                data-tags="防衛,記憶"
+              >
+                <span class="record__top">
+                  <span class="record__index">07</span>
+                  <span class="record__title">軍郵與收音機的清晨</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">東引・中柱</span>
+                  <span class="record__tag">李秋雲</span>
+                  <span class="record__tag">客語／臺語</span>
+                  <span class="record__tag">1973</span>
+                </span>
+                <span class="record__summary">一段交疊語言的清晨敘事，從收音機調頻談到軍郵送達，再談到島上怎麼等消息。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">館內預覽，需註明來源</span>
+                </span>
+              </button>
+
+              <button
+                class="record"
+                type="button"
+                data-eval="record"
+                data-record-id="record-08"
+                data-title="候鳥與守望站"
+                data-island="龜山島・登陸點"
+                data-speaker="吳孟昇"
+                data-language="華語"
+                data-year="2011"
+                data-duration="03:51"
+                data-topic="生態、航海"
+                data-rights="整理中，暫不開放"
+                data-listen="預覽不可播放"
+                data-summary="記錄候鳥遷徙、守望站輪班與海上視線的片段，像一段短而明確的海面註記。"
+                data-collection="採集者：許雅寧；地點：龜山島登陸點；節錄：2024 年彙整。"
+                data-excerpt="「鳥先到，風也跟著到。人只是把看見的順序寫下來。」"
+                data-search="候鳥與守望站 龜山島 登陸點 吳孟昇 華語 2011 03:51 生態 航海 整理中 暫不開放 預覽不可播放"
+                data-tags="生態,航海"
+              >
+                <span class="record__top">
+                  <span class="record__index">08</span>
+                  <span class="record__title">候鳥與守望站</span>
+                </span>
+                <span class="record__meta" aria-hidden="true">
+                  <span class="record__tag">龜山島・登陸點</span>
+                  <span class="record__tag">吳孟昇</span>
+                  <span class="record__tag">華語</span>
+                  <span class="record__tag">2011</span>
+                </span>
+                <span class="record__summary">記錄候鳥遷徙、守望站輪班與海上視線的片段，像一段短而明確的海面註記。</span>
+                <span class="record__foot">
+                  <span class="record__state">預覽不可播放</span>
+                  <span class="record__rights">整理中，暫不開放</span>
+                </span>
+              </button>
+            </div>
+
+            <section class="empty-state" id="emptyState" aria-live="polite" aria-atomic="true">
+              <h2>沒有找到符合條件的錄音。</h2>
+              <p>試著換一個關鍵字，或回到全部錄音，看看島名、講者與主題如何重新對上。</p>
+              <div class="detail-actions">
+                <button class="button button--ghost" type="button" id="resetFilters">重設篩選</button>
+              </div>
+            </section>
+          </div>
+
+          <aside class="detail-panel" id="detail" aria-labelledby="detailTitle" aria-live="polite">
+            <p class="detail-panel__kicker">目前選取</p>
+            <h2 class="detail-panel__title" id="detailTitle">颱風後的修船聲</h2>
+            <p class="detail-panel__summary" id="detailSummary">一段從潮線開始的口述，談的是颱風過後如何判斷木板還能不能補、船還能不能下水。</p>
+
+            <dl class="detail-meta">
+              <div>
+                <dt>島嶼／地點</dt>
+                <dd id="detailIsland">綠島・龜灣</dd>
+              </div>
+              <div>
+                <dt>講者</dt>
+                <dd id="detailSpeaker">林阿嬤</dd>
+              </div>
+              <div>
+                <dt>語言／腔調</dt>
+                <dd id="detailLanguage">臺語</dd>
+              </div>
+              <div>
+                <dt>年代／長度</dt>
+                <dd id="detailTime">1978 · 06:14</dd>
+              </div>
+            </dl>
+
+            <div class="detail-notes">
+              <div class="detail-notes__row">
+                <span class="status status--accent" id="detailListen">預覽不可播放</span>
+                <span class="status" id="detailRights">館內預覽，研究引用須註明</span>
+              </div>
+              <p class="detail-quote" id="detailExcerpt">「海還沒退盡，大家就先看木紋有沒有裂。不是急著修，是先聽風有沒有收。」</p>
+              <p class="detail-collection" id="detailCollection">採集者：陳淑媛；地點：綠島龜灣；節錄：2024 年整理。</p>
+            </div>
+
+            <div class="detail-actions">
+              <button class="button" type="button" disabled aria-disabled="true">預覽不可播放</button>
+              <button class="button button--ghost" type="button" id="jumpToList">回到索引</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="footer-note" id="notes" aria-labelledby="notes-title">
+        <h2 id="notes-title" style="margin:0 0 0.4rem; font-size:1.08rem;">權利與說明</h2>
+        <p style="margin:0;">
+          本頁不提供真實音訊檔；所有播放控制均為誠實的預覽不可播放狀態。若條目標示需申請、館內預覽或整理中，表示該錄音的可見程度不同，不代表可直接聆聽。篩選與選取只會改變頁面上的索引與詳情，不會改變條目本身。
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const cards = Array.from(document.querySelectorAll('[data-eval="record"]'));
+      const search = document.getElementById('search');
+      const filters = Array.from(document.querySelectorAll('.filter'));
+      const resultCount = document.getElementById('resultCount');
+      const archiveStatus = document.getElementById('archiveStatus');
+      const emptyState = document.getElementById('emptyState');
+      const resetFilters = document.getElementById('resetFilters');
+      const detailPanel = document.getElementById('detail');
+      const randomPick = document.getElementById('randomPick');
+      const jumpToList = document.getElementById('jumpToList');
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const detailFields = {
+        title: document.getElementById('detailTitle'),
+        summary: document.getElementById('detailSummary'),
+        island: document.getElementById('detailIsland'),
+        speaker: document.getElementById('detailSpeaker'),
+        language: document.getElementById('detailLanguage'),
+        time: document.getElementById('detailTime'),
+        listen: document.getElementById('detailListen'),
+        rights: document.getElementById('detailRights'),
+        excerpt: document.getElementById('detailExcerpt'),
+        collection: document.getElementById('detailCollection')
+      };
+
+      let activeFilter = '全部';
+      let activeId = cards[0]?.dataset.recordId || '';
+      let pendingTimer = null;
+
+      function updateResultCount() {
+        const visible = cards.filter((card) => !card.hidden);
+        resultCount.textContent = `目前顯示 ${visible.length} 筆。`;
+        archiveStatus.textContent = `共 ${cards.length} 筆示意錄音，目前顯示 ${visible.length} 筆。`;
+        emptyState.classList.toggle('is-visible', visible.length === 0);
+      }
+
+      function matches(card) {
+        const query = search.value.trim().toLowerCase();
+        const filterOk = activeFilter === '全部' || (card.dataset.tags || '').includes(activeFilter);
+        const queryOk = !query || (card.dataset.search || '').toLowerCase().includes(query);
+        return filterOk && queryOk;
+      }
+
+      function setPressed(card) {
+        cards.forEach((item) => item.setAttribute('aria-pressed', String(item === card)));
+        activeId = card.dataset.recordId;
+      }
+
+      function applyFilters() {
+        let visible = 0;
+        cards.forEach((card) => {
+          const show = matches(card);
+          card.hidden = !show;
+          if (show) visible += 1;
+        });
+
+        updateResultCount();
+
+        const visibleCards = cards.filter((card) => !card.hidden);
+        if (!visibleCards.some((card) => card.dataset.recordId === activeId)) {
+          const fallback = visibleCards[0];
+          if (fallback) {
+            selectRecord(fallback, false);
+          }
+        }
+      }
+
+      function renderDetail(data) {
+        detailFields.title.textContent = data.title || '未命名錄音';
+        detailFields.summary.textContent = data.summary || '';
+        detailFields.island.textContent = data.island || '';
+        detailFields.speaker.textContent = data.speaker || '';
+        detailFields.language.textContent = data.language || '';
+        detailFields.time.textContent = `${data.year || ''} · ${data.duration || ''}`.trim();
+        detailFields.listen.textContent = data.listen || '預覽不可播放';
+        detailFields.rights.textContent = data.rights || '';
+        detailFields.excerpt.textContent = data.excerpt || '';
+        detailFields.collection.textContent = data.collection || '';
+      }
+
+      function selectRecord(card, shouldScroll) {
+        if (!card) return;
+        setPressed(card);
+        clearTimeout(pendingTimer);
+        detailPanel.classList.add('is-loading');
+        detailPanel.setAttribute('aria-busy', 'true');
+        archiveStatus.textContent = `正在收攏：${card.dataset.title}`;
+
+        pendingTimer = setTimeout(() => {
+          renderDetail(card.dataset);
+          detailPanel.classList.remove('is-loading');
+          detailPanel.setAttribute('aria-busy', 'false');
+          archiveStatus.textContent = `已選取：${card.dataset.title}`;
+          if (shouldScroll) {
+            detailPanel.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+          }
+        }, 160);
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener('click', () => selectRecord(card, false));
+      });
+
+      filters.forEach((button) => {
+        button.addEventListener('click', () => {
+          activeFilter = button.dataset.filter || '全部';
+          filters.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          applyFilters();
+        });
+      });
+
+      search.addEventListener('input', applyFilters);
+
+      resetFilters?.addEventListener('click', () => {
+        search.value = '';
+        activeFilter = '全部';
+        filters.forEach((item) => item.setAttribute('aria-pressed', String(item.dataset.filter === '全部')));
+        applyFilters();
+      });
+
+      randomPick.addEventListener('click', () => {
+        const visibleCards = cards.filter((card) => !card.hidden);
+        if (!visibleCards.length) {
+          archiveStatus.textContent = '目前沒有可隨機選取的錄音，請先重設篩選。';
+          emptyState.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+          return;
+        }
+        const choice = visibleCards[Math.floor(Math.random() * visibleCards.length)];
+        selectRecord(choice, true);
+      });
+
+      jumpToList.addEventListener('click', () => {
+        document.getElementById('archive').scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      });
+
+      applyFilters();
+      const initial = cards.find((card) => card.dataset.recordId === activeId) || cards[0];
+      if (initial) {
+        setPressed(initial);
+        renderDetail(initial.dataset);
+      }
+    }());
+  </script>
+</body>
+</html>

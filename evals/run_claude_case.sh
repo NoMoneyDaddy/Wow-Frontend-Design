@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   echo "usage: $0 <haiku|sonnet|opus> <fixed-showcase-directory>" >&2
-  echo "       $0 <haiku|sonnet|opus> --case <showcase|product-dashboard|product-dashboard-remake|mountain-rescue-flow-v3|city-poetry-festival-v3|bookstore-one-line-v3>" >&2
+  echo "       $0 <haiku|sonnet|opus> --case <showcase|product-dashboard|product-dashboard-remake|harbor-cold-chain-v4|island-sound-archive-v4|plant-swap-one-line-v4>" >&2
 }
 
 if [[ $# -eq 2 ]]; then
@@ -38,7 +38,7 @@ if [[ "$MODEL" != "haiku" && "$MODEL" != "sonnet" && "$MODEL" != "opus" ]]; then
 fi
 
 case "$CASE_ID" in
-  showcase|product-dashboard|product-dashboard-remake|mountain-rescue-flow-v3|city-poetry-festival-v3|bookstore-one-line-v3) ;;
+  showcase|product-dashboard|product-dashboard-remake|harbor-cold-chain-v4|island-sound-archive-v4|plant-swap-one-line-v4) ;;
   *)
     echo "unsupported case: $CASE_ID" >&2
     exit 2
@@ -46,11 +46,11 @@ case "$CASE_ID" in
 esac
 
 case "$CASE_ID" in
-  mountain-rescue-flow-v3|city-poetry-festival-v3)
+  harbor-cold-chain-v4|island-sound-archive-v4)
     OUTPUTS=(DESIGN.md index.html)
     ;;
-  bookstore-one-line-v3)
-    OUTPUTS=(DESIGN.md index.html catalog.html book.html)
+  plant-swap-one-line-v4)
+    OUTPUTS=(DESIGN.md index.html browse.html listing.html)
     ;;
   *)
     OUTPUTS=(index.html)
@@ -172,7 +172,13 @@ esac
 CLAUDE_ENV+=(CLAUDE_CODE_EFFORT_LEVEL=auto CLAUDE_CODE_DISABLE_THINKING=1)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
-EXPECTED_TARGET="$ROOT/evals/claude-${MODEL}-${CASE_ID}"
+TARGET_ROOT="${PRODUCT_FLOW_TARGET_ROOT:-$ROOT/evals}"
+if [[ "$TARGET_ROOT" != /* || ! -d "$TARGET_ROOT" || -L "$TARGET_ROOT" ]]; then
+  echo "PRODUCT_FLOW_TARGET_ROOT must be an existing, real absolute directory" >&2
+  exit 2
+fi
+TARGET_ROOT_ABS="$(cd "$TARGET_ROOT" && pwd -P)"
+EXPECTED_TARGET="$TARGET_ROOT_ABS/claude-${MODEL}-${CASE_ID}"
 VALIDATOR="$ROOT/evals/validate_visual_web_output.py"
 REJECTED_OUTPUT_DIR_ABS=""
 if [[ -n "${CLAUDE_REJECTED_OUTPUT_DIR:-}" ]]; then
@@ -194,14 +200,14 @@ case "$CASE_ID" in
   product-dashboard|product-dashboard-remake)
     BRIEF="$ROOT/evals/briefs/product-dashboard.md"
     ;;
-  mountain-rescue-flow-v3)
-    BRIEF="$ROOT/evals/briefs/mountain-rescue-flow-v3.md"
+  harbor-cold-chain-v4)
+    BRIEF="$ROOT/evals/briefs/harbor-cold-chain-v4.md"
     ;;
-  city-poetry-festival-v3)
-    BRIEF="$ROOT/evals/briefs/city-poetry-festival-v3.md"
+  island-sound-archive-v4)
+    BRIEF="$ROOT/evals/briefs/island-sound-archive-v4.md"
     ;;
-  bookstore-one-line-v3)
-    BRIEF="$ROOT/evals/briefs/bookstore-one-line-v3.md"
+  plant-swap-one-line-v4)
+    BRIEF="$ROOT/evals/briefs/plant-swap-one-line-v4.md"
     ;;
 esac
 
@@ -249,6 +255,7 @@ CONTEXT_FILES=(
   "$ROOT/wow-frontend-design/references/mobile-responsive.md"
   "$ROOT/wow-frontend-design/references/localization.md"
   "$ROOT/wow-frontend-design/references/typography-webfonts.md"
+  "$ROOT/wow-frontend-design/references/typographic-layout.md"
   "$ROOT/wow-frontend-design/references/implementation.md"
   "$ROOT/wow-frontend-design/references/component-composition.md"
   "$ROOT/wow-frontend-design/references/quality-gates.md"
@@ -295,10 +302,10 @@ from pathlib import Path
 
 destination = Path(sys.argv[1])
 case_id = sys.argv[5]
-if case_id in {"mountain-rescue-flow-v3", "city-poetry-festival-v3"}:
+if case_id in {"harbor-cold-chain-v4", "island-sound-archive-v4"}:
     output_names = ("DESIGN.md", "index.html")
-elif case_id == "bookstore-one-line-v3":
-    output_names = ("DESIGN.md", "index.html", "catalog.html", "book.html")
+elif case_id == "plant-swap-one-line-v4":
+    output_names = ("DESIGN.md", "index.html", "browse.html", "listing.html")
 else:
     output_names = ("index.html",)
 files = []
@@ -358,18 +365,18 @@ emit_prompt() {
     'Controlled comparison contract: lane=CONSTRAINED for every requested Claude model alias. Do not self-tier or change the lane. The caller selected the model and disabled silent fallback.'
 
   case "$CASE_ID" in
-    mountain-rescue-flow-v3|city-poetry-festival-v3)
+    harbor-cold-chain-v4|island-sound-archive-v4)
       printf '%s\n' 'Create exactly DESIGN.md and one self-contained index.html. Put CSS and any necessary JavaScript inline in index.html.'
       ;;
-    bookstore-one-line-v3)
-      printf '%s\n' 'Keep the one-line BRIEF unchanged. Create exactly DESIGN.md plus three coherent self-contained pages: index.html, catalog.html, and book.html. All pages must share the DESIGN.md visual system and link to each other. Put CSS and any necessary JavaScript inline in each HTML file.'
+    plant-swap-one-line-v4)
+      printf '%s\n' 'Keep the one-line BRIEF unchanged. Create exactly DESIGN.md plus three coherent self-contained pages: index.html, browse.html, and listing.html. All pages must share the DESIGN.md visual system and link to each other. Put CSS and any necessary JavaScript inline in each HTML file.'
       ;;
     *)
       printf '%s\n' 'Implement a complete website by creating exactly one self-contained index.html in the current empty directory. Put CSS and any necessary JavaScript inline.'
       ;;
   esac
 
-  if [[ "$CASE_ID" == *-v3 ]]; then
+  if [[ "$CASE_ID" == *-v4 ]]; then
     printf '%s\n' 'DESIGN.md must follow the trusted design-md contract and structural template, replace every example value, use only the allowed token properties, and be expected to pass the pinned official 0.2.0 linter with zero errors and zero warnings.'
   fi
 
@@ -487,10 +494,10 @@ cleared = args[:cleared_count]
 if len(cleared) != cleared_count or len(args) != cleared_count:
     raise SystemExit("invalid manifest argument framing")
 
-if case_id in {"mountain-rescue-flow-v3", "city-poetry-festival-v3"}:
+if case_id in {"harbor-cold-chain-v4", "island-sound-archive-v4"}:
     output_names = ("DESIGN.md", "index.html")
-elif case_id == "bookstore-one-line-v3":
-    output_names = ("DESIGN.md", "index.html", "catalog.html", "book.html")
+elif case_id == "plant-swap-one-line-v4":
+    output_names = ("DESIGN.md", "index.html", "browse.html", "listing.html")
 else:
     output_names = ("index.html",)
 outputs = []

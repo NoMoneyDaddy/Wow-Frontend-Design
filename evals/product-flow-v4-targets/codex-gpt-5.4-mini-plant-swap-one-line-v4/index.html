@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>植換所｜只交換，不販售植物</title>
+  <style>
+    :root {
+      --canvas: #f5f0e6;
+      --surface: #fffdf8;
+      --ink: #1e241c;
+      --muted: #5b6658;
+      --primary: #2d5b40;
+      --on-primary: #fbf7ee;
+      --border: rgba(30, 36, 28, 0.12);
+      --shadow: 0 18px 50px rgba(30, 36, 28, 0.08);
+      --shadow-tight: 0 10px 28px rgba(30, 36, 28, 0.06);
+      --page-pad: clamp(1rem, 2.5vw, 2rem);
+      --gutter: clamp(1rem, 2vw, 1.5rem);
+      --section-gap: clamp(1.25rem, 2.8vw, 2rem);
+      --radius-s: 0.8rem;
+      --radius-m: 1.25rem;
+      --radius-l: 1.75rem;
+      --radius-pill: 999px;
+      --measure: 68ch;
+      --line: 1.7;
+      --ui-line: 1.35;
+      --focus: 0 0 0 3px rgba(45, 91, 64, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+    html { color-scheme: light; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(45, 91, 64, 0.08), transparent 30%),
+        radial-gradient(circle at 20% 15%, rgba(91, 102, 88, 0.08), transparent 20%),
+        linear-gradient(180deg, #f8f4eb 0%, var(--canvas) 100%);
+      font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+      line-height: var(--line);
+      text-rendering: optimizeLegibility;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    a:hover { text-decoration: none; }
+    img, svg { display: block; max-width: 100%; }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+
+    .skip-link {
+      position: absolute;
+      inset-inline-start: 1rem;
+      inset-block-start: 1rem;
+      z-index: 1000;
+      padding: 0.8rem 1rem;
+      border-radius: var(--radius-pill);
+      background: var(--ink);
+      color: var(--on-primary);
+      transform: translateY(-160%);
+      transition: transform 160ms ease;
+    }
+    .skip-link:focus { transform: translateY(0); outline: none; }
+
+    .page {
+      width: min(100%, 82rem);
+      margin: 0 auto;
+      padding: var(--page-pad);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--gutter);
+      padding: 0.25rem 0 1.25rem;
+    }
+
+    .brand {
+      display: grid;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+
+    .brand strong {
+      font-family: "Cormorant Garamond", "Noto Serif TC", "Iowan Old Style", Georgia, serif;
+      font-size: clamp(1.55rem, 2.3vw, 2.2rem);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .nav a, .nav button, .pill, .ghost, .primary {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      padding: 0.72rem 1rem;
+      background: rgba(255, 253, 248, 0.78);
+      box-shadow: none;
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+    }
+
+    .nav a:hover, .nav button:hover, .pill:hover, .ghost:hover, .primary:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-tight);
+    }
+
+    .nav a:focus-visible, .nav button:focus-visible, .pill:focus-visible, .ghost:focus-visible, .primary:focus-visible,
+    .filter:focus-visible, .field:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: none;
+      box-shadow: var(--focus);
+      border-color: rgba(45, 91, 64, 0.4);
+    }
+
+    .primary {
+      background: var(--primary);
+      color: var(--on-primary);
+      border-color: transparent;
+      font-weight: 600;
+    }
+
+    .ghost {
+      background: transparent;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+      gap: var(--section-gap);
+      align-items: stretch;
+      margin-top: 0.8rem;
+    }
+
+    .hero-copy, .panel {
+      background: rgba(255, 253, 248, 0.86);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-l);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-copy {
+      padding: clamp(1.2rem, 3vw, 2.4rem);
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 0.88rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Cormorant Garamond", "Noto Serif TC", "Iowan Old Style", Georgia, serif;
+      font-size: clamp(2.8rem, 6vw, 5.2rem);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+      max-width: 12ch;
+    }
+
+    .lede {
+      margin: 0;
+      max-width: var(--measure);
+      font-size: clamp(1rem, 1.2vw, 1.1rem);
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .hero-points {
+      display: grid;
+      gap: 0.5rem;
+      padding: 0;
+      margin: 0.2rem 0 0;
+      list-style: none;
+      color: var(--muted);
+      max-width: 44ch;
+    }
+
+    .specimen {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(1.1rem, 2.2vw, 1.6rem);
+      display: grid;
+      gap: 1rem;
+      align-content: space-between;
+      min-height: 100%;
+      background:
+        linear-gradient(180deg, rgba(45, 91, 64, 0.08), transparent 30%),
+        rgba(255, 253, 248, 0.9);
+    }
+
+    .specimen::before {
+      content: "";
+      position: absolute;
+      inset: 1.1rem auto 1.1rem 1.1rem;
+      width: 2px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(45, 91, 64, 0.95), rgba(45, 91, 64, 0.2));
+    }
+
+    .specimen-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-left: 1.1rem;
+    }
+
+    .stamp {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: var(--radius-pill);
+      background: rgba(45, 91, 64, 0.08);
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .specimen h2, .section h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      line-height: 1.2;
+    }
+
+    .specimen .name {
+      padding-left: 1.1rem;
+      font-family: "Cormorant Garamond", "Noto Serif TC", "Iowan Old Style", Georgia, serif;
+      font-size: clamp(2rem, 3vw, 3rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .specimen .meta {
+      padding-left: 1.1rem;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      gap: var(--section-gap);
+      margin-top: var(--section-gap);
+    }
+
+    .section {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .section-header p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 54ch;
+    }
+
+    .feature-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .feature {
+      padding: 1.1rem;
+      border-radius: var(--radius-m);
+      border: 1px solid var(--border);
+      background: rgba(255, 253, 248, 0.78);
+    }
+
+    .feature strong {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 1rem;
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .swap-list {
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .swap-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(14rem, 0.8fr);
+      gap: 1rem;
+      padding: 1.05rem;
+      border-radius: var(--radius-m);
+      border: 1px solid var(--border);
+      background: rgba(255, 253, 248, 0.9);
+      align-items: center;
+    }
+
+    .swap-card h3 {
+      margin: 0 0 0.2rem;
+      font-size: 1.1rem;
+    }
+
+    .swap-card p {
+      margin: 0.25rem 0 0;
+      color: var(--muted);
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.8rem;
+    }
+
+    .pill {
+      font-size: 0.9rem;
+      color: var(--muted);
+      background: rgba(255, 253, 248, 0.95);
+    }
+
+    .pill.primary {
+      color: var(--on-primary);
+    }
+
+    .note {
+      padding: 1rem 1.1rem;
+      border-radius: var(--radius-m);
+      border: 1px solid rgba(45, 91, 64, 0.15);
+      background: linear-gradient(180deg, rgba(45, 91, 64, 0.06), rgba(255, 253, 248, 0.95));
+      color: var(--ink);
+    }
+
+    .note p {
+      margin: 0.4rem 0 0;
+      color: var(--muted);
+    }
+
+    .footer {
+      margin: 2rem 0 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .mobile-rail {
+      display: none;
+    }
+
+    .small {
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .swap-card,
+      .feature-list {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: start;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100%, 44rem);
+      }
+
+      .topbar {
+        display: grid;
+      }
+
+      .nav {
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+        scrollbar-width: none;
+      }
+
+      .nav::-webkit-scrollbar { display: none; }
+
+      .hero-copy {
+        order: 1;
+      }
+
+      .specimen {
+        order: 0;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .hero-actions a, .hero-actions button {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+
+      .mobile-rail {
+        position: sticky;
+        inset-block-end: calc(0.75rem + env(safe-area-inset-bottom));
+        z-index: 20;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.6rem;
+        margin-top: 1rem;
+        padding: 0.6rem;
+        border-radius: 1.2rem;
+        border: 1px solid var(--border);
+        background: rgba(245, 240, 230, 0.82);
+        backdrop-filter: blur(8px);
+      }
+
+      .mobile-rail a {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand" aria-label="植換所">
+        <strong>植換所</strong>
+        <span>只交換，不販售植物的社群網站</span>
+      </div>
+      <nav class="nav" aria-label="主要導覽">
+        <a href="index.html" aria-current="page">首頁</a>
+        <a href="browse.html">瀏覽交換</a>
+        <a href="listing.html">發布交換卡</a>
+        <a class="ghost" href="#rules">社群規則</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <div class="eyebrow">交換索引 / 社群共照</div>
+          <h1 id="hero-title">只交換，不販售。讓每盆植物找到下一個照顧者。</h1>
+          <p class="lede">這裡先看來源、照護條件與交換意圖，再決定是否接手。你可以交換整盆、分株、種子，或把暫時無法照顧的植物交給更合適的人。</p>
+          <div class="hero-actions">
+            <a class="primary" href="browse.html">瀏覽現有交換</a>
+            <a class="ghost" href="listing.html">發布交換卡</a>
+          </div>
+          <ul class="hero-points">
+            <li>不刊登售價，不引導買賣。</li>
+            <li>每張交換卡都保留照護重點與取件方式。</li>
+            <li>長品種名、備註與中文標籤都能直接讀。</li>
+          </ul>
+        </div>
+        <aside class="panel specimen" aria-label="本週示意交換卡">
+          <div class="specimen-head">
+            <span class="stamp">交換中</span>
+            <span class="small">可面交 / 可分株</span>
+          </div>
+          <div class="name">龜背芋 · 已養兩年半</div>
+          <div class="meta">明亮散射光，葉片完整，想換到耐陰或小型觀葉。</div>
+          <div class="tag-row" aria-label="交換標籤">
+            <span class="pill">台北市近捷運</span>
+            <span class="pill">適合初學者</span>
+            <span class="pill">附照顧筆記</span>
+          </div>
+        </aside>
+      </section>
+
+      <div class="grid">
+        <section class="section" aria-labelledby="feature-title">
+          <div class="section-header">
+            <div>
+              <h2 id="feature-title">交換不是交易，所以資訊要比價格更完整。</h2>
+              <p>社群先看的是植物的狀態、來源與照護需求，這樣交換才會真的發生，而不是只剩下發文。</p>
+            </div>
+          </div>
+          <div class="feature-list">
+            <article class="feature">
+              <strong>看得見來源</strong>
+              <p>每張卡都有目前照顧者、取得方式與最後更新時間，方便追蹤來源。</p>
+            </article>
+            <article class="feature">
+              <strong>看得懂條件</strong>
+              <p>用光照、澆水、分株與取件方式說清楚，不用猜。</p>
+            </article>
+            <article class="feature">
+              <strong>看得到下一步</strong>
+              <p>交換、暫託或分享照顧技巧都能直接進入操作，不必離開頁面再找入口。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="swap-title">
+          <div class="section-header">
+            <div>
+              <h2 id="swap-title">最近整理中的交換卡</h2>
+              <p>這些卡片示意了社群的內容層級：植物本體、照顧條件、交換偏好與聯絡方式都要同時出現。</p>
+            </div>
+            <a class="pill" href="browse.html">前往瀏覽</a>
+          </div>
+
+          <div class="swap-list">
+            <article class="swap-card">
+              <div>
+                <span class="stamp">可交換</span>
+                <h3>鹿角蕨分株</h3>
+                <p>葉背穩定、鹿角已長新芽，想換吊掛器具或同等照護條件的觀葉植物。</p>
+                <div class="tag-row">
+                  <span class="pill">分株</span>
+                  <span class="pill">室內中光</span>
+                  <span class="pill">可面交</span>
+                </div>
+              </div>
+              <div class="note">
+                <strong>照護筆記</strong>
+                <p>春夏每週澆透一次，冬季減量；避免直射午後陽光。</p>
+              </div>
+            </article>
+
+            <article class="swap-card">
+              <div>
+                <span class="stamp">待接手</span>
+                <h3>迷你多肉組盆</h3>
+                <p>盆器可一併帶走，適合想交換仙人掌或乾燥系植物的人。</p>
+                <div class="tag-row">
+                  <span class="pill">整盆</span>
+                  <span class="pill">低頻澆水</span>
+                  <span class="pill">新手友善</span>
+                </div>
+              </div>
+              <div class="note">
+                <strong>交換偏好</strong>
+                <p>優先交換同樣容易搬運、且不需要高濕環境的品項。</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="rules" aria-labelledby="rules-title">
+          <div class="section-header">
+            <div>
+              <h2 id="rules-title">社群規則</h2>
+              <p>規則寫得越清楚，交換就越少誤會；也越不容易變成販售平台。</p>
+            </div>
+          </div>
+          <div class="note">
+            <strong>我們只交換植物與照顧知識。</strong>
+            <p>不貼價格、不做商品化比較、不接受把交換卡改成銷售文案。若植物需要暫託或重新安置，請把照護條件寫完整。</p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <nav class="mobile-rail" aria-label="行動快速導覽">
+      <a class="ghost" href="browse.html">瀏覽交換</a>
+      <a class="primary" href="listing.html">發布交換卡</a>
+    </nav>
+
+    <footer class="footer">
+      <span>植換所</span>
+      <span>只交換植物，不販售植物。</span>
+    </footer>
+  </div>
+</body>
+</html>

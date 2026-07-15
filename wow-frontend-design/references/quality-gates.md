@@ -93,6 +93,7 @@ Verify:
 - 320px, tablet, and wide screens have intentional compositions;
 - long locales, Traditional Chinese, mixed scripts, and RTL claims survive;
 - no accidental horizontal overflow or fixed-height clipping;
+- no first-paint menu, dialog, or sheet left open unintentionally, and no fixed/sticky control covering the primary task or focused content;
 - media crops and art direction work per viewport;
 - continuous effects pause off-screen and reduced motion truly reduces motion;
 - no console, hydration, broken asset, route, or network errors;
@@ -150,7 +151,8 @@ Do not call the work complete with any of these:
 - any applicable WCAG 2.2 A/AA failure when AA is required, including contrast below the exact applicable threshold, missing labels, or essential content hidden behind motion/JavaScript;
 - accidental horizontal scroll or clipped core content at a required viewport;
 - unintentionally wrapped or clipped short action labels, or hidden responsive DOM copies that duplicate IDs, state, focus targets, or evaluator identities;
-- mobile navigation or form blocked by fixed UI or virtual keyboard;
+- mobile navigation, primary content, focused control, or form blocked by fixed/sticky UI or the virtual keyboard;
+- a brief-required exact locale, route, filename, visible content equivalent, semantic hook, or evaluator hook changed or missing at any required viewport;
 - modal/menu background scrolling, stale open state after navigation, lost focus on close, or contradictory form success/error announcements;
 - unintentional Simplified Chinese in product-owned `zh-Hant` UI copy or assets; preserve legitimate quotations, names, source data, and user content, marking `zh-Hans` parts when needed;
 - broken asset, severe layout shift, uncaught runtime error, or hydration failure;

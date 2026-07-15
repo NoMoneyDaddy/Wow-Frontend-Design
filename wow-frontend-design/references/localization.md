@@ -58,13 +58,13 @@ Choose brand fonts only after confirming Traditional Chinese glyph coverage and 
 
 ## 3. Typography and line breaking
 
-- Let Chinese body copy breathe; `line-height: 1.6` is an internal starting heuristic, not a CLReq requirement. Test the actual face, measure, market, and density.
+- Use [typographic-layout.md](typographic-layout.md) to calibrate measure, line height, wrapping, spacing, and vertical writing. Its numeric ranges are comparison candidates, not universal optima.
 - Avoid Latin-style positive tracking on Chinese paragraphs. Apply tracking only to deliberate short display treatments.
 - Keep body lines comfortable rather than stretching Chinese copy across wide screens.
 - Prevent punctuation from becoming visually stranded. Use browser line-breaking behavior and manual non-breaking spans only for essential names, dates, or short units.
 - Keep numbers and units together when necessary, but do not create large unbreakable blocks.
 - Use `text-wrap: balance` or `pretty` as progressive enhancement, then verify fallback wrapping.
-- Use vertical writing (`writing-mode: vertical-rl`) only when editorial meaning justifies it. Provide a readable horizontal alternative for controls and dense product text.
+- Use real vertical writing (`writing-mode: vertical-rl` with appropriate `text-orientation`) only when editorial meaning justifies it; never rotate the text container. Provide the same readable content horizontally for controls, dense product text, and constrained responsive modes.
 - Never bake text into images merely to control line breaks.
 
 ## 4. Cross-language resilience

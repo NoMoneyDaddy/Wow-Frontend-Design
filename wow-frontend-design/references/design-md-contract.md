@@ -76,4 +76,6 @@ Resolve lint findings in this order, re-running the pinned linter after each pas
 4. Component foreground/background contrast warnings; adjust the normative values rather than hiding the component.
 5. Section order and other remaining warnings.
 
+When an isolated generation attempt fails this gate, preserve the bounded linter summary and provide it to a fresh retry as untrusted diagnostic context. Do not weaken or edit the pinned validator, silently accept warnings, or let the implementation model install a different CLI. Freeze the contract, template, linter version, validator, and runner hashes for the full evaluation run.
+
 Do not declare the design contract complete until the final run is clean. If tools prevent the run, report `DESIGN.md lint: UNVERIFIED` and preserve the file for a later verifier.

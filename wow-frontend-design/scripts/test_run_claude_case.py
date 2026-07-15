@@ -25,6 +25,7 @@ CONTEXT_PATHS = (
     "wow-frontend-design/references/mobile-responsive.md",
     "wow-frontend-design/references/localization.md",
     "wow-frontend-design/references/typography-webfonts.md",
+    "wow-frontend-design/references/typographic-layout.md",
     "wow-frontend-design/references/implementation.md",
     "wow-frontend-design/references/component-composition.md",
     "wow-frontend-design/references/quality-gates.md",
@@ -72,16 +73,16 @@ class ClaudeRunnerTests(unittest.TestCase):
                 showcase_target.mkdir()
                 (showcase_target / "BRIEF.md").write_text("# Fixed showcase test brief\n", encoding="utf-8")
                 fixed_target(root, model, "product-dashboard").mkdir()
-                fixed_target(root, model, "mountain-rescue-flow-v3").mkdir()
-                fixed_target(root, model, "city-poetry-festival-v3").mkdir()
-                fixed_target(root, model, "bookstore-one-line-v3").mkdir()
+                fixed_target(root, model, "harbor-cold-chain-v4").mkdir()
+                fixed_target(root, model, "island-sound-archive-v4").mkdir()
+                fixed_target(root, model, "plant-swap-one-line-v4").mkdir()
             fixed_target(root, "haiku", "product-dashboard-remake").mkdir()
             shared_brief = root / "evals" / "briefs" / "product-dashboard.md"
             shared_brief.parent.mkdir()
             shared_brief.write_text("# Shared product dashboard test brief\n", encoding="utf-8")
-            (root / "evals" / "briefs" / "mountain-rescue-flow-v3.md").write_text("# Mountain rescue flow test brief\n", encoding="utf-8")
-            (root / "evals" / "briefs" / "city-poetry-festival-v3.md").write_text("# City poetry festival test brief\n", encoding="utf-8")
-            (root / "evals" / "briefs" / "bookstore-one-line-v3.md").write_text("Build a bookstore website.\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "harbor-cold-chain-v4.md").write_text("# Harbor cold-chain test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "island-sound-archive-v4.md").write_text("# Island sound archive test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "plant-swap-one-line-v4.md").write_text("Build a plant swap website.\n", encoding="utf-8")
             target = fixed_target(root, "haiku", "showcase")
             for relative in CONTEXT_PATHS:
                 path = root / relative
@@ -103,12 +104,12 @@ fi
 printf '%s\\n' "$@" > "$RUNNER_TEST_CAPTURE/args.txt"
 command cat > "$RUNNER_TEST_CAPTURE/prompt.txt"
 printf '%s' "${RUNNER_TEST_HTML}" > index.html
-if [[ "${RUNNER_TEST_CASE_ID}" == *-v3 ]]; then
+if [[ "${RUNNER_TEST_CASE_ID}" == *-v4 ]]; then
   printf '%s' "${RUNNER_TEST_DESIGN}" > DESIGN.md
 fi
-if [[ "${RUNNER_TEST_CASE_ID}" == "bookstore-one-line-v3" ]]; then
-  printf '%s' "${RUNNER_TEST_HTML}" > catalog.html
-  printf '%s' "${RUNNER_TEST_HTML}" > book.html
+if [[ "${RUNNER_TEST_CASE_ID}" == "plant-swap-one-line-v4" ]]; then
+  printf '%s' "${RUNNER_TEST_HTML}" > browse.html
+  printf '%s' "${RUNNER_TEST_HTML}" > listing.html
 fi
 """,
                 encoding="utf-8",
@@ -259,6 +260,27 @@ fi
             self.assertEqual([], manifest["environment"]["cleared_variable_names"])
             self.assertFalse(manifest["environment"]["official_oauth_state_preserved"])
 
+    def test_matrix_can_isolate_outputs_under_an_evaluator_target_root(self) -> None:
+        with self.fixture() as (root, _, capture):
+            target_root = root / "independent-run"
+            target_root.mkdir()
+            target = target_root / "claude-sonnet-island-sound-archive-v4"
+            target.mkdir()
+            completed = self.run_case(
+                root,
+                target,
+                capture,
+                model="sonnet",
+                case_id="island-sound-archive-v4",
+                extra_env={"PRODUCT_FLOW_TARGET_ROOT": str(target_root)},
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual(
+                {"DESIGN.md", "index.html", "run-manifest.json"},
+                {path.name for path in target.iterdir()},
+            )
+            self.assertFalse((fixed_target(root, "sonnet", "island-sound-archive-v4") / "index.html").exists())
+
     def test_legacy_two_argument_call_keeps_fixed_alias_and_safe_mode(self) -> None:
         with self.fixture() as (root, target, capture):
             completed = self.run_case(root, target, capture)
@@ -344,9 +366,9 @@ fi
 
     def test_flow_themes_map_every_model_to_their_fixed_brief(self) -> None:
         for case_id, expected_text in (
-            ("mountain-rescue-flow-v3", "# Mountain rescue flow test brief"),
-            ("city-poetry-festival-v3", "# City poetry festival test brief"),
-            ("bookstore-one-line-v3", "Build a bookstore website."),
+            ("harbor-cold-chain-v4", "# Harbor cold-chain test brief"),
+            ("island-sound-archive-v4", "# Island sound archive test brief"),
+            ("plant-swap-one-line-v4", "Build a plant swap website."),
         ):
             for model in ("haiku", "sonnet", "opus"):
                 with self.subTest(case_id=case_id, model=model), self.fixture() as (root, _, capture):
@@ -361,8 +383,8 @@ fi
                         (capture / "prompt.txt").read_text(encoding="utf-8"),
                     )
                     expected_outputs = {"DESIGN.md", "index.html", "run-manifest.json"}
-                    if case_id == "bookstore-one-line-v3":
-                        expected_outputs.update({"catalog.html", "book.html"})
+                    if case_id == "plant-swap-one-line-v4":
+                        expected_outputs.update({"browse.html", "listing.html"})
                     self.assertEqual(expected_outputs, {path.name for path in target.iterdir()})
 
     def test_case_and_legacy_target_reject_traversal_or_arbitrary_paths(self) -> None:

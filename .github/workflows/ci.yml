@@ -94,8 +94,8 @@ jobs:
       - name: Validate dashboard failure evidence
         run: python3 wow-frontend-design/scripts/validate_dashboard_evidence.py evals/dashboard-browser-results.json --repository-root .
 
-      - name: Validate product-flow cohort evidence
-        run: python3 wow-frontend-design/scripts/validate_product_flow_evidence.py evals/product-flow-v3-visual-results.json --repository-root .
+      - name: Validate Codex v4 product-flow evidence
+        run: python3 wow-frontend-design/scripts/validate_product_flow_evidence.py evals/product-flow-v4-visual-results.json --repository-root .
 
       - name: Check showcase JavaScript
         run: |
@@ -103,8 +103,7 @@ jobs:
           node --check evals/weak-model-showcase/theme-init.js
           node --check evals/capture_showcase.cjs
           node --check evals/playwright_dashboard_audit.cjs
-          node --check evals/playwright_visual_v3_audit.cjs
-          node --check evals/finalize_visual_v3_report.cjs
+          node --check evals/playwright_visual_v4_audit.cjs
 
       - name: Check showcase source signals
         run: python3 evals/weak-model-showcase/verify.py
@@ -123,4 +122,8 @@ jobs:
           bash -n evals/run_claude_case.sh
           bash -n evals/run_codex_case.sh
           python3 -m py_compile evals/validate_isolated_web_output.py
+          python3 -m py_compile evals/validate_design_md_clean.py
+          python3 -m py_compile evals/validate_codex_log_policy.py
           python3 -m py_compile evals/run_product_flow_matrix.py
+          python3 -m py_compile evals/run_product_flow_evaluation.py
+          python3 -m py_compile wow-frontend-design/scripts/validate_product_flow_evidence.py

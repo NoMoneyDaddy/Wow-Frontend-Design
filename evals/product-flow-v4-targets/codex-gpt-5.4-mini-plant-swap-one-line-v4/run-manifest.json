@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "run_id": "20260715T003320Z-80234-14807",
+  "status": "completed",
+  "started_at": "2026-07-15T00:33:20Z",
+  "finished_at": "2026-07-15T00:43:49Z",
+  "provider": "openai-first-party-chatgpt-oauth",
+  "authentication": {
+    "status": "Logged in using ChatGPT"
+  },
+  "case": {
+    "id": "plant-swap-one-line-v4",
+    "target": "evals/product-flow-v4-targets/codex-gpt-5.4-mini-plant-swap-one-line-v4"
+  },
+  "cli": {
+    "path": "/opt/homebrew/bin/codex",
+    "version": "codex-cli 0.142.0"
+  },
+  "model": {
+    "requested_identifier": "gpt-5.4-mini",
+    "resolution_status": "requested_identifier_accepted_by_cli",
+    "resolved_backend_snapshot": null
+  },
+  "isolation": {
+    "sandbox": "workspace-write",
+    "ephemeral": true,
+    "user_config": "ignored",
+    "rules": "ignored",
+    "web_search": false,
+    "local_provider": false
+  },
+  "reasoning": {
+    "effort": "model_default",
+    "summary": "none",
+    "internal_reasoning_disable_supported": false
+  },
+  "runner": {
+    "path": "evals/run_codex_case.sh",
+    "sha256": "20022760dc0bf0c6ce5838c8a3de0207b89a4aa218a4bc7a2d54d1814ebdd143"
+  },
+  "output_validator": {
+    "path": "evals/validate_visual_web_output.py",
+    "sha256": "d482c129d33830d59b384304bbcec55a0a99b17afd0929016e15f5cd2cc43b04"
+  },
+  "design_linter_gate": {
+    "path": "evals/validate_design_md_clean.py",
+    "sha256": "bd2c6669e303778a5aa1c14548e3cd937ff45455477935766f107234d88838c6",
+    "package": "@google/design.md",
+    "version": "0.2.0",
+    "required_result": "zero_errors_zero_warnings"
+  },
+  "trace_policy_gate": {
+    "path": "evals/validate_codex_log_policy.py",
+    "sha256": "4b20539c0eb02cb8db7d87c89cfa46b3d7ac0658265d92d0517760c0b81d61c3",
+    "required_result": "no_forbidden_commands_or_tools"
+  },
+  "environment": {
+    "cleared_variable_names": [
+      "OPENAI_API_KEY",
+      "OPENAI_BASE_URL",
+      "OPENAI_API_BASE",
+      "OPENAI_ORG_ID",
+      "OPENAI_PROJECT_ID",
+      "CODEX_API_KEY",
+      "AZURE_OPENAI_API_KEY",
+      "AZURE_OPENAI_ENDPOINT",
+      "AZURE_OPENAI_BASE_URL"
+    ],
+    "auth_copied_to_ephemeral_codex_home": true,
+    "isolated_home": true,
+    "user_skills_hidden_by_isolated_home": true,
+    "path_sanitized": true,
+    "forbidden_host_path_audit": "passed"
+  },
+  "context": {
+    "brief": {
+      "path": "evals/briefs/plant-swap-one-line-v4.md",
+      "sha256": "b7b9de09fde52a626898af349dc605c3a5a289624df38fd32c5f280fbaa61d64"
+    },
+    "trusted_files": [
+      {
+        "path": "wow-frontend-design/SKILL.md",
+        "sha256": "430116b2fd1bcf4162b3e450ee1ea27cc687f65a989bccc5789aa7d0291c8a3f"
+      },
+      {
+        "path": "wow-frontend-design/references/creative-direction.md",
+        "sha256": "b168c4e8b3e1ed50237687fc22a827946c025b0bc8660c290da04954a80322b3"
+      },
+      {
+        "path": "wow-frontend-design/references/anti-ai-slop.md",
+        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+      },
+      {
+        "path": "wow-frontend-design/references/mobile-responsive.md",
+        "sha256": "fc142e97fb7f4c409cf33be766981357e630d0419b0fa384e1d336c37137ca5f"
+      },
+      {
+        "path": "wow-frontend-design/references/localization.md",
+        "sha256": "fcc29117f6fba05d3f84eb52acb3d4e763ad00f12b7e040302f60de1d3dd5ec0"
+      },
+      {
+        "path": "wow-frontend-design/references/typography-webfonts.md",
+        "sha256": "a59a7a5493fe64c7bb11a1e691d56e5ebcfa86e2f7e7949d3262739c556d182e"
+      },
+      {
+        "path": "wow-frontend-design/references/implementation.md",
+        "sha256": "4474d1fbde8666c1342861b1b260e948d977eed018417c2873295739e09c22be"
+      },
+      {
+        "path": "wow-frontend-design/references/component-composition.md",
+        "sha256": "ebe4ca4e71d4b118baf8b86963a6106e28ba6fa7fc74fd94536dbe507f302373"
+      },
+      {
+        "path": "wow-frontend-design/references/quality-gates.md",
+        "sha256": "4980e9622226324e2e04ae83784030f83d5ce19788c580150fcdfb08045d1cef"
+      },
+      {
+        "path": "wow-frontend-design/references/weak-model-playbook.md",
+        "sha256": "14ebaeb9c0097a9438d9d2c3da15565981bfe4f7f95d07ce120645d82982e285"
+      },
+      {
+        "path": "wow-frontend-design/references/color-system-psychology.md",
+        "sha256": "7c98dffb7bd1f952952cc6f4ffda0e9d6e3f985397d3930c1184e7d5849196ed"
+      },
+      {
+        "path": "wow-frontend-design/references/design-md-contract.md",
+        "sha256": "d5557542aa867a019f760200bf81f68214eb6864dc736644066ac484a1c0c7fc"
+      },
+      {
+        "path": "wow-frontend-design/assets/DESIGN.template.md",
+        "sha256": "b0151780e69ca8dcd2b83b8b2bbd265646d31c139ae9b9e54abc30f49ad7028d"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "path": "DESIGN.md",
+      "bytes": 5690,
+      "sha256": "e4c7c06cc1b81758b08f5ce5ee081afb5689b5eab0a4261253e5afce92410660"
+    },
+    {
+      "path": "index.html",
+      "bytes": 17138,
+      "sha256": "3b3afd19d5e4f3cdc37df5bdc4e7384502e324ef7f1eabd53b74dc1f30abc849"
+    },
+    {
+      "path": "browse.html",
+      "bytes": 16738,
+      "sha256": "d8b735bcb74c1958dde60aded954350228af661daa1a3d18c28d38583516d0d4"
+    },
+    {
+      "path": "listing.html",
+      "bytes": 21795,
+      "sha256": "273832ebd1ea853c990bc91dde318349c3bd47a6a2d52423eaae88439fa0af49"
+    }
+  ]
+}

@@ -39,75 +39,73 @@ Portable Agent Skill for designing, building, auditing, and refactoring distinct
 
 公開能力與缺口以 [`capability-status.json`](evals/capability-status.json) 為準。機器只驗 schema、固定能力清單與 artifact 路徑；狀態語意仍須人工交叉審查。它明列已測、瀏覽器觀察但失敗、靜態稽核、definition-only、research-to-rule 與未測項目；README 或模型自述不得把狀態自行升級。
 
-## 固定跨模型視覺比較（v3）
+## 最近一次固定測試（Codex v4）
 
-這是三個固定題目、六個 requested model、同一份 frozen Skill/context 的非盲單次比較。用途是找 Skill 的弱點與觀察本案輸出，不是通用模型排名。Claude 與 Codex 的 agent 工具面不同，只能分 cohort 解讀；alias 的 backend snapshot 若 CLI 未回報，repo 不猜版本。
+2026-07-15（Asia/Taipei）以同一份凍結 Skill、三個錯開的繁中產品主題，分別請求 `gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5`。主題涵蓋高密度冷鏈交接台、直排 editorial 聲音典藏，以及低資訊量三頁植物交換流程。這是固定 cohort 的有限證據，不是模型排名或普遍品質宣稱。
 
-### 固定參數
+| 階段 | 最近結果 |
+| --- | --- |
+| 隔離生成 | 9/9 完成；共 13 次 attempt，3 個 case 經重試後完成 |
+| 官方 `@google/design.md@0.2.0` | 9/9 零 error／warning |
+| 瀏覽器截圖 | 30/30；桌機 `1440×1000`、手機 `390×844` CSS viewport／DPR 3 |
+| 更新後 visual auditor | 2/9 target 未觀察到 blocker；7/9 仍有 blocker |
 
-| 項目 | Claude cohort | Codex cohort |
-| --- | --- | --- |
-| Requested models | Haiku、Sonnet、Opus | `gpt-5.4-mini`、`gpt-5.4`、`gpt-5.5` |
-| 智慧／effort | 模型預設 `auto` | 模型預設；忽略個人 effort 設定 |
-| 思考 | `CLAUDE_CODE_DISABLE_THINKING=1`，extended thinking 關閉 | reasoning summary=`none`；CLI 不支援可驗證的內部 reasoning 全關閉 |
-| 工具面 | 僅 `Write`、safe mode、官方登入、隔離目錄 | `workspace-write`、ephemeral、官方 ChatGPT 登入、忽略個人 config/rules、無 web search |
-| 每案上限 | 900 秒 | 900 秒 |
-
-共同條件：`1440×1000` desktop、`390×844` mobile、阻擋外部 request、每頁 viewport screenshot。山域救援與城市詩祭各輸出 `DESIGN.md + index.html`；一句話書局輸出 `DESIGN.md + index.html + catalog.html + book.html`。官方 `@google/design.md@0.2.0 lint` 檢查 18 份 `DESIGN.md`；瀏覽器檢查 60 個頁面／viewport。
-
-正式生成 Skill SHA-256 是 `902ec429ac7343e533c6f8cb845457348829e11999431ab905f7e64d8e2b0008`。正式結果發現的 unitless zero、manual frontmatter preflight、跨頁 token 與 writing-mode collision 規則已回灌目前 Skill；因此下列截圖仍保留 frozen hash，不假裝是回灌後重跑。
-
-題目與 hash：[`mountain-rescue-flow-v3.md`](evals/briefs/mountain-rescue-flow-v3.md) `037e87…51682`、[`city-poetry-festival-v3.md`](evals/briefs/city-poetry-festival-v3.md) `dbea96…c5c0`、一句原文 [`bookstore-one-line-v3.md`](evals/briefs/bookstore-one-line-v3.md) `幫我做書局網頁。`／`239612…a796`。
-
-### 結果摘要
-
-`E/W` 是官方 DESIGN.md lint 的 error/warning；它不是美感分數。自動視覺問題是 rendered-box／DOM 證據；人工觀察另外記錄，避免自動檢查漏掉明顯重疊。
-
-| Model | 山域救援：秒／E/W／觀察 | 城市詩祭：秒／E/W／觀察 | 一句話書局：秒／E/W／觀察 |
+| 主題 | `gpt-5.4-mini` | `gpt-5.4` | `gpt-5.5` |
 | --- | --- | --- | --- |
-| Claude Haiku | 93.185／0/1／清楚但偏通用；mobile inbox 合理 | 162.106／0/5／直排區留白過大、hook 失敗 | 160.662／0/3／mobile 選單遮首頁，catalog header 失效 |
-| Claude Sonnet | 240.611／0/18／暗色操作語言成熟；重複 responsive DOM/ID | 正式 195.646 連線中斷；一次補測 238.000／0/6／編輯感佳但直排 hook 失敗 | 533.636／0/10／視覺成熟；catalog mobile 品牌裁切、token drift |
-| Claude Opus | 230.947／0/13／desktop 比較與 mobile 卡片都強；仍有重複 DOM | 190.366／0/4／報刊感強；直排 hook 未合約化 | 332.166／0/4／本案視覺多頁一致性最佳；機器仍偵測 token drift |
-| Codex `gpt-5.4-mini` | 757.810／2/6／地形語彙鮮明；首屏把任務延到下方 | 477.332／2/0／橫向溢位且直排失敗 | 417.447／2/1／六張畫面視覺一致；lang、裁切、token/shell drift |
-| Codex `gpt-5.4` | 340.898／0/2／desktop 右欄與 mobile 嚴重重疊 | 228.376／0/1／mobile 可讀，desktop 直排壓住標題與內文 | 495.971／0/1／折角書頁概念完整；字級偏大、token/shell drift |
-| Codex `gpt-5.5` | 505.183／**0/0**／本題密度、語意、響應式最均衡 | 320.811／**0/0**／直排概念最佳；仍有 rendered text clipping | 272.171／**0/0**／識別鮮明；catalog 品牌裁切、封面標題重疊、shell drift |
+| 港埠冷鏈 | 橫向溢位、關閉中的手機導航外露 | 短操作文字換行／裁切 | 未觀察到 blocker |
+| 島嶼聲音典藏 | 可見文字裁切 | 文字碰撞、手機導航外露、fixed/sticky 遮擋、直排契約失敗 | 直排契約失敗 |
+| 植物交換 | exact `lang="zh-Hant"` 契約不符、短操作文字、fixed/sticky 遮擋 | 未觀察到 blocker | exact `lang="zh-Hant"` 契約不符 |
 
-正式矩陣保留 Sonnet 詩祭的 `generation_failed`；補測另記在 [`product-flow-v3-infrastructure-retry.json`](evals/product-flow-v3-infrastructure-retry.json)，不覆寫原失敗。完整生成、lint、browser 與人工紀錄分別在 [`product-flow-v3-generation-results.json`](evals/product-flow-v3-generation-results.json)、[`product-flow-v3-design-md-results.json`](evals/product-flow-v3-design-md-results.json)、[`product-flow-v3-visual-results.json`](evals/product-flow-v3-visual-results.json)、[`product-flow-v3-manual-review.json`](evals/product-flow-v3-manual-review.json)。
+完整機器證據：[`generation`](evals/product-flow-v4-generation-results.json)、[`DESIGN.md lint`](evals/product-flow-v4-design-md-results.json)、[`visual audit`](evals/product-flow-v4-visual-results.json)、[`targets`](evals/product-flow-v4-targets/)。生成使用的凍結 Skill SHA-256 是 `430116b2fd1bcf4162b3e450ee1ea27cc687f65a989bccc5789aa7d0291c8a3f`；下方 visual report 則以更新後 auditor 重新檢查相同 HTML。現行 Skill 已依發現補上導航關閉狀態、fixed/sticky 遮擋、短標籤、語系與直排規則，但尚未用新 Skill 重跑生成，因此不能把這輪結果當成修正後通過。
 
-### 山域救援截圖
+<details open>
+<summary><strong>港埠冷鏈：桌機／手機成果</strong></summary>
 
-| Model | Desktop `1440×1000` | Mobile `390×844` |
+| Model | Desktop | Mobile |
 | --- | --- | --- |
-| Claude Haiku | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-claude-haiku-index-desktop.png" alt="Claude Haiku 山域救援 desktop" width="420"> | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-claude-haiku-index-mobile.png" alt="Claude Haiku 山域救援 mobile" width="180"> |
-| Claude Sonnet | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-claude-sonnet-index-desktop.png" alt="Claude Sonnet 山域救援 desktop" width="420"> | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-claude-sonnet-index-mobile.png" alt="Claude Sonnet 山域救援 mobile" width="180"> |
-| Claude Opus | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-claude-opus-index-desktop.png" alt="Claude Opus 山域救援 desktop" width="420"> | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-claude-opus-index-mobile.png" alt="Claude Opus 山域救援 mobile" width="180"> |
-| Codex `gpt-5.4-mini` | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-codex-gpt-5.4-mini-index-desktop.png" alt="Codex GPT-5.4-mini 山域救援 desktop" width="420"> | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-codex-gpt-5.4-mini-index-mobile.png" alt="Codex GPT-5.4-mini 山域救援 mobile" width="180"> |
-| Codex `gpt-5.4` | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-codex-gpt-5.4-index-desktop.png" alt="Codex GPT-5.4 山域救援 desktop" width="420"> | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-codex-gpt-5.4-index-mobile.png" alt="Codex GPT-5.4 山域救援 mobile" width="180"> |
-| Codex `gpt-5.5` | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-codex-gpt-5.5-index-desktop.png" alt="Codex GPT-5.5 山域救援 desktop" width="420"> | <img src="assets/product-flow-v3/mountain-rescue-flow-v3-codex-gpt-5.5-index-mobile.png" alt="Codex GPT-5.5 山域救援 mobile" width="180"> |
+| `gpt-5.4-mini` | <img src="assets/product-flow-v4/harbor-cold-chain-v4-codex-gpt-5.4-mini-index-desktop.png" alt="gpt-5.4-mini 港埠冷鏈桌機畫面" width="500"> | <img src="assets/product-flow-v4/harbor-cold-chain-v4-codex-gpt-5.4-mini-index-mobile.png" alt="gpt-5.4-mini 港埠冷鏈手機畫面" width="220"> |
+| `gpt-5.4` | <img src="assets/product-flow-v4/harbor-cold-chain-v4-codex-gpt-5.4-index-desktop.png" alt="gpt-5.4 港埠冷鏈桌機畫面" width="500"> | <img src="assets/product-flow-v4/harbor-cold-chain-v4-codex-gpt-5.4-index-mobile.png" alt="gpt-5.4 港埠冷鏈手機畫面" width="220"> |
+| `gpt-5.5` | <img src="assets/product-flow-v4/harbor-cold-chain-v4-codex-gpt-5.5-index-desktop.png" alt="gpt-5.5 港埠冷鏈桌機畫面" width="500"> | <img src="assets/product-flow-v4/harbor-cold-chain-v4-codex-gpt-5.5-index-mobile.png" alt="gpt-5.5 港埠冷鏈手機畫面" width="220"> |
 
-### 城市詩祭直排截圖
+</details>
 
-| Model | Desktop `1440×1000` | Mobile `390×844` |
+<details>
+<summary><strong>島嶼聲音典藏：桌機／手機成果</strong></summary>
+
+| Model | Desktop | Mobile |
 | --- | --- | --- |
-| Claude Haiku | <img src="assets/product-flow-v3/city-poetry-festival-v3-claude-haiku-index-desktop.png" alt="Claude Haiku 城市詩祭 desktop 直排" width="420"> | <img src="assets/product-flow-v3/city-poetry-festival-v3-claude-haiku-index-mobile.png" alt="Claude Haiku 城市詩祭 mobile 水平排版" width="180"> |
-| Claude Sonnet（一次補測） | <img src="assets/product-flow-v3/city-poetry-festival-v3-claude-sonnet-index-desktop.png" alt="Claude Sonnet 補測城市詩祭 desktop" width="420"> | <img src="assets/product-flow-v3/city-poetry-festival-v3-claude-sonnet-index-mobile.png" alt="Claude Sonnet 補測城市詩祭 mobile" width="180"> |
-| Claude Opus | <img src="assets/product-flow-v3/city-poetry-festival-v3-claude-opus-index-desktop.png" alt="Claude Opus 城市詩祭 desktop 直排" width="420"> | <img src="assets/product-flow-v3/city-poetry-festival-v3-claude-opus-index-mobile.png" alt="Claude Opus 城市詩祭 mobile 水平排版" width="180"> |
-| Codex `gpt-5.4-mini` | <img src="assets/product-flow-v3/city-poetry-festival-v3-codex-gpt-5.4-mini-index-desktop.png" alt="Codex GPT-5.4-mini 城市詩祭 desktop" width="420"> | <img src="assets/product-flow-v3/city-poetry-festival-v3-codex-gpt-5.4-mini-index-mobile.png" alt="Codex GPT-5.4-mini 城市詩祭 mobile" width="180"> |
-| Codex `gpt-5.4` | <img src="assets/product-flow-v3/city-poetry-festival-v3-codex-gpt-5.4-index-desktop.png" alt="Codex GPT-5.4 城市詩祭 desktop 直排重疊" width="420"> | <img src="assets/product-flow-v3/city-poetry-festival-v3-codex-gpt-5.4-index-mobile.png" alt="Codex GPT-5.4 城市詩祭 mobile 水平排版" width="180"> |
-| Codex `gpt-5.5` | <img src="assets/product-flow-v3/city-poetry-festival-v3-codex-gpt-5.5-index-desktop.png" alt="Codex GPT-5.5 城市詩祭 desktop 直排" width="420"> | <img src="assets/product-flow-v3/city-poetry-festival-v3-codex-gpt-5.5-index-mobile.png" alt="Codex GPT-5.5 城市詩祭 mobile 水平排版" width="180"> |
+| `gpt-5.4-mini` | <img src="assets/product-flow-v4/island-sound-archive-v4-codex-gpt-5.4-mini-index-desktop.png" alt="gpt-5.4-mini 島嶼聲音典藏桌機畫面" width="500"> | <img src="assets/product-flow-v4/island-sound-archive-v4-codex-gpt-5.4-mini-index-mobile.png" alt="gpt-5.4-mini 島嶼聲音典藏手機畫面" width="220"> |
+| `gpt-5.4` | <img src="assets/product-flow-v4/island-sound-archive-v4-codex-gpt-5.4-index-desktop.png" alt="gpt-5.4 島嶼聲音典藏桌機畫面" width="500"> | <img src="assets/product-flow-v4/island-sound-archive-v4-codex-gpt-5.4-index-mobile.png" alt="gpt-5.4 島嶼聲音典藏手機畫面" width="220"> |
+| `gpt-5.5` | <img src="assets/product-flow-v4/island-sound-archive-v4-codex-gpt-5.5-index-desktop.png" alt="gpt-5.5 島嶼聲音典藏桌機畫面" width="500"> | <img src="assets/product-flow-v4/island-sound-archive-v4-codex-gpt-5.5-index-mobile.png" alt="gpt-5.5 島嶼聲音典藏手機畫面" width="220"> |
 
-### 一句話書局三頁截圖
+</details>
 
-每格依序為首頁、目錄、單書頁；每張 `alt` 都含產生模型與 viewport。
+<details>
+<summary><strong>植物交換：三頁功能流程</strong></summary>
 
-| Model | Desktop 三頁 | Mobile 三頁 |
-| --- | --- | --- |
-| Claude Haiku | <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-haiku-index-desktop.png" alt="Claude Haiku 書局首頁 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-haiku-catalog-desktop.png" alt="Claude Haiku 書局目錄 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-haiku-book-desktop.png" alt="Claude Haiku 書局單書頁 desktop" width="31%"> | <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-haiku-index-mobile.png" alt="Claude Haiku 書局首頁 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-haiku-catalog-mobile.png" alt="Claude Haiku 書局目錄 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-haiku-book-mobile.png" alt="Claude Haiku 書局單書頁 mobile" width="31%"> |
-| Claude Sonnet | <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-sonnet-index-desktop.png" alt="Claude Sonnet 書局首頁 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-sonnet-catalog-desktop.png" alt="Claude Sonnet 書局目錄 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-sonnet-book-desktop.png" alt="Claude Sonnet 書局單書頁 desktop" width="31%"> | <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-sonnet-index-mobile.png" alt="Claude Sonnet 書局首頁 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-sonnet-catalog-mobile.png" alt="Claude Sonnet 書局目錄 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-sonnet-book-mobile.png" alt="Claude Sonnet 書局單書頁 mobile" width="31%"> |
-| Claude Opus | <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-opus-index-desktop.png" alt="Claude Opus 書局首頁 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-opus-catalog-desktop.png" alt="Claude Opus 書局目錄 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-opus-book-desktop.png" alt="Claude Opus 書局單書頁 desktop" width="31%"> | <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-opus-index-mobile.png" alt="Claude Opus 書局首頁 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-opus-catalog-mobile.png" alt="Claude Opus 書局目錄 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-claude-opus-book-mobile.png" alt="Claude Opus 書局單書頁 mobile" width="31%"> |
-| Codex `gpt-5.4-mini` | <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-mini-index-desktop.png" alt="Codex GPT-5.4-mini 書局首頁 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-mini-catalog-desktop.png" alt="Codex GPT-5.4-mini 書局目錄 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-mini-book-desktop.png" alt="Codex GPT-5.4-mini 書局單書頁 desktop" width="31%"> | <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-mini-index-mobile.png" alt="Codex GPT-5.4-mini 書局首頁 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-mini-catalog-mobile.png" alt="Codex GPT-5.4-mini 書局目錄 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-mini-book-mobile.png" alt="Codex GPT-5.4-mini 書局單書頁 mobile" width="31%"> |
-| Codex `gpt-5.4` | <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-index-desktop.png" alt="Codex GPT-5.4 書局首頁 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-catalog-desktop.png" alt="Codex GPT-5.4 書局目錄 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-book-desktop.png" alt="Codex GPT-5.4 書局單書頁 desktop" width="31%"> | <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-index-mobile.png" alt="Codex GPT-5.4 書局首頁 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-catalog-mobile.png" alt="Codex GPT-5.4 書局目錄 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.4-book-mobile.png" alt="Codex GPT-5.4 書局單書頁 mobile" width="31%"> |
-| Codex `gpt-5.5` | <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.5-index-desktop.png" alt="Codex GPT-5.5 書局首頁 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.5-catalog-desktop.png" alt="Codex GPT-5.5 書局目錄 desktop" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.5-book-desktop.png" alt="Codex GPT-5.5 書局單書頁 desktop" width="31%"> | <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.5-index-mobile.png" alt="Codex GPT-5.5 書局首頁 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.5-catalog-mobile.png" alt="Codex GPT-5.5 書局目錄 mobile" width="31%"> <img src="assets/product-flow-v3/bookstore-one-line-v3-codex-gpt-5.5-book-mobile.png" alt="Codex GPT-5.5 書局單書頁 mobile" width="31%"> |
+`gpt-5.4-mini`
+
+| Viewport | 首頁 | 瀏覽 | 刊登 |
+| --- | --- | --- | --- |
+| Desktop | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-mini-index-desktop.png" alt="gpt-5.4-mini 植物交換首頁桌機畫面" width="320"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-mini-browse-desktop.png" alt="gpt-5.4-mini 植物交換瀏覽頁桌機畫面" width="320"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-mini-listing-desktop.png" alt="gpt-5.4-mini 植物交換刊登頁桌機畫面" width="320"> |
+| Mobile | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-mini-index-mobile.png" alt="gpt-5.4-mini 植物交換首頁手機畫面" width="180"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-mini-browse-mobile.png" alt="gpt-5.4-mini 植物交換瀏覽頁手機畫面" width="180"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-mini-listing-mobile.png" alt="gpt-5.4-mini 植物交換刊登頁手機畫面" width="180"> |
+
+`gpt-5.4`
+
+| Viewport | 首頁 | 瀏覽 | 刊登 |
+| --- | --- | --- | --- |
+| Desktop | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-index-desktop.png" alt="gpt-5.4 植物交換首頁桌機畫面" width="320"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-browse-desktop.png" alt="gpt-5.4 植物交換瀏覽頁桌機畫面" width="320"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-listing-desktop.png" alt="gpt-5.4 植物交換刊登頁桌機畫面" width="320"> |
+| Mobile | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-index-mobile.png" alt="gpt-5.4 植物交換首頁手機畫面" width="180"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-browse-mobile.png" alt="gpt-5.4 植物交換瀏覽頁手機畫面" width="180"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.4-listing-mobile.png" alt="gpt-5.4 植物交換刊登頁手機畫面" width="180"> |
+
+`gpt-5.5`
+
+| Viewport | 首頁 | 瀏覽 | 刊登 |
+| --- | --- | --- | --- |
+| Desktop | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.5-index-desktop.png" alt="gpt-5.5 植物交換首頁桌機畫面" width="320"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.5-browse-desktop.png" alt="gpt-5.5 植物交換瀏覽頁桌機畫面" width="320"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.5-listing-desktop.png" alt="gpt-5.5 植物交換刊登頁桌機畫面" width="320"> |
+| Mobile | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.5-index-mobile.png" alt="gpt-5.5 植物交換首頁手機畫面" width="180"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.5-browse-mobile.png" alt="gpt-5.5 植物交換瀏覽頁手機畫面" width="180"> | <img src="assets/product-flow-v4/plant-swap-one-line-v4-codex-gpt-5.5-listing-mobile.png" alt="gpt-5.5 植物交換刊登頁手機畫面" width="180"> |
+
+</details>
+
 
 ## 原生 Host／Client 發現
 
@@ -204,6 +202,7 @@ wow-frontend-design/
 │   ├── mobile-responsive.md       # 獨立手機構圖與驗證
 │   ├── localization.md            # 繁中、CJK、RTL、多語系
 │   ├── typography-webfonts.md      # 開源字體、CJK 覆蓋、載入／子集／授權
+│   ├── typographic-layout.md       # 現代網頁字體編排、量測與 CJK 版面規則
 │   ├── color-system-psychology.md  # 對比、語意色、深淺模式與色彩心理證據
 │   ├── design-md-contract.md       # Google Labs DESIGN.md schema、跨頁契約與 lint
 │   ├── visual-material-system.md   # 框線、字體、光源、材質、效果與動效語法
@@ -257,8 +256,9 @@ wow-frontend-design/
     ├── validate_product_cases.py   # 非 landing 產品 fixture 結構／coverage
     ├── validate_capability_status.py # 固定能力清單與 artifact 路徑檢查
     ├── validate_screenshot_manifest.py # 截圖 hash、來源綁定與完整 PNG 解碼
+    ├── validate_product_flow_evidence.py # v4 生成、lint、視覺與 PNG 完整性
     ├── validate_dashboard_evidence.py # 嚴格／診斷 replay 邊界與 artifact hash
-    ├── validate_product_flow_evidence.py # v3 生成／DESIGN／60 張截圖 integrity
+    ├── validate_design_md_clean.py       # 固定版 DESIGN.md 零 finding gate
     ├── weak_model_output.schema.json
     └── test_*.py                  # 掃描器、ledger、scorer 單元測試
 ```
@@ -320,6 +320,7 @@ python3 wow-frontend-design/scripts/score_weak_model_output.py --result "$WORKSP
 - 創意與評審面向參考 [Awwwards](https://www.awwwards.com/) 的 Design、Usability、Creativity、Content，以及 responsive、accessibility、semantics、animation、performance。
 - 無障礙以 [W3C WCAG 2.2](https://www.w3.org/TR/WCAG22/) AA 為預設目標。
 - 中文排版參考持續更新的 [W3C Requirements for Chinese Text Layout](https://www.w3.org/International/clreq/) Draft Note 校準；它是排版指南，不是合規認證。
+- 閱讀行長、行高、字距、換行、直排、元件／卡片間距與字體選擇的證據邊界、候選範圍及驗證矩陣見 [`typographic-layout.md`](wow-frontend-design/references/typographic-layout.md)。WCAG text-spacing 數字是使用者 override 韌性測試，不是作者端「最佳排版」預設值。
 - 效能採 [Core Web Vitals](https://web.dev/articles/vitals) 現行 good thresholds：LCP ≤ 2.5s、INP ≤ 200ms、CLS ≤ 0.1。
 - 參考專案 [creative-web-showcase](https://github.com/Langalu/creative-web-showcase) 的價值在於概念一致性、招牌互動、progressive enhancement 與三輪實機驗證；本 skill 不複製其視覺或程式碼。
 - 熱門前端 Agent Skills 的星數、授權、優點與缺點快照見 [`github-skill-research.md`](wow-frontend-design/references/github-skill-research.md)。星數只用來找候選，不作品質證明。

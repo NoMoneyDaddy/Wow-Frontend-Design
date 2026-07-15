@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-15T01:00:22Z",
+  "generation_ledger": {
+    "path": "evals/product-flow-v4-generation-results.json",
+    "sha256": "eb8526b57a5cc1cf1f30f1f72731a9fcde0d92541d4e7d369c9be8150f8ae495"
+  },
+  "supplemental_retry_ledger": null,
+  "linter": {
+    "package": "@google/design.md",
+    "version": "0.2.0"
+  },
+  "results": [
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "harbor-cold-chain-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.4-mini-harbor-cold-chain-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "f9fae5ae948e957ca0780967448e5a04053406e4450953458eb120678e24820c",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 10 colors, 3 typography scales, 4 rounding levels, 5 spacing tokens, 8 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4",
+      "case_id": "harbor-cold-chain-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.4-harbor-cold-chain-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "ae7e83f50f5772aa9548968a8ef8a81080c1e694761d2da22b1702e309b01d98",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 12 colors, 4 typography scales, 4 rounding levels, 5 spacing tokens, 6 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.5",
+      "case_id": "harbor-cold-chain-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.5-harbor-cold-chain-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "d623d6a3082aa363790b5f814a4a9b10ca1ba920c3811a40a4e37e45af50dd87",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 25 colors, 4 typography scales, 3 rounding levels, 5 spacing tokens, 14 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "island-sound-archive-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.4-mini-island-sound-archive-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "0a8424598ee2da48db3f151e1f9c201c62a7698cd44a056ca42b868269f2c1f9",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 6 colors, 5 typography scales, 3 rounding levels, 5 spacing tokens, 7 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4",
+      "case_id": "island-sound-archive-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.4-island-sound-archive-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "b1ab894f42ce410097387e96a2f31be46f91fd679f39c2c299fa36115a74e471",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 8 colors, 4 typography scales, 3 rounding levels, 5 spacing tokens, 6 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.5",
+      "case_id": "island-sound-archive-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.5-island-sound-archive-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "a4922d9a2b35baba3c79ce651dfd8347f49766cbb310c893258b6bbf14eba108",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 10 colors, 3 typography scales, 3 rounding levels, 3 spacing tokens, 6 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4-mini",
+      "case_id": "plant-swap-one-line-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.4-mini-plant-swap-one-line-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "e4c7c06cc1b81758b08f5ce5ee081afb5689b5eab0a4261253e5afce92410660",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 6 colors, 3 typography scales, 4 rounding levels, 6 spacing tokens, 8 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.4",
+      "case_id": "plant-swap-one-line-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.4-plant-swap-one-line-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "2142e5fb31dce6ea2aff44da606626a932194f812a2788fb9e7b29816345f320",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 9 colors, 3 typography scales, 2 rounding levels, 2 spacing tokens, 5 components."
+        }
+      ]
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-5.5",
+      "case_id": "plant-swap-one-line-v4",
+      "path": "evals/product-flow-v4-targets/codex-gpt-5.5-plant-swap-one-line-v4/DESIGN.md",
+      "evidence_source": "formal_matrix",
+      "sha256": "21f853cf31c7814c22cd0ea03ceb0992e485a78023e1f73e0cc40464c3e82969",
+      "status": "clean",
+      "exit_code": 0,
+      "summary": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 1
+      },
+      "findings": [
+        {
+          "severity": "info",
+          "message": "Design system defines 13 colors, 4 typography scales, 2 rounding levels, 4 spacing tokens, 8 components."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "checked": 9,
+    "clean": 9,
+    "with_findings": 0,
+    "infrastructure_failures": 0
+  }
+}
