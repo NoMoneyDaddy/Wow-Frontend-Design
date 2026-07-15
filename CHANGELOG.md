@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- CI 更新並固定至官方最新穩定版 `actions/checkout@v7.0.0`、`actions/setup-python@v6.3.0`、`actions/setup-node@v7.0.0` 與 GitHub CLI `v2.96.0`，移除舊版 Node.js 20 Action 警告並保持可重現安裝。
+
 ## [0.2.0] - 2026-07-15
 
 ### Added
