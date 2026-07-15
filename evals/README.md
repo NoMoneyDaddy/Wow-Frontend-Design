@@ -23,7 +23,7 @@ python3 wow-frontend-design/scripts/validate_product_flow_evidence.py \
 
 - 換掉 v4 三個主題；測不同產品功能、互動路徑與測試面向，不把舊案換皮重跑。
 - 執行前先研究現代網頁的設計感、字體編排、層級、材質、動效節制與響應式呈現，再把來源轉成可驗證規則。第一個方法論案例是 [Design Skill Comparison Lab](https://designskill.qiaomu.ai/)；只採用其題型分離、實際互動與雙軌評估思路，不照搬作者分數。
-- 第一批只跑 `gpt-5.4-mini`、`gpt-5.4` 與 Claude Haiku；Codex 與 Claude 分 provider cohort 執行、分開報告，不混成直接排名。
+- 後續預設只跑 Codex cohort；Claude 不併入同一矩陣。只有使用者另行要求時，才以獨立 provider cohort 執行並分開報告。
 - 截圖用於 README 的功能／成果展示；測試報告仍分開列出 blocker，不能以好看的截圖取代 acceptance。
 - 新一輪完成後才替換 README 的「最近一次」結果與圖；舊報告保留其凍結 Skill 與 evaluator provenance。
 
