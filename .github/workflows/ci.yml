@@ -131,6 +131,9 @@ jobs:
       - name: Validate published v6 evidence
         run: npm run validate:evidence-v6
 
+      - name: Smoke-test parameterized v7 evidence CLI
+        run: npm run check:evidence-v7-cli
+
       - name: Check showcase JavaScript
         run: |
           node --check evals/weak-model-showcase/app.js

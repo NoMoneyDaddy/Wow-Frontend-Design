@@ -218,7 +218,7 @@ For repair-required findings, preserve the preview, send exact file/route/viewpo
 
 Acceptance is evaluator-owned. Never edit an active gate, accept your own score, fabricate evidence, or upgrade INFERRED/UNVERIFIED to passed.
 
-When the caller requests a machine-readable handoff, start from [quality_result.example.json](scripts/quality_result.example.json) and validate it with [validate_quality_result.py](scripts/validate_quality_result.py). Required applicable `FAIL` or `UNVERIFIED` must make the result ineligible, keep `weighted_total` null, and prevent a `VERIFIED` release claim.
+When the caller requests a machine-readable handoff, start from [quality_result.example.json](scripts/quality_result.example.json). Validate a completion claim with [validate_quality_result.py](scripts/validate_quality_result.py) against the evaluator-owned ledger: `python3 <skill-dir>/scripts/validate_quality_result.py <result.json> --ledger <evaluator-root>/ledger.json --workspace-root <evaluator-root>/workspace --require-gate novel-discovery`. Every positive gate/craft/rendered evidence reference must resolve to one successful command or current hashed artifact. `--structure-only` preserves legacy schema checking but cannot support a completion claim. Required applicable `FAIL` or `UNVERIFIED`, a missing discovery gate, an implementation-owned ledger, or unbound evidence must make the result ineligible and prevent `VERIFIED`.
 
 ## Completion red-flag blacklist
 

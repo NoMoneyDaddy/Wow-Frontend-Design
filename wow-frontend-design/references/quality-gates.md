@@ -159,7 +159,7 @@ weighted_total = null
 release != VERIFIED
 ```
 
-This rule is machine-enforced when a structured result is requested. A high craft judgment can never compensate for a broken primary task, inaccessible action, data/safety failure, missing required evidence, or invalid run.
+This rule is machine-enforced when a structured result is requested. Completion validation must pass `validate_quality_result.py` with the evaluator-owned `--ledger`, its model-writable `--workspace-root`, and evaluator-required gates such as `--require-gate novel-discovery`; `--structure-only` checks shape and cannot validate a release. Every positive evidence label must resolve exactly once to a successful ledger command or a present hash-matching artifact. A high craft judgment can never compensate for a broken primary task, inaccessible action, data/safety failure, missing required evidence, or invalid run.
 
 ### C. Independent core craft vector
 

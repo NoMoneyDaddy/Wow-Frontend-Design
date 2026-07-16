@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import evidence_ledger
+
 
 GATE_STATUSES = {"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"}
 CRAFT_STATUSES = {"UNVERIFIED", "CONCERN", "ACCEPTABLE", "STRONG"}
@@ -217,16 +219,185 @@ def validate(path: Path) -> int:
     return validate_data(data)
 
 
-def main() -> int:
+def _resolve_evidence_reference(
+    reference: str,
+    commands: dict[str, dict[str, Any]],
+    artifacts: dict[str, dict[str, Any]],
+    artifacts_by_path: dict[str, dict[str, Any]],
+    ledger_root: Path,
+    workspace_root: Path,
+) -> None:
+    matches: list[tuple[str, dict[str, Any]]] = []
+    if reference in commands:
+        matches.append(("command", commands[reference]))
+    if reference in artifacts:
+        matches.append(("artifact", artifacts[reference]))
+    path_event = artifacts_by_path.get(reference)
+    if path_event is not None and all(path_event is not event for _, event in matches):
+        matches.append(("artifact", path_event))
+    if len(matches) != 1:
+        raise QualityResultError(
+            f"evidence reference must resolve exactly once in the ledger: {reference}"
+        )
+    kind, event = matches[0]
+    if kind == "command":
+        command_root = (ledger_root / event["cwd"]).resolve()
+        try:
+            command_root.relative_to(workspace_root)
+        except ValueError as error:
+            raise QualityResultError(
+                f"evidence command ran outside the model workspace: {reference}"
+            ) from error
+        if event["exit_code"] != 0:
+            raise QualityResultError(f"evidence command did not pass: {reference}")
+        return
+    artifact_path = (ledger_root / event["path"]).resolve()
+    try:
+        artifact_path.relative_to(workspace_root)
+    except ValueError:
+        pass
+    else:
+        raise QualityResultError(
+            f"evidence artifact must remain outside the model workspace: {reference}"
+        )
+    mismatch = evidence_ledger.verify_artifact_event(event, ledger_root)
+    if event.get("exists") is not True or mismatch:
+        detail = mismatch or "artifact is absent"
+        raise QualityResultError(f"evidence artifact is invalid: {reference} ({detail})")
+
+
+def validate_with_ledger(
+    result_path: Path,
+    ledger_path: Path,
+    workspace_root: Path,
+    required_gates: tuple[str, ...] = (),
+) -> int:
+    """Validate result structure and bind every positive claim to evaluator facts."""
+
+    count = validate(result_path)
+    workspace = workspace_root.expanduser().resolve(strict=True)
+    if not workspace.is_dir() or workspace.is_symlink():
+        raise QualityResultError("workspace root must be a real directory")
+    ledger_file = ledger_path.expanduser().resolve(strict=True)
+    result_file = result_path.expanduser().resolve(strict=True)
+    try:
+        result_file.relative_to(workspace)
+    except ValueError as error:
+        raise QualityResultError("quality result must remain inside the model-writable workspace") from error
+    try:
+        workspace.relative_to(ledger_file.parent)
+    except ValueError as error:
+        raise QualityResultError("workspace root must be a child of the evaluator-owned ledger root") from error
+    try:
+        ledger_file.relative_to(workspace)
+    except ValueError:
+        pass
+    else:
+        raise QualityResultError("evidence ledger must remain outside the model-writable workspace")
+
+    try:
+        ledger = evidence_ledger.load_ledger(ledger_file)
+    except evidence_ledger.LedgerError as error:
+        raise QualityResultError(f"evidence ledger is invalid: {error}") from error
+    data = json.loads(result_path.read_text(encoding="utf-8"))
+    gates = {gate["id"]: gate for gate in data["hard_gates"]}
+    missing_gates = sorted(set(required_gates) - set(gates))
+    if missing_gates:
+        raise QualityResultError(f"required hard gates are missing: {missing_gates}")
+    for gate_id in required_gates:
+        gate = gates[gate_id]
+        if not gate["required"] or not gate["applicable"] or gate["status"] != "PASS":
+            raise QualityResultError(f"required hard gate did not pass: {gate_id}")
+
+    commands: dict[str, dict[str, Any]] = {}
+    artifacts: dict[str, dict[str, Any]] = {}
+    artifacts_by_path: dict[str, dict[str, Any]] = {}
+    for event in ledger["events"]:
+        if event["kind"] == "command":
+            commands[event["label"]] = event
+        else:
+            artifacts[event["label"]] = event
+            artifacts_by_path[event["path"]] = event
+    overlap = sorted(set(commands) & set(artifacts))
+    if overlap:
+        raise QualityResultError(f"ledger evidence labels are ambiguous: {overlap}")
+
+    references: list[str] = []
+    for gate in data["hard_gates"]:
+        if gate["status"] == "PASS":
+            references.extend(gate["evidence"])
+    for dimension in data["craft"]["dimensions"]:
+        if dimension["status"] != "UNVERIFIED":
+            references.extend(dimension["evidence"])
+    award = data["award_lens"]
+    if award is not None and award["status"] == "OBSERVED":
+        references.extend(award["evidence"])
+    for reference in dict.fromkeys(references):
+        _resolve_evidence_reference(
+            reference,
+            commands,
+            artifacts,
+            artifacts_by_path,
+            ledger_file.parent,
+            workspace,
+        )
+
+    rendered = data["handoff"]["rendered_evidence"]
+    if rendered["status"] == "OBSERVED":
+        for path in rendered["paths"]:
+            event = artifacts_by_path.get(path)
+            if event is None:
+                raise QualityResultError(f"rendered evidence path is absent from ledger: {path}")
+            artifact_path = (ledger_file.parent / event["path"]).resolve()
+            try:
+                artifact_path.relative_to(workspace)
+            except ValueError:
+                pass
+            else:
+                raise QualityResultError(
+                    f"rendered evidence must remain outside the model workspace: {path}"
+                )
+            mismatch = evidence_ledger.verify_artifact_event(event, ledger_file.parent)
+            if event.get("exists") is not True or mismatch:
+                detail = mismatch or "artifact is absent"
+                raise QualityResultError(f"rendered evidence is invalid: {path} ({detail})")
+    return count
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("result", type=Path)
-    args = parser.parse_args()
+    parser.add_argument("--ledger", type=Path)
+    parser.add_argument("--workspace-root", type=Path)
+    parser.add_argument("--require-gate", action="append", default=[])
+    parser.add_argument(
+        "--structure-only",
+        action="store_true",
+        help="validate the legacy JSON shape without accepting its evidence claims",
+    )
+    args = parser.parse_args(argv)
     try:
-        count = validate(args.result.expanduser())
-    except QualityResultError as error:
+        if args.structure_only:
+            if args.ledger is not None or args.workspace_root is not None or args.require_gate:
+                raise QualityResultError("--structure-only cannot be combined with evidence options")
+            count = validate(args.result.expanduser())
+            print(f"quality result structure valid: {count} hard gates; evidence not checked")
+            return 0
+        if args.ledger is None or args.workspace_root is None:
+            raise QualityResultError(
+                "completion validation requires --ledger and --workspace-root; "
+                "use --structure-only only for legacy shape checks"
+            )
+        count = validate_with_ledger(
+            args.result.expanduser(),
+            args.ledger,
+            args.workspace_root,
+            tuple(args.require_gate),
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, QualityResultError) as error:
         print(f"quality result invalid: {error}", file=sys.stderr)
         return 1
-    print(f"quality result valid: {count} hard gates")
+    print(f"quality result valid with bound evidence: {count} hard gates")
     return 0
 
 
