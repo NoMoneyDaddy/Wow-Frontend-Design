@@ -220,6 +220,17 @@ Acceptance is evaluator-owned. Never edit an active gate, accept your own score,
 
 When the caller requests a machine-readable handoff, start from [quality_result.example.json](scripts/quality_result.example.json) and validate it with [validate_quality_result.py](scripts/validate_quality_result.py). Required applicable `FAIL` or `UNVERIFIED` must make the result ineligible, keep `weighted_total` null, and prevent a `VERIFIED` release claim.
 
+## Completion red-flag blacklist
+
+Do not claim completion while an applicable red flag below remains. These are release blockers, not style suggestions:
+
+- **Fabricated product truth:** invented people, places, clients, outcomes, metrics, rights, or remote persistence/notification claims; evaluator, breakpoint, prompt, or implementation language exposed as product copy; content or cross-route records silently added, removed, or contradicted.
+- **Broken public contract or state:** changed routes, props, APIs, analytics payloads, data/business semantics, or required hooks; dead anchors, wrong current-route state, stale success after clear/invalid/reject, unawaited async work, duplicate submit, or a pending result mutating a newly selected/navigated item.
+- **Unsafe fallback or input:** a no-JavaScript form leaks personal data through default `GET`, history, or logs; script failure hides primary navigation; IME composition is treated as ordinary Enter; invalid, offline, permission, and retry paths lose user input or imply a completed transaction.
+- **Obstructed or misleading UI:** one-character title orphans, clipped prose or atomic controls, undiscoverable horizontal control tracks, horizontal page overflow, fixed/sticky/overlay content covering another task region, visible content hidden from the accessibility tree, missing focus containment/return, or motion without a reduced/static path.
+- **Evidence laundering:** a source audit presented as rendered proof, a screenshot presented as an interaction assertion, a narrow rerun presented as a full matrix, candidate-authored gates accepted without counterexamples, or a browser/device/accessibility claim whose engine, viewport, state, DPR, touch/emulation, and command provenance were not recorded.
+- **Known issue without closure:** a deterministic named or novel failure is omitted because it lacks an existing issue code, left only in prose, or downgraded to advisory without a counterexample. Record raw evidence, make the smallest repair, pass the narrow gate and affected matrix, or label the claim `UNVERIFIED`/`PARTIALLY VERIFIED`; never emit `VERIFIED` for that scope.
+
 ## Capability fallbacks and anti-generic gate
 
 A familiar technique is allowed when product, task, platform, accessibility, or the existing system earns it. Repair unearned repeated cards/pills, equal-weight grids, generic SaaS copy, fake metrics, arbitrary glow/glass/blob/grain, mixed icon families, desktop-only stacking, disruptive motion, and media runtimes without semantic/static fallbacks. Do not rewrite a framework for a CSS-level visual problem.
