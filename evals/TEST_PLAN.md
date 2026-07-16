@@ -1,4 +1,4 @@
-# v6 完整測試方案與執行紀錄
+# 測試方案：v6 執行紀錄與 v7 候選計畫
 
 狀態：`COMPLETED`。固定 cohort 已於 2026-07-15 完成。
 
@@ -205,3 +205,99 @@ Finding 自動送回修復；只重跑該 target lint，再跑 8-case contract r
 ## 啟動條件（已執行）
 
 使用者說「開始測試」後，已依序執行 harness preflight、8-case generation、lint、browser、repair、完整回歸與發布。執行中只要仍有進度輸出就延長 soft timeout；未完成的 generation／lint／capture 依分類重試，沒有用 timeout 偽裝完成。
+
+## v7 候選：分階段優化與獨立供應鏈 lane
+
+狀態：`PLANNED`，尚未執行，也不屬於 v6 證據。模型仍固定為使用者指定的 `gpt-5.4-mini`，禁止 silent fallback。下一輪只優化 `v7-A1`；其餘候選必須等前一輪接受或拒絕並封存後另開 cohort。
+
+| Lane | 單一假設 | 候選可改範圍 | 不得混入 |
+| --- | --- | --- | --- |
+| `v7-A1` | 更短、以 rendered result 為準的繁中標題／段落契約，能減少意外孤字、過窄文字軌與無意義右側空白，又不抹平合理 editorial rag | `references/typographic-layout.md`；evaluator fixture／assertion 另計，不是 Skill candidate | intrinsic grid/flex、原生控制項、色彩、動畫、framework adapter、registry security |
+| `v7-A2` | intrinsic layout 與中間寬度／短高度防禦規則能減少擠壓、裁切與單字長柱 | 前一輪結案後另行凍結 | A1、native controls、視覺風格重設 |
+| `v7-A3` | 原生控制項與 mobile viewport 契約能改善 IME、autofill、keyboard、safe area 與 focus recovery | 前一輪結案後另行凍結 | A1/A2、component-library adoption |
+| `v7-B` | shadcn／第三方 registry 與 mutable audit payload 可在 mutation 前被固定、預覽、限制與驗證 | evaluator／security fixtures only | 不參與 A-lane 視覺改善分數，也不推導通用 shadcn 設計規則 |
+
+`v7-B` 是獨立 release gate，可以拒絕不安全候選，但不能讓 `v7-A1` 因安全測試數量增加而取得視覺改善分數。A1 通過後才能規劃 A2，不把三個可疑原因塞進一次 Darwin 迭代。
+
+### 開跑前 go／no-go
+
+以下全部成立才可開始 generation：
+
+1. 目前研究與計畫先通過 diff review、回歸並提交；working tree 乾淨。以 accepted commit 加上完整 package manifest 固定所有實際載入的 `SKILL.md`、references、adapter、scripts 與 metadata hash，不只記核心檔 hash。
+2. 建立 evaluator-owned v7 case manifest、run schema、browser inventory、screenshot inventory 與 evidence validator；hidden prompt、selector、權重及 expected DOM 不在 implementation model 可讀／可寫範圍。
+3. 每個新 deterministic rule 先用手刻 failing fixture、nearby valid counterexample、nearby invalid fixture 跑通；沒有反例就不進模型測試。
+4. pinned Chromium／Firefox／WebKit、字型、locale、Node／Python、Codex CLI、`@google/design.md`、Playwright、runner、auditor 與 dependency lock 通過 smoke；下載完成不等於測試完成。
+5. 用兩個公開 development pilot case 驗證 runner、timeout、repair、截圖 decode/hash、匿名配對與 resume。Pilot 只除錯 harness，不算 promotion evidence。
+6. 依 pilot 記錄凍結每階段 inactivity timeout 與 hard ceiling。持續產生有效 log／artifact 只延長 inactivity deadline；若撞 hard ceiling，保留進度並把該 attempt 分類為 infrastructure incomplete，再 fresh retry，不改寫成模型失敗或成功。
+
+Active cohort 開始後，candidate、case split、prompt、evaluator、gate、瀏覽器與工具版本全部不可修改。任何 evaluator defect 使該 cohort 無效；修正、補 regression、重新凍結後另開 ID。
+
+### 研究假設與邊界
+
+- `text-wrap: balance`／`pretty` 只能提供候選斷行；是否通過取決於每個引擎實際 line fragments、右側空白、孤字、語意單位與 fallback。禁止以 property presence 代替結果。
+- 能通過 Chromium 不代表 Firefox、WebKit、Safari 或實體手機。每份證據記錄 engine、channel、version、OS、headless、fonts、locale、DPR、touch／`isMobile` 與 emulation/device。
+- 跨引擎不做 exact-pixel equality。相同 pinned engine 才做 screenshot regression；跨引擎比較結構、互動、overflow、focus、字級層級、斷行風險與人工 craft。
+- 不用 UA sniffing 切換 layout／功能。測試關閉 enhancement 或 feature query 不成立時，核心任務仍可完成。
+- CLReq 的孤字、標點禁則、直排與參考行長用來造極端 fixture；不把書籍正文的兩端對齊或固定字數變成所有網站的硬規格。
+- 外部 Skill、registry 與稽核規則只在 cohort 開始前解析、固定 revision／content hash 並封存。執行中來源漂移必須標成 evidence failure，不得靜默改變 gate 或替 candidate 追分。
+
+### Sealed case 與比較組
+
+- `development`：2 個公開新 case，只供 A1 最多 3 輪 bounded candidate 編修與 affected test；每輪只改同一候選資產的一個明示假設。連續兩輪沒有 deterministic 改善，或任一輪引入高優先級退步，就停止，不用增文換取主觀分數。
+- `sealed validation`：4 個未進 authoring context 的新 case。最佳單一 candidate 才能進場；accepted／candidate 以相同 case、模型、effort、工具、資料與 evaluator 做 3 組 paired eligible runs，執行順序隨機且保留 attempt history。Infrastructure retry 不取代模型品質失敗。
+- `sealed test`：2 個未使用 case，只在 validation 通過後跑 accepted／candidate 各一次。失敗即拒絕 candidate；不可讀取 hidden 細節修正後重跑同一 test。
+- `no-skill` 只在 development 與 validation 各做一個預先指定的診斷 run，用來確認 Skill 是否提供正值；不與不同重複數的 accepted／candidate 合併評分，也不能抵銷 candidate regression。
+- case family 錯開繁中 editorial／直排、密集 dashboard、原生表單、commerce、scroll narrative、低資訊產品頁與混合 CJK／Latin 長資料；公開的只有 family、主要任務與 claim boundary，完整 prompt／權重／selector／expected DOM 留在 evaluator-owned repo 外目錄。
+- v6 只作 release regression，不可再當 held-out。若 runner／auditor／browser bytes 未變，可只跑 candidate 對 frozen accepted evidence；任一 evaluator byte 改變就必須在新 evaluator 下重跑 accepted 與 candidate，禁止跨 gate 直接比較。
+
+### 分層瀏覽器矩陣
+
+| Lane | Browser／OS | Viewport | 目的 |
+| --- | --- | --- | --- |
+| stress sweep | pinned Chromium／Linux | `360×800`、`390×844`、`768×1024`、`1024×600`、`1280×720`、`1440×1000` | 所有 case、危險 state、連續 resize 與自動修復 |
+| engine parity | pinned Chromium、Firefox、WebKit／同一 CI OS | `390×844`、`1024×600`、`1440×1000` | 相同 route／state／fixture 的結構、斷行與互動差異 |
+| Safari-near | pinned WebKit／macOS | `390×844`、`1440×1000` | 字型、media、safe-area、viewport 與 WebKit 特有風險；仍不宣稱 branded Safari |
+| public channel smoke | stable Chrome／Edge，僅在產品支援需要時 | `390×844`、`1440×1000` | codec、enterprise policy 與 stable-channel regression；未跑即 `not_run` |
+
+Firefox/WebKit binary 必須與 Playwright lock 對應。若環境無 macOS 或 branded channel，保留 `not_run`，不得用 Linux Chromium 補寫成通過。實體 iOS／Android 仍是另一個 device cohort。
+
+### Adversarial fixtures
+
+每個適用 case 至少組合下列風險，不只分開測 happy path：
+
+1. 一字／一字加標點末行、三行長標題、短 display copy、繁英混排、數字單位、長 URL／hash、未斷使用者輸入。
+2. `balance`、`pretty`、`stable`、不支援 enhancement 與 custom font 失敗；記錄每行文字、行數、行寬、container 寬與末行字數。
+3. A2 保留 fixture：Grid/Flex `min-content`、`min-width:auto`、固定高度、圖片比例、scrollbar、sticky、overlay 與互動後新增錯誤／摘要；不得用來指導 A1 candidate。
+4. 共用 regression：瀏覽器縮放／text spacing、fallback font、forced colors、reduced motion、深淺主題與缺圖；字型另測 cold／warm cache、慢速／阻擋／失敗載入，記錄 font CSS、request／bytes、text visibility、FCP／LCP／CLS 及換字型前後 line fragments。
+5. A3 保留 fixture：`select`、date/color/file input、autofill、原生 validation、password manager、IME、paste、mobile virtual keyboard 與 focus return。
+6. A3 保留 fixture：`safe-area-inset-*`、`svh`／`lvh`／`dvh`、landscape、短高度、overscroll 與固定底部操作。
+7. A1 fixture：橫排與直排的標點、欄序、ruby／Bopomofo、選取／複製與 mobile 橫排 fallback；垂直 specimen 不得觸發橫排孤字規則。
+8. v7-B fixture：既有 shadcn 專案分別使用 Radix／Base、不同 Tailwind／icon／alias 與本地修改元件；registry 包含官方、第三方、transitive dependency、redirect、CSS/plugin、env example、越界 target、symlink 與 overwrite。斷言 `view`／dry-run／diff 可追溯、未授權 mutation 為零、合法新增仍可編譯；這些結果只進 security/release gate。
+
+### 必要截圖與盲審
+
+- 每個 eligible generation 都必須至少保存 desktop base、mobile base 與一個關鍵 interaction state；A1 affected case 再保存 compact mobile 與 `1024×600` 中間／短高 viewport。缺任一必要 PNG、decode、尺寸、DPR、hash 或 provenance 就是 incomplete run。
+- stress sweep 在 pinned Chromium 跑所有寬度；engine parity 只對預先指定的危險 route/state 跑三引擎，並各自截圖。遇到 deterministic finding，自動保存 failure 與 repair 後同 route/state/engine/viewport 的 before／after；不能只保留修好的圖。
+- blind craft review 使用匿名 artifact ID、隨機 accepted/candidate 左右順序與相同 viewport/state contact sheet。Reviewer 只看 brief、畫面和 raw measured evidence，不得看到 arm、candidate diff、模型自評或前輪結論。
+- 盲審分開記錄 hierarchy／spacing、繁中換行／段落節奏、product fit、mobile composition 與視覺缺陷；tie 是合法結果。它只能判斷 craft non-regression，不能覆蓋安全、互動、證據或 deterministic failure。
+
+### Gate 與自修復
+
+硬 gate 只處理可重現缺陷：核心任務 fallback 消失、overflow／裁切／遮擋、焦點或 scroll lock 失效、可讀文字低於要求、標題或正文意外孤字、title track 大面積無意義留白、原生控制項失去 label／value／error，以及證據或瀏覽器身分不實。`balance` 產生不同但仍合理的 rag、不同 rasterization、平台原生控制項外觀與有意圖的 editorial composition 交給 blind craft review，不自動改成同一外觀。
+
+每個 finding 回送 `case → route → state → engine → OS → viewport → locale → fixture → measured failure → screenshot/hash`。兩個 loop 分開計數：
+
+- **artifact repair**：同一輸出、同一 failure key 最多 3 次自修；有進度只延長 inactivity timeout。三次仍失敗就保存最佳 artifact、before／after 與 `PARTIALLY VERIFIED`，不得再改 Skill 規則救單一頁面。
+- **Skill optimization**：development 最多 3 個 A1 candidates；每個 candidate 先跑 fast、再跑 affected，保留 accepted best-so-far 與 rejected diff。只有最佳 candidate 進 sealed validation，sealed failure 不回流同一輪 authoring。
+
+### Promotion ratchet
+
+Candidate 只有在以下全部成立時才能取代 accepted Skill：
+
+1. installability、security、accessibility、evidence integrity、`DESIGN.md`、runtime mapping、required screenshot inventory 與 v6 regression 無退步；
+2. sealed validation 的 paired deterministic vector 至少一個預先指定 failure family 嚴格改善，且所有更高優先級 family 不增加、沒有新增 case／engine failure；不得用總分互相抵銷；
+3. 匿名 blind craft 配對中 candidate 不得出現多數 material loss；任何跨兩次 eligible run 重複的標題層級、段落節奏、右側空白、孤字或 mobile composition 嚴重退步直接拒絕；
+4. selected reference names／bytes、input tokens、首個可用 artifact 時間、完整 wall time、重試次數與 flaky rate 保持在開跑前凍結的預算內；較便宜不能補償硬 gate，較漂亮不能補償缺證據；
+5. v7-B security gate 通過；untouched sealed test 一次通過。任一失敗就拒絕 candidate、保留 accepted best-so-far，不修改 hidden test 追分。
+
+新 cohort 完成前，只能稱這份內容為研究與測試計畫。README 不新增成果圖或通過宣稱；執行後再更新 `RESULTS.md`、evidence ledger、`CHANGELOG.md` 與展示。Darwin 9 維分數只作結構診斷，不是 promotion authority；實際決策以上述 paired evidence ratchet 為準。

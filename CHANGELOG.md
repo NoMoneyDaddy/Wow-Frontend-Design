@@ -6,6 +6,8 @@
 
 ### Added
 
+- 網頁常見錯誤與主流瀏覽器研究：把 capability detection、Baseline、Playwright engine／channel 邊界、intrinsic／defensive layout、原生控制項、dynamic viewport／safe area、CJK 字型 delivery，以及繁中 `text-wrap`／CLReq 孤字限制整理成候選規則與反例；新增尚未執行的 v7 跨瀏覽器 sealed validation／test、分層 viewport、字型效能、self-repair 與 promotion ratchet 計畫，不冒充 v6 已驗證成果。
+- 官方 shadcn Skill／registry 與 Vercel `web-design-guidelines` pinned 稽核：加入 project-owned source、`components.json`／CLI info、view／dry-run／diff 的框架 adapter 邊界，並把 registry source／dependency／CSS／env／path mutation 與雙層 mutable remote rule 納入供應鏈檢查及 v7 反例；不把框架慣例或英文 audit 清單升級成通用硬 gate。
 - Portable CI contract smoke：用固定 Python 3.12 在 `ubuntu-latest`、`macos-latest`、`windows-latest` 驗 Skill installability、平台／capability ledger 與 focused tests；新增不讀 hostname／user／home／IP／environment、不執行外部 probe 的 runtime provenance helper，以及 `--report` 機器可讀缺口摘要。Workflow 尚未完成的 cell 不會自動升級。
 - 一次性 script runtime 支援快照：Agent Skills package 依標準驗證，不按模型品牌分格；12 個固定 cell 精確涵蓋 23 個 installed Python entrypoint、CI／POSIX evaluator 與主流 browser backend，綁定 5 個官方來源座標。Validator 拒絕漏列／重複 script、未知來源、路徑逃逸、stage 矛盾與任何下次查核日期欄位。
 - 中文標題逐行量測 gate：重建 `h1–h3` 可見字元行，將意外的一字末行回送自動修復，並納入 v6 evidence validator。
@@ -24,6 +26,8 @@
 
 ### Changed
 
+- INSTALL 明確區分已安裝 Skill 的 implicit invocation、AI 代辦安裝與執行期驗證工具補裝；未提供可信來源／scope 時不會自行搜尋安裝，也不把驗證工具授權擴大成 framework、global 或 product runtime mutation。
+- v7 計畫拆成 A1 繁中換行／文字軌、A2 intrinsic layout、A3 原生控制項與獨立 B 供應鏈 lane；新增 clean-commit／完整 package freeze、development→sealed validation→one-shot test、paired runs、必要截圖／匿名盲審、雙層三次熔斷與明確 go／no-go，避免多變因候選及反覆窺看 held-out test。
 - Skill 維護流程把 standards-compatible package 與 executable runtime 分離；model routing 只屬於 evaluator 品質策略。Python／OS／POSIX evaluator／browser 支援採逐階段 ratchet，並要求 privacy-bounded runtime profile；caller declaration 不再能單獨升級為實測證據。
 - README、INSTALL、平台說明、評測文件、公開 capability ledger 與 CI 改為引用同一份有界支援快照，未實跑平台維持未驗證；`SKILL.md` 核心不綁定這份一次性外部狀態，避免把安裝研究載入每個設計任務或冒充既有 v6 已用新版核心重跑。
 - CI 更新並固定至官方最新穩定版 `actions/checkout@v7.0.0`、`actions/setup-python@v6.3.0`、`actions/setup-node@v7.0.0` 與 GitHub CLI `v2.96.0`，移除舊版 Node.js 20 Action 警告並保持可重現安裝。

@@ -54,7 +54,7 @@ CHROME_EXECUTABLE_PATH=/absolute/path/to/chrome npm run audit:dashboards -- \
 
 ## v6 截圖與 hash 證據
 
-v6 report 把 screenshot、route、state、viewport、DPR、browser、source、auditor 與 dependency lock 互相以 SHA-256 綁定。Evidence validator 會拒絕 stale byte、缺圖、額外圖片、錯誤尺寸、model drift、body-flow finding 或 auditor drift；不可手改 hash 讓 validator 變綠。完整規格與執行紀錄見 [`TEST_PLAN.md`](TEST_PLAN.md)。
+v6 report 把 screenshot、route、state、viewport、DPR、browser、source、auditor 與 dependency lock 互相以 SHA-256 綁定。Evidence validator 會拒絕 stale byte、缺圖、額外圖片、錯誤尺寸、model drift、body-flow finding 或 auditor drift；不可手改 hash 讓 validator 變綠。完整規格、執行紀錄與尚未執行的 v7 分階段單一候選／獨立供應鏈計畫見 [`TEST_PLAN.md`](TEST_PLAN.md)。
 
 ## 目前案例
 

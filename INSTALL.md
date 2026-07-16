@@ -4,6 +4,12 @@
 
 Package 相容性以 [Agent Skills specification](https://agentskills.io/specification) 為準，不按模型品牌維護不同版本。Host 安裝路徑、scope 與 discovery UI 仍可能不同；installer 能放置檔案不等於當次 session 已載入。Python、OS、POSIX evaluator 與主流 browser backend 的實測邊界見 [`PLATFORM_SUPPORT.md`](PLATFORM_SUPPORT.md)與 [`evals/platform-support.json`](evals/platform-support.json)。
 
+## 自動辨識不等於未授權安裝
+
+- 安裝完成後，支援 Agent Skills implicit invocation 的 host 可依 `SKILL.md` 的 `name`／`description` 自動辨識任務並啟用；Codex metadata 已設定 `allow_implicit_invocation: true`。不支援的 host 仍須用 `$wow-frontend-design`、`/wow-frontend-design` 或 wrapper 明確載入。
+- 尚未安裝時，模型不能憑空知道可信來源。使用者、host registry 或 caller 必須提供 repository／catalogue 座標與允許的 scope；AI 才能代辦 preview、固定 revision、安裝與 discovery smoke。不得自行搜尋同名套件後安裝，也不得覆寫既有 Skill。
+- Skill 執行時可自動辨識缺少的「驗證用工具」，沿用 lockfile；沒有 pin 才解析最新穩定相容版、固定精確版本，安裝到專案或授權的 evaluator cache 並續跑。這不授權 global install、產品 runtime dependency、框架遷移、lockfile family 變更或 lifecycle scripts。
+
 ## 5 分鐘成功路徑
 
 先取得目前 `main` 的完整 commit SHA；預覽後才把同一 SHA 安裝到指定 host。正式環境應改用團隊已審查的 SHA。此 repo 目前沒有 GitHub Release，因此不要把浮動 `main` 當成 production pin。
