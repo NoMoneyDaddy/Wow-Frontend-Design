@@ -31,8 +31,14 @@ Before reusing a rule, record repository, full content-addressed commit, path, r
 | --- | --- | --- | --- |
 | Optional visual style | Swiss Design, Taste, Impeccable | vocabulary, coherent grammar, focused refinement pass | mandatory grids, fonts, palettes, bans, durations, or “anti-slop” taste |
 | Design exploration | 0x Design Lab, designer-skills | isolated variants, shared fixtures, structured regional feedback | fixed variant count, generic long interview, broad cleanup |
+| Optional decision playground | Anthropic Playground | only an explicit playground request or one material unresolved visual/structural choice; one self-contained explorer with live preview and actionable prompt output | default activation, broad control panels, `open .html`, copied prompts as implementation or verification evidence |
+| Aesthetic attention and audit | Anthropic aesthetics cookbook, Interface Design | prompt or inspect only the missing dimension; name domain, hierarchy, defaults, and one signature quality; use swap, squint, signature, and token checks as diagnostics | copy-pasted prompt blocks, blanket font/palette/motion bans, visual difference as quality proof, or a mandatory direction pause for a clear brief |
+| Product planning and handoff | Design OS | separate outcome, data vocabulary, tokens, shell, section contract, and screen; keep component props/callbacks explicit; use varied realistic fixtures and bounded handoffs | mandatory ceremony for a clear brief, fixed React/Tailwind/palette/font/count recipes, or generated test specs/screenshots as executed evidence |
 | Product discovery and usability | goodux skill subtree | non-leading interviews, no invented personas/quotes, IA validation, observation/inference separation | fixed sample/persona counts, five-stage ceremony, industry style lookup, fixed stack, destructive installer |
 | UI engineering | Addy Osmani frontend UI | state ownership, complete states, composition, rollback | React/Tailwind assumptions and arbitrary size/depth thresholds |
+| Design-tool workflow method | Figma MCP guide, Augment Figma workflow | inspect the exact target first; use precondition → bounded mutation → affected-item receipt → immediate structural/rendered check; existing components/tokens before external search; outer structure before incremental sections; one writer per mutable surface | requiring Figma/MCP for web delivery, treating a design export as production evidence, fixed operation counts/rate limits, a frame as sole product truth, or parallel writers on shared state |
+| Evidence-backed design system | Open Design | bind normalized token roles to source references and confidence; report exact/alias/fallback coverage; validate declared references and resolved runtime values; treat fallback debt as a repair signal | importing its catalogues, fixed palettes or nine-section ceremony, installing its desktop/MCP runtime, or claiming brand fidelity from a generated `DESIGN.md` alone |
+| Critique protocol | Open Design | version the result protocol; persist findings and degraded/failure state; require zero open must-fix items in addition to positive gates; keep below-threshold output clearly incomplete | role-play consensus, self-scored composites as acceptance, transcript volume as rigor, or `ship_best` below threshold as completion |
 | Quality audit | Addy web quality, AccessLint, GitHub reviewer, Vercel guidelines | exact tool provenance, live DOM, before/after, root-cause dedupe | automation as conformance, mutable runtime fetch, stash/checkout mutation, overflow hiding |
 | Framework adapter | Nuxt, Pinia, pnpm, UnoCSS, Slidev | only after exact installed version and conventions are detected | personal Antfu conventions as project law; cross-version syntax guesses |
 | Platform component adapter | official Material Web implementation | existing `@material/web` version, real component API, semantic token mapping, focus/forced-color tests | installing Material only for style, copying `main` tokens, treating maintenance-mode APIs as universal |
@@ -44,6 +50,24 @@ Before reusing a rule, record repository, full content-addressed commit, path, r
 | Three.js/media | CloudAI-X recipes | subsystem discovery after version detection | copying stale API examples, unbounded loops, UA routing, incomplete teardown |
 
 Named sources are research coordinates, not installed dependencies or endorsements. See [github-skill-research.md](github-skill-research.md) and [ui-skills-ecosystem.md](ui-skills-ecosystem.md) for the critical review.
+
+### Optional playground boundary
+
+Keep the playground off in `DIRECT`. In `CHECKPOINT-GUIDED`, enable it only when the user explicitly requests an explorer or one unresolved visual/structural decision would materially change the implementation. Limit it to that decision surface, three to five cohesive presets, at most three review cycles, and two or three representative screenshots per cycle. Do not install the upstream plugin or copy its browser-launch command during an ordinary run.
+
+Serve the single-file artifact from the authorized workspace and exercise its controls, presets, live preview, prompt output, keyboard path, responsive behavior, console/page errors, and copy feedback only with the project-pinned Playwright runtime. The selected result becomes a bounded design input, then the workflow returns to `DIRECT`. A working playground proves only the explorer; it cannot satisfy production routes, states, accessibility, performance, or completion gates, and it never replaces Playwright verification of the implemented frontend.
+
+### Portable incremental-mutation recipe
+
+For a repeated stateful or failure-prone operation, prefer one exact recipe over a generic warning:
+
+```text
+verify capability/precondition → inspect the exact target → mutate one bounded unit
+→ return affected files/IDs and unresolved state → run the narrow structural/runtime/rendered check
+→ diagnose and repair before the next unit
+```
+
+Use the repository's code, existing components, tokens, and rendered behavior before external search. Establish the stable outer shell before incremental sections, but do not turn an implementation detail such as a Figma frame into the product's sole source of truth. Claim atomic rollback only when the actual tool guarantees it; ordinary code edits still need diff review, tests, and an explicit rollback boundary. Parallelize read-only discovery or independent frozen surfaces only. Keep one writer for shared mutable output. These are portable workflow methods; they do not activate Figma, MCP, Code Connect, FigJam, or design write-back in a normal web run.
 
 ### Registry and installer hygiene
 

@@ -237,7 +237,7 @@ def _resolve_evidence_reference(
         matches.append(("artifact", path_event))
     if len(matches) != 1:
         raise QualityResultError(
-            f"evidence reference must resolve exactly once in the ledger: {reference}"
+            f"evidence reference must resolve unambiguously to one latest ledger event: {reference}"
         )
     kind, event = matches[0]
     if kind == "command":
@@ -309,6 +309,9 @@ def validate_with_ledger(
         if not gate["required"] or not gate["applicable"] or gate["status"] != "PASS":
             raise QualityResultError(f"required hard gate did not pass: {gate_id}")
 
+    # Evidence ledgers are append-only because repair loops may rerun the same
+    # gate. Match evidence_ledger.check_command(): the latest event of each
+    # kind is authoritative, while reusing one label across kinds is ambiguous.
     commands: dict[str, dict[str, Any]] = {}
     artifacts: dict[str, dict[str, Any]] = {}
     artifacts_by_path: dict[str, dict[str, Any]] = {}

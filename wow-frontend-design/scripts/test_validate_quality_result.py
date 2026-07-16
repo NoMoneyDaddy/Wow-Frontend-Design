@@ -100,6 +100,33 @@ class QualityResultTests(unittest.TestCase):
                 3,
             )
 
+    def test_strict_validation_uses_latest_repair_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, workspace = self._strict_fixture(Path(directory))
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    evidence_ledger.main(
+                        [
+                            "run",
+                            "--ledger",
+                            str(ledger),
+                            "--label",
+                            "primary-task",
+                            "--cwd",
+                            str(workspace),
+                            "--",
+                            sys.executable,
+                            "-c",
+                            "raise SystemExit(7)",
+                        ]
+                    ),
+                    7,
+                )
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "did not pass"):
+                validate_quality_result.validate_with_ledger(
+                    result, ledger, workspace, ("novel-discovery",)
+                )
+
     def test_strict_validation_rejects_unbound_or_workspace_owned_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -107,7 +134,7 @@ class QualityResultTests(unittest.TestCase):
             data = json.loads(result.read_text(encoding="utf-8"))
             data["hard_gates"][0]["evidence"] = ["not-recorded"]
             result.write_text(json.dumps(data), encoding="utf-8")
-            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "resolve exactly once"):
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "one latest ledger event"):
                 validate_quality_result.validate_with_ledger(
                     result, ledger, workspace, ("novel-discovery",)
                 )

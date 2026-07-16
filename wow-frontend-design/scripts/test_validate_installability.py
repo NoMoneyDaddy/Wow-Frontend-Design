@@ -20,6 +20,25 @@ class InstallabilityTests(unittest.TestCase):
         count = validate_installability.validate(root / "wow-frontend-design", root)
         self.assertGreaterEqual(count, 35)
 
+    def test_repository_openai_prompt_tracks_runtime_contract(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        prompt = (root / "wow-frontend-design" / "agents" / "openai.yaml").read_text(
+            encoding="utf-8"
+        )
+        for signal in (
+            "直接完成可執行成品",
+            "CONTRACT",
+            "DISCOVERY",
+            "project-pinned Playwright",
+            "禁止 Computer Use",
+            "最小修正",
+            "UNVERIFIED",
+            "維持唯讀",
+        ):
+            with self.subTest(signal=signal):
+                self.assertIn(signal, prompt)
+        self.assertNotIn("必要時先確認方向與重構深度", prompt)
+
     def test_escaping_link_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

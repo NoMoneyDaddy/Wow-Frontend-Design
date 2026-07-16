@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import contextlib
+import io
 import json
 import struct
 import tempfile
@@ -56,6 +58,12 @@ class V7EvidenceTests(unittest.TestCase):
     def test_unknown_gate_fails_closed(self) -> None:
         with self.assertRaisesRegex(evidence.V7EvidenceError, "unknown visual gate"):
             evidence.expected_inventory(self.manifest(2), "development", "partial")
+
+    def test_cli_without_required_arguments_fails_closed(self) -> None:
+        with mock.patch("sys.argv", [str(MODULE)]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as raised:
+                evidence.main()
+        self.assertEqual(raised.exception.code, 2)
 
     def test_validator_rejects_mixed_gate_before_artifact_scan(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
