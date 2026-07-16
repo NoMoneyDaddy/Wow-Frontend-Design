@@ -4,8 +4,8 @@
   "stage": "pilot_ready",
   "baseline_commit": "5b7dfdcda200870f1c4ef3b63692818902adfafb",
   "candidate": {
-    "id": "v7-a2",
-    "hypothesis": "把長繁中產品標題設為優先跨欄，只有必須同時可見且實際占用版面的任務內容才能取得側軌，並在桌機與手機檢查一至兩字短尾，可減少標題窄長、末行孤字與右側無效留白，同時保留文章閱讀欄、直排展示與真正任務側欄的合理窄軌。",
+    "id": "v7-a3",
+    "hypothesis": "要求每個寬螢幕欄位以同一閱讀或任務階段、內容高度與同時可見需求證明其必要性，並把側欄獨自延伸、直排區撐高、後續表單被塞進側欄及主欄下方大片空白列為重排訊號，可降低跨區塊巨大空洞，同時保留長繁中標題跨越無必要側欄的改善。",
     "editable_paths": [
       "wow-frontend-design/references/typographic-layout.md"
     ],

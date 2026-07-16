@@ -17,30 +17,18 @@ script + exact font + task + viewport + density + input method
 - Treat external design-system numbers as context-specific examples. Carbon's 2/4/8 increments, GOV.UK's responsive spacing, and USWDS's type/measure guidance do not become product requirements by citation.
 - Prefer a small candidate set, compare rendered evidence, and record why the selected value fits this content. Do not tune only the hero screenshot.
 
-### A1 checkpoint: protect the title track before adding side content
+### A1 checkpoint: make every wide column earn its occupied area
 
-Classify each page title, intro, and substantial paragraph as product/UI, editorial, display, or vertical before adding a child `max-width`, grid column, manual break, or balancing rule. Then identify its owning surface and test the longest localized copy with the fallback font.
+Before choosing a wide-screen grid, map each major region to its task stage, source order, expected content height, minimum readable width, and mobile position. A column is not justified merely because a compact card, vertical note, or control can fit beside the main content.
 
-For a long horizontal Traditional Chinese product title, the title and intro are the primary track:
+- Keep unrelated task stages in sequential full-width regions. Do not stack a short display note and a later form beside a long article when this leaves either column continuing alone through a large empty rectangle.
+- Use two columns only when both regions belong to the same reading or task moment and benefit from simultaneous visibility. If one column ends while the other continues through another substantial component, move the later component below the shared row or recompose the parent grid.
+- Treat vertical writing as display content with its own measured block. It must not become a tall narrow spacer that determines the height of an otherwise unrelated article or form. Preserve the same semantic text as a horizontal region at the mobile breakpoint.
+- For a long horizontal Traditional Chinese product title with no simultaneous task peer, let the title and intro span their owning surface. If the title reaches four lines or ends with a stranded one- or two-Han tail, widen or recompose before reducing type size or editing copy.
+- Do not apply a Latin `ch` cap directly to CJK product copy. Give extended prose a coherent reading surface, but do not leave that surface floating at the start of a substantially wider empty owner.
+- At wide desktop, short desktop, 390 px, and 360 px, inspect the whole page after both default and interaction states. Reject a layout with a detached summary, a side stack outliving its peer, a large unexplained void, or a later control visually appearing before the content that explains it.
 
-- Let them span the owning surface first. Add a side rail only when its navigation, evidence, status, comparison, or controls must remain visible at the same time.
-- A compact card or control cluster at the top does not justify an empty full-height column. Let the title span the grid, or place that compact peer in the next row.
-- When a persistent peer truly needs a side rail, keep the long title near two thirds of the wide-screen owner as a starting point. If it becomes four or more lines, ends in a stranded one- or two-Han tail, or leaves unused space below the peer, span/recompose before shrinking the font.
-- On mobile, collapse title, intro, peer, and actions to one full-width content track in reading order. Do not preserve a desktop side rail by narrowing the title.
-- Do not apply a Latin `ch` cap directly to CJK product copy. If extended prose needs a reading measure, size and align a coherent reading surface; do not leave a narrow child at the start of a wide empty card.
-
-Editorial and display compositions may use an intentional reading column or rag. Vertical text needs its own `writing-mode` composition and horizontal fallback; keep both outside horizontal product hard rules.
-
-Repair ordinary horizontal copy in this order:
-
-1. remove `<br>`, `keep-all`, `nowrap`, source-controlled line breaks, and narrow child caps that are not explicit display art direction;
-2. let the title/intro span before badges, compact controls, or secondary metadata;
-3. render at adjacent required widths, including wide desktop, short desktop, 390 px, and 360 px, with exact localized content and fallback fonts;
-4. for a multi-line product heading, reject a final line of one Han character; also repair a visually stranded two-Han tail when a small track or layout adjustment solves it;
-5. widen or recompose first, then try supported `balance`/`pretty`, and only then edit fixed copy without changing meaning;
-6. reserve manual breaks or compact non-breaking phrases for approved display content with a tested responsive fallback.
-
-Do not stretch a valid short one-line heading merely to fill space. When browser evidence is unavailable, perform the same owner/peer/mode and wide/mobile inventory as a source preflight, then label the rendered result `UNVERIFIED`.
+Record the major-region parent, reading order, desktop composition, mobile composition, and the void or detachment signal in `DESIGN.md`. When browser evidence is unavailable, label the layout `UNVERIFIED`; source intent alone cannot prove that the columns remain balanced.
 
 ## 2. Calibrate reading measure and vertical rhythm
 
