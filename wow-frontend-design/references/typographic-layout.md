@@ -17,6 +17,33 @@ script + exact font + task + viewport + density + input method
 - Treat external design-system numbers as context-specific examples. Carbon's 2/4/8 increments, GOV.UK's responsive spacing, and USWDS's type/measure guidance do not become product requirements by citation.
 - Prefer a small candidate set, compare rendered evidence, and record why the selected value fits this content. Do not tune only the hero screenshot.
 
+### A1 checkpoint: assign the text track before tuning the text
+
+For every page title, intro, and substantial paragraph, make this compact placement decision before adding a child `max-width`, grid column, manual break, or balancing rule:
+
+```text
+region → product/UI | editorial | display | vertical
+       → owning surface/track
+       → real task-bearing peer, or none
+       → desktop track → mobile track
+       → longest/fallback-font content → rendered repair
+```
+
+- **Product/UI, no real peer:** give the text the owner's available inline track. If that would make prose too wide, size and align the owning reading surface or recompose the parent; do not leave a narrow `p` or title at the start of an otherwise empty wide card.
+- **Product/UI, real peer:** a narrower text track is earned only when the remaining track contains persistent navigation, status, evidence, comparison, or controls for the same task. Recheck it after interaction and on mobile; a decorative, empty, hidden, or displaced peer does not count.
+- **Editorial/display:** an intentional reading column or rag is allowed. Put the measure on a coherent centered/aligned region, preserve the intended reading order, and keep it out of product/UI hard rules.
+- **Vertical:** use a separate `writing-mode` composition and horizontal fallback. Never repair it with horizontal orphan or empty-track heuristics.
+
+Repair horizontal Traditional Chinese product copy in this order:
+
+1. remove ordinary-body `<br>`, source-controlled wrapping, `keep-all`, `nowrap`, and Latin-`ch` caps;
+2. give the title/intro its primary owner track before badges and secondary metadata;
+3. render adjacent required widths with the exact content and fallback font;
+4. if a multi-line heading or substantial paragraph ends in one Han character, first widen/recompose the track, then try supported `balance`/`pretty`, and finally edit fixed copy without changing meaning;
+5. use a manual break or compact non-breaking phrase only for fixed, explicitly approved display content with a tested responsive fallback.
+
+Do not stretch a valid short one-line heading merely to fill space. Do not accept two evenly short balanced lines when the text element itself still occupies only a small start-side rail inside a wide empty owner. When browser evidence is unavailable, perform the same owner/peer/mode inventory as a source preflight and label the rendered result `UNVERIFIED` rather than guessing.
+
 ## 2. Calibrate reading measure and vertical rhythm
 
 For extended Traditional Chinese horizontal reading, begin exploration around `17–40` full-width characters per line. CLReq reports this as common publication practice, with shorter lines usually no fewer than `10` and horizontal lines often no more than `48`; it is a research envelope, not a web conformance limit. Test at the actual phone and desktop widths. For mixed Latin/CJK, do not assume Latin `ch` predicts Han measure; prefer the rendered line count or a verified `ic`-based measure with a fallback.

@@ -12,8 +12,12 @@
     "audit:dashboards": "node evals/playwright_dashboard_audit.cjs",
     "audit:visual-v5": "node evals/playwright_visual_v5_audit.cjs",
     "audit:visual-v6": "node evals/playwright_visual_v6_audit.cjs",
+    "audit:visual-v7-a1": "node evals/playwright_v7_a1_audit.cjs",
     "validate:evidence-v6": "python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py evals/product-flow-v6-visual-results.json --repository-root .",
+    "validate:evidence-v7": "python3 wow-frontend-design/scripts/validate_v7_evidence.py",
     "eval:product-flow": "python3 evals/run_product_flow_evaluation.py",
+    "eval:v7-visual": "python3 evals/run_v7_visual_matrix.py",
+    "eval:v7-case": "python3 evals/run_v7_codex_case.py",
     "capture:showcase": "node evals/capture_showcase.cjs"
   },
   "devDependencies": {

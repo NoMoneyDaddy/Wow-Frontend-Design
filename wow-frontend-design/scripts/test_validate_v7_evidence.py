@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Focused contract tests for the v7 evidence inventory."""
+
+from __future__ import annotations
+
+import importlib.util
+import hashlib
+import json
+import struct
+import tempfile
+import unittest
+import zlib
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+MODULE = ROOT / "wow-frontend-design" / "scripts" / "validate_v7_evidence.py"
+SPEC = importlib.util.spec_from_file_location("validate_v7_evidence", MODULE)
+assert SPEC and SPEC.loader
+evidence = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(evidence)
+
+
+class V7EvidenceTests(unittest.TestCase):
+    @staticmethod
+    def png(width: int = 1440, height: int = 1000) -> bytes:
+        def chunk(name: bytes, body: bytes) -> bytes:
+            return struct.pack(">I", len(body)) + name + body + struct.pack(">I", zlib.crc32(name + body) & 0xFFFFFFFF)
+
+        header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+        row = b"\x00" + b"\x00\x00\x00\xff" * width
+        pixels = zlib.compress(row * height)
+        return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", pixels) + chunk(b"IEND", b"")
+
+    def manifest(self, count: int) -> dict[str, object]:
+        cases = [
+            {"id": f"case-{index}", "required_states": ["base", "interaction"]}
+            for index in range(1, count + 1)
+        ]
+        return {"splits": {"development": cases}}
+
+    def test_each_case_requires_thirty_variant_screenshots(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(2), "development")
+        self.assertEqual(60, len(inventory))
+        self.assertEqual(30, len([item for item in inventory if item[1] == "case-1"]))
+
+    def test_base_uses_six_chromium_profiles(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(1), "development")
+        accepted_base = [item for item in inventory if item[0] == "accepted" and item[2] == "base"]
+        self.assertEqual(6, len(accepted_base))
+        self.assertEqual({"chromium"}, {item[4] for item in accepted_base})
+        self.assertEqual(set(evidence.BASE_PROFILES), {item[3] for item in accepted_base})
+
+    def test_interaction_uses_three_profiles_and_engines(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(1), "development")
+        accepted = [item for item in inventory if item[0] == "accepted" and item[2] == "interaction"]
+        self.assertEqual(9, len(accepted))
+        self.assertEqual(set(evidence.PARITY_PROFILES), {item[3] for item in accepted})
+        self.assertEqual(set(evidence.PARITY_ENGINES), {item[4] for item in accepted})
+
+    def test_missing_required_state_fails_closed(self) -> None:
+        manifest = self.manifest(1)
+        manifest["splits"]["development"][0]["required_states"] = ["base", "hover"]
+        with self.assertRaisesRegex(evidence.V7EvidenceError, "base and interaction"):
+            evidence.expected_inventory(manifest, "development")
+
+    def test_real_decoded_png_and_matching_result_are_accepted(self) -> None:
+        with self.subTest("full PNG decode"), tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "base", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 1,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "base", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {
+                    "playwright": "1.61.1",
+                    "engineVersion": "test",
+                    "profile": {
+                        "width": 1440,
+                        "height": 1000,
+                        "hasTouch": False,
+                        "isMobile": False,
+                        "deviceScaleFactor": 1,
+                        "fullMobileEmulation": False,
+                        "userAgent": "test",
+                    },
+                },
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [],
+                    "assertions": [],
+                    "consoleErrors": [],
+                    "pageErrors": [],
+                    "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000},
+                    "devicePixelArea": 1440000,
+                    "horizontalOverflow": False,
+                    "eventOverflow": False,
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": [],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "clean",
+                "screenshot": {
+                    "path": screenshot.name,
+                    "fullPage": True,
+                    "width": 1440,
+                    "height": 1000,
+                    "bytes": screenshot.stat().st_size,
+                    "sha256": screenshot_hash,
+                },
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "clean",
+                evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"),
+            )
+            payload["typography"]["issues"] = [{"code": "tampered-finding"}]
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            tampered_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "verdict does not match"):
+                evidence._validate_result(key, result, screenshot, tampered_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+
+if __name__ == "__main__":
+    unittest.main()

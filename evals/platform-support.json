@@ -40,7 +40,8 @@
         "wow-frontend-design/scripts/validate_quality_result.py",
         "wow-frontend-design/scripts/validate_screenshot_manifest.py",
         "wow-frontend-design/scripts/validate_site_plan.py",
-        "wow-frontend-design/scripts/validate_trigger_cases.py"
+        "wow-frontend-design/scripts/validate_trigger_cases.py",
+        "wow-frontend-design/scripts/validate_v7_evidence.py"
       ],
       "requirements": ["Python 3.12 standard library", "Writable caller-authorized output only when a script explicitly produces an artifact"],
       "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},

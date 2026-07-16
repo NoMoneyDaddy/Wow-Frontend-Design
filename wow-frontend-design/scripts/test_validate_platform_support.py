@@ -34,7 +34,7 @@ class PlatformSupportTests(unittest.TestCase):
         report = validate_platform_support.build_gap_report(self.matrix_path, self.root)
         self.assertEqual(report["target_count"], 12)
         self.assertEqual(report["official_source_count"], 5)
-        self.assertEqual(report["installed_script_entrypoint_count"], 23)
+        self.assertEqual(report["installed_script_entrypoint_count"], 24)
         self.assertIn("evaluator-windows-wsl", report["incomplete_target_ids"])
         self.assertIn("evaluator-windows-native", report["unsupported_target_ids"])
         self.assertIn("ci-portable-python-matrix", report["target_ids_by_incomplete_check"]["windows"])

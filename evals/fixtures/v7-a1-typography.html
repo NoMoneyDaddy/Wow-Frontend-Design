@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8">
+    <title>v7-A1 typography evaluator fixtures</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: monospace; font-size: 16px; }
+      section { margin-block: 24px; }
+      .owner { position: relative; background: #eee; }
+      .owner-1000 { inline-size: 1000px; }
+      .owner-760 { inline-size: 760px; }
+      .owner-560 { inline-size: 560px; }
+      .owner-512 { inline-size: 512px; }
+      h1, h2, p { margin: 0; font: inherit; line-height: 1.5; }
+      .orphan { inline-size: 14em; }
+      .vertical { writing-mode: vertical-rl; block-size: 14em; }
+      .track-59 { inline-size: 59%; }
+      .track-60 { inline-size: 60%; }
+      .track-full { inline-size: 100%; text-wrap: balance; }
+      .track-520 { inline-size: 520px; }
+      .track-32em { inline-size: 32em; }
+      .peer { position: absolute; inset-inline-end: 0; inset-block-start: 0; inline-size: 180px; min-block-size: 32px; }
+      #gap-280 { inline-size: 455px; margin-inline-start: 25px; }
+      #gap-281 { inline-size: 454px; margin-inline-start: 25px; }
+    </style>
+  </head>
+  <body>
+    <section class="owner owner-512" id="owner-orphan"><h1 class="orphan" id="heading-orphan">市場攤商過敏查<br>核。</h1></section>
+    <section class="owner owner-512" id="owner-valid-line"><h1 id="heading-valid-line">市場攤商過敏<br>查核</h1></section>
+    <section class="owner owner-512" id="owner-display"><h1 id="heading-display">春日市<br>集</h1></section>
+    <section class="owner owner-512" id="owner-vertical"><h1 class="vertical" id="heading-vertical">市場攤商過敏查<br>核。</h1></section>
+    <section class="owner owner-1000" id="owner-title-59"><h1 class="track-59" id="title-59">市場攤商過敏查核流程與處置摘要</h1></section>
+    <section class="owner owner-1000" id="owner-title-60"><h1 class="track-60" id="title-60">市場攤商過敏查核流程與處置摘要</h1></section>
+    <section class="owner owner-1000" id="owner-balanced"><h1 class="track-full" id="title-balanced">市場攤商過敏查核流程與處置摘要</h1></section>
+    <section class="owner owner-1000" id="owner-peer"><h1 class="track-520" id="title-peer">市場攤商過敏查核流程與處置摘要</h1><button class="peer" id="task-peer">查看查核狀態</button></section>
+    <section class="owner owner-1000" id="owner-prose"><p class="track-32em" id="prose-void">這是一段用來驗證繁體中文正文軌道是否被不必要壓縮的內容，右方若沒有任務資訊便不應留下大面積空白。</p></section>
+    <section class="owner owner-512" id="owner-prose-narrow"><p id="prose-narrow">這是一段位於合理閱讀欄寬中的繁體中文正文，外層本身就是閱讀軌道，因此不應被誤判為右方浪費。</p></section>
+    <section class="owner owner-1000" id="owner-editorial"><p class="track-32em" id="prose-editorial">這是一段刻意採用編輯式閱讀欄寬的繁體中文內容，評估器只能留下觀察紀錄，不能直接阻擋結果。</p></section>
+    <section class="owner owner-512" id="owner-editorial-clean"><p id="prose-editorial-clean">這是一段沒有空軌或孤字問題的編輯式繁體中文內容，仍應留下 intent observation 而不發生 browser context 錯誤。</p></section>
+    <section class="owner owner-760" id="owner-gap-280"><h1 id="gap-280">市場攤商過敏查核流程與處置摘要</h1></section>
+    <section class="owner owner-760" id="owner-gap-281"><h1 id="gap-281">市場攤商過敏查核流程與處置摘要</h1></section>
+    <section class="owner owner-512" id="owner-control"><button><h2 id="control-heading">送出<br>查</h2></button></section>
+    <section class="owner owner-512" id="owner-ruby"><h2 id="ruby-heading">資料<ruby>核<rt>ㄏㄜˊ</rt></ruby><br>驗證</h2></section>
+  </body>
+</html>
