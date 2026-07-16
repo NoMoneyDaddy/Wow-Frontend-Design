@@ -18,7 +18,7 @@ class CapabilityStatusTests(unittest.TestCase):
     def test_repository_status_is_valid(self) -> None:
         root = Path(__file__).resolve().parents[2]
         count = validate_capability_status.validate(root / "evals" / "capability-status.json", root)
-        self.assertEqual(count, 19)
+        self.assertEqual(count, 20)
 
     def test_missing_or_escaping_artifact_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

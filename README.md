@@ -47,7 +47,7 @@ Portable Agent Skill for designing, building, auditing, and refactoring distinct
 
 ## 相容與安裝
 
-本專案遵循開放的 [Agent Skills specification](https://agentskills.io/specification)，可供 Codex、Claude Code、GitHub Copilot、Gemini CLI 與自訂 wrapper 載入；相容不等於每個 host、模型與工具組合都已完成實測。安裝路徑、5 分鐘成功流程、remote sandbox、版本 pin、更新與卸載由 [`INSTALL.md`](INSTALL.md) 單一維護。
+本專案遵循開放的 [Agent Skills specification](https://agentskills.io/specification)，可供 Codex、Claude Code、GitHub Copilot、Gemini CLI 與自訂 wrapper 載入；相容不等於每個 host、模型與工具組合都已完成實測。[平台支援說明](PLATFORM_SUPPORT.md)與[一次性機器快照](evals/platform-support.json)逐格分開官方文件、安裝、發現、呼叫、實作、browser 與 visual 證據；沒有排定下次查核日期，只描述這一版。安裝路徑、5 分鐘成功流程、remote sandbox、版本 pin、更新與卸載由 [`INSTALL.md`](INSTALL.md) 單一維護。
 
 ## 使用
 
@@ -76,12 +76,14 @@ Preserve routes, APIs, analytics, and the current framework. Verify mobile, erro
 ## 文件
 
 - [安裝與 host 路徑](INSTALL.md)
+- [平台／OS／環境／模型支援說明](PLATFORM_SUPPORT.md)
 - [版本變更](CHANGELOG.md)
 - [資安回報政策](SECURITY.md)
 - [Skill 核心流程](wow-frontend-design/SKILL.md)
 - [評測方法與重現方式](evals/README.md)
 - [完整測試方案與執行紀錄](evals/TEST_PLAN.md)
 - [最新測試結果與限制](evals/RESULTS.md)
+- [平台／OS／環境／模型支援快照](evals/platform-support.json)
 - [公開能力狀態](evals/capability-status.json)
 
 ## 授權

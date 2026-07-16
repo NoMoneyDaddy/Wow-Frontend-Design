@@ -49,6 +49,14 @@ python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py \
 
 This proves only this exact model/cohort, frozen evaluator, Chromium device emulation, and checked states. It does not certify physical phones, Safari/Firefox, OS assistive technology, formal WCAG conformance, real-user usability, production performance, or general model ranking.
 
+## Platform, OS and environment snapshot
+
+The one-version [`platform-support.json`](platform-support.json) snapshot records 32 host, operating-system, browser/device, environment and model cells against 20 reviewed official source coordinates. Each cell keeps install, discovery, invocation, implementation, browser and visual stages independent. The validator rejects missing inventory, unknown sources, unsafe artifacts, evidence/status contradictions and any scheduled recheck field.
+
+Current positive evidence remains narrow: the Codex CLI `gpt-5.4-mini` v6 cohort has external pinned-Chromium visual evidence; Ubuntu CI validates installation, source/tests and checked-in evidence; macOS development evidence lacks a fully bound host-version/architecture/font manifest. Claude Code has historical generated outputs but failed strict browser acceptance. Copilot, Gemini CLI, Claude API, claude.ai, WSL, native Windows full harness, Firefox, WebKit, physical iOS/Android, read-only-home remote and exact local-model cohorts remain documented or untested—not silently promoted.
+
+Official pages are mutable, but this file intentionally contains no next-review date: it describes only this repository version. A future release must replace it with a newly reviewed snapshot if maintainers choose to perform another platform review.
+
 ## Darwin advisory optimization audit
 
 The trusted `alchaincyf/darwin-skill` source was pinned at commit `7c7b7909b630dc3b5cbb91bd4bcb1b10bfb1f894`. Two independent judges applied its nine-dimension rubric and runtime-neutrality scan to the current Skill plus three dry-run prompts: a Traditional Chinese mobile disaster-information build, a React returns-dashboard retrofit, and a read-only vertical/ruby literature audit. Runtime red-light matches were 0; both judges selected checkpoint design as the weakest safe dimension. The accepted one-line candidate now pauses only for new authority or material side effects and explicitly keeps ordinary authorized repair automatic.

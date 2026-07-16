@@ -78,6 +78,9 @@ jobs:
       - name: Validate external source lock
         run: python3 wow-frontend-design/scripts/validate_external_sources.py wow-frontend-design/references/external-sources.lock.json
 
+      - name: Validate frozen platform support snapshot
+        run: python3 wow-frontend-design/scripts/validate_platform_support.py evals/platform-support.json --repository-root .
+
       - name: Validate product fixtures
         run: python3 wow-frontend-design/scripts/validate_product_cases.py evals/product_cases.json
 

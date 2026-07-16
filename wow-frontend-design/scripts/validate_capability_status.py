@@ -40,6 +40,7 @@ REQUIRED_CAPABILITY_IDS = {
     "local-models",
     "locale-portability",
     "motion-svg-lottie",
+    "platform-environment-matrix",
     "search-aeo-geo",
     "skill-package",
     "structured-site-planning",

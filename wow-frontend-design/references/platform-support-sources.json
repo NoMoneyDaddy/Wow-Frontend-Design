@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "retrieved_at": "2026-07-16",
+  "policy": "Frozen official-source coordinates for this repository version. Validation checks structure, approved origins and claim bindings; it does not re-fetch pages or prove that mutable upstream content remains unchanged.",
+  "sources": [
+    {
+      "id": "agent-skills-specification",
+      "publisher": "Agent Skills",
+      "url": "https://agentskills.io/specification",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["portable skill format", "optional compatibility metadata"]
+    },
+    {
+      "id": "codex-skills",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/skills",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Codex skill discovery", "Codex surfaces"]
+    },
+    {
+      "id": "codex-cli",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/cli",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Codex CLI installation", "Codex CLI operating systems"]
+    },
+    {
+      "id": "codex-windows",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/windows",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["native Windows guidance", "WSL alternative"]
+    },
+    {
+      "id": "codex-models",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/models",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Codex model availability", "gpt-5.4-mini listing"]
+    },
+    {
+      "id": "claude-agent-skills",
+      "publisher": "Anthropic",
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Claude skill surfaces", "Claude API sandbox limits", "surface isolation"]
+    },
+    {
+      "id": "claude-code-setup",
+      "publisher": "Anthropic",
+      "url": "https://docs.anthropic.com/en/docs/claude-code/getting-started",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Claude Code installation", "Claude Code operating systems"]
+    },
+    {
+      "id": "claude-model-versioning",
+      "publisher": "Anthropic",
+      "url": "https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Claude model identifiers", "Claude model versioning"]
+    },
+    {
+      "id": "copilot-agent-skills",
+      "publisher": "GitHub",
+      "url": "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Copilot Agent Skills surfaces", "Copilot skill discovery"]
+    },
+    {
+      "id": "copilot-feature-matrix",
+      "publisher": "GitHub",
+      "url": "https://docs.github.com/en/copilot/reference/copilot-feature-matrix",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Copilot client feature availability", "Copilot preview states"]
+    },
+    {
+      "id": "copilot-models",
+      "publisher": "GitHub",
+      "url": "https://docs.github.com/en/copilot/reference/ai-models/supported-models",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Copilot model availability"]
+    },
+    {
+      "id": "copilot-cli",
+      "publisher": "GitHub",
+      "url": "https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-copilot-cli",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Copilot CLI operating systems", "Copilot CLI environment"]
+    },
+    {
+      "id": "github-cli-skill",
+      "publisher": "GitHub CLI",
+      "url": "https://cli.github.com/manual/gh_skill",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["gh skill preview status", "gh skill commands"]
+    },
+    {
+      "id": "github-cli-skill-install",
+      "publisher": "GitHub CLI",
+      "url": "https://cli.github.com/manual/gh_skill_install",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["gh skill install targets", "gh skill installation scopes"]
+    },
+    {
+      "id": "gemini-agent-skills",
+      "publisher": "Google",
+      "url": "https://geminicli.com/docs/cli/using-agent-skills/",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Gemini CLI skill discovery", "Gemini CLI activation"]
+    },
+    {
+      "id": "gemini-installation",
+      "publisher": "Google",
+      "url": "https://geminicli.com/docs/get-started/installation/",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Gemini CLI installation", "Gemini CLI operating systems", "Gemini CLI Node requirement"]
+    },
+    {
+      "id": "gemini-model-selection",
+      "publisher": "Google",
+      "url": "https://geminicli.com/docs/cli/model/",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Gemini CLI model selection", "Gemini subagent model boundary"]
+    },
+    {
+      "id": "gemini-model-routing",
+      "publisher": "Google",
+      "url": "https://geminicli.com/docs/cli/model-routing/",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Gemini CLI automatic routing", "Gemini model fallback"]
+    },
+    {
+      "id": "playwright-installation",
+      "publisher": "Microsoft",
+      "url": "https://playwright.dev/docs/intro",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["Playwright browser engines", "Playwright operating systems", "Playwright runtime requirements"]
+    },
+    {
+      "id": "playwright-browsers",
+      "publisher": "Microsoft",
+      "url": "https://playwright.dev/docs/browsers",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["browser engine differences", "Chrome and Edge channels", "WebKit boundary"]
+    }
+  ]
+}

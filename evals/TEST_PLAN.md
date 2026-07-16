@@ -44,6 +44,7 @@ python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py \
 - `@google/design.md@0.3.0`、`playwright@1.61.1`，或執行前經官方 stable channel 確認後另開變更，不在 active run 中升級。
 - Node、Python、Codex CLI、OS、browser engine revision、locale、timezone 與字型環境。
 - implementation builder 停用 browser/computer/subagent；外層 evaluator 獨立擁有瀏覽器、截圖與判定。
+- 平台／OS／environment／model 支援只以本版 `platform-support.json` 的 stage-by-stage evidence 宣稱；官方文件與 repo 實測不得互相代替。這是一次性快照，不排定下次查核日期。
 
 Active gate 開始後不得修改期待值或 auditor。發現 evaluator defect 時，該 run 標記無效；修 evaluator、補 counterexample test、重新凍結後再開新 run。
 
@@ -186,6 +187,7 @@ Finding 自動送回修復；只重跑該 target lint，再跑 8-case contract r
 - automatic repair 至少以注入 fixture 證明 finding → repair → narrow rerun → regression 的閉環。
 - 最少 60 張 screenshot 與所有 artifact hash 通過通用 validator。
 - unit、lint、syntax、build、Skill installability、CI equivalent 全過。
+- 平台快照 inventory、官方來源綁定、安全 artifact path 與 stage consistency validator 全過；`not_run` 不能被改寫成 `supported`。
 - 結果文件明確分開 `VERIFIED`、`OBSERVED`、`INFERRED`、`UNVERIFIED`。
 
 這些條件只能關閉 development/regression cohort。Skill promotion 另需 sealed held-out validation/test 無硬 gate 退步，且依「安全／資料／主要任務 → evidence coverage → deterministic defects → independent craft → runtime/context cost」順序比較；不得用加權總分抵銷前層失敗。

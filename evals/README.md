@@ -67,6 +67,7 @@ v6 report 把 screenshot、route、state、viewport、DPR、browser、source、a
 - `briefs/*-v6.md`、`product-flow-v6-repaired-v2-targets/`、`product-flow-v6-visual-results.json` 與 `../assets/product-flow-v6/`：目前 8 案自修復 cohort 的 brief、最終網站、browser report 與 64 張發布截圖。
 - `claude-haiku-product-dashboard-remake/`：唯一一次 anti-slop remediation invocation 的拒絕紀錄；輸出政策在 publish 前熔斷，沒有可接受網站產物。
 - `capability-status.json`：公開 claim ledger。每項能力都要有現存 artifact 與明示 boundary；validator 只確保狀態結構與路徑未腐化，不替內容升級證據。
+- `platform-support.json`：本版一次性平台快照。32 格分開 host／OS／browser／device／environment／model 的官方狀態與 install → discovery → invocation → implementation → browser → visual 證據；沒有下次查核日期，未跑過的格子維持 `not_run`。
 - `../wow-frontend-design/scripts/model_profile.example.json`、`route_model.py`：由 evaluator 依 task／locale／surface／risk 與精確環境 revision 決定起始 lane；模型不能自報強弱。
 - `../wow-frontend-design/scripts/runtime_events.example.json`、`runtime_downgrade.py`：把真實 schema／工具／repair／timeout／權限結果轉成單向降級；不允許同一 run 自動升級。
 - `../wow-frontend-design/scripts/{site_manifest,wireframe_plan}.example.json`：有效的 IA／wireflow 契約範例；`validate_site_plan.py` 會連同本機 XML sitemap 驗證 route、權限、狀態、手機轉換、證據引用與 canonical 集合。通過不等於使用者研究、視覺品質、可用性或索引結果。
@@ -79,6 +80,8 @@ v6 report 把 screenshot、route、state、viewport、DPR、browser、source、a
 
 ```bash
 python3 wow-frontend-design/scripts/validate_product_cases.py evals/product_cases.json
+python3 wow-frontend-design/scripts/validate_platform_support.py \
+  evals/platform-support.json --repository-root .
 python3 wow-frontend-design/scripts/validate_site_plan.py \
   wow-frontend-design/scripts/site_manifest.example.json \
   wow-frontend-design/scripts/wireframe_plan.example.json \

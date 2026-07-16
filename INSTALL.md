@@ -2,6 +2,8 @@
 
 `wow-frontend-design/` 本身就是符合 Agent Skills 格式的 skill 目錄。安裝只代表 host 能發現 metadata；不代表特定模型、工具、框架或品質已通過實測。
 
+本版的 host、OS、browser、remote environment 與 model 邊界先看 [`PLATFORM_SUPPORT.md`](PLATFORM_SUPPORT.md)，機器證據收錄在 [`evals/platform-support.json`](evals/platform-support.json)，官方來源座標固定在 [`platform-support-sources.json`](wow-frontend-design/references/platform-support-sources.json)。這是一次性版本快照，沒有下次查核日期。先看每格 `checks`：installer 能放置檔案不等於 host 已發現，host 能呼叫也不等於生成、browser 或 visual 已通過。
+
 ## 5 分鐘成功路徑
 
 先取得目前 `main` 的完整 commit SHA；預覽後才把同一 SHA 安裝到指定 host。正式環境應改用團隊已審查的 SHA。此 repo 目前沒有 GitHub Release，因此不要把浮動 `main` 當成 production pin。
