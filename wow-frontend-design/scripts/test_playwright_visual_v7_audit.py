@@ -61,6 +61,24 @@ process.stdout.write(JSON.stringify(VIEWPORTS.filter((viewport) => viewport.name
             self.assertEqual(3, profile["deviceScaleFactor"])
             self.assertIn("Android", profile["userAgent"])
 
+    def test_readable_text_roots_include_top_layer_and_portal_dialogs(self) -> None:
+        source = f"""
+const {{ PRODUCT_TEXT_ROOT_SELECTOR }} = require({json.dumps(str(AUDITOR))});
+process.stdout.write(JSON.stringify(PRODUCT_TEXT_ROOT_SELECTOR));
+"""
+        selector = self.run_node(source)
+        self.assertIn("main", selector)
+        self.assertIn("dialog[open]", selector)
+        self.assertIn("[role='dialog'][aria-modal='true']", selector)
+        auditor_source = AUDITOR.read_text(encoding="utf-8")
+        self.assertNotIn('querySelectorAll("main p, main li")', auditor_source)
+        self.assertIn('const readableNodes = productTextNodes("p, li")', auditor_source)
+        self.assertIn('const narrowTextColumns = productTextNodes("p, li")', auditor_source)
+        self.assertIn('const bodyFlowNodes = productTextNodes("p, li")', auditor_source)
+        self.assertIn('...productTextNodes("p")', auditor_source)
+        self.assertIn('!isolatedBehindModal(root)', auditor_source)
+        self.assertIn('!isolatedBehindModal(node)', auditor_source)
+
     def test_grant_interaction_follows_mobile_case_navigation(self) -> None:
         source = f"""
 const {{ grantInteractionPlan }} = require({json.dumps(str(AUDITOR))});

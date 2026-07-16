@@ -6,6 +6,8 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { chromium } = require("playwright");
 
+const PRODUCT_TEXT_ROOT_SELECTOR = "main, dialog[open], [role='dialog'][aria-modal='true']";
+
 const CASE_PAGES = {
   "wind-maintenance-dispatch-v6": ["index.html"],
   "type-foundry-specimen-v6": ["index.html"],
@@ -338,7 +340,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     ? await runCaseInteraction(page, target.caseId, viewport)
     : { attempted: false, failures: [] };
 
-  const measured = await page.evaluate(({ caseId, viewportName, requiredPages, localeRules }) => {
+  const measured = await page.evaluate(({ caseId, viewportName, requiredPages, localeRules, productTextRootSelector }) => {
     const visible = (node) => {
       const style = getComputedStyle(node);
       const rect = node.getBoundingClientRect();
@@ -415,6 +417,17 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       return uniqueInPage(values.filter((value, index) => values.indexOf(value) !== index));
     };
     const uniqueInPage = (values) => [...new Set(values)];
+    const activeModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+    const isolatedBehindModal = (node) => Boolean(
+      activeModal
+      && !activeModal.contains(node)
+      && node.closest('[inert], [aria-hidden="true"]')
+    );
+    const productTextNodes = (selector) => [...new Set(
+      [...document.querySelectorAll(productTextRootSelector)]
+        .filter((root) => visible(root) && !isolatedBehindModal(root))
+        .flatMap((root) => [...root.querySelectorAll(selector)]),
+    )].filter((node) => visible(node) && !isolatedBehindModal(node));
     const flowContainer = (node) => node.parentElement
       || node.closest("header, .masthead, .hero, .banner, .panel, section, article");
     const hasTaskBearingRightPeer = (node, container) => {
@@ -444,12 +457,6 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       return { tag: node.tagName.toLowerCase(), hook: node.getAttribute("data-eval"), text: (node.textContent || "").trim().replace(/\s+/g, " ").slice(0, 80), clipped: clipped && clipsOverflow };
     }).filter((item) => item.text && item.clipped).slice(0, 30);
 
-    const activeModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
-    const isolatedBehindModal = (node) => Boolean(
-      activeModal
-      && !activeModal.contains(node)
-      && node.closest('[inert], [aria-hidden="true"]')
-    );
     const criticalNodes = [...document.querySelectorAll("h1, h2, h3, button, [role='button']")]
       .filter(visibleInViewport)
       .filter((node) => node.textContent.trim() && !isolatedBehindModal(node));
@@ -506,8 +513,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       return { text: nameFor(node).slice(0, 60), width: Math.round(rect.width), height: Math.round(rect.height) };
     }).filter((item) => item.width < 24 || item.height < 24).slice(0, 30);
 
-    const readableNodes = [...document.querySelectorAll("main p, main li")]
-      .filter(visible)
+    const readableNodes = productTextNodes("p, li")
       .filter((node) => node.tagName !== "LI" || !node.querySelector("p, div, section, article, ul, ol"))
       .filter((node) => node.textContent.trim().length >= 40);
     const readingRhythm = { tooTight: [], tooWide: [] };
@@ -549,8 +555,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       .slice(0, 20);
     const textScale = { undersizedReadableText };
 
-    const narrowTextColumns = [...document.querySelectorAll("main p, main li")]
-      .filter(visible)
+    const narrowTextColumns = productTextNodes("p, li")
       .map((node) => {
         const style = getComputedStyle(node);
         const rect = node.getBoundingClientRect();
@@ -567,8 +572,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       .filter((item) => item.writingMode.startsWith("horizontal") && item.characterCount >= 12 && item.widthInEms < 6)
       .slice(0, 20);
 
-    const bodyFlowNodes = [...document.querySelectorAll("main p, main li")]
-      .filter(visible)
+    const bodyFlowNodes = productTextNodes("p, li")
       .filter((node) => node.tagName !== "LI" || !node.querySelector("p, div, section, article, ul, ol"))
       .filter((node) => node.textContent.trim().length >= 40);
     const forcedLineBreaks = bodyFlowNodes
@@ -596,7 +600,10 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       })
       .filter((item) => ["nowrap", "pre"].includes(item.whiteSpace) || (item.cjkDominant && item.wordBreak === "keep-all"))
       .slice(0, 20);
-    const underfilledProseBlocks = [...document.querySelectorAll("header p, main p")]
+    const underfilledProseBlocks = [...new Set([
+      ...document.querySelectorAll("header p"),
+      ...productTextNodes("p"),
+    ])]
       .filter(visible)
       .filter((node) => node.textContent.trim().length >= 40)
       .map((node) => {
@@ -927,6 +934,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     viewportName: viewport.name,
     requiredPages: CASE_PAGES[target.caseId],
     localeRules: LOCALE_RULES,
+    productTextRootSelector: PRODUCT_TEXT_ROOT_SELECTOR,
   });
 
   const pageSlug = pageName.replace(/\.html$/i, "");
@@ -1041,6 +1049,7 @@ async function main() {
 
 module.exports = {
   CASE_PAGES,
+  PRODUCT_TEXT_ROOT_SELECTOR,
   VIEWPORTS,
   compareMultiPageShell,
   grantInteractionPlan,
