@@ -8,7 +8,7 @@
       "required": true,
       "applicable": true,
       "status": "PASS",
-      "evidence": ["browser-primary-task.json"],
+      "evidence": ["browser-critical-path"],
       "reason": ""
     },
     {
@@ -16,44 +16,52 @@
       "required": true,
       "applicable": true,
       "status": "PASS",
-      "evidence": ["mobile-default.png", "mobile-interaction.png"],
+      "evidence": ["artifacts/mobile-default.png", "artifacts/mobile-interaction.png"],
+      "reason": ""
+    },
+    {
+      "id": "novel-discovery",
+      "required": true,
+      "applicable": true,
+      "status": "PASS",
+      "evidence": ["artifacts/novel-findings.json"],
       "reason": ""
     }
   ],
   "eligible": true,
   "coverage": {
-    "required_applicable": 2,
-    "required_passed": 2,
-    "evidence_items": 3
+    "required_applicable": 3,
+    "required_passed": 3,
+    "evidence_items": 4
   },
   "craft": {
     "evaluator_id": "independent-reviewer-example",
     "independent": true,
     "rubric_version": "wow-core-craft-v1",
     "dimensions": [
-      {"id": "concept-coherence", "status": "ACCEPTABLE", "evidence": ["desktop-default.png"], "uncertainty": "One route sampled."},
-      {"id": "visual-typography", "status": "ACCEPTABLE", "evidence": ["desktop-default.png", "mobile-default.png"], "uncertainty": "No physical-device font rendering."},
-      {"id": "usability-content", "status": "ACCEPTABLE", "evidence": ["browser-primary-task.json"], "uncertainty": "No real-user study."},
-      {"id": "mobile-experience", "status": "ACCEPTABLE", "evidence": ["mobile-default.png", "mobile-interaction.png"], "uncertainty": "Browser device emulation only."},
-      {"id": "originality", "status": "ACCEPTABLE", "evidence": ["desktop-default.png"], "uncertainty": "Subjective independent review."},
+      {"id": "concept-coherence", "status": "ACCEPTABLE", "evidence": ["artifacts/desktop-default.png"], "uncertainty": "One route sampled."},
+      {"id": "visual-typography", "status": "ACCEPTABLE", "evidence": ["artifacts/desktop-default.png", "artifacts/mobile-default.png"], "uncertainty": "No physical-device font rendering."},
+      {"id": "usability-content", "status": "ACCEPTABLE", "evidence": ["browser-critical-path"], "uncertainty": "No real-user study."},
+      {"id": "mobile-experience", "status": "ACCEPTABLE", "evidence": ["artifacts/mobile-default.png", "artifacts/mobile-interaction.png"], "uncertainty": "Browser device emulation only."},
+      {"id": "originality", "status": "ACCEPTABLE", "evidence": ["artifacts/desktop-default.png"], "uncertainty": "Subjective independent review."},
       {"id": "accessibility", "status": "UNVERIFIED", "evidence": [], "uncertainty": "Formal conformance was out of scope."},
-      {"id": "localization", "status": "ACCEPTABLE", "evidence": ["mobile-default.png"], "uncertainty": "Only zh-Hant sampled."},
+      {"id": "localization", "status": "ACCEPTABLE", "evidence": ["artifacts/mobile-default.png"], "uncertainty": "Only zh-Hant sampled."},
       {"id": "performance-resilience", "status": "UNVERIFIED", "evidence": [], "uncertainty": "No production RUM."},
-      {"id": "code-quality", "status": "ACCEPTABLE", "evidence": ["build.log"], "uncertainty": "Focused project checks only."}
+      {"id": "code-quality", "status": "ACCEPTABLE", "evidence": ["js-syntax"], "uncertainty": "Focused project checks only."}
     ]
   },
   "weighted_total": null,
   "award_lens": null,
-  "release": "VERIFIED",
+  "release": "PARTIALLY_VERIFIED",
   "handoff": {
     "artifact": "dist/index.html",
     "launch_command": "npm run preview",
     "rendered_evidence": {
       "status": "OBSERVED",
-      "paths": ["desktop-default.png", "mobile-default.png", "mobile-interaction.png"],
+      "paths": ["artifacts/desktop-default.png", "artifacts/mobile-default.png", "artifacts/mobile-interaction.png"],
       "reason": ""
     },
     "remaining_risks": ["Physical devices and real users were not tested."],
-    "next_action": "Open the preview and run the declared release matrix before production deployment."
+    "next_action": "Obtain evaluator acceptance, then upgrade release to VERIFIED before production deployment."
   }
 }

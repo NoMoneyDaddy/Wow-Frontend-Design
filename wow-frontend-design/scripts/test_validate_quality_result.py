@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import copy
 import contextlib
 import io
@@ -18,6 +19,11 @@ import validate_quality_result
 import evidence_ledger
 
 
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+
+
 class QualityResultTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -26,12 +32,113 @@ class QualityResultTests(unittest.TestCase):
         cls.example = json.loads(cls.example_path.read_text(encoding="utf-8"))
 
     def test_repository_example_is_valid(self) -> None:
-        self.assertEqual(validate_quality_result.validate(self.example_path), 2)
+        self.assertEqual(validate_quality_result.validate(self.example_path), 3)
 
-    def _strict_fixture(self, root: Path) -> tuple[Path, Path, Path]:
+    def test_checked_in_examples_are_strictly_compatible(self) -> None:
+        policy_template = json.loads(
+            (self.root / "evidence_policy.example.json").read_text(encoding="utf-8")
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            ledger = root / "ledger.json"
+            policy_path = root / "policy.json"
+            result_path = workspace / "result.json"
+            policy = copy.deepcopy(policy_template)
+            policy["case_id"] = "quality-example"
+            policy["run_id"] = "quality-example-run-001"
+            self.assertEqual(
+                evidence_ledger.main(
+                    [
+                        "init",
+                        "--ledger",
+                        str(ledger),
+                        "--case-id",
+                        policy["case_id"],
+                        "--run-id",
+                        policy["run_id"],
+                    ]
+                ),
+                0,
+            )
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                for label, rule in policy["evidence"].items():
+                    if rule["kind"] == "command":
+                        command = [
+                            sys.executable,
+                            "-c",
+                            f"raise SystemExit(0)  # checked-in-example:{label}",
+                        ]
+                        rule["command"] = command
+                        rule["command_sha256"] = evidence_ledger.canonical_command_sha256(command)
+                        self.assertEqual(
+                            evidence_ledger.main(
+                                [
+                                    "run",
+                                    "--ledger",
+                                    str(ledger),
+                                    "--label",
+                                    label,
+                                    "--cwd",
+                                    str(workspace),
+                                    "--",
+                                    *command,
+                                ]
+                            ),
+                            0,
+                        )
+                        continue
+
+                    artifact = root / rule["path"]
+                    artifact.parent.mkdir(parents=True, exist_ok=True)
+                    artifact.write_bytes(
+                        PNG_1X1 if rule["artifact_kind"] == "screenshot" else b"{}\n"
+                    )
+                    artifact_args = [
+                        "artifact",
+                        "--ledger",
+                        str(ledger),
+                        "--label",
+                        label,
+                        "--kind",
+                        rule["artifact_kind"],
+                        "--path",
+                        str(artifact),
+                    ]
+                    context = rule.get("context", {})
+                    for field, flag in (
+                        ("route", "--route"),
+                        ("viewport", "--viewport"),
+                        ("locale", "--locale"),
+                        ("state", "--state"),
+                        ("note", "--context"),
+                    ):
+                        if field in context:
+                            artifact_args.extend([flag, context[field]])
+                    self.assertEqual(evidence_ledger.main(artifact_args), 0)
+
+            result = copy.deepcopy(self.example)
+            self.assertEqual(result["release"], "PARTIALLY_VERIFIED")
+            self.assertEqual(policy["release_acceptance"]["decision"], "not_accepted")
+            result_path.write_text(json.dumps(result), encoding="utf-8")
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            self.assertEqual(
+                validate_quality_result.validate_with_ledger(
+                    result_path,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                ),
+                3,
+            )
+
+    def _strict_fixture(self, root: Path) -> tuple[Path, Path, Path, Path]:
         workspace = root / "workspace"
         workspace.mkdir()
         ledger = root / "ledger.json"
+        policy_path = root / "policy.json"
         self.assertEqual(
             evidence_ledger.main(
                 ["init", "--ledger", str(ledger), "--case-id", "quality-case", "--run-id", "quality-run-001"]
@@ -39,17 +146,8 @@ class QualityResultTests(unittest.TestCase):
             0,
         )
         result = copy.deepcopy(self.example)
+        result["release"] = "VERIFIED"
         labels = ["primary-task", "rendered-mobile-layout", "novel-discovery"]
-        result["hard_gates"].append(
-            {
-                "id": "novel-discovery",
-                "required": True,
-                "applicable": True,
-                "status": "PASS",
-                "evidence": [labels[2]],
-                "reason": "",
-            }
-        )
         self.assertEqual(len(result["hard_gates"]), len(labels))
         for gate, label in zip(result["hard_gates"], labels):
             gate["evidence"] = [label]
@@ -62,13 +160,17 @@ class QualityResultTests(unittest.TestCase):
             dimension["status"] = "UNVERIFIED"
             dimension["evidence"] = []
         result["handoff"]["rendered_evidence"] = {
-            "status": "UNVERIFIED",
-            "paths": [],
-            "reason": "Strict unit fixture records command evidence only.",
+            "status": "OBSERVED",
+            "paths": ["mobile.png"],
+            "reason": "",
         }
         result_path = workspace / "result.json"
         result_path.write_text(json.dumps(result), encoding="utf-8")
-        for label in labels:
+        commands = {
+            label: [sys.executable, "-c", f"raise SystemExit(0)  # {label}"]
+            for label in labels
+        }
+        for label, command in commands.items():
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(
                     evidence_ledger.main(
@@ -81,28 +183,117 @@ class QualityResultTests(unittest.TestCase):
                             "--cwd",
                             str(workspace),
                             "--",
-                            sys.executable,
-                            "-c",
-                            "raise SystemExit(0)",
+                            *command,
                         ]
                     ),
                     0,
                 )
-        return result_path, ledger, workspace
+        screenshot = root / "mobile.png"
+        screenshot.write_bytes(PNG_1X1)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(
+                evidence_ledger.main(
+                    [
+                        "artifact",
+                        "--ledger",
+                        str(ledger),
+                        "--label",
+                        "rendered-mobile",
+                        "--kind",
+                        "screenshot",
+                        "--path",
+                        str(screenshot),
+                        "--route",
+                        "/",
+                        "--viewport",
+                        "390x844",
+                        "--locale",
+                        "zh-Hant",
+                        "--state",
+                        "default",
+                    ]
+                ),
+                0,
+            )
+        evidence = {
+            label: {
+                "kind": "command",
+                "claim_types": [f"gate:{gate['id']}"],
+                "command": commands[label],
+                "command_sha256": evidence_ledger.canonical_command_sha256(commands[label]),
+                "cwd": "workspace",
+            }
+            for gate, label in zip(result["hard_gates"], labels)
+        }
+        evidence["rendered-mobile"] = {
+            "kind": "artifact",
+            "claim_types": ["rendered_visual"],
+            "artifact_kind": "screenshot",
+            "path": "mobile.png",
+            "context": {
+                "route": "/",
+                "viewport": "390x844",
+                "locale": "zh-Hant",
+                "state": "default",
+            },
+        }
+        policy = {
+            "schema_version": 3,
+            "case_id": "quality-case",
+            "run_id": "quality-run-001",
+            "trust_boundary": {
+                "evaluator_owned": True,
+                "outside_model_write_scope": True,
+                "integrity": "unsigned",
+                "note": "Unit-test policy stored outside the model-writable workspace.",
+            },
+            "release_acceptance": {
+                "decision": "accepted_by_evaluator",
+                "evaluator": "quality-test-evaluator",
+                "record": "fixture-acceptance",
+                "reason": "Fixture exercises exact policy and evidence binding.",
+            },
+            "evidence": evidence,
+        }
+        policy_path.write_text(json.dumps(policy), encoding="utf-8")
+        return result_path, ledger, policy_path, workspace
 
     def test_strict_validation_binds_passes_and_discovery_to_evaluator_ledger(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            result, ledger, workspace = self._strict_fixture(Path(directory))
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
             self.assertEqual(
                 validate_quality_result.validate_with_ledger(
-                    result, ledger, workspace, ("novel-discovery",)
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
                 ),
                 3,
             )
 
+    def test_verified_release_requires_novel_discovery_without_caller_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
+            data = json.loads(result.read_text(encoding="utf-8"))
+            data["hard_gates"] = data["hard_gates"][:-1]
+            data["coverage"] = {
+                "required_applicable": 2,
+                "required_passed": 2,
+                "evidence_items": 2,
+            }
+            result.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "novel-discovery"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    policy_path=policy,
+                )
+
     def test_strict_validation_uses_latest_repair_attempt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            result, ledger, workspace = self._strict_fixture(Path(directory))
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(
                     evidence_ledger.main(
@@ -122,27 +313,159 @@ class QualityResultTests(unittest.TestCase):
                     ),
                     7,
                 )
-            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "did not pass"):
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "command failed"):
                 validate_quality_result.validate_with_ledger(
-                    result, ledger, workspace, ("novel-discovery",)
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_strict_validation_rejects_wrong_successful_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    evidence_ledger.main(
+                        [
+                            "run",
+                            "--ledger",
+                            str(ledger),
+                            "--label",
+                            "primary-task",
+                            "--cwd",
+                            str(workspace),
+                            "--",
+                            sys.executable,
+                            "-c",
+                            "raise SystemExit(0)  # not-the-approved-test",
+                        ]
+                    ),
+                    0,
+                )
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "does not match policy"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
                 )
 
     def test_strict_validation_rejects_unbound_or_workspace_owned_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            result, ledger, workspace = self._strict_fixture(root)
+            result, ledger, policy, workspace = self._strict_fixture(root)
             data = json.loads(result.read_text(encoding="utf-8"))
             data["hard_gates"][0]["evidence"] = ["not-recorded"]
             result.write_text(json.dumps(data), encoding="utf-8")
-            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "one latest ledger event"):
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "not unambiguously"):
                 validate_quality_result.validate_with_ledger(
-                    result, ledger, workspace, ("novel-discovery",)
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
                 )
             forged = workspace / "ledger.json"
             forged.write_bytes(ledger.read_bytes())
             with self.assertRaisesRegex(validate_quality_result.QualityResultError, "outside"):
                 validate_quality_result.validate_with_ledger(
-                    result, forged, workspace, ("novel-discovery",)
+                    result,
+                    forged,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_strict_validation_requires_policy_claim_and_evaluator_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy_path, workspace = self._strict_fixture(Path(directory))
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "requires an evaluator-owned"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                )
+
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["release_acceptance"] = {
+                "decision": "not_accepted",
+                "reason": "Independent acceptance is intentionally absent.",
+            }
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "evaluator acceptance"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                )
+
+            policy["release_acceptance"] = {
+                "decision": "accepted_by_evaluator",
+                "evaluator": "quality-test-evaluator",
+                "record": "fixture-acceptance",
+                "reason": "Fixture exercises exact policy and evidence binding.",
+            }
+            policy["evidence"]["novel-discovery"]["claim_types"] = ["gate:primary-task"]
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "cannot prove claim_type"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                )
+
+    def test_strict_validation_rechecks_rendered_artifact_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, ledger, policy, workspace = self._strict_fixture(root)
+            (root / "mobile.png").write_bytes(PNG_1X1 + b"tampered")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "artifact is invalid"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_rendered_path_cannot_resolve_to_a_command_label(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy_path, workspace = self._strict_fixture(Path(directory))
+            data = json.loads(result.read_text(encoding="utf-8"))
+            data["handoff"]["rendered_evidence"]["paths"] = ["primary-task"]
+            result.write_text(json.dumps(data), encoding="utf-8")
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["evidence"]["primary-task"]["claim_types"].append("rendered_visual")
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "must be an approved artifact"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                )
+
+    def test_rendered_paths_cannot_use_an_artifact_label_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
+            data = json.loads(result.read_text(encoding="utf-8"))
+            data["handoff"]["rendered_evidence"]["paths"] = ["rendered-mobile"]
+            result.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "approved artifact path"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    policy_path=policy,
                 )
 
     def test_cli_requires_explicit_structure_only_or_bound_evidence(self) -> None:
@@ -153,22 +476,44 @@ class QualityResultTests(unittest.TestCase):
                 0,
             )
 
+    def test_cli_accepts_fully_bound_completion_and_rejects_legacy_evidence_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
+            common = [
+                str(result),
+                "--ledger",
+                str(ledger),
+                "--workspace-root",
+                str(workspace),
+                "--require-gate",
+                "novel-discovery",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    validate_quality_result.main(
+                        [*common, "--policy", str(policy)]
+                    ),
+                    0,
+                )
+                self.assertEqual(validate_quality_result.main(common), 1)
+
     def test_required_failure_makes_eligible_false_and_total_null(self) -> None:
         result = copy.deepcopy(self.example)
         result["hard_gates"][0]["status"] = "FAIL"
         result["hard_gates"][0]["evidence"] = ["failure.json"]
         result["eligible"] = False
-        result["coverage"]["required_passed"] = 1
+        result["coverage"]["required_passed"] = 2
         result["release"] = "PARTIALLY_VERIFIED"
-        self.assertEqual(validate_quality_result.validate_data(result), 2)
+        self.assertEqual(validate_quality_result.validate_data(result), 3)
 
     def test_ineligible_result_cannot_claim_verified(self) -> None:
         result = copy.deepcopy(self.example)
+        result["release"] = "VERIFIED"
         result["hard_gates"][0]["status"] = "UNVERIFIED"
         result["hard_gates"][0]["evidence"] = []
         result["eligible"] = False
-        result["coverage"]["required_passed"] = 1
-        result["coverage"]["evidence_items"] = 2
+        result["coverage"]["required_passed"] = 2
+        result["coverage"]["evidence_items"] = 3
         with self.assertRaisesRegex(validate_quality_result.QualityResultError, "release cannot"):
             validate_quality_result.validate_data(result)
 
@@ -193,6 +538,17 @@ class QualityResultTests(unittest.TestCase):
             "reason": "",
         }
         with self.assertRaisesRegex(validate_quality_result.QualityResultError, "requires a reason"):
+            validate_quality_result.validate_data(result)
+
+    def test_verified_release_requires_observed_rendering(self) -> None:
+        result = copy.deepcopy(self.example)
+        result["release"] = "VERIFIED"
+        result["handoff"]["rendered_evidence"] = {
+            "status": "UNVERIFIED",
+            "paths": [],
+            "reason": "No rendered browser evidence was captured.",
+        }
+        with self.assertRaisesRegex(validate_quality_result.QualityResultError, "requires OBSERVED"):
             validate_quality_result.validate_data(result)
 
     def test_symlink_and_oversized_input_are_rejected(self) -> None:

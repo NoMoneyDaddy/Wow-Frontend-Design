@@ -15,21 +15,33 @@
   "evidence": {
     "js-syntax": {
       "kind": "command",
-      "claim_types": ["syntax"],
+      "claim_types": ["syntax", "craft:code-quality"],
       "command": ["node", "--check", "app.js"],
       "command_sha256": "52b4e9033736622f5a39a47747da48229599dad8b7ca682f2c22a4b09f889d4c",
       "cwd": "workspace"
     },
     "browser-critical-path": {
       "kind": "command",
-      "claim_types": ["browser_behavior", "localization_rendered"],
+      "claim_types": ["browser_behavior", "localization_rendered", "gate:primary-task", "craft:usability-content"],
       "command": ["npx", "playwright", "test", "tests/critical-path.spec.ts"],
       "command_sha256": "4ce178e58c73954cf66a996cfea3abe74ba82e53cd4827dee5fa5f6f85d547e1",
       "cwd": "workspace"
     },
+    "desktop-default": {
+      "kind": "artifact",
+      "claim_types": ["rendered_visual", "craft:concept-coherence", "craft:visual-typography", "craft:originality"],
+      "artifact_kind": "screenshot",
+      "path": "artifacts/desktop-default.png",
+      "context": {
+        "route": "/",
+        "viewport": "1440x1000",
+        "locale": "zh-Hant",
+        "state": "default"
+      }
+    },
     "mobile-default": {
       "kind": "artifact",
-      "claim_types": ["rendered_visual"],
+      "claim_types": ["rendered_visual", "gate:rendered-mobile-layout", "craft:visual-typography", "craft:mobile-experience", "craft:localization"],
       "artifact_kind": "screenshot",
       "path": "artifacts/mobile-default.png",
       "context": {
@@ -38,6 +50,24 @@
         "locale": "zh-Hant",
         "state": "default"
       }
+    },
+    "mobile-interaction": {
+      "kind": "artifact",
+      "claim_types": ["rendered_visual", "gate:rendered-mobile-layout", "craft:mobile-experience"],
+      "artifact_kind": "screenshot",
+      "path": "artifacts/mobile-interaction.png",
+      "context": {
+        "route": "/",
+        "viewport": "390x844",
+        "locale": "zh-Hant",
+        "state": "interaction"
+      }
+    },
+    "novel-findings": {
+      "kind": "artifact",
+      "claim_types": ["gate:novel-discovery"],
+      "artifact_kind": "report",
+      "path": "artifacts/novel-findings.json"
     }
   }
 }

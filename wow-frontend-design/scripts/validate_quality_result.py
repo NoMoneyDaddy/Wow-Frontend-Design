@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import evidence_ledger
+import score_weak_model_output
 
 
 GATE_STATUSES = {"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"}
@@ -204,6 +205,8 @@ def validate_data(data: Any) -> int:
         raise QualityResultError("OBSERVED rendered evidence requires paths")
     if rendered["status"] == "UNVERIFIED" and not reason.strip():
         raise QualityResultError("UNVERIFIED rendered evidence requires a reason")
+    if root["release"] == "VERIFIED" and rendered["status"] != "OBSERVED":
+        raise QualityResultError("VERIFIED release requires OBSERVED rendered evidence")
     return len(gates)
 
 
@@ -219,51 +222,75 @@ def validate(path: Path) -> int:
     return validate_data(data)
 
 
-def _resolve_evidence_reference(
+def _resolve_policy_reference(
     reference: str,
-    commands: dict[str, dict[str, Any]],
-    artifacts: dict[str, dict[str, Any]],
-    artifacts_by_path: dict[str, dict[str, Any]],
-    ledger_root: Path,
-    workspace_root: Path,
+    claim_type: str,
+    events: dict[str, dict[str, Any]],
+    policy: dict[str, Any],
+    artifact_root: Path,
 ) -> None:
-    matches: list[tuple[str, dict[str, Any]]] = []
-    if reference in commands:
-        matches.append(("command", commands[reference]))
-    if reference in artifacts:
-        matches.append(("artifact", artifacts[reference]))
-    path_event = artifacts_by_path.get(reference)
-    if path_event is not None and all(path_event is not event for _, event in matches):
-        matches.append(("artifact", path_event))
-    if len(matches) != 1:
+    rules = policy["evidence"]
+    candidates = {reference} if reference in rules else set()
+    candidates.update(
+        candidate
+        for candidate, rule in rules.items()
+        if rule.get("kind") == "artifact" and rule.get("path") == reference
+    )
+    if len(candidates) != 1:
         raise QualityResultError(
-            f"evidence reference must resolve unambiguously to one latest ledger event: {reference}"
+            f"evidence reference is not unambiguously evaluator-approved: {reference}"
         )
-    kind, event = matches[0]
-    if kind == "command":
-        command_root = (ledger_root / event["cwd"]).resolve()
-        try:
-            command_root.relative_to(workspace_root)
-        except ValueError as error:
+
+    label = next(iter(candidates))
+    rule = rules[label]
+    event = events.get(label)
+    if claim_type == "rendered_visual":
+        if rule.get("kind") != "artifact":
+            raise QualityResultError(f"rendered evidence {label} must be an approved artifact")
+        if rule.get("path") != reference:
             raise QualityResultError(
-                f"evidence command ran outside the model workspace: {reference}"
-            ) from error
-        if event["exit_code"] != 0:
-            raise QualityResultError(f"evidence command did not pass: {reference}")
-        return
-    artifact_path = (ledger_root / event["path"]).resolve()
-    try:
-        artifact_path.relative_to(workspace_root)
-    except ValueError:
-        pass
-    else:
-        raise QualityResultError(
-            f"evidence artifact must remain outside the model workspace: {reference}"
+                f"rendered evidence must reference the approved artifact path: {reference}"
+            )
+    if rule.get("kind") == "command":
+        failure = score_weak_model_output.evidence_failure(
+            label,
+            claim_type,
+            "VERIFIED",
+            event,
+            rule,
+            policy["run_id"],
+            artifact_root,
         )
-    mismatch = evidence_ledger.verify_artifact_event(event, ledger_root)
-    if event.get("exists") is not True or mismatch:
+        if failure:
+            raise QualityResultError(failure)
+        return
+
+    if event is None:
+        raise QualityResultError(f"evidence label has no latest event: {label}")
+    try:
+        evidence_ledger.validate_event(event, policy["run_id"], label)
+    except evidence_ledger.LedgerError as error:
+        raise QualityResultError(f"evidence event is malformed: {error}") from error
+    if claim_type not in rule.get("claim_types", []):
+        raise QualityResultError(f"evidence label {label} cannot prove claim_type {claim_type}")
+    if rule.get("kind") != "artifact" or event.get("kind") != "artifact":
+        raise QualityResultError(f"evidence {label} must be an approved artifact")
+    if event.get("exists") is not True:
+        raise QualityResultError(f"evidence artifact is missing: {label}")
+    if event.get("artifact_kind") != rule.get("artifact_kind"):
+        raise QualityResultError(f"artifact kind does not match policy: {label}")
+    if event.get("path") != rule.get("path"):
+        raise QualityResultError(f"artifact path does not match policy: {label}")
+    expected_context = rule.get("context", {})
+    actual_context = event.get("context", {})
+    if not isinstance(expected_context, dict) or not isinstance(actual_context, dict) or any(
+        actual_context.get(key) != value for key, value in expected_context.items()
+    ):
+        raise QualityResultError(f"artifact context does not match policy: {label}")
+    mismatch = evidence_ledger.verify_artifact_event(event, artifact_root)
+    if mismatch:
         detail = mismatch or "artifact is absent"
-        raise QualityResultError(f"evidence artifact is invalid: {reference} ({detail})")
+        raise QualityResultError(f"evidence artifact is invalid: {label} ({detail})")
 
 
 def validate_with_ledger(
@@ -271,10 +298,13 @@ def validate_with_ledger(
     ledger_path: Path,
     workspace_root: Path,
     required_gates: tuple[str, ...] = (),
+    policy_path: Path | None = None,
 ) -> int:
-    """Validate result structure and bind every positive claim to evaluator facts."""
+    """Validate result structure and bind every positive claim to evaluator policy and facts."""
 
     count = validate(result_path)
+    if policy_path is None:
+        raise QualityResultError("completion validation requires an evaluator-owned evidence policy")
     workspace = workspace_root.expanduser().resolve(strict=True)
     if not workspace.is_dir() or workspace.is_symlink():
         raise QualityResultError("workspace root must be a real directory")
@@ -295,75 +325,57 @@ def validate_with_ledger(
     else:
         raise QualityResultError("evidence ledger must remain outside the model-writable workspace")
 
-    try:
-        ledger = evidence_ledger.load_ledger(ledger_file)
-    except evidence_ledger.LedgerError as error:
-        raise QualityResultError(f"evidence ledger is invalid: {error}") from error
     data = json.loads(result_path.read_text(encoding="utf-8"))
+    try:
+        events, policy, artifact_root = score_weak_model_output.load_evaluator_context(
+            ledger_file,
+            policy_path,
+            workspace,
+            None,
+            None,
+        )
+    except (ValueError, evidence_ledger.LedgerError) as error:
+        raise QualityResultError(f"evaluator policy is invalid: {error}") from error
+    if policy is None or artifact_root is None:
+        raise QualityResultError("completion validation requires an evaluator-owned evidence policy")
+    if data["release"] == "VERIFIED" and policy["release_acceptance"]["decision"] != "accepted_by_evaluator":
+        raise QualityResultError("VERIFIED release requires evaluator acceptance in the evidence policy")
+
     gates = {gate["id"]: gate for gate in data["hard_gates"]}
-    missing_gates = sorted(set(required_gates) - set(gates))
+    effective_required_gates = set(required_gates)
+    if data["release"] == "VERIFIED":
+        effective_required_gates.add("novel-discovery")
+    missing_gates = sorted(effective_required_gates - set(gates))
     if missing_gates:
         raise QualityResultError(f"required hard gates are missing: {missing_gates}")
-    for gate_id in required_gates:
+    for gate_id in effective_required_gates:
         gate = gates[gate_id]
         if not gate["required"] or not gate["applicable"] or gate["status"] != "PASS":
             raise QualityResultError(f"required hard gate did not pass: {gate_id}")
 
-    # Evidence ledgers are append-only because repair loops may rerun the same
-    # gate. Match evidence_ledger.check_command(): the latest event of each
-    # kind is authoritative, while reusing one label across kinds is ambiguous.
-    commands: dict[str, dict[str, Any]] = {}
-    artifacts: dict[str, dict[str, Any]] = {}
-    artifacts_by_path: dict[str, dict[str, Any]] = {}
-    for event in ledger["events"]:
-        if event["kind"] == "command":
-            commands[event["label"]] = event
-        else:
-            artifacts[event["label"]] = event
-            artifacts_by_path[event["path"]] = event
-    overlap = sorted(set(commands) & set(artifacts))
-    if overlap:
-        raise QualityResultError(f"ledger evidence labels are ambiguous: {overlap}")
-
-    references: list[str] = []
+    references: list[tuple[str, str]] = []
     for gate in data["hard_gates"]:
         if gate["status"] == "PASS":
-            references.extend(gate["evidence"])
+            references.extend((reference, f"gate:{gate['id']}") for reference in gate["evidence"])
     for dimension in data["craft"]["dimensions"]:
         if dimension["status"] != "UNVERIFIED":
-            references.extend(dimension["evidence"])
+            references.extend(
+                (reference, f"craft:{dimension['id']}") for reference in dimension["evidence"]
+            )
     award = data["award_lens"]
     if award is not None and award["status"] == "OBSERVED":
-        references.extend(award["evidence"])
-    for reference in dict.fromkeys(references):
-        _resolve_evidence_reference(
-            reference,
-            commands,
-            artifacts,
-            artifacts_by_path,
-            ledger_file.parent,
-            workspace,
-        )
-
+        references.extend((reference, "award-lens") for reference in award["evidence"])
     rendered = data["handoff"]["rendered_evidence"]
     if rendered["status"] == "OBSERVED":
-        for path in rendered["paths"]:
-            event = artifacts_by_path.get(path)
-            if event is None:
-                raise QualityResultError(f"rendered evidence path is absent from ledger: {path}")
-            artifact_path = (ledger_file.parent / event["path"]).resolve()
-            try:
-                artifact_path.relative_to(workspace)
-            except ValueError:
-                pass
-            else:
-                raise QualityResultError(
-                    f"rendered evidence must remain outside the model workspace: {path}"
-                )
-            mismatch = evidence_ledger.verify_artifact_event(event, ledger_file.parent)
-            if event.get("exists") is not True or mismatch:
-                detail = mismatch or "artifact is absent"
-                raise QualityResultError(f"rendered evidence is invalid: {path} ({detail})")
+        references.extend((path, "rendered_visual") for path in rendered["paths"])
+    for reference, claim_type in dict.fromkeys(references):
+        _resolve_policy_reference(
+            reference,
+            claim_type,
+            events,
+            policy,
+            artifact_root,
+        )
     return count
 
 
@@ -371,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("result", type=Path)
     parser.add_argument("--ledger", type=Path)
+    parser.add_argument("--policy", type=Path)
     parser.add_argument("--workspace-root", type=Path)
     parser.add_argument("--require-gate", action="append", default=[])
     parser.add_argument(
@@ -381,14 +394,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.structure_only:
-            if args.ledger is not None or args.workspace_root is not None or args.require_gate:
+            if args.ledger is not None or args.policy is not None or args.workspace_root is not None or args.require_gate:
                 raise QualityResultError("--structure-only cannot be combined with evidence options")
             count = validate(args.result.expanduser())
             print(f"quality result structure valid: {count} hard gates; evidence not checked")
             return 0
-        if args.ledger is None or args.workspace_root is None:
+        if args.ledger is None or args.policy is None or args.workspace_root is None:
             raise QualityResultError(
-                "completion validation requires --ledger and --workspace-root; "
+                "completion validation requires --ledger, --policy, and --workspace-root; "
                 "use --structure-only only for legacy shape checks"
             )
         count = validate_with_ledger(
@@ -396,6 +409,7 @@ def main(argv: list[str] | None = None) -> int:
             args.ledger,
             args.workspace_root,
             tuple(args.require_gate),
+            args.policy,
         )
     except (OSError, UnicodeError, json.JSONDecodeError, QualityResultError) as error:
         print(f"quality result invalid: {error}", file=sys.stderr)
