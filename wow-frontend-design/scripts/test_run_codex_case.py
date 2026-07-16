@@ -289,6 +289,8 @@ fi
                     "Dollar signs, asterisks, question marks, square brackets, curly braces, and backticks are forbidden anywhere in the command string, including quoted code or regular expressions",
                     prompt,
                 )
+                self.assertIn("Do not use inline python -c, node -e, heredocs", prompt)
+                self.assertIn("skip that optional check and leave it to the evaluator-owned post-run gates", prompt)
                 target = root / "evals" / f"codex-{model}-harbor-cold-chain-v4"
                 manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
                 self.assertEqual(model, manifest["model"]["requested_identifier"])
