@@ -674,6 +674,36 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                                     }
                                 ],
                             },
+                            {
+                                "caseId": "layout-void-v6",
+                                "page": "story.html",
+                                "viewport": "desktop",
+                                "state": "base",
+                                "visualIssues": ["layout_column_void"],
+                                "layoutFlow": {
+                                    "unfilledColumnVoids": [
+                                        {
+                                            "target": "article-copy",
+                                            "voidHeight": 936,
+                                            "threshold": 300,
+                                            "parentDisplay": "grid",
+                                            "parentWidth": 1180,
+                                        }
+                                    ]
+                                },
+                            },
+                            {
+                                "caseId": "small-text-v7",
+                                "page": "details.html",
+                                "viewport": "mobile",
+                                "state": "base",
+                                "visualIssues": ["readable_text_below_12px"],
+                                "textScale": {
+                                    "undersizedReadableText": [
+                                        {"text": "這是一段需要持續閱讀的產品說明。", "fontSize": 11, "hook": "details"}
+                                    ]
+                                },
+                            },
                         ],
                         "crossPageComparisons": [],
                     },
@@ -685,15 +715,24 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 {
                     "oral-history-archive-v6:codex-gpt-5.4-mini": ["prose_track_underfilled"],
                     "packaging-configurator-v6:codex-gpt-5.4-mini": ["fixed_or_sticky_content_obstruction"],
+                    "layout-void-v6:codex-gpt-5.4-mini": ["layout_column_void"],
+                    "small-text-v7:codex-gpt-5.4-mini": ["readable_text_below_12px"],
                 },
                 report,
             )
         oral = feedback["oral-history-archive-v6"]
         packaging = feedback["packaging-configurator-v6"]
+        layout_void = feedback["layout-void-v6"]
+        small_text = feedback["small-text-v7"]
         self.assertIn("archive.html/desktop/base", oral)
         self.assertIn("trackRatio=0.51", oral)
         self.assertIn("summary.html/desktop/base", packaging)
         self.assertIn("overlaps='目前配置'", packaging)
+        self.assertIn("story.html/desktop/base", layout_void)
+        self.assertIn("voidHeight=936", layout_void)
+        self.assertIn("target='article-copy'", layout_void)
+        self.assertIn("details.html/mobile/base", small_text)
+        self.assertIn("fontSize=11", small_text)
         self.assertTrue(all(len(value) <= 500 and "\n" not in value for value in feedback.values()))
 
     def test_visual_repair_feedback_normalizes_long_interaction_exception(self) -> None:

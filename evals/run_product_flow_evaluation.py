@@ -30,7 +30,7 @@ from evidence_ledger import LedgerError, png_metadata  # noqa: E402
 
 MATRIX_RUNNER = ROOT / "evals" / "run_product_flow_matrix.py"
 DESIGN_LINTER = ROOT / "evals" / "lint_design_md_matrix.py"
-VISUAL_AUDITOR = ROOT / "evals" / "playwright_visual_v6_audit.cjs"
+VISUAL_AUDITOR = ROOT / "evals" / "playwright_visual_v7_audit.cjs"
 CASE_PAGES = {
     "wind-maintenance-dispatch-v6": ("index.html",),
     "type-foundry-specimen-v6": ("index.html",),
@@ -700,6 +700,14 @@ def _visual_issue_detail(result: dict[str, Any], code: str) -> str:
                 f"{code}@{location} text={_one_line(block.get('text', ''), 56)!r} "
                 f"trackRatio={block.get('trackRatio')} unusedInline={block.get('unusedInline')}"
             )
+    if code == "readable_text_below_12px":
+        items = result.get("textScale", {}).get("undersizedReadableText", [])
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            item = items[0]
+            return (
+                f"{code}@{location} text={_one_line(item.get('text', ''), 56)!r} "
+                f"fontSize={item.get('fontSize')} hook={_one_line(item.get('hook', ''), 40)!r}"
+            )
     if code in {"wide_heading_track_underfilled", "cjk_heading_overcompressed", "cjk_heading_orphan_line"}:
         key = {
             "wide_heading_track_underfilled": "underfilledWideHeadings",
@@ -731,6 +739,15 @@ def _visual_issue_detail(result: dict[str, Any], code: str) -> str:
             if isinstance(overlaps, list) and overlaps and isinstance(overlaps[0], dict):
                 overlap_text = _one_line(overlaps[0].get("text", ""), 56)
             return f"{code}@{location} position={obstruction.get('position')} overlaps={overlap_text!r}"
+    if code == "layout_column_void":
+        voids = result.get("layoutFlow", {}).get("unfilledColumnVoids", [])
+        if isinstance(voids, list) and voids and isinstance(voids[0], dict):
+            void = voids[0]
+            return (
+                f"{code}@{location} target={_one_line(void.get('target', ''), 56)!r} "
+                f"voidHeight={void.get('voidHeight')} threshold={void.get('threshold')} "
+                f"parentDisplay={void.get('parentDisplay')} parentWidth={void.get('parentWidth')}"
+            )
     if code == "zh_hant_untranslated_interface_copy":
         copies = result.get("localeFlow", {}).get("untranslatedInterfaceCopy", [])
         if isinstance(copies, list) and copies and isinstance(copies[0], dict):

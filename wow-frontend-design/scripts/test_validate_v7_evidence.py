@@ -11,6 +11,7 @@ import tempfile
 import unittest
 import zlib
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,59 @@ class V7EvidenceTests(unittest.TestCase):
         inventory = evidence.expected_inventory(self.manifest(2), "development")
         self.assertEqual(60, len(inventory))
         self.assertEqual(30, len([item for item in inventory if item[1] == "case-1"]))
+
+    def test_fast_gate_requires_exact_development_inventory(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(2), "development", "fast")
+        self.assertEqual(16, len(inventory))
+        self.assertEqual({"accepted", "candidate"}, {item[0] for item in inventory})
+        self.assertEqual({"base", "interaction"}, {item[2] for item in inventory})
+        self.assertEqual({"desktop", "mobile"}, {item[3] for item in inventory})
+        self.assertEqual({"chromium"}, {item[4] for item in inventory})
+
+    def test_unknown_gate_fails_closed(self) -> None:
+        with self.assertRaisesRegex(evidence.V7EvidenceError, "unknown visual gate"):
+            evidence.expected_inventory(self.manifest(2), "development", "partial")
+
+    def test_validator_rejects_mixed_gate_before_artifact_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text("{}", encoding="utf-8")
+            ledger_path = root / "ledger.json"
+            ledger_path.write_text("{}", encoding="utf-8")
+            result_dir = root / "results"
+            screenshot_dir = root / "screenshots"
+            result_dir.mkdir()
+            screenshot_dir.mkdir()
+            manifest = self.manifest(2)
+            ledger = {
+                "schema_version": 1,
+                "cohort_manifest": {
+                    "path": "manifest.json",
+                    "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                },
+                "split": "development",
+                "gate": "fast",
+                "status": "completed",
+                "variants": list(evidence.VARIANTS),
+                "expected_count": 16,
+                "hidden_matrix_sha256": "0" * 64,
+                "input_inventory_sha256": "0" * 64,
+                "attempts": [],
+            }
+            with (
+                mock.patch.object(evidence.preflight, "validate_manifest"),
+                mock.patch.object(evidence, "_load", side_effect=[manifest, ledger]),
+                self.assertRaisesRegex(evidence.V7EvidenceError, "gate does not match"),
+            ):
+                evidence.validate(
+                    manifest_path,
+                    ledger_path,
+                    result_dir,
+                    screenshot_dir,
+                    root,
+                    "full",
+                )
 
     def test_base_uses_six_chromium_profiles(self) -> None:
         inventory = evidence.expected_inventory(self.manifest(1), "development")

@@ -38,6 +38,7 @@ GENERATION_PATH = "evals/product-flow-v6-repaired-v2-generation-results.json"
 DESIGN_PATH = "evals/product-flow-v6-repaired-v2-design-md-results.json"
 AUDITOR_PATH = "evals/playwright_visual_v6_audit.cjs"
 SCREENSHOT_ROOT = "assets/product-flow-v6"
+FROZEN_SKILL_PATH = "evals/provenance/wow-frontend-design-skill-8d987fa54182ee4359fd7f1e309cab3462ca01a4e5d7098d5a935e873e26c6c5.md"
 
 
 class ProductFlowV6EvidenceError(ValueError):
@@ -219,7 +220,7 @@ def _validate_generation(root: Path, path: Path, visual_path: Path) -> None:
             visual = provenance.get("visual_report")
             note = provenance.get("research_note")
             for record, expected_path, label in (
-                (skill, "wow-frontend-design/SKILL.md", f"repair Skill {case_id}"),
+                (skill, FROZEN_SKILL_PATH, f"repair Skill {case_id}"),
                 (note, "evals/product-flow-v6-latest-skill-repair.md", f"repair research note {case_id}"),
             ):
                 if not isinstance(record, dict) or record.get("path") != expected_path:
@@ -436,6 +437,7 @@ def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
             not isinstance(layout_flow, dict)
             or layout_flow.get("domOrderReversals") != []
             or layout_flow.get("displacedIntroCopy") != []
+            or layout_flow.get("unfilledColumnVoids", []) != []
         ):
             raise ProductFlowV6EvidenceError(f"layout flow repair finding remains for {key}")
         locale_flow = result.get("localeFlow")

@@ -29,6 +29,7 @@
         "wow-frontend-design/scripts/runtime_downgrade.py",
         "wow-frontend-design/scripts/score_weak_model_output.py",
         "wow-frontend-design/scripts/search_discovery_audit.py",
+        "wow-frontend-design/scripts/source_layout_audit.py",
         "wow-frontend-design/scripts/validate_capability_status.py",
         "wow-frontend-design/scripts/validate_dashboard_evidence.py",
         "wow-frontend-design/scripts/validate_external_sources.py",

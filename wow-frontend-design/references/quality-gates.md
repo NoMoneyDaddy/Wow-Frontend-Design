@@ -55,6 +55,12 @@ For accessibility regression reports, distinguish `new`, `fixed`, `pre-existing`
 
 Source inspection can suggest risk. It cannot prove rendered layout, touch size, focus visibility, contrast over motion, or absence of overflow. Automated scans and sampled route matrices cannot establish WCAG conformance by themselves; assess every applicable A/AA criterion across complete pages, responsive variations, and complete processes.
 
+Before rendered verification, run the dependency-free source layout risk audit when the project contains supported HTML/template/style files:
+
+    python3 <skill-dir>/scripts/source_layout_audit.py <project-root> --authorized-root <workspace-root>
+
+Use its file/line evidence to inspect forced body breaks, globally destructive CJK breaking, prose wrapping disabled in CSS, Latin-`ch` heading measures, and fixed-height text clipping. Medium findings are review candidates. High findings may enter automatic repair only after checking selector scope and intended role. Always confirm the result with computed browser geometry and matched screenshots; source text alone cannot prove a rendered defect or a successful repair.
+
 When rendering is unavailable, route through [no-visual-first-pass.md](no-visual-first-pass.md). Browserless checks may release a low-risk artifact only with an explicit evidence ceiling; they cannot earn rendered-visual, browser, touch, assistive-technology, or formal-conformance acceptance. A structured high-risk no-visual result must be `blocked` or match an `accepted_by_evaluator` record in the evaluator-owned policy; builder-authored acceptance is invalid.
 
 ## 2. Three-pass review
@@ -132,6 +138,8 @@ Build a compact matrix for the routes in scope. Use three layers instead of clai
 | Key workflow complete |  |  |  |  |  |  |  |  |
 
 Adapt rows to the product. Record why a row/cell is applicable, sampled, or excluded. Never test only the happy homepage, and never turn a sampled matrix into an all-routes or formal-conformance claim.
+
+Do not impose one screenshot quota on every user project. During an automatic repair, first recapture the failed route/state at one representative desktop and one true mobile browser profile. When that narrow result passes, run the affected breakpoints, states, locales, engines, and routes selected by the diff and declared support. A broad refactor expands the affected matrix because shared tokens, primitives, routing, state ownership, or layout foundations have greater blast radius. A release or formal support claim still requires the complete declared matrix.
 
 ## 4. Layered quality decision
 

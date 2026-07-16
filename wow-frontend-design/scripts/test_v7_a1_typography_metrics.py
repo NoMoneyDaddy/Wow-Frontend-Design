@@ -34,6 +34,9 @@ class V7A1TypographyMetricsTests(unittest.TestCase):
         {"id": "gap-281", "selector": "#gap-281", "ownerSelector": "#owner-gap-281", "role": "heading", "mode": "product"},
         {"id": "control", "selector": "#control-heading", "ownerSelector": "#owner-control", "role": "heading", "mode": "product"},
         {"id": "ruby", "selector": "#ruby-heading", "ownerSelector": "#owner-ruby", "role": "heading", "mode": "product"},
+        {"id": "void-column", "selector": "#void-column-heading", "ownerSelector": "#void-column-owner", "role": "heading", "mode": "editorial"},
+        {"id": "balanced-column", "selector": "#balanced-column-heading", "ownerSelector": "#balanced-column-owner", "role": "heading", "mode": "editorial"},
+        {"id": "nested-column", "selector": "#nested-column-copy", "ownerSelector": "#nested-column-owner", "role": "prose", "mode": "editorial"},
     ]
 
     @classmethod
@@ -107,6 +110,14 @@ const { auditV7A1Typography, validateSpecs } = require(process.argv[1]);
         self.assertNotIn(("control", "a1_heading_han_orphan"), self.codes)
         self.assertEqual("驗證", self.targets["ruby"]["lastLineText"])
         self.assertNotIn(("ruby", "a1_heading_han_orphan"), self.codes)
+
+    def test_large_unfilled_side_by_side_column_is_a_hard_layout_issue(self) -> None:
+        self.assertIn(("void-column", "a1_layout_column_void"), self.codes)
+        self.assertGreater(self.targets["void-column"]["columnVoid"]["voidHeight"], 600)
+        self.assertNotIn(("balanced-column", "a1_layout_column_void"), self.codes)
+        self.assertIsNone(self.targets["balanced-column"]["columnVoid"])
+        self.assertIn(("nested-column", "a1_layout_column_void"), self.codes)
+        self.assertEqual("target", self.targets["nested-column"]["columnVoid"]["source"])
 
     def test_fonts_are_ready_before_measurement(self) -> None:
         self.assertEqual("loaded", self.result["environment"]["fontsStatus"])

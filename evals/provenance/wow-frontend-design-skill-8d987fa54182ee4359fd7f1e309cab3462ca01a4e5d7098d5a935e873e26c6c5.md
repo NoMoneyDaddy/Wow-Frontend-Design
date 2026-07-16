@@ -1,27 +1,15 @@
 ---
 name: wow-frontend-design
-description: >-
-  Plan, design, build, audit, repair, or refactor distinctive production-oriented web frontends as an integrated product manager, UX designer, UI designer, and frontend engineer. Use for new websites or existing projects: product UI, landing pages, portfolios, dashboards, commerce, design systems, visual redesigns, responsive UX, Traditional Chinese localization and typography, accessibility, motion, creative direction, UI polish, controlled frontend refactoring, or anti-generic frontend work. Supports automatic, checkpoint-guided, or user-directed delivery; adapts to detected frameworks and available tools while keeping verification evidence-bounded.
+description: Design, build, audit, or refactor distinctive production-oriented web frontends with first-class Traditional Chinese and true mobile composition. Use for websites, product UI, landing pages, portfolios, dashboards, commerce, design systems, visual redesigns, responsive UX, localization, accessibility, motion, creative direction, UI polish, or anti-generic frontend work. Adapts to the detected framework and available tools; verification claims remain evidence-bounded.
 license: MIT
 metadata:
   author: NoMoneyDaddy
-  version: "0.3.0"
+  version: "0.2.0"
 ---
 
 # WOW Frontend Design
 
 Create coherent experiences, not decorated templates. Make the product useful first, then make its identity unmistakable.
-
-## Integrated product team
-
-Operate as one coordinated product manager, UX designer, UI designer, and frontend engineer:
-
-- Product management frames the outcome, scope, priorities, constraints, decision points, acceptance contract, progress, and handoff.
-- UX defines information architecture, task/content order, reachable states, recovery, mobile transformation, and testable usability hypotheses.
-- UI establishes or preserves the visual thesis, `DESIGN.md`, type, color, spacing, composition, components, responsive behavior, and motion.
-- Frontend engineering detects the installed stack, implements or incrementally refactors maintainable code, protects public behavior, verifies it, and automatically repairs evidenced failures.
-
-Run all four responsibilities at a depth proportional to the request. Planning artifacts and UX reasoning are hypotheses until supported by actual user research or usability evidence; never describe model-generated personas, journeys, or design judgments as observed users. Working code and rendered evidence remain required when implementation is requested.
 
 ## Non-negotiable contract
 
@@ -96,19 +84,11 @@ Classify the mutation boundary:
 
 - AUDIT: read-only findings and evidence.
 - BUILD: new/empty product.
-- RETROFIT: take over an existing frontend and preserve its declared contracts while modifying or refactoring its implementation, design system, composition, or UX.
+- RETROFIT: preserve behavior while changing system or UX.
 - POLISH: bounded hierarchy/type/spacing/motion refinement.
 - REPAIR: fix an evidenced defect.
 
-Treat the scanner's `mode_hint` as file evidence, not the whole task decision. An empty authorized project normally enters BUILD. A recognized existing frontend enters AUDIT, REPAIR, POLISH, or RETROFIT according to the user's requested outcome. An unrecognized non-empty root requires bounded inspection; never overwrite it as a new build. RETROFIT includes controlled refactoring when the user asks for it or measured structural debt prevents the requested result. Choose and record the smallest sufficient intervention depth: surface, system, composition, experience, or architecture.
-
-Select the collaboration mode from the user's request; do not ask the model to infer its own capability:
-
-- AUTOMATIC: inspect, propose up to three materially distinct directions when needed, choose the safest reversible default, implement, verify, and repair without routine pauses. Stop only for a material scope/authority decision named by the contract.
-- CHECKPOINT-GUIDED: the default when a material direction remains unresolved. Ask at no more than the meaningful direction, refactor-depth/public-contract, and final-candidate checkpoints; automate the work between them.
-- USER-DIRECTED: when the user already specifies direction or implementation constraints, summarize them as the working contract and proceed without asking the same questions again.
-
-Record what must stay, what may change, migration/rollback needs, and the evidence required at the chosen depth. Preserve existing framework, routes, public component/API contracts, data/state semantics, business rules, analytics, accessibility behavior, and conventions unless the requested outcome explicitly changes them. Internal modules, tokens, CSS architecture, component boundaries, and page composition may be refactored inside the authorized depth. A framework migration, public contract change, content/data deletion, or destructive rewrite is a separate material scope decision; do not infer it from a request to improve design or refactor code.
+Record what must stay, what may change, and the evidence needed. Preserve existing framework, routes, APIs, business logic, analytics, and conventions unless the requested outcome requires a named change.
 
 Inventory workspace, shell, package manager/lockfile, runtime, browser/screenshot, loopback, network, and write boundaries. If the caller supplies an evaluator-owned capability profile, use scripts/route_model.py; never synthesize a tier from model identity or confidence. Apply only evaluator-owned runtime events through scripts/runtime_downgrade.py. Runtime observation may keep or lower a lane, never promote it.
 
@@ -132,8 +112,6 @@ Before implementation, record terse working decisions:
 8. mobile reorder/replacement/deferral/thumb-reach transformation.
 
 Use real brand/product evidence; do not infer demographics or copy a reference. Compare two, occasionally three, directions only when a material choice is unresolved. Focused repairs inherit the existing direction.
-
-When a direction choice is material and still unresolved, present the options in product language: concept, what remains recognizable, layout/interaction consequences, mobile behavior, refactor/migration cost, and primary risk. In CHECKPOINT-GUIDED mode, ask the user to select. In AUTOMATIC mode, record why the chosen reversible option best satisfies the acceptance contract and continue. Do not ask for a visual preference that the brief or existing system already answered.
 
 When implementation creates or changes a visual system, create or update repository-root DESIGN.md before page composition. Extract approved evidence, replace every template example, keep official token frontmatter, and map normative roles to shared runtime tokens/primitives. Preflight required fields, quoted values, dimensional zeros, role references, foreground/background contrast, and allowed properties. Run the repository-pinned official lint immediately when available; a generated system proceeds only at zero errors and warnings. Re-run after token changes.
 

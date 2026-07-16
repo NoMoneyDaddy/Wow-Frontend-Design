@@ -27,6 +27,8 @@ PREFLIGHT_SPEC.loader.exec_module(preflight)
 
 SHA256 = re.compile(r"[0-9a-f]{64}")
 VARIANTS = ("accepted", "candidate")
+GATES = ("fast", "full")
+FAST_PROFILES = ("desktop", "mobile")
 BASE_PROFILES = ("desktop", "standard-desktop", "short-desktop", "tablet", "mobile", "compact-mobile")
 PARITY_PROFILES = ("desktop", "short-desktop", "mobile")
 PARITY_ENGINES = ("chromium", "firefox", "webkit")
@@ -42,6 +44,7 @@ LEDGER_KEYS = {
     "schema_version",
     "cohort_manifest",
     "split",
+    "gate",
     "status",
     "variants",
     "expected_count",
@@ -88,7 +91,13 @@ def artifact_stem(key: tuple[str, str, str, str, str]) -> str:
     return "--".join(key)
 
 
-def expected_inventory(manifest: dict[str, Any], split: str) -> list[tuple[str, str, str, str, str]]:
+def expected_inventory(
+    manifest: dict[str, Any],
+    split: str,
+    gate: str = "full",
+) -> list[tuple[str, str, str, str, str]]:
+    if gate not in GATES:
+        raise V7EvidenceError(f"unknown visual gate: {gate}")
     splits = manifest.get("splits")
     if not isinstance(splits, dict) or split not in splits or not isinstance(splits[split], list):
         raise V7EvidenceError(f"unknown split: {split}")
@@ -100,11 +109,16 @@ def expected_inventory(manifest: dict[str, Any], split: str) -> list[tuple[str, 
         if set(states) != {"base", "interaction"}:
             raise V7EvidenceError(f"case {case['id']} must freeze base and interaction states")
         for variant in VARIANTS:
-            for profile in BASE_PROFILES:
-                inventory.add(_key(variant, case["id"], "base", profile, "chromium"))
-            for profile in PARITY_PROFILES:
-                for engine in PARITY_ENGINES:
-                    inventory.add(_key(variant, case["id"], "interaction", profile, engine))
+            if gate == "fast":
+                for state in ("base", "interaction"):
+                    for profile in FAST_PROFILES:
+                        inventory.add(_key(variant, case["id"], state, profile, "chromium"))
+            else:
+                for profile in BASE_PROFILES:
+                    inventory.add(_key(variant, case["id"], "base", profile, "chromium"))
+                for profile in PARITY_PROFILES:
+                    for engine in PARITY_ENGINES:
+                        inventory.add(_key(variant, case["id"], "interaction", profile, engine))
     return sorted(inventory)
 
 
@@ -256,6 +270,7 @@ def validate(
     result_dir: Path,
     screenshot_dir: Path,
     repository_root: Path,
+    gate: str = "full",
 ) -> tuple[int, int]:
     root = repository_root.resolve(strict=True)
     preflight.validate_manifest(manifest_path, root)
@@ -269,7 +284,9 @@ def validate(
     split = ledger.get("split")
     if not isinstance(split, str):
         raise V7EvidenceError("visual ledger split is invalid")
-    expected = expected_inventory(manifest, split)
+    if ledger.get("gate") != gate:
+        raise V7EvidenceError("visual ledger gate does not match requested gate")
+    expected = expected_inventory(manifest, split, gate)
     if ledger.get("variants") != list(VARIANTS) or ledger.get("expected_count") != len(expected):
         raise V7EvidenceError("visual ledger inventory contract changed")
     if not isinstance(ledger.get("hidden_matrix_sha256"), str) or SHA256.fullmatch(ledger["hidden_matrix_sha256"]) is None:
@@ -364,6 +381,7 @@ def main() -> int:
     parser.add_argument("--result-dir", required=True, type=Path)
     parser.add_argument("--screenshot-dir", required=True, type=Path)
     parser.add_argument("--repository-root", type=Path, default=ROOT)
+    parser.add_argument("--gate", choices=GATES, default="full")
     args = parser.parse_args()
     try:
         count, findings = validate(
@@ -372,6 +390,7 @@ def main() -> int:
             args.result_dir.resolve(strict=True),
             args.screenshot_dir.resolve(strict=True),
             args.repository_root.resolve(strict=True),
+            args.gate,
         )
     except (OSError, V7EvidenceError, preflight.PreflightError) as error:
         print(f"v7 evidence invalid: {error}", file=sys.stderr)

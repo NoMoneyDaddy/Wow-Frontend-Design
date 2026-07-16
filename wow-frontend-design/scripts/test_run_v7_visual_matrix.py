@@ -19,6 +19,16 @@ SPEC.loader.exec_module(runner)
 
 
 class V7VisualMatrixTests(unittest.TestCase):
+    def test_gate_inventory_defaults_to_full_and_fast_is_sixteen(self) -> None:
+        cohort = {
+            "splits": {"development": [
+                {"id": "case-one", "required_states": ["base", "interaction"]},
+                {"id": "case-two", "required_states": ["base", "interaction"]},
+            ]},
+        }
+        self.assertEqual(60, len(runner.evidence.expected_inventory(cohort, "development")))
+        self.assertEqual(16, len(runner.evidence.expected_inventory(cohort, "development", "fast")))
+
     def test_hidden_matrix_must_stay_outside_repository(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as directory:
             path = Path(directory) / "matrix.json"

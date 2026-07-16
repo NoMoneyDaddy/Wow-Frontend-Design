@@ -23,6 +23,14 @@
       .peer { position: absolute; inset-inline-end: 0; inset-block-start: 0; inline-size: 180px; min-block-size: 32px; }
       #gap-280 { inline-size: 455px; margin-inline-start: 25px; }
       #gap-281 { inline-size: 454px; margin-inline-start: 25px; }
+      .column-layout { display: grid; grid-template-columns: 600px 360px; gap: 40px; inline-size: 1000px; align-items: start; }
+      .column-owner { min-block-size: 240px; padding: 16px; background: #eee; }
+      .column-peer-tall { min-block-size: 900px; background: #ddd; }
+      .column-owner-balanced { min-block-size: 620px; padding: 16px; background: #eee; }
+      .column-peer-balanced { min-block-size: 700px; background: #ddd; }
+      .nested-column-owner { display: grid; grid-template-columns: 600px 360px; gap: 40px; inline-size: 1000px; align-items: start; }
+      .nested-column-copy { min-block-size: 260px; padding: 16px; background: #eee; }
+      .nested-column-peer { min-block-size: 860px; background: #ddd; }
     </style>
   </head>
   <body>
@@ -42,5 +50,8 @@
     <section class="owner owner-760" id="owner-gap-281"><h1 id="gap-281">市場攤商過敏查核流程與處置摘要</h1></section>
     <section class="owner owner-512" id="owner-control"><button><h2 id="control-heading">送出<br>查</h2></button></section>
     <section class="owner owner-512" id="owner-ruby"><h2 id="ruby-heading">資料<ruby>核<rt>ㄏㄜˊ</rt></ruby><br>驗證</h2></section>
+    <section class="column-layout" id="void-column-layout"><article class="column-owner" id="void-column-owner"><h2 id="void-column-heading">導讀文章</h2></article><aside class="column-peer-tall">直排展示</aside></section>
+    <section class="column-layout" id="balanced-column-layout"><article class="column-owner-balanced" id="balanced-column-owner"><h2 id="balanced-column-heading">導讀文章</h2></article><aside class="column-peer-balanced">相關內容</aside></section>
+    <section class="nested-column-owner" id="nested-column-owner"><div class="nested-column-copy" id="nested-column-copy">這是一段會先結束的導讀文字。</div><aside class="nested-column-peer">直排展示</aside></section>
   </body>
 </html>

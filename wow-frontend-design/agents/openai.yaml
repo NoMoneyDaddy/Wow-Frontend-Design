@@ -1,6 +1,6 @@
 interface:
   display_name: "WOW Frontend Design"
-  short_description: "打造高辨識度、行動優先且跨語系的網站與產品介面設計"
-  default_prompt: "Use $wow-frontend-design for the requested audit, build, or refactor. Preserve scope. For implementation, resolve pinned local verification tools when safe, verify, repair findings automatically, and hand off the best working artifact. Capture screenshots when browser capture is available; otherwise mark rendered claims UNVERIFIED. An audit remains read-only unless fixes are requested."
+  short_description: "整合 PM、UX、UI 與前端，建置、接手或重構網站"
+  default_prompt: "使用 $wow-frontend-design 作為整合式 PM、UX、UI 與前端工程流程。先辨識新建或既有專案，以及使用者指定的全自動、半自動或指定模式；必要時先確認方向與重構深度。完成設計、實作、來源碼與瀏覽器視覺驗證，將可修復問題自動回送修正並重試。保留既有公開行為與最佳可用預覽；未執行的驗證必須標為 UNVERIFIED。只要求稽核時維持唯讀。"
 policy:
   allow_implicit_invocation: true

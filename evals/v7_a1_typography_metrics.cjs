@@ -121,6 +121,44 @@ function auditV7A1Typography(specs) {
   const issues = [];
   const observations = [];
   const targets = [];
+  const flaggedVoidOwners = new Set();
+  const columnVoid = (owner) => {
+    const parent = owner.parentElement;
+    if (!parent || parent === document.body || !visible(parent)) return null;
+    const parentStyle = getComputedStyle(parent);
+    if (!["grid", "inline-grid", "flex", "inline-flex"].includes(parentStyle.display)) return null;
+    const ownerRect = owner.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    if (ownerRect.width >= parentRect.width * 0.8 || ownerRect.height < 120) return null;
+    const siblings = [...parent.children].filter((item) => item !== owner && visible(item));
+    const sidePeers = siblings.map((item) => ({ item, rect: item.getBoundingClientRect() })).filter(({ rect }) => {
+      const horizontalOverlap = Math.max(0, Math.min(ownerRect.right, rect.right) - Math.max(ownerRect.left, rect.left));
+      return horizontalOverlap <= Math.min(ownerRect.width, rect.width) * 0.2
+        && rect.top <= ownerRect.bottom + 64
+        && rect.bottom > ownerRect.bottom;
+    });
+    if (!sidePeers.length) return null;
+    const peerBottom = Math.max(...sidePeers.map(({ rect }) => rect.bottom));
+    const voidHeight = peerBottom - ownerRect.bottom;
+    const filler = siblings.some((item) => {
+      if (sidePeers.some((peer) => peer.item === item)) return false;
+      const rect = item.getBoundingClientRect();
+      const horizontalOverlap = Math.max(0, Math.min(ownerRect.right, rect.right) - Math.max(ownerRect.left, rect.left));
+      return horizontalOverlap >= Math.min(ownerRect.width, rect.width) * 0.45
+        && rect.top < peerBottom - 24
+        && rect.bottom > ownerRect.bottom + 24;
+    });
+    const threshold = Math.max(240, innerHeight * 0.3);
+    if (filler || voidHeight <= threshold) return null;
+    return {
+      voidHeight: Number(voidHeight.toFixed(2)),
+      threshold: Number(threshold.toFixed(2)),
+      ownerHeight: Number(ownerRect.height.toFixed(2)),
+      peerHeight: Number(Math.max(...sidePeers.map(({ rect }) => rect.height)).toFixed(2)),
+      parentDisplay: parentStyle.display,
+      parentWidth: Number(parentRect.width.toFixed(2)),
+    };
+  };
   for (const spec of specs) {
     const nodes = query(spec.selector);
     const owners = query(spec.ownerSelector);
@@ -160,6 +198,12 @@ function auditV7A1Typography(specs) {
       && han(lastLine).length === 1
       && meaningful(previousLine).length >= 2;
     const hasTaskPeer = taskPeer(spec, node, owner);
+    const ownerColumnVoid = columnVoid(owner);
+    const targetColumnVoid = ownerColumnVoid ? null : columnVoid(node);
+    const columnVoidMeasurement = ownerColumnVoid
+      ? { source: "owner", ...ownerColumnVoid }
+      : targetColumnVoid ? { source: "target", ...targetColumnVoid } : null;
+    const columnVoidKey = ownerColumnVoid ? owner : node.parentElement;
     const ownerMinimum = role === "heading" ? 760 : 560;
     const gapMinimum = role === "heading" ? 280 : 220;
     const startAligned = inlineStartGap >= -2 && inlineStartGap <= Math.max(32, ownerRect.width * 0.08);
@@ -189,11 +233,16 @@ function auditV7A1Typography(specs) {
       ownerWidth: Number(ownerRect.width.toFixed(2)),
       trackWidth: Number(rect.width.toFixed(2)),
       hasTaskPeer,
+      columnVoid: columnVoidMeasurement,
       computedFontFamily: style.fontFamily,
     };
     targets.push(measurement);
 
     const findings = [];
+    if (columnVoidMeasurement && columnVoidKey && !flaggedVoidOwners.has(columnVoidKey)) {
+      flaggedVoidOwners.add(columnVoidKey);
+      issues.push({ code: "a1_layout_column_void", targetId: spec.id, measurement });
+    }
     if (orphan) findings.push(role === "heading" ? "a1_heading_han_orphan" : "a1_prose_han_orphan");
     if (underfilledTrack) findings.push(role === "heading" ? "a1_heading_track_void" : "a1_prose_track_void");
     if (eligible) {

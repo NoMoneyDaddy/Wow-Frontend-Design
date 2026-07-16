@@ -87,6 +87,15 @@ class ProductFlowV6EvidenceTests(unittest.TestCase):
                 "layout flow repair finding remains",
             ),
             (
+                "layoutFlow",
+                {
+                    "domOrderReversals": [],
+                    "displacedIntroCopy": [],
+                    "unfilledColumnVoids": [{"target": "article-copy", "voidHeight": 936}],
+                },
+                "layout flow repair finding remains",
+            ),
+            (
                 "localeFlow",
                 {"untranslatedInterfaceCopy": [{"text": "Current configuration"}]},
                 "locale flow repair finding remains",

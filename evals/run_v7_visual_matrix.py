@@ -276,6 +276,7 @@ def _write_completed_ledger(
     result_dir: Path,
     screenshot_dir: Path,
     repository_root: Path,
+    gate: str = "full",
 ) -> None:
     if path.exists() or path.is_symlink():
         raise V7VisualRunnerError(f"refusing to overwrite ledger: {path}")
@@ -288,7 +289,7 @@ def _write_completed_ledger(
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        evidence.validate(manifest_path, temporary_path, result_dir, screenshot_dir, repository_root)
+        evidence.validate(manifest_path, temporary_path, result_dir, screenshot_dir, repository_root, gate)
         os.replace(temporary_path, path)
     except BaseException:
         try:
@@ -333,7 +334,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     capture_timeout = cohort["timeouts"]["capture"]["hard_seconds"]
     result_dir = _empty_directory(args.result_dir, "result directory")
     screenshot_dir = _empty_directory(args.screenshot_dir, "screenshot directory")
-    expected = evidence.expected_inventory(cohort, args.split)
+    gate = getattr(args, "gate", "full")
+    expected = evidence.expected_inventory(cohort, args.split, gate)
     attempts: list[dict[str, Any]] = []
     for key in expected:
         variant, case_id, state, profile, engine = key
@@ -412,6 +414,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "schema_version": 1,
                 "cohort_manifest": {"path": manifest_path.relative_to(root).as_posix(), "sha256": _digest(manifest_path)},
                 "split": args.split,
+                "gate": gate,
                 "status": "failed",
                 "variants": list(evidence.VARIANTS),
                 "expected_count": len(expected),
@@ -425,6 +428,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version": 1,
         "cohort_manifest": {"path": manifest_path.relative_to(root).as_posix(), "sha256": _digest(manifest_path)},
         "split": args.split,
+        "gate": gate,
         "status": "completed",
         "variants": list(evidence.VARIANTS),
         "expected_count": len(expected),
@@ -433,7 +437,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "attempts": attempts,
     }
     _write_completed_ledger(
-        args.ledger.resolve(strict=False), ledger, manifest_path, result_dir, screenshot_dir, root
+        args.ledger.resolve(strict=False), ledger, manifest_path, result_dir, screenshot_dir, root, gate
     )
     return ledger
 
@@ -448,6 +452,7 @@ def main() -> int:
     parser.add_argument("--ledger", required=True, type=Path)
     parser.add_argument("--repository-root", type=Path, default=ROOT)
     parser.add_argument("--max-attempts", type=int, default=3, choices=(1, 2, 3))
+    parser.add_argument("--gate", choices=evidence.GATES, default="full")
     args = parser.parse_args()
     try:
         ledger = run(args)
