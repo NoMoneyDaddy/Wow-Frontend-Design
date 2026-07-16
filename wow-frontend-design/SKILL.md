@@ -44,6 +44,8 @@ Run all four responsibilities at a depth proportional to the request. Planning a
 
 Load only the smallest set that covers the request. Read a selected file completely. Do not treat research catalogues as runtime style presets.
 
+Choose the delivery lane below before loading references. In `DIRECT`, load `quality-gates.md` plus at most two task-specific references before the first runnable implementation; load another reference only when an encountered decision requires it. Multiple known routes alone do not justify site planning, a sitemap, or a wireframe.
+
 ### Core route
 
 - Read [creative-direction.md](references/creative-direction.md) before choosing or changing visual language, and [mobile-responsive.md](references/mobile-responsive.md) for every viewport-based interface.
@@ -83,6 +85,20 @@ Load only the smallest set that covers the request. Read a selected file complet
 ## Execute the workflow
 
 Do not skip a stage; scale its depth to the request. Keep one accepted artifact available throughout the run.
+
+### Choose the delivery lane before creating artifacts
+
+- `DIRECT`: the target, user outcome, mutation boundary, preserved contracts, and route inventory are known or safely inferable. This includes a clear new build and a bounded audit, repair, polish, or retrofit. Produce a runnable vertical slice first; a plan is not an accepted artifact.
+- `PLANNED`: unresolved information architecture, route ownership, permissions, public contracts, or an architecture decision prevents safe implementation. Create only the planning artifact that resolves that blocker, then return to `DIRECT`.
+
+In `DIRECT`, do not create a site manifest, sitemap, wireframe, journey, or alternative-direction deck merely because the product has several pages. Create or update `DESIGN.md` only when the visual-system contract changes, keep it smaller than the implementation it governs, and verify that runtime tokens and behavior match it before adding more planning. If documentation and runtime diverge, stop authoring documents and repair the runnable artifact.
+
+Every verification cycle has two independent lanes:
+
+1. `CONTRACT`: run the named project gates and replay every user- or evaluator-declared route, state, viewport, interaction, and preserved contract.
+2. `DISCOVERY`: after the named gates, inspect raw DOM, screenshots, logs, computed layout, and state transitions without using existing issue codes as the search boundary. Exercise at least one relevant route/state/viewport/interaction combination not named in the brief. For each user-triggered async action, test pending, resolve, reject, rapid repeat, and selection/navigation changes during pending work when the public contract permits them.
+
+Record a new candidate as `novel:<surface>:<state>:<symptom>` with route, viewport, state, reproduction, expected result, actual result, raw evidence, severity, and owner. Confirm it by a second replay or a nearby valid counterexample. A confirmed novel finding enters the same smallest-repair → narrow-gate → affected-matrix loop and gains a regression check before completion; never discard it because no current evaluator code names it. Keep an unreproduced candidate as `ADVISORY`, not a pass or a fabricated failure.
 
 ### 1. Inspect scope and capability
 
@@ -188,7 +204,7 @@ Before evaluator handoff, run a source-level counterexample preflight even when 
 - Treat the brief as the public automation contract: implement every named hook exactly, but never invent a value, ID, slot, or state attribute that the brief did not require. Preflight each required control through its semantic input and observable result, not a styling wrapper or hidden implementation detail.
 - Check short command labels as atomic controls: keep ordinary one-line labels from shrinking or wrapping, and recompose the surrounding action group when space is insufficient. Check product/UI paragraphs at a readable rendered leading—roughly `1.5` or higher is a starting comparison for normal Traditional Chinese body sizes, not a universal threshold—and never use display-tight leading on multi-line body copy.
 
-When browser access is authorized, verify representative routes and reachable states at compact/common mobile, tablet portrait/landscape, desktop, and wide desktop as scope requires. Capture default and post-interaction screenshots separately with route, viewport, locale, state, DPR, engine, touch/isMobile, and emulation/device provenance. Width-only resizing is not a physical-device claim. Inspect matched evidence for wrapping, clipping, collisions, visual order, state-created voids, fixed obstructions, interaction round-trips, focus, console/runtime/network errors, zoom/reflow, reduced motion, and computed tracks.
+When browser access is authorized, use the project-pinned Playwright library, test runner, or CLI exclusively for browser interaction and screenshots. Do not use Computer Use, an in-app browser controller, a Chrome extension, or general desktop control as a substitute. If Playwright is unavailable and adding it is not authorized, follow the no-visual fallback and mark rendered claims `UNVERIFIED`. Verify representative routes and reachable states at compact/common mobile, tablet portrait/landscape, desktop, and wide desktop as scope requires. Capture default and post-interaction screenshots separately with route, viewport, locale, state, DPR, engine, touch/isMobile, and emulation/device provenance. Width-only resizing is not a physical-device claim. Inspect matched evidence for wrapping, clipping, collisions, visual order, state-created voids, fixed obstructions, interaction round-trips, focus, console/runtime/network errors, zoom/reflow, reduced motion, and computed tracks.
 
 Classify results:
 
