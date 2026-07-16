@@ -2,6 +2,31 @@
 
 `wow-frontend-design/` 本身就是符合 Agent Skills 格式的 skill 目錄。安裝只代表 host 能發現 metadata；不代表特定模型、工具、框架或品質已通過實測。
 
+## 5 分鐘成功路徑
+
+先取得目前 `main` 的完整 commit SHA；預覽後才把同一 SHA 安裝到指定 host。正式環境應改用團隊已審查的 SHA。此 repo 目前沒有 GitHub Release，因此不要把浮動 `main` 當成 production pin。
+
+```bash
+PIN="$(gh api repos/NoMoneyDaddy/Wow-Frontend-Design/commits/main --jq .sha)"
+printf '%s\n' "$PIN"
+gh skill preview NoMoneyDaddy/Wow-Frontend-Design "wow-frontend-design/SKILL.md@$PIN"
+gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md \
+  --agent codex --scope user --pin "$PIN"
+gh skill list --json skillName,sourceURL,scope,version,pinned,path
+```
+
+重新開啟一個 session，做不修改檔案的 discovery smoke：
+
+```text
+Use $wow-frontend-design to audit this repository read-only. Report the detected
+project type, mutation boundary, available verification capabilities, and exact
+evidence ceiling. Do not edit files or install tools.
+```
+
+成功條件不是只看 `gh skill list`：host 必須真的觸發 Skill，並回報 `AUDIT`、專案類型、能力與不誇大的 evidence ceiling。Claude Code 把 `--agent codex --scope user` 改為 `--agent claude-code --scope project`，然後以 `/wow-frontend-design` 執行同一 smoke。
+
+> Claude Code remote：本機 `~/.claude/skills/` 不會自動同步到 remote sandbox。最可靠做法是在 remote 內安裝到專案 `.claude/skills/wow-frontend-design/`。Remote 的 home 可能是暫時性或不可寫；沒有 browser／vision 時，Skill 應交付網站與靜態證據，但把 rendered claims 標為 `UNVERIFIED`。
+
 ## AI 直接安裝（Codex）
 
 在 Codex 對話貼上：
@@ -29,13 +54,13 @@ gh skill preview NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md
 gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md --agent codex --scope user
 ```
 
-正式部署加上已發布 tag 或完整 commit：
+正式部署加上完整 commit；未來有已審查 release tag 時也可固定該 tag：
 
 ```bash
 gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md --agent codex --scope user --pin <release-tag-or-full-sha>
 ```
 
-把 `--agent` 改為 `claude-code`、`github-copilot` 或 `gemini-cli` 即可導向該 host；用 `gh skill list --json skillName,sourceURL,scope,version,pinned,path` 驗證來源與安裝位置。preview 命令、參數或 metadata 可能隨 GitHub CLI 版本改變；正式流程固定 CLI 版本與 skill commit。預覽與安裝成功仍不證明模型已正確觸發，需再跑 host discovery／invocation smoke test。
+把 `--agent` 改為 `claude-code`、`github-copilot` 或 `gemini-cli` 即可導向該 host；用 `gh skill list --json skillName,sourceURL,scope,version,pinned,path` 驗證來源與安裝位置，再跑上方 discovery smoke。preview 命令、參數或 metadata 可能隨 GitHub CLI 版本改變；正式流程固定 CLI 版本與 skill commit。
 
 ## Host 原生方式
 
@@ -81,12 +106,14 @@ Claude.ai custom skills、Claude API workspace skills、Claude Code filesystem s
 4. 只在授權工具存在時執行 `scripts/`；
 5. 把缺 browser、vision、command、write 或 context 能力轉成明示 evidence ceiling。
 
+若 wrapper 會跨模型編排，不要把 `MODEL_TIER=strong` 交給模型自行解讀。由 wrapper 建立 evaluator-owned schema-v2 capability profile，先以 `scripts/route_model.py` 選 lane；再把真實執行事件交給 `scripts/runtime_downgrade.py` 單向降級。Skill 本身不切換模型，也不允許同一 run 自行升級。
+
 單純把整個 skill 塞進 system prompt 是 prompt adapter，不是原生安裝；必須另標 cohort，不能宣稱與 Codex、Claude Code、Copilot 或 Gemini CLI 的 discovery 行為相同。
 
 ## 版本、完整性與卸載
 
 - production pin release tag、完整 commit 或已審查 skill version；不要浮動追蹤 `main`。`gh skill` 安裝會注入來源 metadata，供 `gh skill update --dry-run` 核對。
-- 部署前驗證 `SKILL.md` frontmatter、相對 reference、單元測試與來源 lock。
+- 部署前驗證 `SKILL.md` frontmatter、每份 Markdown reference／adapter 都可由核心直接到達、單元測試與來源 lock。
 - 記錄安裝來源、revision、hash、host/version、scope 與安裝時間。
 - 停用優先於刪除；Codex 在 `~/.codex/config.toml` 使用精確絕對路徑：
 

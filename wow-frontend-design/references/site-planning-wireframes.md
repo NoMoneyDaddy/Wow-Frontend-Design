@@ -81,6 +81,20 @@ Plan landmarks and heading hierarchy while arranging content. Each region needs 
 
 Use a simple saliency check only to inspect intended priority: after a brief exposure, ask what was noticed first. Do not treat recall as proof of comprehension or task success. Validate navigation labels and hierarchy with appropriate research such as card sorting or tree testing when the product risk warrants it.
 
+### Choose a layout pattern from the task
+
+Record `content operation → candidate pattern → focal anchor → reading/action sequence → mobile transformation → failure signal` before polishing. Common patterns are conditional:
+
+- single-column flow for sustained reading or one focused decision;
+- aligned comparison or split view only when users must compare or act while retaining context;
+- grid/gallery/cards for independently browsable entities, not for turning every sentence into a container;
+- master-detail for scanning records while preserving a selected record's context;
+- magazine/F-like composition for scannable editorial density, with semantic headings carrying the hierarchy;
+- horizontal rails only for a bounded collection with visible previous/next affordances and keyboard/touch alternatives;
+- full-screen, animated, or immersive composition only when truthful media/evidence earns the space and the same task remains available without motion or media.
+
+F-patterns, Z-patterns, thirds, symmetry, and asymmetry are teaching heuristics. They do not predict every user's gaze, comprehension, or conversion. Test the actual language, content density, task, viewport, input method, and reachable states; revert to a simpler structure when the pattern delays the top task or creates an unexplained track.
+
 ## Mobile is a transformation
 
 For every desktop region choose one mobile action: preserve, reorder, replace, condense, defer, remove, or move to thumb reach. Record the equivalent access path and reason. Scaling the desktop canvas or merely stacking every region is not a mobile design.
@@ -103,3 +117,5 @@ Use absolute canonical URLs on approved origins. Each uncompressed sitemap is li
 - Nielsen Norman Group's user-flow, task-analysis, workflow, and error-recovery guidance informs goal scope, point-of-need controls, system responses, alternate paths, and effort preservation.
 - Google Search Central and sitemaps.org define XML sitemap syntax and crawler boundaries.
 - DayDayDing's practitioner article supplied useful prompts about real content, negative paths, roles, hierarchy, interaction detail, and responsive planning. Its undated/older tool survey is not treated as current tooling authority. The unsupported numerical claim that negative flows occur three-to-ten times as often as positive flows is not adopted.
+- Figma's [website layout ideas](https://www.figma.com/resource-library/website-layout-ideas/) supplies a useful vocabulary for matching grids, split views, galleries, editorial flows, horizontal rails, interactivity, and animation to content. Its pattern descriptions, eye-path diagrams, and rule-of-thirds advice are discovery heuristics, not universal task or conversion evidence.
+- YoungDay's [breathing layout article](https://www.youngday.com/breathtaking-web-design-layout.html) is a practitioner prompt to escape premature rectangle frames, build one focal region through contrast, and preserve proportion in asymmetry. Its geometry symbolism and aesthetic examples are not product facts or fixed recipes.

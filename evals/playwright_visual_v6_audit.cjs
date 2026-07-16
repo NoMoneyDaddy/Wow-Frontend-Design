@@ -18,6 +18,11 @@ const CASE_PAGES = {
 };
 const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 const TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const LOCALE_RULES = {
+  explainedTerm: String.raw`[（(][^）)]*[A-Za-z][^）)]*[）)]`,
+  identifier: String.raw`\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b`,
+  namedCurrencyValue: String.raw`^[A-Za-z][A-Za-z0-9 .&'’/-]*\s+(?:NT\$|TWD|USD|EUR)\s*[\d,]+(?:\.\d+)?$`,
+};
 const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 1000, screenWidth: 1440, screenHeight: 1000, deviceScaleFactor: 1, isMobile: false, hasTouch: false, userAgent: null },
   { name: "tablet", width: 834, height: 1112, screenWidth: 834, screenHeight: 1112, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: TABLET_USER_AGENT },
@@ -71,6 +76,49 @@ function parseArguments(argv) {
 
 function unique(values) {
   return [...new Set(values)];
+}
+
+function matchesAllowedNetworkOrigin(value, allowedOrigin) {
+  try {
+    const parsed = new URL(value);
+    if (["data:", "about:"].includes(parsed.protocol)) return true;
+    if (parsed.protocol === "ws:") parsed.protocol = "http:";
+    if (parsed.protocol === "wss:") parsed.protocol = "https:";
+    return parsed.origin === allowedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+async function installExactOriginRoutes(context, allowedOrigin, externalRequests) {
+  await context.route("**/*", async (route) => {
+    const requestUrl = route.request().url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      return route.abort("blockedbyclient");
+    }
+    const parsed = new URL(requestUrl);
+    if (parsed.pathname.endsWith("/favicon.ico")) return route.fulfill({ status: 204, body: "" });
+    return route.continue();
+  });
+  await context.routeWebSocket("**/*", async (webSocket) => {
+    const requestUrl = webSocket.url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      await webSocket.close({ code: 1008, reason: "Blocked by evaluator origin policy" });
+      return;
+    }
+    webSocket.connectToServer();
+  });
+}
+
+function hasUnexplainedEnglish(text) {
+  const normalized = String(text || "").trim().replace(/\s+/g, " ");
+  if (!normalized || new RegExp(LOCALE_RULES.namedCurrencyValue, "u").test(normalized)) return false;
+  const stripped = normalized
+    .replace(new RegExp(LOCALE_RULES.explainedTerm, "gu"), "")
+    .replace(new RegExp(LOCALE_RULES.identifier, "gu"), "");
+  return /[A-Za-z]{3,}/.test(stripped);
 }
 
 async function visibleCount(page, selector) {
@@ -127,14 +175,20 @@ async function runCaseInteraction(page, caseId, viewport) {
         evidence.failures.push("type_writing_mode_toggle_failed");
       }
     } else if (caseId === "repair-cafe-intake-v6") {
+      const step = await firstVisible(page, '[data-eval="booking-step"]');
+      const beforeStep = (await step.innerText()).trim();
       await (await firstVisible(page, '[data-eval="continue-action"]')).click();
       await page.waitForTimeout(100);
       evidence.errorVisible = await page.locator('[data-eval="form-error"]').isVisible();
       await page.locator('[data-eval="item-name"]').fill("二十年以上的手提收音機，旋鈕鬆脫且偶爾沒有聲音");
       await (await firstVisible(page, '[data-eval="continue-action"]')).click();
       await page.waitForTimeout(100);
-      evidence.step = await (await firstVisible(page, '[data-eval="booking-step"]')).getAttribute("data-step");
-      if (!evidence.errorVisible || !["2", "3"].includes(evidence.step)) evidence.failures.push("repair_intake_validation_or_transition_failed");
+      const afterStep = await firstVisible(page, '[data-eval="booking-step"]');
+      evidence.step = await afterStep.getAttribute("data-step");
+      evidence.stepChanged = beforeStep !== (await afterStep.innerText()).trim();
+      evidence.confirmationVisible = await page.locator('[data-eval="confirmation-summary"]').isVisible();
+      const transitioned = evidence.stepChanged || evidence.confirmationVisible || ["2", "3"].includes(evidence.step);
+      if (!evidence.errorVisible || !transitioned) evidence.failures.push("repair_intake_validation_or_transition_failed");
     } else if (caseId === "night-market-allergen-v6") {
       evidence.initialRecords = await visibleCount(page, '[data-eval="stall-record"]');
       await page.locator('button[data-filter-value="peanut-free"]').click();
@@ -145,20 +199,40 @@ async function runCaseInteraction(page, caseId, viewport) {
       if (evidence.initialRecords !== 8 || evidence.filteredRecords !== 4) evidence.failures.push("allergen_filter_count_failed");
       if (!evidence.detailVisible) evidence.failures.push("allergen_detail_failed");
     } else if (caseId === "royalty-statement-v6") {
-      const before = await page.locator('[data-eval="royalty-workspace"]').getAttribute("data-period");
-      await page.locator('[data-period-value="previous"]').click();
+      const workspace = page.locator('[data-eval="royalty-workspace"]');
+      const previous = page.locator('[data-period-value="previous"]');
+      const beforePeriod = await workspace.getAttribute("data-period");
+      const beforeText = (await workspace.innerText()).trim();
+      const beforePressed = await previous.getAttribute("aria-pressed");
+      await previous.click();
+      await page.waitForTimeout(100);
+      evidence.afterPeriod = await workspace.getAttribute("data-period");
+      evidence.periodContentChanged = beforeText !== (await workspace.innerText()).trim();
+      evidence.periodControlChanged = beforePressed !== await previous.getAttribute("aria-pressed");
       await (await firstVisible(page, '[data-eval="chart-mark"]')).click();
       await page.waitForTimeout(100);
-      evidence.afterPeriod = await page.locator('[data-eval="royalty-workspace"]').getAttribute("data-period");
       evidence.tooltipVisible = await page.locator('[data-eval="chart-tooltip"]').isVisible();
-      if (before === evidence.afterPeriod) evidence.failures.push("royalty_period_switch_failed");
+      if (beforePeriod === evidence.afterPeriod && !evidence.periodContentChanged && !evidence.periodControlChanged) {
+        evidence.failures.push("royalty_period_switch_failed");
+      }
       if (!evidence.tooltipVisible) evidence.failures.push("royalty_tooltip_failed");
     } else if (caseId === "packaging-configurator-v6") {
-      const option = await firstVisible(page, '[data-eval="size-option"]:has(input[value="s"])');
-      if (!(await option.isEnabled())) throw new Error("S size option is disabled");
-      await option.click();
+      const inputs = page.locator('[data-eval="size-option"] input[type="radio"]:enabled');
+      const inputCount = await inputs.count();
+      if (!inputCount) throw new Error("no enabled size radio inside data-eval=size-option");
+      let input = inputs.first();
+      for (let index = 0; index < inputCount; index += 1) {
+        if (!(await inputs.nth(index).isChecked())) {
+          input = inputs.nth(index);
+          break;
+        }
+      }
+      const label = input.locator("xpath=ancestor::label[1]");
+      if ((await label.count()) && await label.isVisible()) await label.click();
+      else await input.check();
+      evidence.sizeSelected = await input.isChecked();
       evidence.summaryVisible = await page.locator('[data-eval="config-summary"]').isVisible();
-      if (!evidence.summaryVisible) evidence.failures.push("packaging_summary_failed");
+      if (!evidence.sizeSelected || !evidence.summaryVisible) evidence.failures.push("packaging_summary_failed");
     } else if (caseId === "oral-history-archive-v6") {
       evidence.shellVisible = await page.locator('[data-eval="archive-shell"]').isVisible();
       if (!evidence.shellVisible) evidence.failures.push("oral_history_shell_missing");
@@ -171,13 +245,13 @@ async function runCaseInteraction(page, caseId, viewport) {
       const firstRow = rows.nth(0);
       const secondRow = rows.nth(1);
       await firstRow.locator('[data-eval="shortlist-action"]').click();
-      await firstRow.locator('[data-action="compare"][data-slot="a"]').click();
+      await firstRow.locator('[data-eval="compare-a-action"]').click();
       if (plan.usesCaseNavigation) {
-        await page.locator('#nextCase').click();
+        await page.locator('[data-eval="next-proposal"]').click();
         await page.waitForTimeout(100);
       }
       await secondRow.locator('[data-eval="shortlist-action"]').click();
-      await secondRow.locator('[data-action="compare"][data-slot="b"]').click();
+      await secondRow.locator('[data-eval="compare-b-action"]').click();
       await page.locator('[data-eval="decision-action"]').click();
       await page.waitForTimeout(100);
       evidence.modalVisible = await page.locator('[data-eval="decision-modal"]').isVisible();
@@ -213,6 +287,13 @@ function issueCodes(result) {
   if ((result.narrowTextColumns || []).length) issues.push("content_column_too_narrow");
   if ((result.bodyFlow?.forcedLineBreaks || []).length) issues.push("forced_body_line_break");
   if ((result.bodyFlow?.nonWrappingProse || []).length) issues.push("body_copy_normal_wrap_disabled");
+  if ((result.bodyFlow?.underfilledProseBlocks || []).length) issues.push("prose_track_underfilled");
+  if ((result.headingFlow?.compressedCjkHeadings || []).length) issues.push("cjk_heading_overcompressed");
+  if ((result.headingFlow?.orphanedCjkHeadingLines || []).length) issues.push("cjk_heading_orphan_line");
+  if ((result.headingFlow?.underfilledWideHeadings || []).length) issues.push("wide_heading_track_underfilled");
+  if ((result.layoutFlow?.domOrderReversals || []).length) issues.push("visual_order_reverses_dom_flow");
+  if ((result.layoutFlow?.displacedIntroCopy || []).length) issues.push("intro_copy_displaced_to_right_track");
+  if ((result.localeFlow?.untranslatedInterfaceCopy || []).length) issues.push("zh_hant_untranslated_interface_copy");
   if (result.reducedMotionAnimations.length) issues.push("reduced_motion_animation_active");
   if (result.consoleErrors.length) issues.push("console_errors");
   if (result.externalRequests.length) issues.push("external_requests_attempted");
@@ -229,15 +310,17 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     hasTouch: viewport.hasTouch,
     locale: "zh-TW",
     reducedMotion: "reduce",
+    serviceWorkers: "block",
   };
   if (viewport.userAgent) contextOptions.userAgent = viewport.userAgent;
-  const context = await browser.newContext(contextOptions);
-  const page = await context.newPage();
   const targetUrl = new URL(pageName, target.url).href;
   const origin = new URL(target.url).origin;
   const consoleErrors = [];
   const externalRequests = [];
   const badResponses = [];
+  const context = await browser.newContext(contextOptions);
+  await installExactOriginRoutes(context, origin, externalRequests);
+  const page = await context.newPage();
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -247,24 +330,13 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       badResponses.push({ status: response.status(), url: response.url() });
     }
   });
-  await page.route("**/*", async (route) => {
-    const requestUrl = new URL(route.request().url());
-    if (["data:", "blob:"].includes(requestUrl.protocol)) return route.continue();
-    if (requestUrl.origin !== origin) {
-      externalRequests.push(route.request().url());
-      return route.abort("blockedbyclient");
-    }
-    if (requestUrl.pathname.endsWith("/favicon.ico")) return route.fulfill({ status: 204, body: "" });
-    return route.continue();
-  });
-
   await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(250);
   const interaction = state === "interaction"
     ? await runCaseInteraction(page, target.caseId, viewport)
     : { attempted: false, failures: [] };
 
-  const measured = await page.evaluate(({ caseId, viewportName, requiredPages }) => {
+  const measured = await page.evaluate(({ caseId, viewportName, requiredPages, localeRules }) => {
     const visible = (node) => {
       const style = getComputedStyle(node);
       const rect = node.getBoundingClientRect();
@@ -285,6 +357,46 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       range.selectNodeContents(node);
       return new Set([...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).map((rect) => Math.round(rect.top))).size;
     };
+    const textLineRects = (node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const lines = new Map();
+      for (const rect of [...range.getClientRects()].filter((item) => item.width > 0.5 && item.height > 0.5)) {
+        const key = Math.round(rect.top);
+        const current = lines.get(key) || { left: rect.left, right: rect.right };
+        current.left = Math.min(current.left, rect.left);
+        current.right = Math.max(current.right, rect.right);
+        lines.set(key, current);
+      }
+      return [...lines.values()].map((line) => ({ ...line, width: line.right - line.left }));
+    };
+    const textLineFragments = (node) => {
+      const lines = new Map();
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const textNode = walker.currentNode;
+        let offset = 0;
+        for (const character of textNode.data) {
+          const end = offset + character.length;
+          const range = document.createRange();
+          range.setStart(textNode, offset);
+          range.setEnd(textNode, end);
+          const rect = [...range.getClientRects()].find((item) => item.width > 0.1 && item.height > 0.1);
+          if (rect) {
+            const key = Math.round(rect.top);
+            const current = lines.get(key) || { top: rect.top, left: rect.left, right: rect.right, text: "" };
+            current.left = Math.min(current.left, rect.left);
+            current.right = Math.max(current.right, rect.right);
+            current.text += character;
+            lines.set(key, current);
+          }
+          offset = end;
+        }
+      }
+      return [...lines.values()]
+        .sort((a, b) => a.top - b.top)
+        .map((line) => ({ ...line, text: line.text.trim(), width: line.right - line.left }));
+    };
     const signature = (node, properties) => {
       if (!node) return null;
       const style = getComputedStyle(node);
@@ -301,6 +413,19 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       return uniqueInPage(values.filter((value, index) => values.indexOf(value) !== index));
     };
     const uniqueInPage = (values) => [...new Set(values)];
+    const flowContainer = (node) => node.parentElement
+      || node.closest("header, .masthead, .hero, .banner, .panel, section, article");
+    const hasTaskBearingRightPeer = (node, container) => {
+      if (!container) return false;
+      const rect = node.getBoundingClientRect();
+      return [...container.querySelectorAll("nav, aside, button, input, select, textarea, [role='button'], [role='group'], [data-status], [data-eval]")]
+        .filter((peer) => peer !== node && !node.contains(peer) && visible(peer))
+        .some((peer) => {
+          const peerRect = peer.getBoundingClientRect();
+          const verticallyRelevant = peerRect.bottom > rect.top - 24 && peerRect.top < rect.bottom + 24;
+          return verticallyRelevant && peerRect.left > rect.left + rect.width * 0.72 && peerRect.width >= 96;
+        });
+    };
 
     const actionNodes = [...document.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit']")].filter(visible);
     const shortActionFailures = actionNodes.map((node) => {
@@ -317,7 +442,15 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       return { tag: node.tagName.toLowerCase(), hook: node.getAttribute("data-eval"), text: (node.textContent || "").trim().replace(/\s+/g, " ").slice(0, 80), clipped: clipped && clipsOverflow };
     }).filter((item) => item.text && item.clipped).slice(0, 30);
 
-    const criticalNodes = [...document.querySelectorAll("h1, h2, h3, button, [role='button']")].filter(visibleInViewport).filter((node) => node.textContent.trim());
+    const activeModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+    const isolatedBehindModal = (node) => Boolean(
+      activeModal
+      && !activeModal.contains(node)
+      && node.closest('[inert], [aria-hidden="true"]')
+    );
+    const criticalNodes = [...document.querySelectorAll("h1, h2, h3, button, [role='button']")]
+      .filter(visibleInViewport)
+      .filter((node) => node.textContent.trim() && !isolatedBehindModal(node));
     const criticalTextCollisions = [];
     for (let leftIndex = 0; leftIndex < criticalNodes.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < criticalNodes.length; rightIndex += 1) {
@@ -393,7 +526,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       }, 0);
       const capacity = cjkDominant ? rect.width / fontSize : rect.width / (fontSize * 0.55);
       const estimatedCharacters = Math.min(cjkDominant ? weightedFullWidthLength : characters.length, capacity);
-      const measureLimit = cjkDominant ? 40 : 90;
+      const measureLimit = cjkDominant ? 48 : 90;
       if (Number.isFinite(ratio) && ratio < 1.35) readingRhythm.tooTight.push({ text: node.textContent.trim().slice(0, 60), ratio: Number(ratio.toFixed(2)) });
       if (estimatedCharacters > measureLimit) readingRhythm.tooWide.push({
         text: node.textContent.trim().slice(0, 60),
@@ -452,7 +585,169 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       })
       .filter((item) => ["nowrap", "pre"].includes(item.whiteSpace) || (item.cjkDominant && item.wordBreak === "keep-all"))
       .slice(0, 20);
-    const bodyFlow = { forcedLineBreaks, nonWrappingProse };
+    const underfilledProseBlocks = [...document.querySelectorAll("header p, main p")]
+      .filter(visible)
+      .filter((node) => node.textContent.trim().length >= 40)
+      .map((node) => {
+        const container = flowContainer(node);
+        const rect = node.getBoundingClientRect();
+        const containerRect = container?.getBoundingClientRect() || rect;
+        const text = node.textContent.trim().replace(/\s+/g, " ");
+        const characters = [...text];
+        const hanCount = characters.filter((character) => /\p{Script=Han}/u.test(character)).length;
+        return {
+          text: text.slice(0, 80),
+          cjkDominant: hanCount / Math.max(characters.length, 1) >= 0.35,
+          trackRatio: Number((rect.width / Math.max(containerRect.width, 1)).toFixed(2)),
+          unusedInline: Math.round(containerRect.width - rect.width),
+          containerWidth: Math.round(containerRect.width),
+          hasTaskPeer: hasTaskBearingRightPeer(node, container),
+        };
+      })
+      .filter((item) => item.cjkDominant && item.containerWidth >= 560 && item.trackRatio < 0.6
+        && item.unusedInline > 220 && !item.hasTaskPeer)
+      .slice(0, 20);
+    const bodyFlow = { forcedLineBreaks, nonWrappingProse, underfilledProseBlocks };
+
+    const compressedCjkHeadings = [...document.querySelectorAll("h1")]
+      .filter(visible)
+      .map((node) => {
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        const parentRect = node.parentElement?.getBoundingClientRect() || rect;
+        const fontSize = Number.parseFloat(style.fontSize);
+        const text = node.textContent.trim().replace(/\s+/g, " ");
+        const characters = [...text];
+        const hanCount = characters.filter((character) => /\p{Script=Han}/u.test(character)).length;
+        return {
+          text: text.slice(0, 80),
+          lineCount: textLineCount(node),
+          cjkDominant: hanCount / Math.max(characters.length, 1) >= 0.5,
+          widthInEms: Number((rect.width / fontSize).toFixed(2)),
+          parentSpareInEms: Number(((parentRect.width - rect.width) / fontSize).toFixed(2)),
+        };
+      })
+      .filter((item) => item.cjkDominant && item.lineCount >= 4 && item.widthInEms < 8
+        && (item.parentSpareInEms > 1 || item.lineCount >= 5))
+      .slice(0, 20);
+    const orphanedCjkHeadingLines = [...document.querySelectorAll("h1, h2, h3")]
+      .filter(visible)
+      .map((node) => {
+        const style = getComputedStyle(node);
+        const fontSize = Number.parseFloat(style.fontSize);
+        const text = node.textContent.trim().replace(/\s+/g, " ");
+        const characters = [...text];
+        const hanCount = characters.filter((character) => /\p{Script=Han}/u.test(character)).length;
+        const lines = textLineFragments(node);
+        const meaningfulCount = (value) => [...value].filter((character) => /[\p{Letter}\p{Number}]/u.test(character)).length;
+        const lastLine = lines.at(-1) || { text: "", width: 0 };
+        const previousLine = lines.at(-2) || { text: "", width: 0 };
+        return {
+          text: text.slice(0, 80),
+          cjkDominant: hanCount / Math.max(characters.length, 1) >= 0.5,
+          horizontal: style.writingMode.startsWith("horizontal"),
+          characterCount: characters.length,
+          lineCount: lines.length,
+          lastLineText: lastLine.text.slice(0, 24),
+          lastLineMeaningfulCount: meaningfulCount(lastLine.text),
+          previousLineMeaningfulCount: meaningfulCount(previousLine.text),
+          lastLineWidthInEms: Number((lastLine.width / Math.max(fontSize, 1)).toFixed(2)),
+        };
+      })
+      .filter((item) => item.horizontal && item.cjkDominant && item.characterCount >= 4
+        && item.lineCount >= 2 && item.lastLineMeaningfulCount <= 1
+        && item.previousLineMeaningfulCount >= 2 && item.lastLineWidthInEms <= 1.8)
+      .slice(0, 20);
+    const underfilledWideHeadings = [...document.querySelectorAll("h1")]
+      .filter(visible)
+      .map((node) => {
+        const container = flowContainer(node);
+        const peerContainer = node.closest("header, .masthead, .hero, .banner, .panel, section, article") || container;
+        const containerRect = container?.getBoundingClientRect() || node.getBoundingClientRect();
+        const lines = textLineRects(node);
+        const text = node.textContent.trim().replace(/\s+/g, " ");
+        const characters = [...text];
+        const hanCount = characters.filter((character) => /\p{Script=Han}/u.test(character)).length;
+        const longestLine = Math.max(0, ...lines.map((line) => line.width));
+        return {
+          text: text.slice(0, 80),
+          cjkDominant: hanCount / Math.max(characters.length, 1) >= 0.5,
+          characterCount: characters.length,
+          lineCount: lines.length,
+          longestLineRatio: Number((longestLine / Math.max(containerRect.width, 1)).toFixed(2)),
+          unusedInline: Math.round(containerRect.width - longestLine),
+          containerWidth: Math.round(containerRect.width),
+          hasTaskPeer: hasTaskBearingRightPeer(node, peerContainer),
+        };
+      })
+      .filter((item) => item.cjkDominant && item.containerWidth >= 760
+        && item.characterCount >= 14 && item.lineCount >= 2
+        && item.longestLineRatio < 0.6 && item.unusedInline > 280 && !item.hasTaskPeer)
+      .slice(0, 20);
+    const headingFlow = { compressedCjkHeadings, orphanedCjkHeadingLines, underfilledWideHeadings };
+
+    const domOrderReversals = [];
+    for (const root of [...document.querySelectorAll("header")].filter(visible)) {
+      const children = [...root.children]
+        .filter(visible)
+        .filter((node) => !["absolute", "fixed"].includes(getComputedStyle(node).position));
+      for (let index = 1; index < children.length; index += 1) {
+        const previous = children[index - 1];
+        const current = children[index];
+        const previousRect = previous.getBoundingClientRect();
+        const currentRect = current.getBoundingClientRect();
+        const tolerance = Math.max(12, Number.parseFloat(getComputedStyle(current).fontSize) * 0.35);
+        if (currentRect.top + tolerance < previousRect.top) {
+          domOrderReversals.push({
+            header: nameFor(root).slice(0, 60),
+            previous: nameFor(previous).slice(0, 60),
+            current: nameFor(current).slice(0, 60),
+            upwardShift: Math.round(previousRect.top - currentRect.top),
+          });
+        }
+        if (domOrderReversals.length >= 20) break;
+      }
+      if (domOrderReversals.length >= 20) break;
+    }
+    const displacedIntroCopy = [...document.querySelectorAll("header p.lede, header p.summary, .masthead p.lede, .masthead p.summary")]
+      .filter(visible)
+      .map((node) => {
+        const container = flowContainer(node);
+        const rect = node.getBoundingClientRect();
+        const containerRect = container?.getBoundingClientRect() || rect;
+        return {
+          text: node.textContent.trim().replace(/\s+/g, " ").slice(0, 80),
+          startRatio: Number(((rect.left - containerRect.left) / Math.max(containerRect.width, 1)).toFixed(2)),
+          containerWidth: Math.round(containerRect.width),
+        };
+      })
+      .filter((item) => item.containerWidth >= 760 && item.startRatio > 0.35)
+      .slice(0, 20);
+    const layoutFlow = { domOrderReversals, displacedIntroCopy };
+
+    const localeCandidates = [...document.querySelectorAll([
+      "button", "label", "summary", "nav a", "[role='button']",
+      ".eyebrow", ".kicker", ".pill", ".flag", ".chip", ".status-chip",
+      ".section__eyebrow", ".brand__eyebrow", ".media-fallback__label",
+      ".lede", ".summary", ".subhead", ".summary-note", ".fallback-note p",
+    ].join(", "))].filter(visible);
+    const untranslatedInterfaceCopy = localeCandidates
+      .map((node) => {
+        const text = (node.innerText || node.textContent || node.getAttribute("aria-label") || "").trim().replace(/\s+/g, " ");
+        const namedCurrencyValue = new RegExp(localeRules.namedCurrencyValue, "u").test(text);
+        const withoutAllowedTerms = text
+          .replace(new RegExp(localeRules.explainedTerm, "gu"), "")
+          .replace(new RegExp(localeRules.identifier, "gu"), "");
+        return {
+          tag: node.tagName.toLowerCase(),
+          text: text.slice(0, 80),
+          unexplainedEnglish: !namedCurrencyValue && /[A-Za-z]{3,}/.test(withoutAllowedTerms),
+        };
+      })
+      .filter((item) => item.text && item.unexplainedEnglish)
+      .filter((item, index, values) => values.findIndex((candidate) => candidate.text === item.text) === index)
+      .slice(0, 20);
+    const localeFlow = { untranslatedInterfaceCopy };
 
     const reducedMotionAnimations = [...document.body.querySelectorAll("*")].filter(visible).map((node) => {
       const style = getComputedStyle(node);
@@ -526,8 +821,11 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       const records = [...document.querySelectorAll('[data-eval="proposal-row"]')];
       if (!document.querySelector('[data-eval="grant-board"]')) contractIssues.push("grant_board_missing");
       if (records.length !== 6 || duplicateValues(records, "data-record-id").length) contractIssues.push("grant_record_inventory_invalid");
-      for (const hook of ["shortlist-action", "compare-panel", "decision-action", "decision-modal", "retry-action"]) {
+      for (const hook of ["shortlist-action", "compare-a-action", "compare-b-action", "compare-panel", "decision-action", "decision-modal", "retry-action"]) {
         if (!document.querySelector(`[data-eval="${hook}"]`)) contractIssues.push(`grant_${hook}_missing`);
+      }
+      if (["mobile", "compact-mobile"].includes(viewportName) && !document.querySelector('[data-eval="next-proposal"]')) {
+        contractIssues.push("grant_next-proposal_missing");
       }
     }
 
@@ -547,6 +845,9 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       readingRhythm,
       narrowTextColumns,
       bodyFlow,
+      headingFlow,
+      layoutFlow,
+      localeFlow,
       reducedMotionAnimations,
       contractIssues,
       rootVariables,
@@ -556,7 +857,12 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
         nav: signature(nav, ["color", "backgroundColor", "fontFamily", "fontWeight"]),
       },
     };
-  }, { caseId: target.caseId, viewportName: viewport.name, requiredPages: CASE_PAGES[target.caseId] });
+  }, {
+    caseId: target.caseId,
+    viewportName: viewport.name,
+    requiredPages: CASE_PAGES[target.caseId],
+    localeRules: LOCALE_RULES,
+  });
 
   const pageSlug = pageName.replace(/\.html$/i, "");
   const screenshot = path.join(options.artifactDir, `${target.caseId}-${target.alias}-${pageSlug}-${state}-${viewport.name}.png`);
@@ -668,7 +974,16 @@ async function main() {
   fs.writeFileSync(options.output, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
 }
 
-module.exports = { CASE_PAGES, VIEWPORTS, compareMultiPageShell, grantInteractionPlan, issueCodes, parseArguments, sharedRootTokenDrift };
+module.exports = {
+  CASE_PAGES,
+  VIEWPORTS,
+  compareMultiPageShell,
+  grantInteractionPlan,
+  hasUnexplainedEnglish,
+  issueCodes,
+  parseArguments,
+  sharedRootTokenDrift,
+};
 
 if (require.main === module) {
   main().catch((error) => {

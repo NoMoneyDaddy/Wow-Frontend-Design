@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant-TW">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -102,13 +102,12 @@
     .brand { display: grid; gap: 0.25rem; min-width: 0; }
     .brand__eyebrow {
       font: 600 12px/1.2 var(--font-label);
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
       color: var(--color-text-muted);
     }
     .brand__title {
-      font: 700 clamp(1.1rem, 2vw, 1.35rem)/1.1 var(--font-display);
-      letter-spacing: -0.03em;
+      font: 700 clamp(1.1rem, 2vw, 1.35rem)/1.15 var(--font-display);
+      letter-spacing: 0em;
       margin: 0;
     }
     .brand__meta { font-size: 0.92rem; color: var(--color-text-muted); }
@@ -137,7 +136,7 @@
     }
     .banner {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+      grid-template-columns: minmax(0, 1.24fr) minmax(250px, 0.76fr);
       gap: var(--space-section);
       align-items: stretch;
     }
@@ -168,9 +167,8 @@
     }
     .hero h1 {
       margin: 0;
-      font: 700 clamp(2rem, 4vw, 3.2rem)/1.06 var(--font-display);
-      letter-spacing: -0.03em;
-      max-width: 12ch;
+      font: 700 clamp(2rem, 4vw, 3.2rem)/1.12 var(--font-display);
+      letter-spacing: 0em;
       text-wrap: balance;
     }
     .hero p { margin: 0; max-width: 58ch; color: var(--color-text-muted); font-size: 1rem; }
@@ -242,7 +240,7 @@
     }
     .grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.84fr);
       gap: var(--space-section);
       align-items: start;
     }
@@ -254,14 +252,13 @@
     .section__head { display: grid; gap: 0.35rem; }
     .section__eyebrow {
       font: 600 12px/1.2 var(--font-label);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
       color: var(--color-text-muted);
     }
     .section h2 {
       margin: 0;
-      font: 700 clamp(1.25rem, 2.6vw, 1.8rem)/1.15 var(--font-display);
-      letter-spacing: -0.03em;
+      font: 700 clamp(1.25rem, 2.6vw, 1.8rem)/1.16 var(--font-display);
+      letter-spacing: 0em;
       text-wrap: balance;
     }
     .section p { margin: 0; color: var(--color-text-muted); max-width: 60ch; }
@@ -327,14 +324,13 @@
       padding: var(--space-panel);
       display: grid;
       gap: 1rem;
-      position: sticky;
-      top: calc(88px + env(safe-area-inset-top));
+      position: static;
     }
     .summary-card h2,
     .summary-card h3 {
       margin: 0;
       font: 700 1.1rem/1.25 var(--font-display);
-      letter-spacing: -0.02em;
+      letter-spacing: 0em;
     }
     .summary-list {
       display: grid;
@@ -481,8 +477,7 @@
       padding-bottom: 0.6rem;
       color: var(--color-text-muted);
       font: 600 13px/1.3 var(--font-label);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
     .price-table th,
     .price-table td {
@@ -511,9 +506,7 @@
       border-radius: var(--radius-lg);
       background: rgba(255, 255, 255, 0.86);
       border: 1px solid rgba(185, 176, 161, 0.66);
-      position: sticky;
-      bottom: calc(0.75rem + env(safe-area-inset-bottom));
-      z-index: 9;
+      position: static;
     }
     .dock__row {
       display: flex;
@@ -535,12 +528,9 @@
       }
       .nav { width: 100%; justify-content: flex-start; }
       .choice-grid { grid-template-columns: 1fr; }
-      .hero h1 { max-width: 15ch; }
+      .hero h1 { max-width: none; }
       .figure { min-height: 15rem; }
-      .dock {
-        position: static;
-        margin-top: 0.25rem;
-      }
+      .dock { margin-top: 0.25rem; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -559,7 +549,7 @@
     <header class="masthead">
       <div class="masthead__row">
         <div class="brand" aria-label="循環包材配置器">
-          <div class="brand__eyebrow">CIRCULAR PACKAGING / 繁中工作面</div>
+          <div class="brand__eyebrow">循環包材工作面（Circular Packaging）</div>
           <h1 class="brand__title">循環包材三頁配置器</h1>
           <div class="brand__meta">尺寸、用途、材質與回收條件同步保留</div>
         </div>
@@ -574,7 +564,7 @@
     <main id="main" class="grid">
       <section class="banner" aria-labelledby="hero-title">
         <article class="panel hero">
-          <div class="section__eyebrow">Step 3 / price + conflict</div>
+          <div class="section__eyebrow">步驟 3／價格與衝突</div>
           <h1 id="hero-title">價格與衝突一起看，才知道這個方案能不能送樣</h1>
           <p>摘要頁不只列數字，也保留衝突狀態、回收條件與重設操作。手機版把動作列放進可操作區域，但不覆蓋內容。</p>
           <div class="flow" aria-label="摘要流程">
@@ -608,7 +598,7 @@
 
       <section class="panel section" aria-labelledby="price-title">
         <div class="section__head">
-          <div class="section__eyebrow">Price summary</div>
+          <div class="section__eyebrow">價格摘要</div>
           <h2 id="price-title">價格摘要</h2>
           <p>所有數字都跟著同一份配置更新。若有衝突，摘要會保留修正方向與目前狀態。</p>
         </div>
@@ -658,7 +648,7 @@
 
       <aside class="panel summary-card" aria-labelledby="summary-title">
         <div class="compact-summary">
-          <div class="section__eyebrow">Current configuration</div>
+          <div class="section__eyebrow">目前配置</div>
           <h2 id="summary-title">目前配置</h2>
           <div id="status-pill" class="status status--ok" role="status" aria-live="polite">方案可送樣</div>
           <dl class="info-grid">

@@ -42,13 +42,15 @@ rounded:
   lg: 18px
   xl: 24px
 spacing:
-  xs: 4px
   sm: 8px
   md: 12px
   lg: 16px
   xl: 24px
-  xxl: 32px
 components:
+  masthead-title:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.on-canvas}"
+    typography: "{typography.display}"
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
@@ -75,11 +77,17 @@ components:
     typography: "{typography.specimen}"
     rounded: "{rounded.xl}"
     padding: "{spacing.xl}"
-  note-chip:
+  editor-field:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.reading}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+  status-chip:
     backgroundColor: "{colors.muted-surface}"
     textColor: "{colors.on-muted-surface}"
     typography: "{typography.functional}"
-    rounded: "999px"
+    rounded: "{rounded.sm}"
     padding: "{spacing.sm}"
 ---
 
@@ -87,7 +95,7 @@ components:
 
 ## Overview
 
-這是一個給字體設計師與排版工作者使用的繁中文樣張工作台。核心任務只有三件：切換橫書與直書、檢查繁中標點與英文/數字/fallback 的相容性、以及修訂一段短樣張。
+這是一個給字體設計師與排版工作者使用的繁中文樣張工作台。核心任務只有三件：切換橫書與直書、檢查繁中標點與英文/數字/fallback 的相容性、以及修訂一段短樣張。它不是展示型首頁，而是拿來反覆比對字面與框線的校樣工具。
 
 整體語氣偏向校樣紙、鉛字與精密框線，而不是一般 SaaS 儀表板。最重要的內容是樣張本身，因此工具列只保留必要控制，不把介面包成一層層無意義的卡片。
 
@@ -107,7 +115,7 @@ components:
 
 ## Layout
 
-桌面版採兩欄工作台：左側是編修與提示，右側是樣張預覽。閱讀順序是標題、切換控制、編修欄、預覽、fallback 提示。
+桌面版採兩欄工作台：左側是編修與提示，右側是樣張預覽。閱讀順序是標題、切換控制、編修欄、預覽、fallback 提示。標題區與編修區都保留足夠文字量，避免寬欄只剩單一句總結。
 
 行動版改成單欄，先保留切換與編修，樣張預覽往下排。直書只作檢視，不讓主要編修區被壓成狹窄長條；如果直書在窄螢幕上不利於修字，介面會明確提示回到橫書再調整。這裡的變化是重排與職責轉換，不是單純堆疊。
 直書預覽在手機上仍必須收斂在可用視窗內，樣張框與控制列都以邏輯尺寸與換行自我約束，不用隱藏 overflow 來掩蓋版面外溢。
@@ -130,15 +138,16 @@ components:
 
 ## Components
 
-`button-primary` 用在最重要的切換與確認類控制。`button-secondary` 用在輔助控制與出口提示。`surface-panel` 承接編修區與說明區，讓它們像同一套校樣紙。`specimen-panel` 承接實際樣張預覽，字級、行距與內距都比一般說明更開闊。`note-chip` 只承接簡短提示，不用來放長文。
+`masthead-title` 承接頁首主標，讓校樣冊的聲調先被看見。`button-primary` 用在最重要的切換與確認類控制。`button-secondary` 用在輔助控制與出口提示。`surface-panel` 承接編修區與說明區，讓它們像同一套校樣紙。`editor-field` 承接文字編修欄，讓輸入區維持可讀且不搶走樣張。`specimen-panel` 承接實際樣張預覽，字級、行距與內距都比一般說明更開闊。`status-chip` 只承接簡短狀態，不用來放長文。
 
-樣張預覽的方向由同一份內容資料驅動，桌面與行動版只改版式，不複製兩份獨立狀態。`outline` 檢視只是一個檢查層，不改變內容本身。
+樣張預覽的方向由同一份內容資料驅動，桌面與行動版只改版式，不複製兩份獨立狀態。`outline` 檢視只是一個檢查層，不改變內容本身。狀態芯只用來報告模式，不承擔主要內容。
 
 ## Do's and Don'ts
 
 - Do keep Traditional Chinese as the product language and preserve the exact data-eval hooks required by the brief.
 - Do keep the same specimen content source across horizontal and vertical modes.
 - Do provide a clear return path to horizontal editing when vertical preview is harder to revise on mobile.
+- Do keep status chips short and honest, so they support comparison instead of replacing it.
 - Don't replace the workbench with a generic hero, floating dashboard cards, or decorative gradients that do not support comparison.
 - Don't hide the specimen, editor, or toggle behind hover-only affordances or external assets.
 - Don't invent a second system per breakpoint; let one token set and one content source drive all modes.

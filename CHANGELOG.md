@@ -4,9 +4,51 @@
 
 ## [Unreleased]
 
+### Added
+
+- 中文標題逐行量測 gate：重建 `h1–h3` 可見字元行，將意外的一字末行回送自動修復，並納入 v6 evidence validator。
+- 角色字級與字型研究：補入 GogoShark、PixelCake、Apple／Notion／Claude／Stripe／Uber／Mastercard `DESIGN.md`、MindStudio 選型文章、`getdesign@0.6.24`、`design-ai` 與 `emfont` 的可取模式及 schema／授權／預覽失敗／npm-repo 漂移／隱私邊界。
+- `sk1llz` registry 與官方 Material Web 的 pinned 稽核：加入 manifest／分類可取模式、remote installer path／hash／symlink／staging／rollback／隱形 Unicode 防護，並明示 Material Web maintenance mode 與 exact-version adapter 邊界。
+- `skill-repo-skill`、`darwin-skill`、Microsoft SkillOpt 與 CodeLove 比較研究：加入基線／候選比較、正反 trigger、重複 run、held-out validation、best-so-far／rollback 與獨立 evaluator 邊界。
+- 官方 `greensock/gsap-skills` pinned 研究：加入 portfolio／AI dashboard／digital magazine／產品站／scroll narrative 的節奏契約，Hero、ScrollTrigger、dashboard preview、login→dashboard 的 runtime／cleanup／reduced-motion／refresh／驗證規則，並記錄上游範例與文件缺陷而不盲從。
+- FWA／CSS Design Awards／CSS Winner／Awwwards 官方評選研究與 `top-design` pinned 稽核：新增選用型 award-quality lens，保留概念、signature moment、敘事節奏與 craft 啟發，拒絕自評得獎、固定美學配方、預設 smooth scroll 與壓過繁中／UX／可及性／效能的戲劇化。
+- installability gate 會拒絕未由 `SKILL.md` 直接連結的 Markdown reference／adapter，讓孤兒指令文件在 CI 失敗而不是靠人工盤點。
+- 新增 `SECURITY.md`，明示支援版本、敏感／非敏感回報邊界與目前尚未啟用 GitHub private vulnerability reporting 的限制。
+- v6 evidence publisher：原子更新 8 案 manifest、generation ledger、64 張 PNG、auditor／Skill／研究筆記 hash，正式 lint report 可用顯式 `--overwrite` 續跑。
+- evaluator-owned runtime downgrade 狀態機：進度延長 timeout、可恢復錯誤重試、三次同錯熔斷、驗證能力局部降級、權限／安全停止 mutation，並禁止同一 run 自動升級。
+- Darwin-style ratchet 紀錄：三輪候選各完成 generation 與 64 張 audit，劣於基準即拒絕晉級，不以 clean `DESIGN.md` 取代 browser acceptance。
+- 分層品質結果 schema 與 validator：硬 gate、independent craft vector、award lens、maintainer efficiency 分開；required `FAIL`／`UNVERIFIED` 會使結果 ineligible、保持 `weighted_total=null` 並禁止 `VERIFIED`。
+- 常駐 Codex resource monitor：單一 Python process 以 0.5 秒週期量測 log／staging quota，取代 shell 每 0.1 秒反覆啟動多個程序。
+
 ### Changed
 
 - CI 更新並固定至官方最新穩定版 `actions/checkout@v7.0.0`、`actions/setup-python@v6.3.0`、`actions/setup-node@v7.0.0` 與 GitHub CLI `v2.96.0`，移除舊版 Node.js 20 Action 警告並保持可重現安裝。
+- `SKILL.md` 由 333 行／約 5,942 words 收斂為 211 行／約 2,939 words：只保留 trigger、不可違反規則、reference router、七階段狀態機、自修復與 terminal behavior；詳細排版、元件、模型、驗證與研究規則維持在直接 references／scripts。
+- `project_scan.py` 預設輸出 JSON，要求 project root 位於明示 `--authorized-root`，並對 symlink、FIFO／device、超限檔案與 Markdown／控制字元注入 fail closed。
+- 最新繁中排版／layout／hierarchy／字型／色彩研究落實到 Skill 與全部 8 個 v6 網站；最終 ledger 為 8 repairs／0 promotions，公開契約修正後重新發布 64 張截圖。
+- model profile 升級為 schema v2：依 task／locale／surface／risk、Skill／adapter／toolchain／evaluator revision 與 eligible run 路由；infrastructure failure 不計入模型成績。
+- Codex case runner 依 caller model 與案例載入最小固定 context；v6 mini 實際輸入由 190,732 bytes 降至 145,024–161,274 bytes，manifest 保留選取清單，尚不宣稱速度改善。
+- README 只保留產品說明、成果與實際使用流程；host matrix、remote sandbox、pin、更新與卸載集中到 `INSTALL.md`，並新增 5 分鐘 discovery smoke。
+- 評分改為 run validity → required hard gates → independent craft vector → optional award lens → maintainer efficiency 五層決策；v6 明確標為 development/regression closure，不再暗示 held-out validation。
+- 以 pinned `darwin-skill` 與兩個獨立 judge 做 advisory ratchet；只採用「新 authority／material side effect 才停下確認」的 bounded checkpoint，拒絕頻繁 STOP、單一總分與重複 blacklist 等會降低 UX／證據完整性的 generic 建議。
+
+### Fixed
+
+- 安全稽核後關閉 shell quote／command-substitution trace 繞過、特殊檔／巨檔／深層 JSON 阻塞或耗盡、Codex 產物無大小上限、重複截圖冒充多個狀態，以及公開 evidence 洩漏本機絕對路徑等風險。
+- v6 generation matrix 與公開測試契約統一為使用者指定的 `gpt-5.4-mini` 單一 cohort，移除預設會路由到不支援 v6 cases 的 Claude 分支。
+- 修正補助審查 mobile dialog 的狀態 badge 搶走標題主軌，以及字體樣張 mobile hero 只剩「較」一字；窄回歸與第二輪完整 64 張 audit 均無 finding。
+- 修正 evaluator 對 CJK／Latin measure、正文 parent container、長標題、task peer layout 與已翻譯術語的 false positives；新增對應 regression tests。
+- 修正繁中標題以 `ch` 壓窄、正文右側無意義空白、介紹段落偏置、無語境英文 UI、假 CSS 圖解與 sticky 遮擋。
+- 修正繁中改派表單觸發瀏覽器原生英文驗證泡泡，改由頁內繁中錯誤狀態與焦點回復處理。
+- 修正 evaluator 偷綁小寫 size value、`data-step`、grant hidden ID／slot 與 royalty 私有狀態；改用語意輸入、可見狀態及 brief 公開 A/B／逐案 hook。
+- 修正包材摘要 sticky 遮擋與口述歷史寬卡窄文；窄回歸 28 張、完整回歸 64 張均無 deterministic findings。
+- 修正 runtime downgrade 把跨錯誤累積誤當「連續三次」，以及 progress timeout 延長錯算一次失敗；interleaved failure 與 progress→timeout 都有 regression test。
+- generation retry 依 timeout kind 與 failure class 分流；hard-runtime、output-limit 與安全 policy rejection 不再盲目跑滿三次。
+
+### Removed
+
+- 移除已由 `product_cases.json` 與現行 `TEST_PLAN.md` 取代的 `evals/benchmark-matrix.md`。
+- 合併兩份完全相同的 Claude showcase `BRIEF.md`，改由 `evals/briefs/showcase.md` 作唯一來源。
 
 ## [0.2.0] - 2026-07-15
 

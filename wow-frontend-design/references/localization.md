@@ -2,6 +2,15 @@
 
 Use this reference for every interface containing user-facing language. Treat localization as a layout input, not final copy replacement. Chinese typography guidance here is informed by the continuously updated W3C CLReq Draft Note; it is not a conformance certification.
 
+## Chinese-first terminology
+
+- In a Traditional Chinese UI, translate workflow nouns, state labels, buttons, helper text, eyebrow labels, and fallback messages into natural Traditional Chinese.
+- Preserve exact product names, organization names, codes, standards, commands, API identifiers, and domain terms when translation would lose identity or precision.
+- For a useful English technical term, use `中文術語（English term）` on first occurrence, then use the Chinese term. Do not repeatedly drop unexplained English words such as workflow states into otherwise Chinese sentences.
+- Do not add first-use English merely because the source brief used it. Ordinary product terms such as `待選名單`, `對話框`, `重試`, `篩選` and `工作區` normally need no parenthetical English; reserve it for terminology whose original form helps identification, search, standards compliance, or domain precision.
+- Keep code identifiers, `data-*` hooks, event names, storage keys, and evaluator selectors stable; localization changes visible copy, not program contracts.
+- Audit the initial state and every dynamic state. A translated button that changes back to raw English after interaction is still a defect.
+
 ## Contents
 
 1. Locale policy

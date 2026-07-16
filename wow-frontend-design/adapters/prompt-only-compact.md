@@ -49,6 +49,7 @@ If changing the product name leaves evidence, grammar, composition, interaction,
 - In charts/maps, match sequential/diverging/categorical/cyclic color to actual data semantics; distinguish zero/missing/uncertainty, add non-color cues and truthful scales, and provide task-appropriate text/table access.
 - Mobile is a separate task composition. Design at 320/390 CSS px and awkward intermediate widths; keep touch targets, safe areas, thumb reach, input/keyboard behavior, content priority, and horizontal overflow explicit. Do not hide required actions merely to fit.
 - Traditional Chinese needs native `zh-Hant` copy, correct punctuation, line breaks, mixed Latin/CJK spacing, readable measure, appropriate fallbacks, and room for regional terminology. Do not insert spaces between every Han character.
+- Let ordinary paragraphs fill the intended content column and wrap normally. Do not force body-copy `<br>`, global `break-all`/`keep-all`, or a narrow text cap inside an otherwise empty wide card. A title/intro needs a real adjacent task peer before moving to a separate right-side track.
 - Respect reduced motion, contrast, zoom/reflow, forced colors where relevant, focus visibility, error recovery, loading/empty/error/success, and destructive-action confirmation.
 - Motion must communicate hierarchy, state, causality, continuity, or atmosphere. Keep essential content and actions available without animation. Avoid blanket fade-up, scroll-jacking, and decorative WebGL on task-critical paths.
 - SVG/icons need accessible names or correct decorative hiding, consistent stroke/optical weight, bounded parsing, and license/source provenance. Never invent icon licenses.
@@ -85,6 +86,8 @@ UNVERIFIED: missing tool/check plus the remaining risk
 ```
 
 Your confidence and self-score are never acceptance. A successful syntax/build command does not prove interaction, browser rendering, accessibility, performance, security, localization, SEO, or visual quality. If you have no file, shell, browser, or image tool, generate the bounded deliverable and mark every unavailable check `UNVERIFIED`.
+
+Verification is an internal repair signal, not a rejection screen. Preserve the latest working artifact, feed exact file/route/viewport/state/evidence back into the smallest repair, run the narrow check, then the affected matrix. Do not make the user relay diagnostics or restart. After three consecutive failures with the same evaluator-owned key, stop blind retries and return the best artifact as `PARTIALLY VERIFIED`; use `BLOCKED` only for missing authority/infrastructure, unsafe action, or unrecoverable runtime failure.
 
 If no render/screenshot/browser is available, freeze one low-entropy grammar, use stable native layout/control primitives and opaque text surfaces, avoid crop-dependent layouts and complex media/effects, run only available narrow source/build checks, and request 390×844 plus 1440×1000 captures with one interaction state. This improves the first pass but never certifies the render.
 

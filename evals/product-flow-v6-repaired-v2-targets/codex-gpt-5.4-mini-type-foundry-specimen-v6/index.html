@@ -33,7 +33,7 @@
       --font-reading: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
       --font-functional: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
       --font-specimen: "Noto Serif TC", "Iowan Old Style", "PingFang TC", serif;
-      --measure: 68ch;
+      --measure: 40rem;
       --max-shell: 76rem;
     }
 
@@ -131,14 +131,20 @@
       font-size: clamp(2.1rem, 4vw, 3.65rem);
       line-height: 1.05;
       letter-spacing: 0;
-      max-inline-size: 13ch;
+      max-inline-size: none;
+      text-wrap: balance;
     }
 
     .summary {
       margin: 0;
-      max-inline-size: var(--measure);
+      max-inline-size: 46rem;
       font-size: 1.05rem;
       color: rgba(32, 25, 21, 0.85);
+    }
+
+    .summary--detail {
+      font-size: 0.98rem;
+      color: rgba(32, 25, 21, 0.75);
     }
 
     .workbench {
@@ -271,6 +277,14 @@
       display: grid;
       gap: var(--space-2);
       min-inline-size: 0;
+    }
+
+    .field-note {
+      margin: 0;
+      max-inline-size: 42rem;
+      color: rgba(32, 25, 21, 0.76);
+      font: 600 0.9rem/1.55 var(--font-functional);
+      letter-spacing: 0.01em;
     }
 
     .field-label {
@@ -442,7 +456,8 @@
       }
 
       .title {
-        max-inline-size: 11ch;
+        max-inline-size: none;
+        font-size: clamp(1.75rem, 8vw, 1.875rem);
       }
 
       .toolbar {
@@ -487,6 +502,10 @@
         --focus: Highlight;
       }
 
+      body::before {
+        display: none;
+      }
+
       body::before,
       .panel,
       .specimen-frame,
@@ -518,7 +537,8 @@
     <header class="masthead">
       <span class="eyebrow">繁中字體鑄造所樣張庫</span>
       <h1 class="title">樣張、框線、橫直書比較</h1>
-      <p class="summary">把繁中標點、英文、數字與 fallback 放進同一個校樣台，用真實版面檢查字形與字距，不把樣張藏進假卡片。</p>
+      <p class="summary">把繁中標點、英文、數字與回退（fallback）放進同一個校樣台，用真實版面檢查字形與字距，不把樣張藏進假卡片。</p>
+      <p class="summary summary--detail">校樣時先看標點的落點，再看英數與中文字面的節奏；如果直書讓手機上的編修變得費力，先切回橫書，再用框線比較細節。</p>
     </header>
 
     <main id="main" class="workbench" data-eval="specimen-workspace" data-writing="horizontal" data-outline="false">
@@ -551,13 +571,17 @@
 
           <div class="copy-field">
             <label class="field-label" for="specimen-editor">樣張內容</label>
-            <textarea id="specimen-editor" class="copy-editor" rows="7">繁體中文標點，ABC 123，fallback 與字距。
-「引號、頓號、分號」都要清楚。
-直書與橫書都要能讀。</textarea>
+            <p class="field-note">先保留一段能代表字型氣質的短文，再補上常見的標點、英數、括號與換行，避免只看單一字面。</p>
+            <textarea id="specimen-editor" class="copy-editor" rows="9">繁體中文標點，ABC 123，回退（fallback）與字距。
+「引號、頓號、分號、冒號」都要清楚。
+直書與橫書都要能讀，連同括號、破折號與全形空白一起檢查。
+校樣紙上要看字面、行距、數字位置和字族氣質。
+若直書壓縮了修字空間，先回到橫書，再確認每個標點是否站對位置。</textarea>
           </div>
 
           <div class="fallback-note" data-eval="fallback-note" id="fallback-note">
-            <p>fallback：窄螢幕上請優先回到橫書編修；直書只保留作比對，不把短樣張壓成一字寬長柱。</p>
+            <p>回退說明（fallback）：窄螢幕上請優先回到橫書編修；直書只保留作比對，不把短樣張壓成一字寬長柱。</p>
+            <p>可比較項目包括標點站位、英數比例、全形與半形空隙，以及框線是否把字面擠歪。</p>
           </div>
         </div>
       </section>
@@ -612,6 +636,19 @@
       const specimenCopy = () => editor.value.replace(/\n{3,}/g, '\n\n').trimEnd();
 
       const mobilePrompt = () => window.matchMedia('(max-width: 640px)').matches;
+      const fallbackHorizontal = [
+        '<p>回退說明（fallback）：窄螢幕上請優先回到橫書編修；直書只保留作比對，不把短樣張壓成一字寬長柱。</p>',
+        '<p>可比較項目包括標點站位、英數比例、全形與半形空隙，以及框線是否把字面擠歪。</p>'
+      ].join('');
+      const fallbackVerticalDesktop = [
+        '<p>回退說明（fallback）：直書預覽已啟用；若要精修，仍可回到橫書比較標點、英文與數字。</p>',
+        '<p>這個直書狀態只負責比對，不負責代替修字。</p>'
+      ].join('');
+      const fallbackVerticalMobile = [
+        '<p>回退說明（fallback）：現在是直書預覽。若要編修，請按「回到橫書」回到較好輸入的版面。</p>',
+        '<button type="button" class="inline-action" data-fallback-return>回到橫書編修</button>',
+        '<p>手機上直書只用來確認字面比例與標點位置，不作長篇修訂。</p>'
+      ].join('');
 
       const syncSpecimen = () => {
         specimen.textContent = specimenCopy();
@@ -620,19 +657,16 @@
       const syncWriting = () => {
         const isVertical = state.writing === 'vertical';
         workbench.dataset.writing = state.writing;
+        specimen.style.writingMode = isVertical ? 'vertical-rl' : 'horizontal-tb';
+        specimen.style.textOrientation = isVertical ? 'mixed' : '';
         writingToggle.setAttribute('aria-pressed', String(isVertical));
         writingToggle.textContent = isVertical ? '回到橫書' : '切換為直書';
         modeChip.textContent = isVertical ? '直書預覽' : '橫書預覽';
         previewTitle.textContent = isVertical ? '直書預覽' : '樣張預覽';
-        if (mobilePrompt()) {
-          fallbackNote.innerHTML = isVertical
-            ? '<p>fallback：現在是直書預覽。若要編修，請按「回到橫書」回到較好輸入的版面。</p><button type="button" class="inline-action" data-fallback-return>回到橫書編修</button>'
-            : '<p>fallback：窄螢幕上請優先回到橫書編修；直書只保留作比對，不把短樣張壓成一字寬長柱。</p>';
-        } else {
-          fallbackNote.innerHTML = isVertical
-            ? '<p>fallback：直書預覽已啟用；若要精修，仍可回到橫書比較標點、英文與數字。</p>'
-            : '<p>fallback：窄螢幕上請優先回到橫書編修；直書只保留作比對，不把短樣張壓成一字寬長柱。</p>';
-        }
+        specimen.setAttribute('aria-label', isVertical ? '直書樣張預覽' : '橫書樣張預覽');
+        fallbackNote.innerHTML = isVertical
+          ? (mobilePrompt() ? fallbackVerticalMobile : fallbackVerticalDesktop)
+          : fallbackHorizontal;
       };
 
       const syncOutline = () => {

@@ -70,7 +70,7 @@ components:
     textColor: "{colors.on-primary}"
     typography: "{typography.display}"
     rounded: "{rounded.lg}"
-    padding: "{spacing.lg}"
+    padding: "{spacing.xl}"
   surface-base:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"

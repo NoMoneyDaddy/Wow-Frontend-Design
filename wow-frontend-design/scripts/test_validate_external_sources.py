@@ -20,7 +20,7 @@ class SourceLockTests(unittest.TestCase):
         count = validate_external_sources.validate(
             root / "wow-frontend-design" / "references" / "external-sources.lock.json"
         )
-        self.assertEqual(count, 29)
+        self.assertEqual(count, 45)
 
     def test_short_revision_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -45,6 +45,19 @@ class SourceLockTests(unittest.TestCase):
             )
             with self.assertRaises(validate_external_sources.SourceLockError):
                 validate_external_sources.validate(path)
+
+    def test_oversized_and_deep_locks_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            oversized = root / "oversized.json"
+            oversized.write_bytes(b" " * (validate_external_sources.MAX_LOCK_BYTES + 1))
+            with self.assertRaisesRegex(validate_external_sources.SourceLockError, "exceeds"):
+                validate_external_sources.load(oversized)
+
+            deep = root / "deep.json"
+            deep.write_text("[" * 1_100 + "]" * 1_100, encoding="utf-8")
+            with self.assertRaises(validate_external_sources.SourceLockError):
+                validate_external_sources.load(deep)
 
 
 if __name__ == "__main__":

@@ -13,9 +13,9 @@
     {
       "id": "deterministic-weak-model-guardrails",
       "status": "tested_in_repo",
-      "claim": "Project scan, model routing, evidence ledger, scorer, fail-closed schemas and the published v6 evidence-integrity gate have automated tests.",
-      "artifacts": ["wow-frontend-design/scripts/project_scan.py", "wow-frontend-design/scripts/route_model.py", "wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/score_weak_model_output.py", "wow-frontend-design/scripts/test_evidence_workflow_smoke.py", "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py", "wow-frontend-design/scripts/test_validate_product_flow_v6_evidence.py"],
-      "boundary": "Passing unit and evidence-integrity tests verifies encoded invariants only; it does not make a weak model truthful or generally visually capable."
+      "claim": "Project scan, task-specific external model routing, one-way runtime downgrade, evidence ledger, scorer, fail-closed schemas and the published v6 evidence-integrity gate have automated tests.",
+      "artifacts": ["wow-frontend-design/references/model-routing.md", "wow-frontend-design/scripts/project_scan.py", "wow-frontend-design/scripts/model_profile.example.json", "wow-frontend-design/scripts/route_model.py", "wow-frontend-design/scripts/test_route_model.py", "wow-frontend-design/scripts/runtime_events.example.json", "wow-frontend-design/scripts/runtime_downgrade.py", "wow-frontend-design/scripts/test_runtime_downgrade.py", "wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/score_weak_model_output.py", "wow-frontend-design/scripts/test_evidence_workflow_smoke.py", "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py", "wow-frontend-design/scripts/test_validate_product_flow_v6_evidence.py"],
+      "boundary": "Passing unit and evidence-integrity tests verifies encoded routing and downgrade invariants only; it does not establish a universal strong/weak ordering, predict unseen tasks, make a model truthful or prove visual capability."
     },
     {
       "id": "structured-site-planning",
@@ -23,6 +23,13 @@
       "claim": "IA manifests, end-to-end user flows, responsive wireframe plans and local XML sitemaps have fail-closed cross-artifact validation and hostile tests.",
       "artifacts": ["wow-frontend-design/references/site-planning-wireframes.md", "wow-frontend-design/scripts/site_manifest.schema.json", "wow-frontend-design/scripts/wireframe_plan.schema.json", "wow-frontend-design/scripts/validate_site_plan.py", "wow-frontend-design/scripts/test_validate_site_plan.py"],
       "boundary": "Passing schemas and hostile tests proves the encoded planning invariants only; it does not prove research validity, usability, visual quality, production behavior, indexing or ranking."
+    },
+    {
+      "id": "external-research-supply-chain",
+      "status": "tested_in_repo",
+      "claim": "External GitHub research coordinates are pinned to full revisions with reviewed license labels and safe relative paths; registry and installer guidance rejects mutable sources, path escape, symlink escape, missing hashes, non-transactional promotion and unexplained invisible Unicode.",
+      "artifacts": ["wow-frontend-design/references/external-sources.lock.json", "wow-frontend-design/references/curated-skill-integration.md", "wow-frontend-design/references/github-skill-research.md", "wow-frontend-design/scripts/validate_external_sources.py", "wow-frontend-design/scripts/test_validate_external_sources.py"],
+      "boundary": "The local validator proves lock structure and path syntax only. It does not re-fetch repositories, certify every upstream claim, scan an installed tree, or replace per-file license and security review before code or assets are copied or executed."
     },
     {
       "id": "traditional-chinese-showcase",

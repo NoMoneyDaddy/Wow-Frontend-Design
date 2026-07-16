@@ -115,6 +115,8 @@
     }
 
     .masthead {
+      display: grid;
+      gap: var(--space-section);
       padding: var(--space-section);
       border: 1px solid var(--border-soft);
       border-radius: var(--radius-lg);
@@ -122,6 +124,51 @@
         linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 80%),
         rgba(26, 21, 17, 0.88);
       box-shadow: var(--shadow-soft);
+    }
+
+    .masthead-main {
+      display: grid;
+      gap: 0.9rem;
+      min-width: 0;
+    }
+
+    .masthead-note {
+      display: grid;
+      gap: 0.8rem;
+      padding: var(--space-panel);
+      border: 1px solid rgba(242, 181, 76, 0.18);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.03);
+      align-self: start;
+      min-width: 0;
+    }
+
+    .note-kicker {
+      margin: 0;
+      color: var(--color-primary);
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .note-steps {
+      margin: 0;
+      padding-inline-start: 1.2rem;
+      display: grid;
+      gap: 0.45rem;
+      color: var(--text-soft);
+      line-height: 1.55;
+    }
+
+    .note-steps li::marker {
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+
+    .note-foot {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.55;
     }
 
     .eyebrow {
@@ -142,8 +189,8 @@
     }
 
     .lede {
-      margin: 0.9rem 0 0;
-      max-inline-size: 58ch;
+      margin: 0;
+      max-inline-size: 64ch;
       color: var(--text-soft);
       line-height: 1.65;
     }
@@ -561,6 +608,19 @@
     }
 
     @media (min-width: 900px) {
+      .masthead {
+        grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
+      }
+
+      .masthead-main {
+        grid-column: 1;
+      }
+
+      .masthead-note {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+      }
+
       .content {
         grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.9fr);
         align-items: start;
@@ -591,6 +651,10 @@
       .controls,
       .index-rail {
         border-radius: 20px;
+      }
+
+      .masthead-note {
+        padding: 0.9rem;
       }
 
       .search-row {
@@ -630,14 +694,25 @@
   <a class="skip-link" href="#stall-list">跳到攤位清單</a>
   <main class="page" data-eval="allergen-guide">
     <header class="masthead" id="top">
-      <p class="eyebrow">夜市索引</p>
-      <h1>夜市過敏原隨身指南</h1>
-      <p class="lede">在擁擠環境中快速找攤位、篩選「不含花生」，再把單筆資訊打開看清楚。每筆內容都以攤商提供的標示為準，點餐前仍要現場再確認。</p>
-      <div class="hero-meta" aria-label="頁面摘要">
-        <span class="badge"><strong>8</strong> 筆攤位</span>
-        <span class="badge"><strong>4</strong> 筆明示不含花生</span>
-        <span class="badge">資料為示意攤位欄位</span>
+      <div class="masthead-main">
+        <p class="eyebrow">夜市索引</p>
+        <h1>夜市過敏原隨身指南</h1>
+        <p class="lede">在擁擠環境中快速找攤位、篩選「不含花生」，再把單筆資訊打開看清楚。每筆內容都以攤商提供的標示為準，點餐前仍要現場再確認。</p>
+        <div class="hero-meta" aria-label="頁面摘要">
+          <span class="badge"><strong>8</strong> 筆攤位</span>
+          <span class="badge"><strong>4</strong> 筆明示不含花生</span>
+          <span class="badge">攤商提供資訊</span>
+        </div>
       </div>
+      <aside class="masthead-note" aria-label="快速確認">
+        <p class="note-kicker">快速確認</p>
+        <ol class="note-steps">
+          <li>先輸入攤名、品項或區位。</li>
+          <li>點「不含花生」，先看已明示的攤位。</li>
+          <li>再展開單筆，直接向攤商確認。</li>
+        </ol>
+        <p class="note-foot">攤商提供的標示只供現場再確認，不是醫療保證。</p>
+      </aside>
     </header>
 
     <section class="controls" aria-label="搜尋與篩選">
@@ -654,7 +729,7 @@
         </div>
         <div class="counter" id="visible-count" aria-live="polite">顯示 8 / 8</div>
       </div>
-      <p class="status-note" id="status-text">先用搜尋縮小範圍，再點開單筆細節。短操作標籤都保持單行。</p>
+      <p class="status-note" id="status-text">先用搜尋縮小範圍，再點開單筆細節。</p>
     </section>
 
     <section class="content" aria-label="攤位內容">
@@ -895,8 +970,8 @@
         <p id="empty-state" class="empty" hidden>找不到符合條件的攤位。可以先清除篩選，或改用更短的關鍵字。</p>
       </div>
 
-      <aside class="index-rail" aria-label="桌機索引">
-        <h2>桌機索引</h2>
+      <aside class="index-rail" aria-label="快速索引">
+        <h2>快速索引</h2>
         <p>右側只放快速參考，主工作仍在左側清單完成。</p>
         <ul class="index-links">
           <li><a href="#stall-list"><span>所有攤位</span><span>8 筆</span></a></li>
@@ -911,7 +986,7 @@
 
   <script>
     (() => {
-      const records = Array.from(document.querySelectorAll('[data-eval="stall-record"]'));
+      const records = Array.from(document.querySelectorAll('.stall-card'));
       const search = document.querySelector('[data-eval="stall-search"]');
       const filter = document.querySelector('[data-filter-value="peanut-free"]');
       const reset = document.querySelector('[data-action="clear-filters"]');

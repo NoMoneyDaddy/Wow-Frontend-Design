@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-15T12:18:08.663Z",
+  "generated_at": "2026-07-16T02:04:45.975Z",
   "evaluator": "Playwright 1.61.1",
   "auditor": {
     "path": "evals/playwright_visual_v6_audit.cjs",
-    "sha256": "716fb3f32640c66900230619d93d47446f0e0f52116d2e8ae4843f5dd7e69dc3"
+    "sha256": "6b829c61a553f4d347d2c88058afd761d1e28422d7ccae4189f0cab1c300b4ff"
   },
-  "browser": "149.0.7827.55",
+  "browser": "150.0.7871.124",
   "viewports": [
     {
       "name": "desktop",
@@ -57,42 +57,42 @@
     {
       "caseId": "wind-maintenance-dispatch-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-0/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/"
     },
     {
       "caseId": "type-foundry-specimen-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-1/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/"
     },
     {
       "caseId": "repair-cafe-intake-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-2/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/"
     },
     {
       "caseId": "night-market-allergen-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-3/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/"
     },
     {
       "caseId": "royalty-statement-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-4/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/"
     },
     {
       "caseId": "packaging-configurator-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-5/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/"
     },
     {
       "caseId": "oral-history-archive-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-6/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/"
     },
     {
       "caseId": "grant-review-board-v6",
       "alias": "codex-gpt-5.4-mini",
-      "url": "http://127.0.0.1:51585/target-7/"
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/"
     }
   ],
   "results": [
@@ -101,11 +101,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-0/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/wind-maintenance-dispatch-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "ac6f8ee496d458e9c9d11dec689d9f9d653241a6eec853454b7c1cbdaec9ce80",
+      "screenshotSha256": "41ead935d95a92ccc54abbd47a6d50237d75d584a2bbaf8e0c7ee63d6daa29f3",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -129,7 +129,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -148,19 +161,19 @@
         "--shadow": "0 18px 40px rgba(0, 0, 0, 0.28)",
         "--space-4": "1rem",
         "--space-3": "0.875rem",
-        "--radius-md": "0.8rem",
         "--page-max": "94rem",
+        "--radius-md": "0.8rem",
         "--soft": "rgba(234, 243, 247, 0.12)",
-        "--radius-lg": "1.25rem",
         "--danger-ink": "#231112",
+        "--radius-lg": "1.25rem",
         "--danger": "#d86a5e",
         "--surface": "#10212b",
         "--success": "#4fbf9c",
         "--space-7": "2.75rem",
         "--space-6": "2rem",
         "--line": "rgba(234, 243, 247, 0.16)",
-        "--space-5": "1.5rem",
         "--ink": "#eaf3f7",
+        "--space-5": "1.5rem",
         "--canvas": "#08131a"
       },
       "shellSignature": {
@@ -178,11 +191,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-0/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/wind-maintenance-dispatch-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "ca97f3b2ae82dbc7d822f6e9aa1f7114259c4e3fa354fc9eddeb2e38f785e228",
+      "screenshotSha256": "dd986ec2f875387f26166afbf60de3697c014a11f080b03253dfe7156977fccc",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -206,7 +219,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -225,8 +251,8 @@
         "--shadow": "0 18px 40px rgba(0, 0, 0, 0.28)",
         "--space-4": "1rem",
         "--space-3": "0.875rem",
-        "--radius-md": "0.8rem",
         "--page-max": "94rem",
+        "--radius-md": "0.8rem",
         "--soft": "rgba(234, 243, 247, 0.12)",
         "--danger-ink": "#231112",
         "--radius-lg": "1.25rem",
@@ -255,11 +281,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-0/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/wind-maintenance-dispatch-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "ebc7c143f0304a0e17284b1249e5b85bac18329c35c1ffbcf6d5daf480dffcd7",
+      "screenshotSha256": "35faad7bb6ba828443755accc74fb74e7bb8728ce365d48ac88a740371978d38",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -283,7 +309,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -302,8 +341,8 @@
         "--shadow": "0 18px 40px rgba(0, 0, 0, 0.28)",
         "--space-4": "1rem",
         "--space-3": "0.875rem",
-        "--radius-md": "0.8rem",
         "--page-max": "94rem",
+        "--radius-md": "0.8rem",
         "--soft": "rgba(234, 243, 247, 0.12)",
         "--danger-ink": "#231112",
         "--radius-lg": "1.25rem",
@@ -332,11 +371,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-0/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/wind-maintenance-dispatch-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "e82b1284a578e041aa553e0a90d96da37b481b1503a9c246be66650e03c4ab63",
+      "screenshotSha256": "d54f44e2a6084d0dee885fd1703647f6cc24aa53bf4950841b223a698cdbec15",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -360,7 +399,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -379,8 +431,8 @@
         "--shadow": "0 18px 40px rgba(0, 0, 0, 0.28)",
         "--space-4": "1rem",
         "--space-3": "0.875rem",
-        "--radius-md": "0.8rem",
         "--page-max": "94rem",
+        "--radius-md": "0.8rem",
         "--soft": "rgba(234, 243, 247, 0.12)",
         "--danger-ink": "#231112",
         "--radius-lg": "1.25rem",
@@ -409,11 +461,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-0/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/wind-maintenance-dispatch-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "73f23b7ac097a703673967ca20f0ad4abe57ccbd37ac4b7f67adc458e1dc017e",
+      "screenshotSha256": "63eb6d8db8d079755831f775e000f6936ec0b9808afa9c893803835d1b85ed84",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -440,7 +492,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -459,8 +524,8 @@
         "--shadow": "0 18px 40px rgba(0, 0, 0, 0.28)",
         "--space-4": "1rem",
         "--space-3": "0.875rem",
-        "--radius-md": "0.8rem",
         "--page-max": "94rem",
+        "--radius-md": "0.8rem",
         "--soft": "rgba(234, 243, 247, 0.12)",
         "--danger-ink": "#231112",
         "--radius-lg": "1.25rem",
@@ -489,11 +554,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-0/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/wind-maintenance-dispatch-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "5e4ab471d091b569cfd761208e13482c9c025dd2d56976c90477b13324903d57",
+      "screenshotSha256": "261e9c4e8d7caeb7a4a5cd11720887f58ba3ab4fdd4af5343443241f649c0283",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -520,14 +585,27 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
         "--space-1": "0.375rem",
-        "--muted": "rgba(234, 243, 247, 0.72)",
         "--success-ink": "#09211d",
+        "--muted": "rgba(234, 243, 247, 0.72)",
         "--surface-2": "#152938",
         "--measure": "38em",
         "--radius-sm": "0.45rem",
@@ -539,19 +617,19 @@
         "--shadow": "0 18px 40px rgba(0, 0, 0, 0.28)",
         "--space-4": "1rem",
         "--space-3": "0.875rem",
-        "--radius-md": "0.8rem",
         "--page-max": "94rem",
+        "--radius-md": "0.8rem",
         "--soft": "rgba(234, 243, 247, 0.12)",
-        "--radius-lg": "1.25rem",
         "--danger-ink": "#231112",
+        "--radius-lg": "1.25rem",
         "--danger": "#d86a5e",
         "--surface": "#10212b",
         "--success": "#4fbf9c",
         "--space-7": "2.75rem",
         "--space-6": "2rem",
         "--line": "rgba(234, 243, 247, 0.16)",
-        "--space-5": "1.5rem",
         "--ink": "#eaf3f7",
+        "--space-5": "1.5rem",
         "--canvas": "#08131a"
       },
       "shellSignature": {
@@ -569,11 +647,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-1/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/type-foundry-specimen-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "324115fe84e2302cccd29995802b4631aa84ff9bce5fed69d2c04d9c456b12d5",
+      "screenshotSha256": "f9adcc9a29985c0e3b075a54e474786c9e499df845108971f89073a318ef2668",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -597,7 +675,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -608,7 +699,7 @@
         "--font-reading": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-surface": "#fff9f4",
         "--color-canvas": "#f4ebdd",
-        "--measure": "68ch",
+        "--measure": "40rem",
         "--focus": "#a01f2d",
         "--radius-sm": "0.375rem",
         "--color-on-surface": "#201915",
@@ -616,8 +707,8 @@
         "--shadow-soft": "0 18px 48px rgba(32, 25, 21, 0.08)",
         "--color-on-primary": "#fff8f1",
         "--color-on-canvas": "#201915",
-        "--max-shell": "76rem",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Noto Serif TC\", serif",
+        "--max-shell": "76rem",
         "--space-2": "0.5rem",
         "--radius-xl": "1.5rem",
         "--space-4": "1rem",
@@ -626,11 +717,11 @@
         "--radius-lg": "1rem",
         "--color-muted-surface": "#e7d8c8",
         "--font-specimen": "\"Noto Serif TC\", \"Iowan Old Style\", \"PingFang TC\", serif",
-        "--color-primary": "#202020",
         "--space-7": "3rem",
+        "--color-primary": "#202020",
         "--space-6": "2rem",
-        "--space-5": "1.5rem",
-        "--rule": "rgba(32, 25, 21, 0.14)"
+        "--rule": "rgba(32, 25, 21, 0.14)",
+        "--space-5": "1.5rem"
       },
       "shellSignature": {
         "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif|16px",
@@ -647,11 +738,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-1/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/type-foundry-specimen-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "ac9d18b02bf709990a75491aa3c8534b5409b91490cfa43cafa36f4784acb68e",
+      "screenshotSha256": "70315887d4e39a98a51bf92e4119b106f0c9d813f0fb783a365cad6ef9566f25",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -675,7 +766,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -686,12 +790,12 @@
         "--font-reading": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-surface": "#fff9f4",
         "--color-canvas": "#f4ebdd",
-        "--measure": "68ch",
+        "--measure": "40rem",
         "--focus": "#a01f2d",
         "--radius-sm": "0.375rem",
         "--color-on-surface": "#201915",
-        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--shadow-soft": "0 18px 48px rgba(32, 25, 21, 0.08)",
+        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-on-primary": "#fff8f1",
         "--color-on-canvas": "#201915",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Noto Serif TC\", serif",
@@ -704,11 +808,11 @@
         "--radius-lg": "1rem",
         "--color-muted-surface": "#e7d8c8",
         "--font-specimen": "\"Noto Serif TC\", \"Iowan Old Style\", \"PingFang TC\", serif",
-        "--color-primary": "#202020",
         "--space-7": "3rem",
+        "--color-primary": "#202020",
         "--space-6": "2rem",
-        "--space-5": "1.5rem",
-        "--rule": "rgba(32, 25, 21, 0.14)"
+        "--rule": "rgba(32, 25, 21, 0.14)",
+        "--space-5": "1.5rem"
       },
       "shellSignature": {
         "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif|16px",
@@ -725,11 +829,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-1/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/type-foundry-specimen-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "9cba2d1b4fc2f0be50b4940a49303477febdc50fdb4a0546981dc24912f48898",
+      "screenshotSha256": "74d506f16c79272ff62919eb44e41dba35690f77d2dd044ae9ffda3da1d5a2af",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -753,7 +857,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -764,12 +881,12 @@
         "--font-reading": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-surface": "#fff9f4",
         "--color-canvas": "#f4ebdd",
-        "--measure": "68ch",
+        "--measure": "40rem",
         "--focus": "#a01f2d",
         "--radius-sm": "0.375rem",
         "--color-on-surface": "#201915",
-        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--shadow-soft": "0 18px 48px rgba(32, 25, 21, 0.08)",
+        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-on-primary": "#fff8f1",
         "--color-on-canvas": "#201915",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Noto Serif TC\", serif",
@@ -782,11 +899,11 @@
         "--radius-lg": "1rem",
         "--color-muted-surface": "#e7d8c8",
         "--font-specimen": "\"Noto Serif TC\", \"Iowan Old Style\", \"PingFang TC\", serif",
-        "--color-primary": "#202020",
         "--space-7": "3rem",
+        "--color-primary": "#202020",
         "--space-6": "2rem",
-        "--space-5": "1.5rem",
-        "--rule": "rgba(32, 25, 21, 0.14)"
+        "--rule": "rgba(32, 25, 21, 0.14)",
+        "--space-5": "1.5rem"
       },
       "shellSignature": {
         "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif|16px",
@@ -803,11 +920,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-1/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/type-foundry-specimen-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "7407e7a50d86bf1afdaf8fe4d0205f610092edda0b8f80c5bf33eaea5773ab47",
+      "screenshotSha256": "2a578f6f82f1a68ca4eebd8c1e4c798e4af0ee6f37e6053075d058c913790aec",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -831,7 +948,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -842,12 +972,12 @@
         "--font-reading": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-surface": "#fff9f4",
         "--color-canvas": "#f4ebdd",
-        "--measure": "68ch",
+        "--measure": "40rem",
         "--focus": "#a01f2d",
         "--radius-sm": "0.375rem",
         "--color-on-surface": "#201915",
-        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--shadow-soft": "0 18px 48px rgba(32, 25, 21, 0.08)",
+        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-on-primary": "#fff8f1",
         "--color-on-canvas": "#201915",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Noto Serif TC\", serif",
@@ -860,11 +990,11 @@
         "--radius-lg": "1rem",
         "--color-muted-surface": "#e7d8c8",
         "--font-specimen": "\"Noto Serif TC\", \"Iowan Old Style\", \"PingFang TC\", serif",
-        "--color-primary": "#202020",
         "--space-7": "3rem",
+        "--color-primary": "#202020",
         "--space-6": "2rem",
-        "--space-5": "1.5rem",
-        "--rule": "rgba(32, 25, 21, 0.14)"
+        "--rule": "rgba(32, 25, 21, 0.14)",
+        "--space-5": "1.5rem"
       },
       "shellSignature": {
         "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif|16px",
@@ -881,11 +1011,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-1/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/type-foundry-specimen-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "ad8f287259d05f78cc4d0784cfe218680ff3dbc02cdb0aea25c41193ccd95dff",
+      "screenshotSha256": "962d1770f35ef8555fe6dcc47098b38b754d0c96d39f75fffc824398a3e9b407",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -912,7 +1042,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -923,7 +1066,7 @@
         "--font-reading": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-surface": "#fff9f4",
         "--color-canvas": "#f4ebdd",
-        "--measure": "68ch",
+        "--measure": "40rem",
         "--focus": "#a01f2d",
         "--radius-sm": "0.375rem",
         "--color-on-surface": "#201915",
@@ -931,8 +1074,8 @@
         "--shadow-soft": "0 18px 48px rgba(32, 25, 21, 0.08)",
         "--color-on-primary": "#fff8f1",
         "--color-on-canvas": "#201915",
-        "--max-shell": "76rem",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Noto Serif TC\", serif",
+        "--max-shell": "76rem",
         "--space-2": "0.5rem",
         "--radius-xl": "1.5rem",
         "--space-4": "1rem",
@@ -941,11 +1084,11 @@
         "--radius-lg": "1rem",
         "--color-muted-surface": "#e7d8c8",
         "--font-specimen": "\"Noto Serif TC\", \"Iowan Old Style\", \"PingFang TC\", serif",
-        "--color-primary": "#202020",
         "--space-7": "3rem",
+        "--color-primary": "#202020",
         "--space-6": "2rem",
-        "--space-5": "1.5rem",
-        "--rule": "rgba(32, 25, 21, 0.14)"
+        "--rule": "rgba(32, 25, 21, 0.14)",
+        "--space-5": "1.5rem"
       },
       "shellSignature": {
         "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif|16px",
@@ -962,11 +1105,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-1/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-type-foundry-specimen-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/type-foundry-specimen-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "971d204d691bd3c280d9e1910a0b851d53ee9b863fc25ccc0cf6b1598b0455d8",
+      "screenshotSha256": "ac093200cf99ef84569e1f93b5eec09a6c4ee7f83ce3947202e2e80dfd856a94",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -993,7 +1136,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1004,12 +1160,12 @@
         "--font-reading": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-surface": "#fff9f4",
         "--color-canvas": "#f4ebdd",
-        "--measure": "68ch",
+        "--measure": "40rem",
         "--focus": "#a01f2d",
         "--radius-sm": "0.375rem",
         "--color-on-surface": "#201915",
-        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--shadow-soft": "0 18px 48px rgba(32, 25, 21, 0.08)",
+        "--font-functional": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif",
         "--color-on-primary": "#fff8f1",
         "--color-on-canvas": "#201915",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Noto Serif TC\", serif",
@@ -1022,11 +1178,11 @@
         "--radius-lg": "1rem",
         "--color-muted-surface": "#e7d8c8",
         "--font-specimen": "\"Noto Serif TC\", \"Iowan Old Style\", \"PingFang TC\", serif",
-        "--color-primary": "#202020",
         "--space-7": "3rem",
+        "--color-primary": "#202020",
         "--space-6": "2rem",
-        "--space-5": "1.5rem",
-        "--rule": "rgba(32, 25, 21, 0.14)"
+        "--rule": "rgba(32, 25, 21, 0.14)",
+        "--space-5": "1.5rem"
       },
       "shellSignature": {
         "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif|16px",
@@ -1043,11 +1199,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-2/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/repair-cafe-intake-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "867aa14a40a66db5aa9783e21622e3e48c4d4ae889d08d6f4bb83beb453e0cb2",
+      "screenshotSha256": "8954c0854e9b8be474ae0b1ca02409acac6d518449cf2134efe5afeef46aba11",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1071,44 +1227,53 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
-        "--border": "#d9c6b0",
-        "--space-1": "0.25rem",
-        "--base": "240ms",
-        "--success-ink": "#f4fbf7",
-        "--muted": "#665549",
-        "--r-md": "0.875rem",
-        "--measure": "38ch",
-        "--error-ink": "#fff8f4",
-        "--surface-strong": "#fff8f2",
-        "--shadow-soft": "0 10px 24px rgba(58, 36, 24, 0.08)",
-        "--r-sm": "0.5rem",
-        "--space-2": "0.5rem",
-        "--shadow": "0 24px 60px rgba(58, 36, 24, 0.12)",
-        "--r-lg": "1.25rem",
-        "--space-4": "1rem",
-        "--space-3": "0.875rem",
-        "--error": "#a13d32",
-        "--primary": "#6f3c27",
-        "--fast": "160ms",
-        "--surface": "#f8f1e8",
-        "--primary-ink": "#fff8f2",
-        "--success": "#2f694f",
-        "--space-7": "2.75rem",
-        "--space-6": "2rem",
-        "--surface-soft": "#ece0d1",
-        "--space-5": "1.5rem",
-        "--ink": "#241912",
-        "--ease": "cubic-bezier(.2, .8, .2, 1)",
-        "--canvas": "#f3ebe1"
+        "--space-1": "0.5rem",
+        "--muted": "#6d5d51",
+        "--line-strong": "rgba(46, 111, 94, 0.36)",
+        "--measure": "72rem",
+        "--action-soft": "rgba(46, 111, 94, 0.12)",
+        "--surface-strong": "#fffefc",
+        "--shadow-soft": "0 8px 24px rgba(65, 43, 26, 0.08)",
+        "--radius-sm": "12px",
+        "--space-2": "0.75rem",
+        "--shadow": "0 14px 40px rgba(65, 43, 26, 0.12)",
+        "--space-4": "1.25rem",
+        "--space-3": "1rem",
+        "--radius-md": "18px",
+        "--radius-lg": "24px",
+        "--danger-soft": "rgba(140, 74, 58, 0.1)",
+        "--danger": "#8c4a3a",
+        "--surface": "#fff9f1",
+        "--action-ink": "#ffffff",
+        "--canvas-2": "#efe4d4",
+        "--space-6": "2.5rem",
+        "--line": "rgba(58, 47, 40, 0.14)",
+        "--action": "#2e6f5e",
+        "--space-5": "1.75rem",
+        "--ink": "#2a221c",
+        "--canvas": "#f4ede2"
       },
       "shellSignature": {
-        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif|16px",
-        "header": "rgb(36, 25, 18)|rgba(0, 0, 0, 0)|rgba(109, 82, 61, 0.18)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
+        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif|16px",
+        "header": "rgb(42, 34, 28)|rgba(0, 0, 0, 0)|rgb(42, 34, 28)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "nav": null
       },
       "consoleErrors": [],
@@ -1121,11 +1286,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-2/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/repair-cafe-intake-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "f85a2943b75b6129819d3a8089a3ae9ddaac71480899cdba7ea6d955701a285d",
+      "screenshotSha256": "eb1146d3a8e5f823c8da658323ae9d7320ce52db37bf29af16a069a1b0149764",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1149,44 +1314,53 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
-        "--border": "#d9c6b0",
-        "--space-1": "0.25rem",
-        "--base": "240ms",
-        "--success-ink": "#f4fbf7",
-        "--muted": "#665549",
-        "--r-md": "0.875rem",
-        "--measure": "38ch",
-        "--error-ink": "#fff8f4",
-        "--surface-strong": "#fff8f2",
-        "--shadow-soft": "0 10px 24px rgba(58, 36, 24, 0.08)",
-        "--r-sm": "0.5rem",
-        "--space-2": "0.5rem",
-        "--shadow": "0 24px 60px rgba(58, 36, 24, 0.12)",
-        "--r-lg": "1.25rem",
-        "--space-4": "1rem",
-        "--space-3": "0.875rem",
-        "--error": "#a13d32",
-        "--primary": "#6f3c27",
-        "--fast": "160ms",
-        "--surface": "#f8f1e8",
-        "--success": "#2f694f",
-        "--primary-ink": "#fff8f2",
-        "--space-7": "2.75rem",
-        "--space-6": "2rem",
-        "--surface-soft": "#ece0d1",
-        "--space-5": "1.5rem",
-        "--ink": "#241912",
-        "--ease": "cubic-bezier(.2, .8, .2, 1)",
-        "--canvas": "#f3ebe1"
+        "--space-1": "0.5rem",
+        "--muted": "#6d5d51",
+        "--line-strong": "rgba(46, 111, 94, 0.36)",
+        "--measure": "72rem",
+        "--action-soft": "rgba(46, 111, 94, 0.12)",
+        "--surface-strong": "#fffefc",
+        "--shadow-soft": "0 8px 24px rgba(65, 43, 26, 0.08)",
+        "--radius-sm": "12px",
+        "--space-2": "0.75rem",
+        "--shadow": "0 14px 40px rgba(65, 43, 26, 0.12)",
+        "--space-4": "1.25rem",
+        "--space-3": "1rem",
+        "--radius-md": "18px",
+        "--radius-lg": "24px",
+        "--danger-soft": "rgba(140, 74, 58, 0.1)",
+        "--danger": "#8c4a3a",
+        "--surface": "#fff9f1",
+        "--action-ink": "#ffffff",
+        "--canvas-2": "#efe4d4",
+        "--space-6": "2.5rem",
+        "--line": "rgba(58, 47, 40, 0.14)",
+        "--action": "#2e6f5e",
+        "--space-5": "1.75rem",
+        "--ink": "#2a221c",
+        "--canvas": "#f4ede2"
       },
       "shellSignature": {
-        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif|16px",
-        "header": "rgb(36, 25, 18)|rgba(0, 0, 0, 0)|rgba(109, 82, 61, 0.18)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
+        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif|16px",
+        "header": "rgb(42, 34, 28)|rgba(0, 0, 0, 0)|rgb(42, 34, 28)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "nav": null
       },
       "consoleErrors": [],
@@ -1199,11 +1373,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-2/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/repair-cafe-intake-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "f16e68e48461d818f30789be5bd3fd0d03c0ab8aee7d5099b422fa47dccd7c80",
+      "screenshotSha256": "15af7a7a2846c6cc95183e9da8fa23ca237b9583b9777ed726de585386f10351",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1227,44 +1401,53 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
-        "--border": "#d9c6b0",
-        "--space-1": "0.25rem",
-        "--base": "240ms",
-        "--success-ink": "#f4fbf7",
-        "--muted": "#665549",
-        "--r-md": "0.875rem",
-        "--measure": "38ch",
-        "--error-ink": "#fff8f4",
-        "--surface-strong": "#fff8f2",
-        "--shadow-soft": "0 10px 24px rgba(58, 36, 24, 0.08)",
-        "--r-sm": "0.5rem",
-        "--space-2": "0.5rem",
-        "--shadow": "0 24px 60px rgba(58, 36, 24, 0.12)",
-        "--r-lg": "1.25rem",
-        "--space-4": "1rem",
-        "--space-3": "0.875rem",
-        "--error": "#a13d32",
-        "--primary": "#6f3c27",
-        "--fast": "160ms",
-        "--surface": "#f8f1e8",
-        "--success": "#2f694f",
-        "--primary-ink": "#fff8f2",
-        "--space-7": "2.75rem",
-        "--space-6": "2rem",
-        "--surface-soft": "#ece0d1",
-        "--space-5": "1.5rem",
-        "--ink": "#241912",
-        "--ease": "cubic-bezier(.2, .8, .2, 1)",
-        "--canvas": "#f3ebe1"
+        "--space-1": "0.5rem",
+        "--muted": "#6d5d51",
+        "--line-strong": "rgba(46, 111, 94, 0.36)",
+        "--measure": "72rem",
+        "--action-soft": "rgba(46, 111, 94, 0.12)",
+        "--surface-strong": "#fffefc",
+        "--shadow-soft": "0 8px 24px rgba(65, 43, 26, 0.08)",
+        "--radius-sm": "12px",
+        "--space-2": "0.75rem",
+        "--shadow": "0 14px 40px rgba(65, 43, 26, 0.12)",
+        "--space-4": "1.25rem",
+        "--space-3": "1rem",
+        "--radius-md": "18px",
+        "--radius-lg": "24px",
+        "--danger-soft": "rgba(140, 74, 58, 0.1)",
+        "--danger": "#8c4a3a",
+        "--surface": "#fff9f1",
+        "--action-ink": "#ffffff",
+        "--canvas-2": "#efe4d4",
+        "--space-6": "2.5rem",
+        "--line": "rgba(58, 47, 40, 0.14)",
+        "--action": "#2e6f5e",
+        "--space-5": "1.75rem",
+        "--ink": "#2a221c",
+        "--canvas": "#f4ede2"
       },
       "shellSignature": {
-        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif|16px",
-        "header": "rgb(36, 25, 18)|rgba(0, 0, 0, 0)|rgba(109, 82, 61, 0.18)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
+        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif|16px",
+        "header": "rgb(42, 34, 28)|rgba(0, 0, 0, 0)|rgb(42, 34, 28)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "nav": null
       },
       "consoleErrors": [],
@@ -1277,11 +1460,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-2/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/repair-cafe-intake-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "5ba3a0946e6b42bb34bf0085dbf37346764cd7b998150854210c8bae1518f443",
+      "screenshotSha256": "b7bf2faa2e375a7a291c81ab9a2d388ede1308e544fd480c7c75b23711a5ae3d",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1305,44 +1488,53 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
-        "--border": "#d9c6b0",
-        "--space-1": "0.25rem",
-        "--base": "240ms",
-        "--success-ink": "#f4fbf7",
-        "--muted": "#665549",
-        "--r-md": "0.875rem",
-        "--measure": "38ch",
-        "--error-ink": "#fff8f4",
-        "--surface-strong": "#fff8f2",
-        "--shadow-soft": "0 10px 24px rgba(58, 36, 24, 0.08)",
-        "--r-sm": "0.5rem",
-        "--space-2": "0.5rem",
-        "--shadow": "0 24px 60px rgba(58, 36, 24, 0.12)",
-        "--r-lg": "1.25rem",
-        "--space-4": "1rem",
-        "--space-3": "0.875rem",
-        "--error": "#a13d32",
-        "--primary": "#6f3c27",
-        "--fast": "160ms",
-        "--surface": "#f8f1e8",
-        "--success": "#2f694f",
-        "--primary-ink": "#fff8f2",
-        "--space-7": "2.75rem",
-        "--space-6": "2rem",
-        "--surface-soft": "#ece0d1",
-        "--space-5": "1.5rem",
-        "--ink": "#241912",
-        "--ease": "cubic-bezier(.2, .8, .2, 1)",
-        "--canvas": "#f3ebe1"
+        "--space-1": "0.5rem",
+        "--muted": "#6d5d51",
+        "--line-strong": "rgba(46, 111, 94, 0.36)",
+        "--measure": "72rem",
+        "--action-soft": "rgba(46, 111, 94, 0.12)",
+        "--surface-strong": "#fffefc",
+        "--shadow-soft": "0 8px 24px rgba(65, 43, 26, 0.08)",
+        "--radius-sm": "12px",
+        "--space-2": "0.75rem",
+        "--shadow": "0 14px 40px rgba(65, 43, 26, 0.12)",
+        "--space-4": "1.25rem",
+        "--space-3": "1rem",
+        "--radius-md": "18px",
+        "--radius-lg": "24px",
+        "--danger-soft": "rgba(140, 74, 58, 0.1)",
+        "--danger": "#8c4a3a",
+        "--surface": "#fff9f1",
+        "--action-ink": "#ffffff",
+        "--canvas-2": "#efe4d4",
+        "--space-6": "2.5rem",
+        "--line": "rgba(58, 47, 40, 0.14)",
+        "--action": "#2e6f5e",
+        "--space-5": "1.75rem",
+        "--ink": "#2a221c",
+        "--canvas": "#f4ede2"
       },
       "shellSignature": {
-        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif|16px",
-        "header": "rgb(36, 25, 18)|rgba(0, 0, 0, 0)|rgba(109, 82, 61, 0.18)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
+        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif|16px",
+        "header": "rgb(42, 34, 28)|rgba(0, 0, 0, 0)|rgb(42, 34, 28)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "nav": null
       },
       "consoleErrors": [],
@@ -1355,16 +1547,18 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-2/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/repair-cafe-intake-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "7ade7c7a0476199161b0bed8d63aa3555bf004e0554a582b2ff01a9b6d925c0f",
+      "screenshotSha256": "256fdb037ee068b2d3d1cb1888f728341aeff1e0d8ec9ea208ea8684f8ea36b9",
       "interaction": {
         "attempted": true,
         "failures": [],
         "errorVisible": true,
-        "step": "2"
+        "step": "2",
+        "stepChanged": true,
+        "confirmationVisible": false
       },
       "lang": "zh-Hant-TW",
       "title": "社區修繕咖啡館預約",
@@ -1385,44 +1579,53 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
-        "--border": "#d9c6b0",
-        "--space-1": "0.25rem",
-        "--base": "240ms",
-        "--success-ink": "#f4fbf7",
-        "--muted": "#665549",
-        "--r-md": "0.875rem",
-        "--measure": "38ch",
-        "--error-ink": "#fff8f4",
-        "--surface-strong": "#fff8f2",
-        "--shadow-soft": "0 10px 24px rgba(58, 36, 24, 0.08)",
-        "--r-sm": "0.5rem",
-        "--space-2": "0.5rem",
-        "--shadow": "0 24px 60px rgba(58, 36, 24, 0.12)",
-        "--r-lg": "1.25rem",
-        "--space-4": "1rem",
-        "--space-3": "0.875rem",
-        "--error": "#a13d32",
-        "--primary": "#6f3c27",
-        "--fast": "160ms",
-        "--surface": "#f8f1e8",
-        "--primary-ink": "#fff8f2",
-        "--success": "#2f694f",
-        "--space-7": "2.75rem",
-        "--space-6": "2rem",
-        "--surface-soft": "#ece0d1",
-        "--space-5": "1.5rem",
-        "--ink": "#241912",
-        "--ease": "cubic-bezier(.2, .8, .2, 1)",
-        "--canvas": "#f3ebe1"
+        "--space-1": "0.5rem",
+        "--muted": "#6d5d51",
+        "--line-strong": "rgba(46, 111, 94, 0.36)",
+        "--measure": "72rem",
+        "--action-soft": "rgba(46, 111, 94, 0.12)",
+        "--surface-strong": "#fffefc",
+        "--shadow-soft": "0 8px 24px rgba(65, 43, 26, 0.08)",
+        "--radius-sm": "12px",
+        "--space-2": "0.75rem",
+        "--shadow": "0 14px 40px rgba(65, 43, 26, 0.12)",
+        "--space-4": "1.25rem",
+        "--space-3": "1rem",
+        "--radius-md": "18px",
+        "--radius-lg": "24px",
+        "--danger-soft": "rgba(140, 74, 58, 0.1)",
+        "--danger": "#8c4a3a",
+        "--surface": "#fff9f1",
+        "--action-ink": "#ffffff",
+        "--canvas-2": "#efe4d4",
+        "--space-6": "2.5rem",
+        "--line": "rgba(58, 47, 40, 0.14)",
+        "--action": "#2e6f5e",
+        "--space-5": "1.75rem",
+        "--ink": "#2a221c",
+        "--canvas": "#f4ede2"
       },
       "shellSignature": {
-        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif|16px",
-        "header": "rgb(36, 25, 18)|rgba(0, 0, 0, 0)|rgba(109, 82, 61, 0.18)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
+        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif|16px",
+        "header": "rgb(42, 34, 28)|rgba(0, 0, 0, 0)|rgb(42, 34, 28)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "nav": null
       },
       "consoleErrors": [],
@@ -1435,16 +1638,18 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-2/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-repair-cafe-intake-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/repair-cafe-intake-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "70a9d53dfdb63fa666b31e88f062bb23b94cca0ab3d4964a093af69148a07498",
+      "screenshotSha256": "43ef49505a457b24731247f9a6990f487bcc00d9950638d552e3fdfa4aa4147c",
       "interaction": {
         "attempted": true,
         "failures": [],
         "errorVisible": true,
-        "step": "2"
+        "step": "2",
+        "stepChanged": true,
+        "confirmationVisible": false
       },
       "lang": "zh-Hant-TW",
       "title": "社區修繕咖啡館預約",
@@ -1465,44 +1670,53 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
       "rootVariables": {
-        "--border": "#d9c6b0",
-        "--space-1": "0.25rem",
-        "--base": "240ms",
-        "--success-ink": "#f4fbf7",
-        "--muted": "#665549",
-        "--r-md": "0.875rem",
-        "--measure": "38ch",
-        "--error-ink": "#fff8f4",
-        "--surface-strong": "#fff8f2",
-        "--shadow-soft": "0 10px 24px rgba(58, 36, 24, 0.08)",
-        "--r-sm": "0.5rem",
-        "--space-2": "0.5rem",
-        "--shadow": "0 24px 60px rgba(58, 36, 24, 0.12)",
-        "--r-lg": "1.25rem",
-        "--space-4": "1rem",
-        "--space-3": "0.875rem",
-        "--error": "#a13d32",
-        "--primary": "#6f3c27",
-        "--fast": "160ms",
-        "--surface": "#f8f1e8",
-        "--success": "#2f694f",
-        "--primary-ink": "#fff8f2",
-        "--space-7": "2.75rem",
-        "--space-6": "2rem",
-        "--surface-soft": "#ece0d1",
-        "--space-5": "1.5rem",
-        "--ink": "#241912",
-        "--ease": "cubic-bezier(.2, .8, .2, 1)",
-        "--canvas": "#f3ebe1"
+        "--space-1": "0.5rem",
+        "--muted": "#6d5d51",
+        "--line-strong": "rgba(46, 111, 94, 0.36)",
+        "--measure": "72rem",
+        "--action-soft": "rgba(46, 111, 94, 0.12)",
+        "--surface-strong": "#fffefc",
+        "--shadow-soft": "0 8px 24px rgba(65, 43, 26, 0.08)",
+        "--radius-sm": "12px",
+        "--space-2": "0.75rem",
+        "--shadow": "0 14px 40px rgba(65, 43, 26, 0.12)",
+        "--space-4": "1.25rem",
+        "--space-3": "1rem",
+        "--radius-md": "18px",
+        "--radius-lg": "24px",
+        "--danger-soft": "rgba(140, 74, 58, 0.1)",
+        "--danger": "#8c4a3a",
+        "--surface": "#fff9f1",
+        "--action-ink": "#ffffff",
+        "--canvas-2": "#efe4d4",
+        "--space-6": "2.5rem",
+        "--line": "rgba(58, 47, 40, 0.14)",
+        "--action": "#2e6f5e",
+        "--space-5": "1.75rem",
+        "--ink": "#2a221c",
+        "--canvas": "#f4ede2"
       },
       "shellSignature": {
-        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif|16px",
-        "header": "rgb(36, 25, 18)|rgba(0, 0, 0, 0)|rgba(109, 82, 61, 0.18)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
+        "typography": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif|16px",
+        "header": "rgb(42, 34, 28)|rgba(0, 0, 0, 0)|rgb(42, 34, 28)|\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "nav": null
       },
       "consoleErrors": [],
@@ -1515,11 +1729,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-3/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/night-market-allergen-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "97cc88fde131beee4a5b242c6ad15bd21d6dc861ec7e48d65de54987e60c4aa2",
+      "screenshotSha256": "c4d2b44dc35397d04a277bd8b4668b4f717c4db614058a4366e55f5a244a942f",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1543,7 +1757,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1557,19 +1784,19 @@
         "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-surface": "#f6efe6",
         "--shadow-soft": "0 18px 40px rgba(0, 0, 0, 0.22)",
+        "--color-on-primary": "#201407",
+        "--text-soft": "rgba(246, 239, 230, 0.88)",
         "--space-rail": "1.25rem",
+        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--radius-sm": "10px",
         "--space-section": "clamp(1.5rem, 4vw, 2rem)",
-        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-on-primary": "#201407",
         "--space-panel": "1rem",
-        "--text-soft": "rgba(246, 239, 230, 0.88)",
         "--radius-md": "16px",
         "--radius-lg": "24px",
         "--border-strong": "rgba(242, 181, 76, 0.28)",
         "--font-body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-primary": "#f2b54c",
         "--color-action": "#66d7c7",
+        "--color-primary": "#f2b54c",
         "--text-muted": "rgba(246, 239, 230, 0.72)",
         "--ease-out": "cubic-bezier(0.2, 0.8, 0.2, 1)",
         "--radius-pill": "999px"
@@ -1589,11 +1816,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-3/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/night-market-allergen-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "ce5c4c3435d1313437fe06332d0fe3754ac7b4dd8ffc37f405158fa8c4b7873e",
+      "screenshotSha256": "125bb0afd54de3ef7ee3c39bf31a49873d2780049aad27626a5bcd8d798a0e44",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1617,7 +1844,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1628,22 +1868,22 @@
         "--color-canvas": "#100c09",
         "--measure": "72rem",
         "--radius-sm": "10px",
-        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-surface": "#f6efe6",
+        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-action": "#08211f",
         "--shadow-soft": "0 18px 40px rgba(0, 0, 0, 0.22)",
-        "--color-on-primary": "#201407",
-        "--space-rail": "1.25rem",
         "--text-soft": "rgba(246, 239, 230, 0.88)",
-        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--color-on-primary": "#201407",
         "--space-section": "clamp(1.5rem, 4vw, 2rem)",
+        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--space-rail": "1.25rem",
         "--space-panel": "1rem",
         "--radius-md": "16px",
         "--border-strong": "rgba(242, 181, 76, 0.28)",
         "--radius-lg": "24px",
         "--font-body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-action": "#66d7c7",
         "--color-primary": "#f2b54c",
+        "--color-action": "#66d7c7",
         "--text-muted": "rgba(246, 239, 230, 0.72)",
         "--ease-out": "cubic-bezier(0.2, 0.8, 0.2, 1)",
         "--radius-pill": "999px"
@@ -1663,11 +1903,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-3/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/night-market-allergen-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "c19d83fe94cc765343c32884429c6b7584f89396931b07989e6c0126eb6ce55e",
+      "screenshotSha256": "82b09d096ccdf8f4600a7392d31eec218f4246591f6306e82e31583e87004768",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1691,7 +1931,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1702,22 +1955,22 @@
         "--color-canvas": "#100c09",
         "--measure": "72rem",
         "--radius-sm": "10px",
-        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-surface": "#f6efe6",
+        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-action": "#08211f",
         "--shadow-soft": "0 18px 40px rgba(0, 0, 0, 0.22)",
-        "--color-on-primary": "#201407",
-        "--space-rail": "1.25rem",
         "--text-soft": "rgba(246, 239, 230, 0.88)",
-        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--color-on-primary": "#201407",
         "--space-section": "clamp(1.5rem, 4vw, 2rem)",
+        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--space-rail": "1.25rem",
         "--space-panel": "1rem",
         "--radius-md": "16px",
         "--border-strong": "rgba(242, 181, 76, 0.28)",
         "--radius-lg": "24px",
         "--font-body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-action": "#66d7c7",
         "--color-primary": "#f2b54c",
+        "--color-action": "#66d7c7",
         "--text-muted": "rgba(246, 239, 230, 0.72)",
         "--ease-out": "cubic-bezier(0.2, 0.8, 0.2, 1)",
         "--radius-pill": "999px"
@@ -1737,11 +1990,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-3/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/night-market-allergen-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "949f7826e40d1160358b5e2331d80365da5ca11cd10c252fc879fa5d49268dc7",
+      "screenshotSha256": "15febdac12f65cd35871866c70ec1a2bd7179bd2fe4eddbd3ba4ebb0fe181ad6",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1765,7 +2018,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1776,22 +2042,22 @@
         "--color-canvas": "#100c09",
         "--measure": "72rem",
         "--radius-sm": "10px",
-        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-surface": "#f6efe6",
+        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-action": "#08211f",
         "--shadow-soft": "0 18px 40px rgba(0, 0, 0, 0.22)",
-        "--color-on-primary": "#201407",
-        "--space-rail": "1.25rem",
         "--text-soft": "rgba(246, 239, 230, 0.88)",
-        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--color-on-primary": "#201407",
         "--space-section": "clamp(1.5rem, 4vw, 2rem)",
+        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--space-rail": "1.25rem",
         "--space-panel": "1rem",
         "--radius-md": "16px",
         "--border-strong": "rgba(242, 181, 76, 0.28)",
         "--radius-lg": "24px",
         "--font-body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-action": "#66d7c7",
         "--color-primary": "#f2b54c",
+        "--color-action": "#66d7c7",
         "--text-muted": "rgba(246, 239, 230, 0.72)",
         "--ease-out": "cubic-bezier(0.2, 0.8, 0.2, 1)",
         "--radius-pill": "999px"
@@ -1811,11 +2077,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-3/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/night-market-allergen-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "33c18a85aba74af75b24a358acb27cc021e7424d972120eec216e4eec3e341ab",
+      "screenshotSha256": "8fb398d70bd1615895cbe1e50682ad66eb39325a7e2d162c57b479af6c6f47a0",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -1842,7 +2108,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1856,19 +2135,19 @@
         "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-surface": "#f6efe6",
         "--shadow-soft": "0 18px 40px rgba(0, 0, 0, 0.22)",
+        "--color-on-primary": "#201407",
+        "--text-soft": "rgba(246, 239, 230, 0.88)",
         "--space-rail": "1.25rem",
+        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--radius-sm": "10px",
         "--space-section": "clamp(1.5rem, 4vw, 2rem)",
-        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-on-primary": "#201407",
         "--space-panel": "1rem",
-        "--text-soft": "rgba(246, 239, 230, 0.88)",
         "--radius-md": "16px",
         "--radius-lg": "24px",
         "--border-strong": "rgba(242, 181, 76, 0.28)",
         "--font-body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-primary": "#f2b54c",
         "--color-action": "#66d7c7",
+        "--color-primary": "#f2b54c",
         "--text-muted": "rgba(246, 239, 230, 0.72)",
         "--ease-out": "cubic-bezier(0.2, 0.8, 0.2, 1)",
         "--radius-pill": "999px"
@@ -1888,11 +2167,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-3/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-night-market-allergen-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/night-market-allergen-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "3a2528e5910cc0a7336349b9b6fd924143b9711bfdfc4f7a5a54dc603849537b",
+      "screenshotSha256": "90dc30b45177b4fe108ea3ad17699434097ef69a133b81f58c98869acb8a1ef1",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -1919,7 +2198,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -1930,22 +2222,22 @@
         "--color-canvas": "#100c09",
         "--measure": "72rem",
         "--radius-sm": "10px",
-        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-surface": "#f6efe6",
+        "--space-page": "clamp(1rem, 3vw, 1.5rem)",
         "--color-on-action": "#08211f",
         "--shadow-soft": "0 18px 40px rgba(0, 0, 0, 0.22)",
-        "--color-on-primary": "#201407",
-        "--space-rail": "1.25rem",
         "--text-soft": "rgba(246, 239, 230, 0.88)",
-        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--color-on-primary": "#201407",
         "--space-section": "clamp(1.5rem, 4vw, 2rem)",
+        "--font-display": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--space-rail": "1.25rem",
         "--space-panel": "1rem",
         "--radius-md": "16px",
         "--border-strong": "rgba(242, 181, 76, 0.28)",
         "--radius-lg": "24px",
         "--font-body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-action": "#66d7c7",
         "--color-primary": "#f2b54c",
+        "--color-action": "#66d7c7",
         "--text-muted": "rgba(246, 239, 230, 0.72)",
         "--ease-out": "cubic-bezier(0.2, 0.8, 0.2, 1)",
         "--radius-pill": "999px"
@@ -1965,11 +2257,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-4/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/royalty-statement-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "fe069eeb67d4cb600ed8d4b533a5eef98f0b5b5400001fe188b220f78a9c63d6",
+      "screenshotSha256": "9e1aecc5ecbc76324079c7a1889dabdda59ae383ee6094762a7c23079233a951",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -1993,7 +2285,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2010,8 +2315,8 @@
         "--space-3": "0.75rem",
         "--danger": "#f2d3d8",
         "--success": "#d9e8d8",
-        "--space-7": "2.5rem",
         "--data-6": "#eedccf",
+        "--space-7": "2.5rem",
         "--line": "rgba(199, 185, 165, 0.55)",
         "--ink": "#1a1613",
         "--surface-raised": "#ede4d7",
@@ -2049,11 +2354,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-4/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/royalty-statement-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "bce3265da63682db753442f4b1cec38e50e1c1bdce83e37f6ef9c0dbd6deec4b",
+      "screenshotSha256": "ebdbc886a27087d8a1a07da895a79ff1bb5d911f9b0f418b88b86aec6f7482ba",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -2077,7 +2382,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2094,8 +2412,8 @@
         "--space-3": "0.75rem",
         "--danger": "#f2d3d8",
         "--success": "#d9e8d8",
-        "--space-7": "2.5rem",
         "--data-6": "#eedccf",
+        "--space-7": "2.5rem",
         "--line": "rgba(199, 185, 165, 0.55)",
         "--ink": "#1a1613",
         "--surface-raised": "#ede4d7",
@@ -2133,11 +2451,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-4/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/royalty-statement-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "7a794d682583f78e5ea25c0d77b1270bfc699f3fb5c1e9c5eccb1219af6dc7e7",
+      "screenshotSha256": "391d3c74ca75f693497c913ed33fd29132c5ce336af77e968cdbdeb4f856dece",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -2161,7 +2479,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2178,8 +2509,8 @@
         "--space-3": "0.75rem",
         "--danger": "#f2d3d8",
         "--success": "#d9e8d8",
-        "--space-7": "2.5rem",
         "--data-6": "#eedccf",
+        "--space-7": "2.5rem",
         "--line": "rgba(199, 185, 165, 0.55)",
         "--ink": "#1a1613",
         "--surface-raised": "#ede4d7",
@@ -2217,11 +2548,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-4/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/royalty-statement-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "05838503f87584eca06160d99e3d3f4dfced203727af6f691487fb100f090a9d",
+      "screenshotSha256": "18dcb67667a8a6639443de2ba5158ac8f5ebced96f36559b3eb8742c76aac0b6",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -2245,7 +2576,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2262,8 +2606,8 @@
         "--space-3": "0.75rem",
         "--danger": "#f2d3d8",
         "--success": "#d9e8d8",
-        "--space-7": "2.5rem",
         "--data-6": "#eedccf",
+        "--space-7": "2.5rem",
         "--line": "rgba(199, 185, 165, 0.55)",
         "--ink": "#1a1613",
         "--surface-raised": "#ede4d7",
@@ -2301,15 +2645,17 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-4/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/royalty-statement-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "e065db4d8ea408bd74713016092addc38b3b44edeb708a9bf93f72fb720e0321",
+      "screenshotSha256": "c1bd2b42019d418439dffbf2b12c7454e3c1dfec250e0d6b71e3f260c453af7e",
       "interaction": {
         "attempted": true,
         "failures": [],
         "afterPeriod": "previous",
+        "periodContentChanged": true,
+        "periodControlChanged": true,
         "tooltipVisible": true
       },
       "lang": "zh-Hant-TW",
@@ -2331,7 +2677,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2348,8 +2707,8 @@
         "--space-3": "0.75rem",
         "--danger": "#f2d3d8",
         "--success": "#d9e8d8",
-        "--space-7": "2.5rem",
         "--data-6": "#eedccf",
+        "--space-7": "2.5rem",
         "--line": "rgba(199, 185, 165, 0.55)",
         "--ink": "#1a1613",
         "--surface-raised": "#ede4d7",
@@ -2387,15 +2746,17 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-4/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-royalty-statement-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/royalty-statement-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "40e266093d192d4edecec6b5e1807b0068bd9a3c1c2e9f959e5835c35e3a7a5b",
+      "screenshotSha256": "1cfe6fd3cf58b4450e046c503110ccc7c0683d70143b6a0f569fc3b10f9abaf5",
       "interaction": {
         "attempted": true,
         "failures": [],
         "afterPeriod": "previous",
+        "periodContentChanged": true,
+        "periodControlChanged": true,
         "tooltipVisible": true
       },
       "lang": "zh-Hant-TW",
@@ -2417,7 +2778,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2434,8 +2808,8 @@
         "--space-3": "0.75rem",
         "--danger": "#f2d3d8",
         "--success": "#d9e8d8",
-        "--space-7": "2.5rem",
         "--data-6": "#eedccf",
+        "--space-7": "2.5rem",
         "--line": "rgba(199, 185, 165, 0.55)",
         "--ink": "#1a1613",
         "--surface-raised": "#ede4d7",
@@ -2473,16 +2847,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "2c60d8ca0af7d76ffb9d5bfb7b06bfed34e71d4d1254a915f29fad2cbf476501",
+      "screenshotSha256": "3e8b6b6b3ee03aa6f3ec1026725b293dd5eeb0668c02dceefb561f8e6fa1139d",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 尺寸與用途",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2501,7 +2875,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2509,6 +2896,7 @@
         "--color-warning": "#E8C65A",
         "--space-shell": "16px",
         "--color-surface-strong": "#E9E2D7",
+        "--color-accent": "#355E2A",
         "--color-surface": "#FFFFFF",
         "--color-canvas": "#F6F2EA",
         "--measure": "68rem",
@@ -2516,10 +2904,9 @@
         "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
-        "--color-accent": "#355E2A",
         "--color-on-primary": "#FFFFFF",
-        "--space-chip": "8px",
         "--page-status": "ok",
+        "--space-chip": "8px",
         "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
@@ -2553,16 +2940,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "50990da7eb312ff17d324ee9b4aeadd50be45c9f633dac62822835c4e28f0a2e",
+      "screenshotSha256": "ec3ee3da1501a3c1f0bebd887913e881bb32a123af61d48013d8fc5b9b83e3da",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 尺寸與用途",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2581,7 +2968,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2594,7 +2994,6 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
@@ -2602,6 +3001,7 @@
         "--space-chip": "8px",
         "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--radius-sm": "10px",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
@@ -2611,9 +3011,9 @@
         "--radius-md": "16px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-on-accent": "#FFFFFF",
-        "--color-primary": "#234B46",
         "--color-border": "#B9B0A1",
+        "--color-primary": "#234B46",
+        "--color-on-accent": "#FFFFFF",
         "--radius-pill": "999px",
         "--color-text-muted": "#4B535B",
         "--font-label": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
@@ -2633,16 +3033,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "db7e1a26487f64483982024a45ec956846ab205ab4e9b069b120bcbe3c028272",
+      "screenshotSha256": "56f8d382f2eeb461714929e68b3561e8199c86ddba9bef0b406e72f628a56d1d",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 尺寸與用途",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2661,7 +3061,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2674,7 +3087,6 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
@@ -2682,6 +3094,7 @@
         "--space-chip": "8px",
         "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--radius-sm": "10px",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
@@ -2691,9 +3104,9 @@
         "--radius-md": "16px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-on-accent": "#FFFFFF",
-        "--color-primary": "#234B46",
         "--color-border": "#B9B0A1",
+        "--color-primary": "#234B46",
+        "--color-on-accent": "#FFFFFF",
         "--radius-pill": "999px",
         "--color-text-muted": "#4B535B",
         "--font-label": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
@@ -2713,16 +3126,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "57b5b2c08a45099b6978d82a02bbae05a8dff123b7bc837867346477ca7edf60",
+      "screenshotSha256": "d67c146f4c41d2c433f96061bb135b2b74f9e6552345cd0d5afca886e4171e49",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 尺寸與用途",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2741,7 +3154,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2754,7 +3180,6 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
@@ -2762,6 +3187,7 @@
         "--space-chip": "8px",
         "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--radius-sm": "10px",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
@@ -2771,9 +3197,9 @@
         "--radius-md": "16px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-on-accent": "#FFFFFF",
-        "--color-primary": "#234B46",
         "--color-border": "#B9B0A1",
+        "--color-primary": "#234B46",
+        "--color-on-accent": "#FFFFFF",
         "--radius-pill": "999px",
         "--color-text-muted": "#4B535B",
         "--font-label": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
@@ -2793,16 +3219,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "materials.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/materials.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/materials.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-materials-base-desktop.png",
-      "screenshotSha256": "d89b41eb7ce6fc82dd4f0169d8449da5397188e1432121d7afb7be82c1e7c006",
+      "screenshotSha256": "d468476ca730ec575cf9c666378421f8c5946fbbe3399f7719f1d02c46fb768b",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 材質與回收",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2821,7 +3247,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2829,6 +3268,7 @@
         "--color-warning": "#E8C65A",
         "--space-shell": "16px",
         "--color-surface-strong": "#E9E2D7",
+        "--color-accent": "#355E2A",
         "--color-surface": "#FFFFFF",
         "--color-canvas": "#F6F2EA",
         "--measure": "68rem",
@@ -2836,7 +3276,6 @@
         "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
-        "--color-accent": "#355E2A",
         "--color-on-primary": "#FFFFFF",
         "--space-card": "16px",
         "--space-chip": "8px",
@@ -2873,16 +3312,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "materials.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/materials.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/materials.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-materials-base-tablet.png",
-      "screenshotSha256": "79d69e68d87e6e6ec86ad615c0e4ce55e9e4892c27c0751c304ea4bc589cb8ec",
+      "screenshotSha256": "63573dbf389a6d6730281b7ee421203b4364284c67fb855dc788c9877c5bc5c7",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 材質與回收",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2901,7 +3340,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2914,21 +3366,21 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
-        "--space-card": "16px",
+        "--page-status": "ok",
         "--space-chip": "8px",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
+        "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--space-section": "24px",
         "--color-on-warning": "#1B1F23",
         "--radius-md": "16px",
-        "--page-status": "ok",
+        "--radius-sm": "10px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--color-on-accent": "#FFFFFF",
@@ -2953,16 +3405,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "materials.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/materials.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/materials.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-materials-base-mobile.png",
-      "screenshotSha256": "f7967390e04b5170d2861646319dd6eae7dd06e1503a6cbebd466291f6c01e40",
+      "screenshotSha256": "93e1f5807adec6c26f26773d21f97d64451afc90801af538cd5a946dcd072ea5",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 材質與回收",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -2981,7 +3433,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -2994,21 +3459,21 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
-        "--space-card": "16px",
+        "--page-status": "ok",
         "--space-chip": "8px",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
+        "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--space-section": "24px",
         "--color-on-warning": "#1B1F23",
         "--radius-md": "16px",
-        "--page-status": "ok",
+        "--radius-sm": "10px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--color-on-accent": "#FFFFFF",
@@ -3033,16 +3498,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "materials.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/materials.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/materials.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-materials-base-compact-mobile.png",
-      "screenshotSha256": "819791fa33e97fb2ab53df5506d142ee5c540e3965353b80bf6a700cb9e0b38f",
+      "screenshotSha256": "3d30610c71339b5977b0e5ca0ba05f2248da0d928e4bc86a439f36ba7e92e77c",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 材質與回收",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3061,7 +3526,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3074,21 +3552,21 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
-        "--space-card": "16px",
+        "--page-status": "ok",
         "--space-chip": "8px",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
+        "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--space-section": "24px",
         "--color-on-warning": "#1B1F23",
         "--radius-md": "16px",
-        "--page-status": "ok",
+        "--radius-sm": "10px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--color-on-accent": "#FFFFFF",
@@ -3113,16 +3591,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "summary.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/summary.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/summary.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-summary-base-desktop.png",
-      "screenshotSha256": "45a0eca7a16ac2e40f8888eaa50b1d9c30f47f45eafaa74abf349fa78ba8ccd3",
+      "screenshotSha256": "b8643deacb45d8e2cbc91b8c039a6fc0067f00908aa58878c036a971609d79de",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 價格摘要",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3141,7 +3619,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3150,30 +3641,30 @@
         "--space-shell": "16px",
         "--color-surface-strong": "#E9E2D7",
         "--color-surface": "#FFFFFF",
+        "--color-accent": "#355E2A",
         "--color-canvas": "#F6F2EA",
         "--measure": "68rem",
         "--space-button": "12px",
         "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
-        "--color-accent": "#355E2A",
-        "--color-on-primary": "#FFFFFF",
         "--space-card": "16px",
         "--space-chip": "8px",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-section": "24px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--color-on-warning": "#1B1F23",
-        "--radius-md": "16px",
         "--page-status": "ok",
+        "--radius-md": "16px",
+        "--color-on-primary": "#FFFFFF",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-border": "#B9B0A1",
-        "--color-primary": "#234B46",
         "--color-on-accent": "#FFFFFF",
+        "--color-primary": "#234B46",
+        "--color-border": "#B9B0A1",
         "--radius-pill": "999px",
         "--color-text-muted": "#4B535B",
         "--font-label": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
@@ -3193,16 +3684,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "summary.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/summary.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/summary.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-summary-base-tablet.png",
-      "screenshotSha256": "9568bedb284d0ed2e7feff11df8432031f47e9f8de8ab364745c975a3cd79542",
+      "screenshotSha256": "5ed229f9ae099c633e0d38fafb035991c103a7fcbf8cb58e9a95550a52eae7ac",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 價格摘要",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3221,7 +3712,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3234,21 +3738,21 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
-        "--space-card": "16px",
+        "--page-status": "ok",
         "--space-chip": "8px",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
+        "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--space-section": "24px",
         "--color-on-warning": "#1B1F23",
-        "--page-status": "ok",
         "--radius-md": "16px",
+        "--radius-sm": "10px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--color-on-accent": "#FFFFFF",
@@ -3273,16 +3777,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "summary.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/summary.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/summary.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-summary-base-mobile.png",
-      "screenshotSha256": "1a2e901d721d7645e31fb54656a8be99cbb433f7ed444055bb1b590d73c70cf3",
+      "screenshotSha256": "d7ff82ede2fc61e6a2df8b2b9a63abf480e03c37b1d859fa2963b1b5d6950a3c",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 價格摘要",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3301,7 +3805,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3314,21 +3831,21 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
-        "--space-card": "16px",
+        "--page-status": "ok",
         "--space-chip": "8px",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
+        "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--space-section": "24px",
         "--color-on-warning": "#1B1F23",
-        "--page-status": "ok",
         "--radius-md": "16px",
+        "--radius-sm": "10px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--color-on-accent": "#FFFFFF",
@@ -3353,16 +3870,16 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "summary.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-5/summary.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/summary.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-summary-base-compact-mobile.png",
-      "screenshotSha256": "fc1dc1be90b1f00b2fe84ca93ecace7d575318f00075c4e3fec60d2cf9282a51",
+      "screenshotSha256": "316830074084cd9cbe388aa7dcec6ab46b5b3c10ed6cae9acf40fc0d379ee315",
       "interaction": {
         "attempted": false,
         "failures": []
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 價格摘要",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3381,7 +3898,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3394,21 +3924,21 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
-        "--space-card": "16px",
+        "--page-status": "ok",
         "--space-chip": "8px",
-        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
+        "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
         "--space-section": "24px",
         "--color-on-warning": "#1B1F23",
-        "--page-status": "ok",
         "--radius-md": "16px",
+        "--radius-sm": "10px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--color-on-accent": "#FFFFFF",
@@ -3433,17 +3963,18 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-5/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "1f43e05822d18f4440cfa7b5ba3aa2cba109bd78d43938ae5d41493bc03b8845",
+      "screenshotSha256": "d1cbdb09cc3b04399f449b155b9974ae9a8d6d910fb5160d5687b657f63e874c",
       "interaction": {
         "attempted": true,
         "failures": [],
+        "sizeSelected": true,
         "summaryVisible": true
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 尺寸與用途",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3462,7 +3993,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3470,6 +4014,7 @@
         "--color-warning": "#E8C65A",
         "--space-shell": "16px",
         "--color-surface-strong": "#E9E2D7",
+        "--color-accent": "#355E2A",
         "--color-surface": "#FFFFFF",
         "--color-canvas": "#F6F2EA",
         "--measure": "68rem",
@@ -3477,10 +4022,9 @@
         "--radius-sm": "10px",
         "--space-page": "24px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
-        "--color-accent": "#355E2A",
         "--color-on-primary": "#FFFFFF",
-        "--space-chip": "8px",
         "--page-status": "ok",
+        "--space-chip": "8px",
         "--space-card": "16px",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
@@ -3514,17 +4058,18 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-5/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-packaging-configurator-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/packaging-configurator-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "0bac5400ab8f85fb0f1123ae1a702739e8d70633cf58e16518ba9d3549284544",
+      "screenshotSha256": "43b331b2e9f15411a68f4263c37e07c939f3d100c06e969dfb6673b221dcc5d7",
       "interaction": {
         "attempted": true,
         "failures": [],
+        "sizeSelected": true,
         "summaryVisible": true
       },
-      "lang": "zh-Hant",
+      "lang": "zh-Hant-TW",
       "title": "循環包材三頁配置器 | 尺寸與用途",
       "hasMain": true,
       "visibleMainCount": 1,
@@ -3543,7 +4088,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3556,7 +4114,6 @@
         "--color-surface": "#FFFFFF",
         "--space-button": "12px",
         "--measure": "68rem",
-        "--radius-sm": "10px",
         "--space-page": "16px",
         "--shadow-soft": "0 18px 38px rgba(27, 31, 35, 0.08)",
         "--color-on-primary": "#FFFFFF",
@@ -3564,6 +4121,7 @@
         "--space-chip": "8px",
         "--font-mono": "\"SFMono-Regular\", \"SF Mono\", \"Menlo\", \"Consolas\", \"PingFang TC\", \"Noto Sans TC\", monospace",
         "--font-display": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "--radius-sm": "10px",
         "--space-line": "1px",
         "--space-panel": "20px",
         "--color-text": "#1B1F23",
@@ -3573,9 +4131,9 @@
         "--radius-md": "16px",
         "--radius-lg": "24px",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
-        "--color-on-accent": "#FFFFFF",
-        "--color-primary": "#234B46",
         "--color-border": "#B9B0A1",
+        "--color-primary": "#234B46",
+        "--color-on-accent": "#FFFFFF",
         "--radius-pill": "999px",
         "--color-text-muted": "#4B535B",
         "--font-label": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
@@ -3595,11 +4153,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "7e2e7c2f22eb45b6b911b4e84e881bd7556d93b65ec1e2fac724e8ce1d960967",
+      "screenshotSha256": "ccffe1725fed6a937bc0784944ee2cc825bd7df1bbf09ab2b3f92b9df14003d7",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -3623,7 +4181,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3632,15 +4203,15 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
-        "--radius-sm": "10px",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
+        "--radius-sm": "10px",
         "--radius-md": "16px",
         "--color-ink": "#1f2a31",
         "--radius-lg": "24px",
@@ -3664,11 +4235,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "b2a81e2c439334f35616fa164333c33bedd45739a7b30d1b6d1d9e2c73c50b40",
+      "screenshotSha256": "4f784d2c985b01d6c1a311b1635f6b662c4e402b4c49b20415404012ce5ba580",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -3692,7 +4263,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3701,11 +4285,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -3733,11 +4317,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "9b581cd040215e4e2602b9a9e27374872bc0477310b721fcc5d452efe9440d96",
+      "screenshotSha256": "d432bdac068a6bd405adf002e80d31a77d1a904b6706fccd0c58d880182cc15e",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -3761,7 +4345,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3770,11 +4367,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -3802,11 +4399,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "4806ed3be62d3319b7a36142d8fc924ab6f0528b8e14910e672d029f8f53854c",
+      "screenshotSha256": "f7fb58cc9a26a51c9b7c1c907328053ccf69255f65f782c62e07edb20980c065",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -3830,7 +4427,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3839,11 +4449,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -3871,11 +4481,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "archive.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/archive.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/archive.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-archive-base-desktop.png",
-      "screenshotSha256": "ecfdaf8cede7bff1656bad04962ffff76baafe2e6957aed66c42c828219c2825",
+      "screenshotSha256": "6e1d774e5f0225e6700f6dab23fed23d88a8795b8c8582203654dfbd4e31170b",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -3899,7 +4509,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3908,15 +4531,15 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
-        "--radius-sm": "10px",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
+        "--radius-sm": "10px",
         "--radius-md": "16px",
         "--color-ink": "#1f2a31",
         "--radius-lg": "24px",
@@ -3940,11 +4563,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "archive.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/archive.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/archive.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-archive-base-tablet.png",
-      "screenshotSha256": "2745ccb464b1fe23890bffbacb023564cd57b89690ee3c586a4b83f9ba13aeab",
+      "screenshotSha256": "5b071270fc34e79272179c5949a1e1ca450911cd534502913c6f14dc57dc5f14",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -3968,7 +4591,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -3977,11 +4613,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4009,11 +4645,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "archive.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/archive.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/archive.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-archive-base-mobile.png",
-      "screenshotSha256": "901738be9775c82b639d755ab810820c2510f63f2a7aa22a00811b6905b5393b",
+      "screenshotSha256": "e74491ef97fdc91a0599283d1d80d1a9752e2e05052eabfed70c20168fe0583c",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4037,7 +4673,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4046,11 +4695,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4078,11 +4727,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "archive.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/archive.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/archive.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-archive-base-compact-mobile.png",
-      "screenshotSha256": "f8034da78d757086b565137753c0c0ffd695430258d54972402d7fe1f947aef0",
+      "screenshotSha256": "0a532be9319222d31123418dcc8103d7f3a3985764cb9ab9bb557eb048ffafa8",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4106,7 +4755,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4115,11 +4777,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4147,11 +4809,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "story.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/story.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/story.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-story-base-desktop.png",
-      "screenshotSha256": "f92fc7dfc9d30bacf44c210537106215c0853b77922bcfbf9a237dc75485c7ad",
+      "screenshotSha256": "38d3e739391ba7ab5a7d457d14be8f687503b36de4f84f44200e569ed1a201e3",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4175,7 +4837,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4184,15 +4859,15 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
-        "--radius-sm": "10px",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
+        "--radius-sm": "10px",
         "--radius-md": "16px",
         "--color-ink": "#1f2a31",
         "--radius-lg": "24px",
@@ -4216,11 +4891,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "story.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/story.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/story.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-story-base-tablet.png",
-      "screenshotSha256": "8d92f3899f6b3db5c627a1f41ada332c1c7961e1c24d7425808b1294ef6ad66c",
+      "screenshotSha256": "b4679a1903b3081e82ac58424aa6983d84fa32eb79ef59a22e42b83f123f7ce0",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4244,7 +4919,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4253,11 +4941,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4285,11 +4973,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "story.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/story.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/story.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-story-base-mobile.png",
-      "screenshotSha256": "3f289883ee6f86d3c9c1f6c4d352d324340b9d2d7e4d394ff8e0c424c66781fa",
+      "screenshotSha256": "6569fee00bf8d5e2d435d05535cf8584399e49d33328ffc805220695dd66611d",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4313,7 +5001,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4322,11 +5023,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4354,11 +5055,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "story.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-6/story.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/story.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-story-base-compact-mobile.png",
-      "screenshotSha256": "37ded1f9a947f2c477f8a1ba6c03e2b8ee53cb1894aae860979a84607d4489a8",
+      "screenshotSha256": "f69d094c0dc510e22c87b0ea2d1a407591192ca2dff57028cacdb8bf33cee17a",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4382,7 +5083,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4391,11 +5105,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4423,11 +5137,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-6/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "7e2e7c2f22eb45b6b911b4e84e881bd7556d93b65ec1e2fac724e8ce1d960967",
+      "screenshotSha256": "ccffe1725fed6a937bc0784944ee2cc825bd7df1bbf09ab2b3f92b9df14003d7",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -4452,7 +5166,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4461,15 +5188,15 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
-        "--radius-sm": "10px",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
+        "--radius-sm": "10px",
         "--radius-md": "16px",
         "--color-ink": "#1f2a31",
         "--radius-lg": "24px",
@@ -4493,11 +5220,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-6/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-oral-history-archive-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/oral-history-archive-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "9b581cd040215e4e2602b9a9e27374872bc0477310b721fcc5d452efe9440d96",
+      "screenshotSha256": "d8a5a194df55460c20f5311b23b57c7429087d8af9c06fc9cfc919b6ba4893ad",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -4522,7 +5249,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4531,11 +5271,11 @@
         "--color-surface-strong": "#e7ddcb",
         "--color-surface": "#fff9f0",
         "--color-canvas": "#f4eee3",
-        "--color-focus": "#a8672a",
-        "--measure": "40em",
+        "--measure": "36rem",
         "--space-gutter": "clamp(0.875rem, 1.6vw, 1.25rem)",
         "--space-page": "clamp(1rem, 3vw, 2rem)",
         "--shadow-soft": "0 18px 40px rgba(48, 35, 18, 0.08)",
+        "--color-focus": "#a8672a",
         "--color-on-primary": "#f8f3e8",
         "--color-rule": "rgba(31, 42, 49, 0.12)",
         "--font-display": "\"Iowan Old Style\", \"Baskerville\", \"Songti TC\", \"Noto Serif TC\", serif",
@@ -4563,11 +5303,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-7/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/grant-review-board-v6-codex-gpt-5.4-mini-index-base-desktop.png",
-      "screenshotSha256": "28712f4535ec97f943ce38179b054dc4ee6ddd3973b0314b811c2066950c4863",
+      "screenshotSha256": "73c0b5c9b3a48c7d86cff5148405c26259f8dbc4b642ea7ce5fc416c6be70b79",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4591,7 +5331,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4602,15 +5355,15 @@
         "--measure": "74rem",
         "--radius-sm": "12px",
         "--surface-strong": "#fbf8f2",
-        "--font-display": "\"Baskerville\", \"Iowan Old Style\", \"Noto Serif TC\", \"Source Han Serif TC\", serif",
+        "--font-display": "\"Noto Serif TC\", \"Source Han Serif TC\", \"Baskerville\", \"Iowan Old Style\", serif",
         "--space-2": "0.625rem",
         "--shadow": "0 18px 48px rgba(24, 35, 31, 0.08)",
         "--space-4": "1.5rem",
         "--space-3": "1rem",
         "--radius-md": "18px",
         "--primary": "#23463e",
-        "--radius-lg": "28px",
         "--danger-ink": "#fff6f7",
+        "--radius-lg": "28px",
         "--danger": "#8e2f3b",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--surface": "#f4f0e8",
@@ -4639,11 +5392,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-7/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/index.html",
       "viewport": "tablet",
       "size": "834x1112",
       "screenshot": "assets/product-flow-v6/grant-review-board-v6-codex-gpt-5.4-mini-index-base-tablet.png",
-      "screenshotSha256": "f93943717855aa57870ffa12f709277b00037d9057bda3d4d0c4efbe6fe8e105",
+      "screenshotSha256": "c594b2672ecd1e036300270c7fe2cd87c7c83a4556134f129f4dd907c4e63541",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4667,7 +5420,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4678,15 +5444,15 @@
         "--measure": "74rem",
         "--radius-sm": "12px",
         "--surface-strong": "#fbf8f2",
-        "--font-display": "\"Baskerville\", \"Iowan Old Style\", \"Noto Serif TC\", \"Source Han Serif TC\", serif",
+        "--font-display": "\"Noto Serif TC\", \"Source Han Serif TC\", \"Baskerville\", \"Iowan Old Style\", serif",
         "--space-2": "0.625rem",
         "--shadow": "0 18px 48px rgba(24, 35, 31, 0.08)",
         "--space-4": "1.5rem",
         "--space-3": "1rem",
         "--radius-md": "18px",
         "--primary": "#23463e",
-        "--radius-lg": "28px",
         "--danger-ink": "#fff6f7",
+        "--radius-lg": "28px",
         "--danger": "#8e2f3b",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--surface": "#f4f0e8",
@@ -4715,11 +5481,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-7/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/grant-review-board-v6-codex-gpt-5.4-mini-index-base-mobile.png",
-      "screenshotSha256": "4a2ee44d17febb1c997ee6f30835ee561c9c321e2ffe8fb58940d3779af6472c",
+      "screenshotSha256": "3fd41f675bd17be7505b3c9bb3f08945ff2535abbe8ad1bb57f099425339558a",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4743,7 +5509,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4754,15 +5533,15 @@
         "--measure": "74rem",
         "--radius-sm": "12px",
         "--surface-strong": "#fbf8f2",
-        "--font-display": "\"Baskerville\", \"Iowan Old Style\", \"Noto Serif TC\", \"Source Han Serif TC\", serif",
+        "--font-display": "\"Noto Serif TC\", \"Source Han Serif TC\", \"Baskerville\", \"Iowan Old Style\", serif",
         "--space-2": "0.625rem",
         "--shadow": "0 18px 48px rgba(24, 35, 31, 0.08)",
         "--space-4": "1.5rem",
         "--space-3": "1rem",
         "--radius-md": "18px",
         "--primary": "#23463e",
-        "--radius-lg": "28px",
         "--danger-ink": "#fff6f7",
+        "--radius-lg": "28px",
         "--danger": "#8e2f3b",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--surface": "#f4f0e8",
@@ -4791,11 +5570,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "base",
-      "url": "http://127.0.0.1:51585/target-7/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/index.html",
       "viewport": "compact-mobile",
       "size": "360x800",
       "screenshot": "assets/product-flow-v6/grant-review-board-v6-codex-gpt-5.4-mini-index-base-compact-mobile.png",
-      "screenshotSha256": "ce3370e41154ac848d239439475ac681ea04ab8236d4beee8cc6593b3d421eb3",
+      "screenshotSha256": "7e5a45fc184a635da3bf3f137c81fc056af1764691866beda493de15d7312639",
       "interaction": {
         "attempted": false,
         "failures": []
@@ -4819,7 +5598,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4830,15 +5622,15 @@
         "--measure": "74rem",
         "--radius-sm": "12px",
         "--surface-strong": "#fbf8f2",
-        "--font-display": "\"Baskerville\", \"Iowan Old Style\", \"Noto Serif TC\", \"Source Han Serif TC\", serif",
+        "--font-display": "\"Noto Serif TC\", \"Source Han Serif TC\", \"Baskerville\", \"Iowan Old Style\", serif",
         "--space-2": "0.625rem",
         "--shadow": "0 18px 48px rgba(24, 35, 31, 0.08)",
         "--space-4": "1.5rem",
         "--space-3": "1rem",
         "--radius-md": "18px",
         "--primary": "#23463e",
-        "--radius-lg": "28px",
         "--danger-ink": "#fff6f7",
+        "--radius-lg": "28px",
         "--danger": "#8e2f3b",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--surface": "#f4f0e8",
@@ -4867,11 +5659,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-7/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/index.html",
       "viewport": "desktop",
       "size": "1440x1000",
       "screenshot": "assets/product-flow-v6/grant-review-board-v6-codex-gpt-5.4-mini-index-interaction-desktop.png",
-      "screenshotSha256": "a540c37521af7c198638dae3ab48e456517479abb50401b8616a6ab402221829",
+      "screenshotSha256": "9574866be68eb0cae185ce480ee99fe639309b5e3e4d39c8029a321f8db48687",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -4898,7 +5690,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4909,15 +5714,15 @@
         "--measure": "74rem",
         "--radius-sm": "12px",
         "--surface-strong": "#fbf8f2",
-        "--font-display": "\"Baskerville\", \"Iowan Old Style\", \"Noto Serif TC\", \"Source Han Serif TC\", serif",
+        "--font-display": "\"Noto Serif TC\", \"Source Han Serif TC\", \"Baskerville\", \"Iowan Old Style\", serif",
         "--space-2": "0.625rem",
         "--shadow": "0 18px 48px rgba(24, 35, 31, 0.08)",
         "--space-4": "1.5rem",
         "--space-3": "1rem",
         "--radius-md": "18px",
         "--primary": "#23463e",
-        "--radius-lg": "28px",
         "--danger-ink": "#fff6f7",
+        "--radius-lg": "28px",
         "--danger": "#8e2f3b",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--surface": "#f4f0e8",
@@ -4946,11 +5751,11 @@
       "alias": "codex-gpt-5.4-mini",
       "page": "index.html",
       "state": "interaction",
-      "url": "http://127.0.0.1:51585/target-7/index.html",
+      "url": "http://127.0.0.1:8766/codex-gpt-5.4-mini-grant-review-board-v6/index.html",
       "viewport": "mobile",
       "size": "390x844",
       "screenshot": "assets/product-flow-v6/grant-review-board-v6-codex-gpt-5.4-mini-index-interaction-mobile.png",
-      "screenshotSha256": "fedc2fad64c5ff21c5f378220fc8a20121c0e6d5103bbcc34714c53999a7188e",
+      "screenshotSha256": "47dcf33c67622341e62bd6e87b8f9fa9f62aafce1d2f8a2b2b4f7c352bcb4af1",
       "interaction": {
         "attempted": true,
         "failures": [],
@@ -4977,7 +5782,20 @@
       "narrowTextColumns": [],
       "bodyFlow": {
         "forcedLineBreaks": [],
-        "nonWrappingProse": []
+        "nonWrappingProse": [],
+        "underfilledProseBlocks": []
+      },
+      "headingFlow": {
+        "compressedCjkHeadings": [],
+        "orphanedCjkHeadingLines": [],
+        "underfilledWideHeadings": []
+      },
+      "layoutFlow": {
+        "domOrderReversals": [],
+        "displacedIntroCopy": []
+      },
+      "localeFlow": {
+        "untranslatedInterfaceCopy": []
       },
       "reducedMotionAnimations": [],
       "contractIssues": [],
@@ -4988,15 +5806,15 @@
         "--measure": "74rem",
         "--radius-sm": "12px",
         "--surface-strong": "#fbf8f2",
-        "--font-display": "\"Baskerville\", \"Iowan Old Style\", \"Noto Serif TC\", \"Source Han Serif TC\", serif",
+        "--font-display": "\"Noto Serif TC\", \"Source Han Serif TC\", \"Baskerville\", \"Iowan Old Style\", serif",
         "--space-2": "0.625rem",
         "--shadow": "0 18px 48px rgba(24, 35, 31, 0.08)",
         "--space-4": "1.5rem",
         "--space-3": "1rem",
         "--radius-md": "18px",
         "--primary": "#23463e",
-        "--radius-lg": "28px",
         "--danger-ink": "#fff6f7",
+        "--radius-lg": "28px",
         "--danger": "#8e2f3b",
         "--font-body": "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
         "--surface": "#f4f0e8",
@@ -5134,5 +5952,167 @@
       "grant-review-board-v6:codex-gpt-5.4-mini": []
     },
     "verdict": "no_observed_issues"
-  }
+  },
+  "generation_ledger": {
+    "path": "evals/product-flow-v6-repaired-v2-generation-results.json",
+    "sha256": "3708750fb66d6ca66ea0aa0201503152cae187b4a3492f0b21e3dbc104a615ea"
+  },
+  "target_inputs": [
+    {
+      "caseId": "wind-maintenance-dispatch-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 8329,
+          "sha256": "728bd6aef637dc2b2d66c9939b85fbc5db73b0c45b894d7d8d2236218c2f6486"
+        },
+        {
+          "path": "index.html",
+          "bytes": 48534,
+          "sha256": "3094aff03d8f54564c6e2ed9e59e5ac983008ea6dd474c97cc3396250023a742"
+        }
+      ]
+    },
+    {
+      "caseId": "type-foundry-specimen-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 7870,
+          "sha256": "75018067e1ef1feebb4064ea040f5927e38330da83b5382617b750e8b0986018"
+        },
+        {
+          "path": "index.html",
+          "bytes": 22003,
+          "sha256": "9c36a48899e0fd415a6931012e666fad26d8e8389244537422f92d9c67871873"
+        }
+      ]
+    },
+    {
+      "caseId": "repair-cafe-intake-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 5827,
+          "sha256": "0cd3d9c969f204e1f2e8409c4898f39d830ff0483f5a23b447d204850f1fa174"
+        },
+        {
+          "path": "index.html",
+          "bytes": 25828,
+          "sha256": "61d5d5fa6616482cf448ce7ea17c1218f61f331266e14783a6199ddd80e279ae"
+        }
+      ]
+    },
+    {
+      "caseId": "night-market-allergen-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-night-market-allergen-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 7165,
+          "sha256": "e4f75853f870ec7c5b48a742aac1731aa0720a2e74aacfe6d982b5a9a2c6c0ec"
+        },
+        {
+          "path": "index.html",
+          "bytes": 34664,
+          "sha256": "5a24a6cbb90cb6c19b93d95603509589f0bbd5af58d1a2565119a8cfb0c63728"
+        }
+      ]
+    },
+    {
+      "caseId": "royalty-statement-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-royalty-statement-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 9876,
+          "sha256": "2e96c0c4ad7c7618b638932f552044ded2da545d4582fbfd708019ee5c05aa4b"
+        },
+        {
+          "path": "index.html",
+          "bytes": 36256,
+          "sha256": "361dd546ac52507ad7c9a22048b96876409b2f995d4f2f68b25516402125ee1b"
+        }
+      ]
+    },
+    {
+      "caseId": "packaging-configurator-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-packaging-configurator-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 8679,
+          "sha256": "f5e2af011d65b8e55a48a444d5a52ca6780ae650d6b02214ee657fd8daa72286"
+        },
+        {
+          "path": "index.html",
+          "bytes": 29952,
+          "sha256": "38154b4d009da0e89cb94a489aa94d7ea6a46f57b98d45986b049a8cf423feeb"
+        },
+        {
+          "path": "materials.html",
+          "bytes": 30046,
+          "sha256": "7b14182de851162fe3fcf044f29d75fafa1d3148c625a03dc198745b7ddc4d43"
+        },
+        {
+          "path": "summary.html",
+          "bytes": 30861,
+          "sha256": "804b552da6c407868130ff542eea23a7b1058ebe34528404394a683229e37d5f"
+        }
+      ]
+    },
+    {
+      "caseId": "oral-history-archive-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-oral-history-archive-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 7804,
+          "sha256": "562ea9ce77ae68183330b13f80503b14073267685ce0563a5bfd94ab08ad7d6a"
+        },
+        {
+          "path": "index.html",
+          "bytes": 12901,
+          "sha256": "49c3b7c9d5aaec98c4a890f7578a5d305b9e6b47a735906bf06abc6a31925574"
+        },
+        {
+          "path": "archive.html",
+          "bytes": 18138,
+          "sha256": "b47d07abeadd6bf9bc3279c4fd6e22e11e87da5e20fc286b677460d58a5d2350"
+        },
+        {
+          "path": "story.html",
+          "bytes": 18598,
+          "sha256": "d5abb65cd9b5b27ea091e03f506666d5423e1adce906cde61a63007a88ea9e61"
+        }
+      ]
+    },
+    {
+      "caseId": "grant-review-board-v6",
+      "alias": "codex-gpt-5.4-mini",
+      "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-grant-review-board-v6",
+      "artifacts": [
+        {
+          "path": "DESIGN.md",
+          "bytes": 6751,
+          "sha256": "60c4e0142dcab80a51f54518bc0ce09b44d739658ac688d4fd1ec349765e0636"
+        },
+        {
+          "path": "index.html",
+          "bytes": 44126,
+          "sha256": "fcbc2b7d91cc90fe455d0a2d925aa5649cfd6a6fec240639fd11c8e533828445"
+        }
+      ]
+    }
+  ]
 }

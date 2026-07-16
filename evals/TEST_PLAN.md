@@ -2,14 +2,16 @@
 
 狀態：`COMPLETED`。固定 cohort 已於 2026-07-15 完成。
 
+方法定位：這 8 案同時參與缺陷發現、Skill／evaluator 修正、Darwin candidate 比較與最終回歸，因此是 **development/regression closure**，不是 held-out validation，也不證明 Skill 已泛化。下一次 promotion 必須另用未進 authoring context 的 sealed validation／test tasks，比較 accepted 與 candidate Skill，並對 stochastic case 重複執行。
+
 ## 執行摘要
 
 - 模型固定為 `gpt-5.4-mini`。初始矩陣先完成 7/8；`repair-cafe-intake-v6` 因 output policy 被拒後依規則 fresh retry，最終 generation 8/8 完成，attempt history 未被隱藏。
-- 初始 browser audit：2 案 clean；6 案出現可重現的文字流、layout、互動或 mobile composition finding，逐案回送診斷並局部修復。
-- 第一輪修復後 6 案使用新 target，2 案以 hash 綁定的既有 clean target promoted。第二輪診斷發現口述歷史正文過窄；補上 browser-owned body flow 修復。補助審查的 mobile navigation timeout 確認是 evaluator false positive，先修 evaluator 並補 regression test，未亂改產品。
-- 最終 generation ledger 8/8、官方 `DESIGN.md` verifier 8/8 clean、12 routes × 4 profiles／互動狀態共 64 張 PNG；deterministic visual、runtime、network、forced body break 與 non-wrapping prose findings 都是 0。
+- 初始 browser audit：2 案 clean；6 案出現可重現的文字流、layout、互動或 mobile composition finding，逐案回送診斷並局部修復。後續把繁中排版、hierarchy、locale 與 layout 研究落實到最新 Skill，再以同一邊界檢閱並修正全部 8 案。
+- 口述歷史過窄／過寬正文、補助審查 hidden desktop action，以及 CJK／Latin measure、parent container、heading、task peer 與術語翻譯等 evaluator false positive，均先修 evaluator 並補 regression test；package、repair、royalty 與 grant interaction 改以公開 brief hook、語意輸入與可見結果判定。
+- 三輪 Darwin 候選共跑 3 次 generation、3 次 64 張 audit；最終 6 案仍有 findings，ratchet 拒絕晉級並保留 repo 外診斷。人工並排檢閱後補上逐字 line-fragment 標題 gate，先修補助 dialog，再由第一次全矩陣抓出字體樣張同類孤字；窄修後第二次 64 張完整重驗為 8/8 targets、0 findings。generation ledger 記錄 8 repairs／0 promotions；官方 `DESIGN.md` verifier 8/8 clean。
 - Mobile 與 compact-mobile 使用 Android Chromium UA、touch、`isMobile=true`、DPR 3 與 mobile screen／visual viewport；仍只屬 browser device emulation，不是實體手機。
-- 64 張最終 screenshot 已人工檢閱；未變動者亦以 SHA-256 證明與上一輪已檢閱檔案 byte-identical。
+- 64 張發布 screenshot 全部由最終 post-orphan-gate rerun 取代並重新計算 SHA-256；manifest、visual report、auditor、Skill 與研究筆記互相綁定，沒有沿用舊圖。
 
 重驗完整性：
 
@@ -56,9 +58,9 @@ Active gate 開始後不得修改期待值或 auditor。發現 evaluator defect 
 | `royalty-statement-v6` | 獨立音樂版稅結算 | 數字／表格／資料視覺、正負語意色 | 期間切換、tooltip touch fallback、異常款項 |
 | `packaging-configurator-v6` | 循環包材三頁規格配置器 | 元件尺寸、選項組合、跨頁 sticky summary | 配置、材質、摘要；衝突、價格更新、mobile summary、reset |
 | `oral-history-archive-v6` | 海岸口述歷史三頁典藏 | 低資訊 editorial、多路由、長段落 | 首頁、典藏、故事頁；長文、腳註、媒體 fallback |
-| `grant-review-board-v6` | 社區文化補助審查台 | 權限語氣、比較、批次操作、modal | shortlist、compare、modal focus、error/retry |
+| `grant-review-board-v6` | 社區文化補助審查台 | 權限語氣、比較、批次操作、對話框 | 待選名單、A/B 比較、對話框焦點、錯誤／重試 |
 
-Brief 需固定 audience、主要任務、內容極端值、必要 interaction hook、mobile transformation 與 hidden acceptance focus。不得在 brief 內指定視覺答案或複製 v4／v5 主題。
+Brief 需固定 audience、主要任務、內容極端值、必要 interaction hook、mobile transformation 與 acceptance focus。Evaluator 只能依 brief 公開的精確 hook 或可觀察結果操作；不得偷綁未公開 ID、value 大小寫、wrapper、slot 或 state attribute。不得在 brief 內指定視覺答案或複製 v4／v5 主題。
 
 ## 執行階段
 
@@ -77,8 +79,9 @@ Brief 需固定 audience、主要任務、內容極端值、必要 interaction h
 - 8 cases 各以全新空 target 執行。
 - 每 case generation infrastructure 最多 3 attempts。
 - timeout 以 inactivity 判斷；log 或 evaluator artifact 持續增加時延長 soft deadline，但不超過 hard ceiling。
-- fresh retry 只接收一行有界、標記為 untrusted 的前次 diagnostic。
+- fresh retry 只接收一行有界、標記為 untrusted 的前次 diagnostic。現行 hardened policy 只自動重試 inactivity timeout 與一般 generation failure；hard-runtime、output-limit、contract/security policy rejection 不盲目重跑，需先分類與明示 remediation。
 - 不覆蓋成功 target，不把 retry 次數隱藏成單次成功。
+- Runner 由 caller 的 `model × case` 選取最小固定 reference 集並把清單寫入 manifest；模型不自報能力。每次 cohort 凍結實際清單與 hash，路由變更必須另開 cohort 才能比較速度或品質。
 
 ### 2. `DESIGN.md` gate
 
@@ -163,6 +166,15 @@ Finding 自動送回修復；只重跑該 target lint，再跑 8-case contract r
 - tool-resolution record 包含 reason、source、version、scope、command、attempt 與 result。
 - `--resume` 只續跑缺失／失敗階段，不能覆蓋已通過證據。
 
+### 8. Model routing and automatic downgrade
+
+- 不接受模型自報 `strong`／`weak`。起始 lane 只讀 evaluator-owned schema-v2 profile；cell 以 task／locale／surface／risk 匹配，另綁 Skill、adapter、toolchain 與 evaluator revision。
+- `attempts` 必須等於 eligible runs 加 infrastructure failures；只有至少 3 次獨立 eligible runs 且 contract／invariant 全過、無 unsupported claims 才能進 `STANDARD`。
+- Profile 缺失、過期、hash 不符、surface 不符、工具不足或 high-risk 一律 fail closed；infrastructure failure 不換算成模型設計失敗或通過。
+- Runtime event 只允許 lane 不變或降低。每個 root cause 使用 evaluator-owned `failure_key`，不同 route／state／工具／根因不得共用三次熔斷計數；測試 progress timeout、無進度 retry、第三次同錯熔斷、schema／invariant failure、缺 verification、缺 mutation、security／permission block 與 evaluator boundary violation。
+- 一般 repair finding 前兩次保留 lane 並自修；第三次才停止盲修、保留最佳產物。成功 retry 不在同一 run 自動升級。
+- 不用一次 generic probe 推論全域能力；probe 結果只限同一工具、契約與環境。更高 lane 必須以新 profile 開新 run。
+
 ## 通過標準
 
 必須全部成立才發布 `VERIFIED` cohort：
@@ -175,6 +187,8 @@ Finding 自動送回修復；只重跑該 target lint，再跑 8-case contract r
 - 最少 60 張 screenshot 與所有 artifact hash 通過通用 validator。
 - unit、lint、syntax、build、Skill installability、CI equivalent 全過。
 - 結果文件明確分開 `VERIFIED`、`OBSERVED`、`INFERRED`、`UNVERIFIED`。
+
+這些條件只能關閉 development/regression cohort。Skill promotion 另需 sealed held-out validation/test 無硬 gate 退步，且依「安全／資料／主要任務 → evidence coverage → deterministic defects → independent craft → runtime/context cost」順序比較；不得用加權總分抵銷前層失敗。
 
 ## 發布與清理
 

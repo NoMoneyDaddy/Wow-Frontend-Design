@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "completed",
-  "started_at": "2026-07-15T10:50:24Z",
-  "finished_at": "2026-07-15T11:55:44Z",
+  "started_at": "2026-07-15T18:10:49Z",
+  "finished_at": "2026-07-16T04:48:24Z",
   "contract": {
     "briefs": {
       "wind-maintenance-dispatch-v6": {
@@ -35,41 +35,41 @@
       },
       "grant-review-board-v6": {
         "path": "evals/briefs/grant-review-board-v6.md",
-        "sha256": "8608347ca88d29a7d49a8ff02ec972a95b6e0a81075f40f04504e1f244468455"
+        "sha256": "ce582f85e40bd3914c4ffdecd991a1b6d4f12785bc365d8acdd5842ce8d3fd94"
       }
     },
     "skill": {
       "path": "wow-frontend-design/SKILL.md",
-      "sha256": "b2690afe84f76d5bd88a02ac087749d196f6fa27765f587d114e659bfe6adcaf"
+      "sha256": "8d987fa54182ee4359fd7f1e309cab3462ca01a4e5d7098d5a935e873e26c6c5"
     },
     "trusted_context": [
       {
         "path": "wow-frontend-design/SKILL.md",
-        "sha256": "b2690afe84f76d5bd88a02ac087749d196f6fa27765f587d114e659bfe6adcaf"
+        "sha256": "8d987fa54182ee4359fd7f1e309cab3462ca01a4e5d7098d5a935e873e26c6c5"
       },
       {
         "path": "wow-frontend-design/references/creative-direction.md",
-        "sha256": "b168c4e8b3e1ed50237687fc22a827946c025b0bc8660c290da04954a80322b3"
+        "sha256": "a4fd972785e5287a125966eca7757389b8c4d025ee94b8a6dabe1c0029c313fe"
       },
       {
         "path": "wow-frontend-design/references/anti-ai-slop.md",
-        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+        "sha256": "f05a5e15c7d3d9c00c4225c3f902401629b5da701200b742fe6a382178ed2e41"
       },
       {
         "path": "wow-frontend-design/references/mobile-responsive.md",
-        "sha256": "133d8df3887922d9ef133119577b83affae2f915fcee6b6005b3fe883ff2e186"
+        "sha256": "ca67b3a22f4b284a3e38e9ae69ef53651c710e18a008a7348fda2a9b30fc4dba"
       },
       {
         "path": "wow-frontend-design/references/localization.md",
-        "sha256": "3eb817b38ca717d4e9ac154bccc5bd662319266478705e92e6c138e759becda5"
+        "sha256": "66ef015935847f2883f3574c0328e8763542c29efdd9e3c202e100374e7c937c"
       },
       {
         "path": "wow-frontend-design/references/typography-webfonts.md",
-        "sha256": "9d946351ad7a07c0a1eb9cfd3069387e9afa2fa4996b5616c82f8c11c1d30b5c"
+        "sha256": "e63f4dc1d0afff88354206fb48747a8104e92290232cb8a46c27e7a4f2ee35a1"
       },
       {
         "path": "wow-frontend-design/references/typographic-layout.md",
-        "sha256": "adb607257a234cb1809759bbbdde8c67bea6442db395029c4f89b3a3a6c85c78"
+        "sha256": "651dad80dc58403dd4be4d9dad6841278ff9d3b9052929b1d15261685b44e47a"
       },
       {
         "path": "wow-frontend-design/references/implementation.md",
@@ -77,11 +77,11 @@
       },
       {
         "path": "wow-frontend-design/references/component-composition.md",
-        "sha256": "688cc24e5117eaaaa8037546cf73d9972af249b8bcecbd3bf180b22f4dadab78"
+        "sha256": "3d9ac53f4dbb1537fdddd5a73d9913f2a120600a859b4d042498ccd2792174d9"
       },
       {
         "path": "wow-frontend-design/references/quality-gates.md",
-        "sha256": "a92248db6cf063aaa1c3fd6d1532fcc4f55d60ed3533c452c175193e6bf4f731"
+        "sha256": "7197ffa2673de15f5450d4e548fe34c7bcb1784dde0067281e0dece0479bd04c"
       },
       {
         "path": "wow-frontend-design/references/weak-model-playbook.md",
@@ -89,11 +89,11 @@
       },
       {
         "path": "wow-frontend-design/references/color-system-psychology.md",
-        "sha256": "08c018fa2fcd4e283af877bd804c9c97cb4ab3cc4cc24d896b8ab55f44d22d72"
+        "sha256": "b5206e184cfd323d329b4920be991d7bbed15244de6f5c4285e9f452bbd0caaa"
       },
       {
         "path": "wow-frontend-design/references/design-md-contract.md",
-        "sha256": "63c2ef3c0417ffef151a7a0f2b6aff35fa6b8ad3f3f4bf77e5ecc35767c20080"
+        "sha256": "632ee880ba2e367258fdaae74771d3873e4eb3927665499d05a14dbdb6b2ee4a"
       },
       {
         "path": "wow-frontend-design/assets/DESIGN.template.md",
@@ -103,27 +103,27 @@
     "evaluator_inputs": [
       {
         "path": "evals/run_product_flow_evaluation.py",
-        "sha256": "beca4105c75c3c6ded7c74e3837deb863c3b3552c91fe3093b1504b10d722198"
+        "sha256": "66e6c20b0552d205dfd4ac45a661f5c13c82e04f7a9d172d6ee6572acb56bd2d"
       },
       {
         "path": "evals/run_product_flow_matrix.py",
-        "sha256": "cc57297bee017489673c295fc1ed9e33d9736a2e340cf2f9d584a7ae1e533c31"
+        "sha256": "469982cbdf0ab6084b7127befe202d1ed4eaedfb1c05b923a0de282ce7643888"
       },
       {
         "path": "evals/lint_design_md_matrix.py",
-        "sha256": "82d8b44304cf06b36393b35b7bc59992816829af15dac34a891257322431e795"
+        "sha256": "18daf52c7bb57dfcccb17638e9d74cb703f912de438b39ca23970e077595cb9a"
       },
       {
         "path": "evals/playwright_visual_v6_audit.cjs",
-        "sha256": "c5221de34b2de98543401ca4e9826244631f5d6f7faf10fa302246b70da310c8"
+        "sha256": "6b829c61a553f4d347d2c88058afd761d1e28422d7ccae4189f0cab1c300b4ff"
       },
       {
         "path": "evals/run_claude_case.sh",
-        "sha256": "3b403ebc0146cb5bd905e93156904ed84d01b4f0cc2cc5d74044c821c7619e76"
+        "sha256": "b5db87745bc994a73e03e15199615a26fe46802b89bdbf67ef9e4a256334ba1f"
       },
       {
         "path": "evals/run_codex_case.sh",
-        "sha256": "63c267c48e43d4381a11da72421270b7711d897222a85a442f6af9751921926b"
+        "sha256": "fa28146de8d05b3b1daaa174fd6b1fd7e410ed1dcc58ac9f6886aae7c769f901"
       },
       {
         "path": "evals/validate_visual_web_output.py",
@@ -135,7 +135,7 @@
       },
       {
         "path": "evals/validate_codex_log_policy.py",
-        "sha256": "9daf52fc38c7914a90f0e45567e6946eed9f1e86e7ddb850695498401d358214"
+        "sha256": "f9a236f4e73e904c0150a5265bd8e0c0251bca11da47e8c79caf47da44e6d189"
       }
     ],
     "outputs_by_case": {
@@ -185,20 +185,37 @@
       "codex_reasoning_summary": "none",
       "codex_internal_reasoning_disable_supported": false
     },
+    "context_routing": "runner_selects_smallest_fixed_set_by_caller_model_and_case",
     "repair_assembly": {
       "source_ledger": {
         "path": "evals/product-flow-v6-repaired-generation-results.json",
         "sha256": "ea7afc49d99d156fae47b44cda86d6d1c9a7c4edcde9b9fdc3cdbd1f10b05c98"
       },
-      "promoted_clean_cases": [
+      "latest_skill_repair": {
+        "skill": {
+          "path": "wow-frontend-design/SKILL.md",
+          "sha256": "8d987fa54182ee4359fd7f1e309cab3462ca01a4e5d7098d5a935e873e26c6c5"
+        },
+        "visual_report": {
+          "path": "evals/product-flow-v6-visual-results.json",
+          "bound_by": "generation_ledger"
+        },
+        "research_note": {
+          "path": "evals/product-flow-v6-latest-skill-repair.md",
+          "sha256": "e907761c24dd3442227107e81e155a113795ae6b097b18c9f3e7737a4d0b0dea"
+        }
+      },
+      "repaired_cases": [
         "grant-review-board-v6",
         "night-market-allergen-v6",
+        "oral-history-archive-v6",
         "packaging-configurator-v6",
         "repair-cafe-intake-v6",
         "royalty-statement-v6",
         "type-foundry-specimen-v6",
         "wind-maintenance-dispatch-v6"
-      ]
+      ],
+      "promoted_clean_cases": []
     }
   },
   "selection": {
@@ -214,25 +231,39 @@
       "case_id": "wind-maintenance-dispatch-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/run-manifest.json",
-      "finished_at": "2026-07-15T10:50:24Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T10:50:24Z",
+      "finished_at": "2026-07-15T18:15:15Z",
+      "duration_seconds": 266.092,
+      "receipt": {
+        "manifest_sha256": "d132bebfb75d4e9f9d023519d161764fa7d64a8a79fbe804e2e676bc41efcad9",
+        "outputs": {
+          "DESIGN.md": "728bd6aef637dc2b2d66c9939b85fbc5db73b0c45b894d7d8d2236218c2f6486",
+          "index.html": "3094aff03d8f54564c6e2ed9e59e5ac983008ea6dd474c97cc3396250023a742"
+        }
+      },
+      "started_at": "2026-07-15T18:10:49Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T10:50:24Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/run-manifest.json",
-          "finished_at": "2026-07-15T10:50:24Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:10:49Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-wind-maintenance-dispatch-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "f6c8c0ed87c8e9fd6b3a703a06518f05490af85f05e552e9adc0a24137633adb",
+            "outputs": {
+              "DESIGN.md": "728bd6aef637dc2b2d66c9939b85fbc5db73b0c45b894d7d8d2236218c2f6486",
+              "index.html": "3094aff03d8f54564c6e2ed9e59e5ac983008ea6dd474c97cc3396250023a742"
+            }
+          },
+          "finished_at": "2026-07-15T18:15:15Z",
+          "duration_seconds": 266.092,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 266.092,
+      "evidence_mode": "repair"
     },
     {
       "provider": "codex",
@@ -240,25 +271,39 @@
       "case_id": "type-foundry-specimen-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6/run-manifest.json",
-      "finished_at": "2026-07-15T10:50:24Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T10:50:24Z",
+      "finished_at": "2026-07-15T18:21:41Z",
+      "duration_seconds": 386.412,
+      "receipt": {
+        "manifest_sha256": "83b2d3543f885b1cd38b7e5839f8547845607a6fbb32cdbc90fb7126d3420b3e",
+        "outputs": {
+          "DESIGN.md": "75018067e1ef1feebb4064ea040f5927e38330da83b5382617b750e8b0986018",
+          "index.html": "9c36a48899e0fd415a6931012e666fad26d8e8389244537422f92d9c67871873"
+        }
+      },
+      "started_at": "2026-07-15T18:15:15Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T10:50:24Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6/run-manifest.json",
-          "finished_at": "2026-07-15T10:50:24Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:15:15Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-type-foundry-specimen-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "93fbd727b80e7a0c9d3a074ae575253d25b4d681d9025c6e861bdd482b55e56f",
+            "outputs": {
+              "DESIGN.md": "75018067e1ef1feebb4064ea040f5927e38330da83b5382617b750e8b0986018",
+              "index.html": "a043c3dc3ee24551a47a1506e5b37f56b7c5be92e43507c40b5e5fc5b53bc49e"
+            }
+          },
+          "finished_at": "2026-07-15T18:21:41Z",
+          "duration_seconds": 386.412,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 386.412,
+      "evidence_mode": "repair"
     },
     {
       "provider": "codex",
@@ -268,23 +313,37 @@
       "status": "completed",
       "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6/run-manifest.json",
-      "finished_at": "2026-07-15T11:01:27Z",
-      "duration_seconds": 663.63,
-      "started_at": "2026-07-15T10:50:24Z",
+      "finished_at": "2026-07-15T18:23:22Z",
+      "duration_seconds": 100.609,
+      "receipt": {
+        "manifest_sha256": "d41dbc01737eed49ddc56bd0843dcbaf18ef67d0e1855c8f46d2ca930b6641b9",
+        "outputs": {
+          "DESIGN.md": "0cd3d9c969f204e1f2e8409c4898f39d830ff0483f5a23b447d204850f1fa174",
+          "index.html": "61d5d5fa6616482cf448ce7ea17c1218f61f331266e14783a6199ddd80e279ae"
+        }
+      },
+      "started_at": "2026-07-15T18:21:41Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T10:50:24Z",
+          "started_at": "2026-07-15T18:21:41Z",
           "status": "completed",
           "exit_code": 0,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6/run-manifest.json",
-          "finished_at": "2026-07-15T11:01:27Z",
-          "duration_seconds": 663.63,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-repair-cafe-intake-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "6fbb3b07ebfab74835b2502ce5c957d67d06056c5a470c1656cab7184cee76c2",
+            "outputs": {
+              "DESIGN.md": "0cd3d9c969f204e1f2e8409c4898f39d830ff0483f5a23b447d204850f1fa174",
+              "index.html": "61d5d5fa6616482cf448ce7ea17c1218f61f331266e14783a6199ddd80e279ae"
+            }
+          },
+          "finished_at": "2026-07-15T18:23:22Z",
+          "duration_seconds": 100.609,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 663.63,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 100.609,
+      "evidence_mode": "repair"
     },
     {
       "provider": "codex",
@@ -292,25 +351,39 @@
       "case_id": "night-market-allergen-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-night-market-allergen-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-night-market-allergen-v6/run-manifest.json",
-      "finished_at": "2026-07-15T11:01:27Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T11:01:27Z",
+      "finished_at": "2026-07-15T18:25:47Z",
+      "duration_seconds": 145.697,
+      "receipt": {
+        "manifest_sha256": "47967762242ab5194031f24aa6d4b8dbf63667a92b65b8794a3c4a9def03653e",
+        "outputs": {
+          "DESIGN.md": "e4f75853f870ec7c5b48a742aac1731aa0720a2e74aacfe6d982b5a9a2c6c0ec",
+          "index.html": "5a24a6cbb90cb6c19b93d95603509589f0bbd5af58d1a2565119a8cfb0c63728"
+        }
+      },
+      "started_at": "2026-07-15T18:23:22Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T11:01:27Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-night-market-allergen-v6/run-manifest.json",
-          "finished_at": "2026-07-15T11:01:27Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:23:22Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-night-market-allergen-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "4db29fe06789db59e933a21cbea53c8c164d592995d492d27edf46a9aa88d9af",
+            "outputs": {
+              "DESIGN.md": "e4f75853f870ec7c5b48a742aac1731aa0720a2e74aacfe6d982b5a9a2c6c0ec",
+              "index.html": "5a24a6cbb90cb6c19b93d95603509589f0bbd5af58d1a2565119a8cfb0c63728"
+            }
+          },
+          "finished_at": "2026-07-15T18:25:47Z",
+          "duration_seconds": 145.697,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 145.697,
+      "evidence_mode": "repair"
     },
     {
       "provider": "codex",
@@ -318,25 +391,39 @@
       "case_id": "royalty-statement-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-royalty-statement-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-royalty-statement-v6/run-manifest.json",
-      "finished_at": "2026-07-15T11:01:27Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T11:01:27Z",
+      "finished_at": "2026-07-15T18:30:03Z",
+      "duration_seconds": 256.034,
+      "receipt": {
+        "manifest_sha256": "fc5e14f462491ace8db4253b20ca869f42a5f05cee7a1e04e5cba89b05ac7bdf",
+        "outputs": {
+          "DESIGN.md": "2e96c0c4ad7c7618b638932f552044ded2da545d4582fbfd708019ee5c05aa4b",
+          "index.html": "361dd546ac52507ad7c9a22048b96876409b2f995d4f2f68b25516402125ee1b"
+        }
+      },
+      "started_at": "2026-07-15T18:25:47Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T11:01:27Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-royalty-statement-v6/run-manifest.json",
-          "finished_at": "2026-07-15T11:01:27Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:25:47Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-royalty-statement-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "d8e2660b65f3123a4ecf819a8ef4ebab9adf8f34e3afda877511aa632ec9294d",
+            "outputs": {
+              "DESIGN.md": "2e96c0c4ad7c7618b638932f552044ded2da545d4582fbfd708019ee5c05aa4b",
+              "index.html": "361dd546ac52507ad7c9a22048b96876409b2f995d4f2f68b25516402125ee1b"
+            }
+          },
+          "finished_at": "2026-07-15T18:30:03Z",
+          "duration_seconds": 256.034,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 256.034,
+      "evidence_mode": "repair"
     },
     {
       "provider": "codex",
@@ -344,25 +431,43 @@
       "case_id": "packaging-configurator-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-packaging-configurator-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-packaging-configurator-v6/run-manifest.json",
-      "finished_at": "2026-07-15T11:01:27Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T11:01:27Z",
+      "finished_at": "2026-07-15T18:33:59Z",
+      "duration_seconds": 236.013,
+      "receipt": {
+        "manifest_sha256": "0efa532e9ffc9c94626adfc91fcd892e809a7367fac60e8a3c75105fb34a4c77",
+        "outputs": {
+          "DESIGN.md": "f5e2af011d65b8e55a48a444d5a52ca6780ae650d6b02214ee657fd8daa72286",
+          "index.html": "38154b4d009da0e89cb94a489aa94d7ea6a46f57b98d45986b049a8cf423feeb",
+          "materials.html": "7b14182de851162fe3fcf044f29d75fafa1d3148c625a03dc198745b7ddc4d43",
+          "summary.html": "804b552da6c407868130ff542eea23a7b1058ebe34528404394a683229e37d5f"
+        }
+      },
+      "started_at": "2026-07-15T18:30:03Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T11:01:27Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-packaging-configurator-v6/run-manifest.json",
-          "finished_at": "2026-07-15T11:01:27Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:30:03Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-packaging-configurator-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "4889a34c99b40781f64a4e794206c8dc5bd464cf3a68b8d6adb2dbc1aff1529d",
+            "outputs": {
+              "DESIGN.md": "f5e2af011d65b8e55a48a444d5a52ca6780ae650d6b02214ee657fd8daa72286",
+              "index.html": "38154b4d009da0e89cb94a489aa94d7ea6a46f57b98d45986b049a8cf423feeb",
+              "materials.html": "7b14182de851162fe3fcf044f29d75fafa1d3148c625a03dc198745b7ddc4d43",
+              "summary.html": "a1cb5ccebcdd5852f9f975470ef7469c6900d57d4ca71de14ce8b557ef375693"
+            }
+          },
+          "finished_at": "2026-07-15T18:33:59Z",
+          "duration_seconds": 236.013,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 236.013,
+      "evidence_mode": "repair"
     },
     {
       "provider": "codex",
@@ -370,24 +475,42 @@
       "case_id": "oral-history-archive-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-oral-history-archive-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
-      "finished_at": "2026-07-15T11:01:27Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T11:01:27Z",
+      "finished_at": "2026-07-15T18:37:15Z",
+      "duration_seconds": 195.847,
+      "receipt": {
+        "manifest_sha256": "9a45f602c1e838c0eef504357d69c031085fb7c4c854795c45627f42b813ee9f",
+        "outputs": {
+          "DESIGN.md": "562ea9ce77ae68183330b13f80503b14073267685ce0563a5bfd94ab08ad7d6a",
+          "index.html": "49c3b7c9d5aaec98c4a890f7578a5d305b9e6b47a735906bf06abc6a31925574",
+          "archive.html": "b47d07abeadd6bf9bc3279c4fd6e22e11e87da5e20fc286b677460d58a5d2350",
+          "story.html": "d5abb65cd9b5b27ea091e03f506666d5423e1adce906cde61a63007a88ea9e61"
+        }
+      },
+      "started_at": "2026-07-15T18:33:59Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T11:01:27Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
-          "finished_at": "2026-07-15T11:01:27Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:33:59Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "8c987bc0c0ebabe90dd5d158993727c93ec7aaaf24fb7be43da3fa710d1e06cf",
+            "outputs": {
+              "DESIGN.md": "562ea9ce77ae68183330b13f80503b14073267685ce0563a5bfd94ab08ad7d6a",
+              "index.html": "60403c78636c80788c6182c7e2271413ffbdd8d0aa5933c12010c1b232f5b63f",
+              "archive.html": "0b68ffe363c9177dbc42787800914fe31d3ee903f2515315da88ac09e3572a95",
+              "story.html": "5c296a8a0c91d4ac06fe5369ddf7d7682b214ba86d6e2a06176aa28397c3c7b2"
+            }
+          },
+          "finished_at": "2026-07-15T18:37:15Z",
+          "duration_seconds": 195.847,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
+      "total_duration_seconds": 195.847,
       "evidence_mode": "repair"
     },
     {
@@ -396,25 +519,39 @@
       "case_id": "grant-review-board-v6",
       "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-grant-review-board-v6",
       "status": "completed",
-      "exit_code": null,
+      "exit_code": 0,
       "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-grant-review-board-v6/run-manifest.json",
-      "finished_at": "2026-07-15T11:01:27Z",
-      "duration_seconds": 0.0,
-      "started_at": "2026-07-15T11:01:27Z",
+      "finished_at": "2026-07-15T18:40:21Z",
+      "duration_seconds": 185.862,
+      "receipt": {
+        "manifest_sha256": "1fa0d6b36408fd40aa18e0264986766d4a25ef1d938a04c8d4ea8663bb0a699a",
+        "outputs": {
+          "DESIGN.md": "60c4e0142dcab80a51f54518bc0ce09b44d739658ac688d4fd1ec349765e0636",
+          "index.html": "fcbc2b7d91cc90fe455d0a2d925aa5649cfd6a6fec240639fd11c8e533828445"
+        }
+      },
+      "started_at": "2026-07-15T18:37:15Z",
       "attempt_count": 1,
       "attempts": [
         {
-          "started_at": "2026-07-15T11:01:27Z",
-          "status": "existing_completed",
-          "exit_code": null,
-          "manifest": "evals/product-flow-v6-initial-targets/codex-gpt-5.4-mini-grant-review-board-v6/run-manifest.json",
-          "finished_at": "2026-07-15T11:01:27Z",
-          "duration_seconds": 0.0,
+          "started_at": "2026-07-15T18:37:15Z",
+          "status": "completed",
+          "exit_code": 0,
+          "manifest": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-grant-review-board-v6/run-manifest.json",
+          "receipt": {
+            "manifest_sha256": "9effcc1dfa976c74cafdcdc61ed4fbbd155c7aab1cb62efb94d64c0042ba2687",
+            "outputs": {
+              "DESIGN.md": "60c4e0142dcab80a51f54518bc0ce09b44d739658ac688d4fd1ec349765e0636",
+              "index.html": "0a10ca79af7b2275911b16727d1503a8de1822533dbcc9c962ff3575d2ae0b64"
+            }
+          },
+          "finished_at": "2026-07-15T18:40:21Z",
+          "duration_seconds": 185.862,
           "attempt": 1
         }
       ],
-      "total_duration_seconds": 0.0,
-      "evidence_mode": "promoted_clean"
+      "total_duration_seconds": 185.862,
+      "evidence_mode": "repair"
     }
   ],
   "retry_policy": {
@@ -435,15 +572,27 @@
     "requested": 8,
     "completed": 8,
     "failed": 0,
-    "repaired_cases": 1,
-    "promoted_clean_cases": 7
+    "repaired_cases": 8,
+    "promoted_clean_cases": 0
   },
   "repair_provenance": {
     "source_ledger": {
       "path": "evals/product-flow-v6-repaired-generation-results.json",
       "sha256": "ea7afc49d99d156fae47b44cda86d6d1c9a7c4edcde9b9fdc3cdbd1f10b05c98"
     },
-    "repaired_cases": 1,
-    "promoted_clean_cases": 7
+    "skill": {
+      "path": "wow-frontend-design/SKILL.md",
+      "sha256": "8d987fa54182ee4359fd7f1e309cab3462ca01a4e5d7098d5a935e873e26c6c5"
+    },
+    "visual_report": {
+      "path": "evals/product-flow-v6-visual-results.json",
+      "bound_by": "generation_ledger"
+    },
+    "research_note": {
+      "path": "evals/product-flow-v6-latest-skill-repair.md",
+      "sha256": "e907761c24dd3442227107e81e155a113795ae6b097b18c9f3e7737a4d0b0dea"
+    },
+    "repaired_cases": 8,
+    "promoted_clean_cases": 0
   }
 }

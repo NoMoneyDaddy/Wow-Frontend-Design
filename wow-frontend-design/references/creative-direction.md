@@ -88,6 +88,8 @@ Score each 1–5:
 
 Choose the highest evidence-backed direction. Combine directions only when their rules are compatible.
 
+If the brief explicitly asks for award quality or an immersive brand/portfolio experience, use [award-quality-lens.md](award-quality-lens.md) only after choosing a product-fit direction. Do not start from an award-gallery trope and reverse-engineer a product around it.
+
 ## 4. Define the visual grammar
 
 ### Color

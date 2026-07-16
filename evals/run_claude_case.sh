@@ -220,7 +220,7 @@ fi
 
 case "$CASE_ID" in
   showcase)
-    BRIEF="$EXPECTED_TARGET/BRIEF.md"
+    BRIEF="$ROOT/evals/briefs/showcase.md"
     ;;
   product-dashboard|product-dashboard-remake)
     BRIEF="$ROOT/evals/briefs/product-dashboard.md"
@@ -562,7 +562,7 @@ manifest = {
     "finished_at": finished_at,
     "auth_mode": auth_mode,
     "case": {"id": case_id, "target": os.path.relpath(target_path, root)},
-    "cli": {"path": cli_path, "version": cli_version},
+    "cli": {"path": Path(cli_path).name, "version": cli_version},
     "model": {
         "requested_alias": model,
         "resolved_exact_model": None,

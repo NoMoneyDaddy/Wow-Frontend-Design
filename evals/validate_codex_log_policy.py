@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Any, Iterator
@@ -37,6 +38,12 @@ FORBIDDEN_ITEM_TYPES = {
     "mcp_tool_call",
     "web_search",
 }
+FORBIDDEN_CREDENTIAL_PATTERNS = (
+    ("Codex authentication state", re.compile(r"(?i)(?:\$\{?CODEX_HOME\}?|auth\.json)")),
+    ("process environment enumeration", re.compile(r"(?i)(?<![A-Za-z0-9_.-])(?:/usr/bin/)?(?:printenv|env)(?=\s|$|[;&|>])")),
+    ("process environment enumeration", re.compile(r"(?i)(?:os\.environ|/proc/(?:self|[0-9]+)/environ)")),
+    ("credential store access", re.compile(r"(?i)(?:\.aws/credentials|\.npmrc|\.netrc|\.ssh/|\.config/gh/|security\s+find-(?:generic|internet)-password)")),
+)
 TEMP_PATH = re.compile(
     r"(?<![A-Za-z0-9_.-])(?P<path>/(?:private/)?(?:tmp|var/folders)(?:/[^\s'\"`|;&<>()\[\]{}]*)?)"
 )
@@ -61,10 +68,26 @@ def _events(path: Path) -> Iterator[dict[str, Any]]:
         yield event
 
 
+def _canonical_command(command: str) -> str:
+    if re.search(r"[$*?\[\]{}]", command) or "`" in command:
+        raise PolicyError("shell expansion is forbidden in controlled traces")
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError as error:
+        raise PolicyError(f"command has invalid shell quoting: {error}") from error
+    if not tokens:
+        raise PolicyError("command_execution has no parsed command")
+    return " ".join(tokens).replace("'", "").replace('"', "")
+
+
 def _forbidden_executable(command: str) -> str | None:
     names = "|".join(re.escape(name) for name in FORBIDDEN_EXECUTABLES)
-    scrubbed = re.sub(rf"\b(?:command\s+-v|which)\s+(?:{names})\b", "", command)
-    match = re.search(rf"(?<![A-Za-z0-9_.-])({names})(?![A-Za-z0-9_.-])", scrubbed)
+    capability_probe = re.compile(
+        rf"^(?:/bin/(?:ba|z)?sh\s+-l?c\s+)?(?:command\s+-v|which)\s+(?:{names})(?:\s+\|\|\s+true)?$"
+    )
+    if capability_probe.fullmatch(command):
+        return None
+    match = re.search(rf"(?<![A-Za-z0-9_.-])({names})(?![A-Za-z0-9_.-])", command)
     return match.group(1) if match else None
 
 
@@ -78,6 +101,13 @@ def _external_temp_path(command: str, stage: Path) -> str | None:
         if candidate == canonical_stage or canonical_stage in candidate.parents:
             continue
         return raw_path
+    return None
+
+
+def _forbidden_credential_access(command: str) -> str | None:
+    for label, pattern in FORBIDDEN_CREDENTIAL_PATTERNS:
+        if pattern.search(command):
+            return label
     return None
 
 
@@ -97,10 +127,17 @@ def validate(path: Path, stage: Path) -> int:
         if not isinstance(command, str) or not command:
             raise PolicyError("command_execution has no command")
         checked_commands += 1
-        executable = _forbidden_executable(command)
+        credential_access = _forbidden_credential_access(command)
+        if credential_access is not None:
+            raise PolicyError(f"forbidden credential access in trace: {credential_access}")
+        canonical = _canonical_command(command)
+        executable = _forbidden_executable(canonical)
         if executable is not None:
             raise PolicyError(f"forbidden executable in trace: {executable}")
-        external_temp = _external_temp_path(command, stage)
+        credential_access = _forbidden_credential_access(canonical)
+        if credential_access is not None:
+            raise PolicyError(f"forbidden credential access in trace: {credential_access}")
+        external_temp = _external_temp_path(canonical, stage)
         if external_temp is not None:
             raise PolicyError(f"command referenced evaluator-external temporary storage: {external_temp}")
     return checked_commands

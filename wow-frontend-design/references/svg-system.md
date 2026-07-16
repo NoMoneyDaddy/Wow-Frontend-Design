@@ -65,6 +65,14 @@ For a morphing state icon:
 - switch to the final state immediately under reduced motion;
 - compare intermediate frames at every shipped optical size so line weight, self-intersection, and alignment do not collapse.
 
+For an animated icon:
+
+- record `static meaning → trigger → start/state/end frame → frequency/loop → reduced result → failure fallback → evidence` before choosing an asset or runtime;
+- keep the static silhouette and control label sufficient for comprehension; motion, color, particles, or a drawn check may confirm state but cannot be the only state signal;
+- use the same licensed family and animation grammar for repeated controls. Keep complex illustrative icons out of dense menus, tables, and compact buttons when their small-size render loses recognition;
+- default to a user-triggered, finite segment. Autoplay, hover-only playback, and infinite loops require a named product purpose plus touch/keyboard, pause, off-screen, and background behavior;
+- for Lottie/dotLottie icons, retain a real poster/static frame, handle asset/runtime failure, and destroy the instance on unmount. Read [motion-system.md](motion-system.md) and [advanced-media.md](advanced-media.md).
+
 [W3C ACT Rule 7d6734](https://www.w3.org/WAI/standards-guidelines/act/rules/7d6734/) requires SVG explicitly exposed as an image/graphics role to have a non-empty accessible name. [SVG 2 accessibility support](https://www.w3.org/TR/SVG/access) describes ARIA and `title`/`desc`; real browser/AT support still requires testing.
 
 ### Illustrations
@@ -193,6 +201,7 @@ Release blockers:
 - broken/missing `viewBox`, unresolved references, duplicate IDs, or post-SVGO visual damage;
 - runtime API icon dependency without offline/loading/CSP handling;
 - icon, asset, editor, export, or collection license not verified;
+- animated icon has no static/reduced/failure result, relies on hover alone, or loops without a named progress/ambient purpose and lifecycle;
 - data visualization without an equivalent summary and access to values.
 
 ## 10. Tool and license notes

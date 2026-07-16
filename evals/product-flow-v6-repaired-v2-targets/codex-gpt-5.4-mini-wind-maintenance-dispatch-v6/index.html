@@ -50,6 +50,15 @@
       html {
         scroll-behavior: auto;
       }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
 
     body {
@@ -187,7 +196,7 @@
       line-height: 1.05;
       letter-spacing: -0.02em;
       text-wrap: balance;
-      max-inline-size: 12ch;
+      max-inline-size: 14em;
     }
 
     .lede {
@@ -1177,13 +1186,13 @@
               <dd id="detail-window">—</dd>
             </div>
             <div class="detail-item">
-              <dt>維修內容</dt>
+              <dt>補充說明</dt>
               <dd id="detail-task">—</dd>
             </div>
           </dl>
         </div>
 
-        <form class="reassign-form" id="reassign-form">
+        <form class="reassign-form" id="reassign-form" novalidate>
           <div class="field">
             <label for="vessel-select">改派船班</label>
             <select id="vessel-select" required>

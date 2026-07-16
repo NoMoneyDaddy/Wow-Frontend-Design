@@ -7,7 +7,7 @@ import argparse
 import json
 import os
 import re
-import sys
+import stat
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -57,16 +57,29 @@ IGNORED_DIRS = {
 }
 MAX_FILE_BYTES = 1_500_000
 MAX_FILES = 4_000
+MAX_TOTAL_BYTES = 64 * 1024 * 1024
 SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
 
 MOTION_PATTERN = re.compile(
     r"\b(?:animation(?:-[a-z-]+)?|transition(?:-[a-z-]+)?|requestAnimationFrame|"
-    r"\.animate\s*\(|startViewTransition|ScrollTrigger|useReducedMotion|lottie|rive)\b",
+    r"startViewTransition|ScrollTrigger|useReducedMotion|lottie|rive)\b|"
+    r"\.animate\s*\(|\bgsap\s*\.\s*(?:to|from|fromTo|set|timeline|quickTo|quickSetter)\s*\(",
     re.IGNORECASE,
 )
 JS_RUNTIME_MOTION_PATTERN = re.compile(
     r"\b(?:ScrollTrigger|startViewTransition|lottie|rive)\b|\.animate\s*\(|"
+    r"\bgsap\s*\.\s*(?:to|from|fromTo|set|timeline|quickTo|quickSetter)\s*\(|"
     r"requestAnimationFrame\s*\(\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\b",
+    re.IGNORECASE,
+)
+GSAP_CALL_PATTERN = re.compile(
+    r"\bgsap\s*\.\s*(?:to|from|fromTo|set|timeline|quickTo|quickSetter)\s*\(|"
+    r"\bScrollTrigger\s*\.\s*(?:create|batch)\s*\(",
+    re.IGNORECASE,
+)
+GSAP_CLEANUP_PATTERN = re.compile(
+    r"\buseGSAP\s*\(|\b[A-Za-z_$][\w$]*\s*(?:\?\.|\.)\s*(?:revert|kill)\s*\(|"
+    r"\bScrollTrigger\s*\.\s*killAll\s*\(",
     re.IGNORECASE,
 )
 REDUCED_MOTION_BLOCK_PATTERN = re.compile(
@@ -129,12 +142,39 @@ def iter_source_files(root: Path) -> Iterable[Path]:
 def read_sources(root: Path) -> tuple[dict[Path, str], list[tuple[Path, str]]]:
     sources: dict[Path, str] = {}
     skipped: list[tuple[Path, str]] = []
+    total_bytes = 0
     for path in iter_source_files(root):
         try:
-            if path.stat().st_size > MAX_FILE_BYTES:
-                skipped.append((path, f"file exceeds {MAX_FILE_BYTES} byte audit limit"))
-                continue
-            sources[path] = path.read_text(encoding="utf-8")
+            flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0)
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            descriptor = os.open(path, flags)
+            try:
+                metadata = os.fstat(descriptor)
+                if not stat.S_ISREG(metadata.st_mode):
+                    skipped.append((path, "path is not a regular file"))
+                    continue
+                if metadata.st_size > MAX_FILE_BYTES:
+                    skipped.append((path, f"file exceeds {MAX_FILE_BYTES} byte audit limit"))
+                    continue
+                chunks: list[bytes] = []
+                remaining = MAX_FILE_BYTES + 1
+                while remaining > 0:
+                    chunk = os.read(descriptor, min(65_536, remaining))
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    remaining -= len(chunk)
+                raw = b"".join(chunks)
+                if len(raw) > MAX_FILE_BYTES:
+                    skipped.append((path, f"file exceeds {MAX_FILE_BYTES} byte audit limit"))
+                    continue
+            finally:
+                os.close(descriptor)
+            total_bytes += len(raw)
+            if total_bytes > MAX_TOTAL_BYTES:
+                raise AuditError(f"aggregate source limit exceeded: {MAX_TOTAL_BYTES}")
+            sources[path] = raw.decode("utf-8")
         except (OSError, UnicodeDecodeError) as error:
             skipped.append((path, f"file could not be decoded/read: {error}"))
     return sources, skipped
@@ -152,8 +192,17 @@ def blank_comments(text: str, *, strip_line_comments: bool = True) -> str:
     return re.sub(r"(?m)(?<!:)//[^\r\n]*$", blank, without_blocks)
 
 
-def has_reduced_motion_path(text: str) -> bool:
+def has_runtime_reduced_motion_path(text: str) -> bool:
     if re.search(r"useReducedMotion|matchMedia\s*\([^)]*prefers-reduced-motion", text, re.IGNORECASE):
+        return True
+    return (
+        re.search(r"\bgsap\s*\.\s*matchMedia\s*\(", text, re.IGNORECASE) is not None
+        and re.search(r"prefers-reduced-motion\s*:\s*reduce", text, re.IGNORECASE) is not None
+    )
+
+
+def has_reduced_motion_path(text: str) -> bool:
+    if has_runtime_reduced_motion_path(text):
         return True
     return any(CSS_DECLARATION_PATTERN.search(match.group("body")) for match in REDUCED_MOTION_BLOCK_PATTERN.finditer(text))
 
@@ -192,11 +241,7 @@ def audit_motion(root: Path, sources: dict[Path, str], findings: list[Finding]) 
     analyzed = {path: blank_comments(text) for path, text in sources.items()}
     combined = "\n".join(analyzed.values())
     has_reduced_motion = has_reduced_motion_path(combined)
-    has_runtime_reduced_motion = re.search(
-        r"useReducedMotion|matchMedia\s*\([^)]*prefers-reduced-motion",
-        combined,
-        re.IGNORECASE,
-    ) is not None
+    has_runtime_reduced_motion = has_runtime_reduced_motion_path(combined)
     has_smooth_scroll = re.search(r"scroll-behavior\s*:\s*smooth", combined, re.IGNORECASE) is not None
     has_static_scroll_fallback = re.search(r"scroll-behavior\s*:\s*auto", combined, re.IGNORECASE) is not None
 
@@ -210,6 +255,49 @@ def audit_motion(root: Path, sources: dict[Path, str], findings: list[Finding]) 
         runtime_match = JS_RUNTIME_MOTION_PATTERN.search(text)
         if runtime_match and runtime_location is None:
             runtime_location = (path, text, runtime_match)
+
+        gsap_match = GSAP_CALL_PATTERN.search(text)
+        if gsap_match and path.suffix.lower() in {".astro", ".jsx", ".svelte", ".tsx", ".vue"}:
+            if GSAP_CLEANUP_PATTERN.search(text) is None:
+                add(
+                    findings,
+                    "medium",
+                    "MOTION008",
+                    path,
+                    root,
+                    text,
+                    gsap_match.start(),
+                    "Component-scoped GSAP motion has no scanned useGSAP/context revert/kill lifecycle; unmounts may leak animations or stale inline state.",
+                )
+
+        for item in re.finditer(r"\bmarkers\s*:\s*true\b", text, re.IGNORECASE):
+            add(
+                findings,
+                "medium",
+                "MOTION009",
+                path,
+                root,
+                text,
+                item.start(),
+                "ScrollTrigger development markers must be disabled before shipping.",
+            )
+
+        for item in re.finditer(
+            r"\bonMounted\s*\(\s*\(\s*\)\s*=>\s*\{\s*(?:[A-Za-z_$][\w$]*\s*&&\s*)?"
+            r"[A-Za-z_$][\w$]*\s*(?:\?\.|\.)\s*revert\s*\(",
+            text,
+            re.IGNORECASE,
+        ):
+            add(
+                findings,
+                "high",
+                "MOTION010",
+                path,
+                root,
+                text,
+                item.start(),
+                "GSAP cleanup is registered during mount; move revert/kill to the framework unmount or disposal lifecycle.",
+            )
 
         for item in re.finditer(r"transition(?:-property)?\s*:\s*all\b", text, re.IGNORECASE):
             add(

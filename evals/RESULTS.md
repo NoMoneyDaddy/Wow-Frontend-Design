@@ -1,32 +1,42 @@
 # Evaluation results
 
-Recorded through 2026-07-15. These are bounded test results, not a claim that every model, framework, locale, or product category has passed.
+Recorded through 2026-07-16. These are bounded test results, not a claim that every model, framework, locale, or product category has passed.
 
 ## Codex v6 self-repair cohort
 
+Method classification: **development/regression closure, not held-out validation**. The same cases informed Skill rules, evaluator counterexamples, candidate selection, and final acceptance. The evidence below credibly closes this frozen cohort; it does not by itself prove generalization or candidate superiority on unseen tasks.
+
 This published cohort used only the exact requested model `gpt-5.4-mini`, one frozen Skill revision, eight intentionally different products, 12 routes, and four device profiles. The first matrix completed 7/8; the repair-cafe output was rejected by output policy and then completed on a fresh bounded retry. The final initial generation ledger therefore records 8/8 completed without hiding attempt history.
 
-Initial browser review left night-market allergen and royalty statement clean. Six targets received the smallest diagnostic repair:
+Initial browser review left night-market allergen and royalty statement clean. Six targets received the smallest diagnostic repair. After broader Traditional Chinese typography, hierarchy, locale and layout research was folded into the latest Skill, all eight targets were reviewed again and changed relative to the previous repaired root:
 
-| Target | Reproducible initial problem | Repair outcome |
-| --- | --- | --- |
-| Wind maintenance | desktop/tablet lead exceeded the CJK reading measure | constrained the prose measure without changing mobile behavior |
-| Type foundry | vertical-writing interaction caused mobile horizontal overflow | constrained logical size and wrapping while preserving the writing-mode switch |
-| Repair cafe | sticky desktop action overlaid the textarea; prose was too wide | returned action to a non-obstructing layout and corrected CJK measure |
-| Packaging configurator | mobile sticky summary covered headings, choices and actions | changed mobile summary/actions to a non-obstructing composition |
-| Oral-history archive | body copy did not use an aligned readable content column | restored browser-owned wrapping, full content-column flow and CJK editorial alignment |
-| Grant review | desktop descriptions were squeezed to about `5.47em` | redesigned the dense row so prose receives a readable column |
+| Target | Latest bounded repair |
+| --- | --- |
+| Wind maintenance | replaced Latin-width heading behavior with strict CJK wrapping and a font-relative measure |
+| Type foundry | removed the narrow title cap, widened prose, localized fallback language, retained the vertical-to-horizontal recovery path, and added a compact-mobile display step that prevents a one-character final line |
+| Repair cafe | returned title, introduction and form copy to one aligned reading flow without detached right-side prose |
+| Night-market allergen | replaced the `ch` prose cap with a font-relative `em` measure |
+| Royalty statement | aligned the hero summary with the heading, widened its readable column, and explained `tabular figures` in Chinese |
+| Packaging configurator | replaced three narrow columns with purpose/action columns plus a spanning summary; removed a non-informative CSS dieline and obstructing sticky behavior |
+| Oral-history archive | removed `11ch–18ch` title/body caps across all three routes, restored browser-owned wrapping, and localized the media fallback label |
+| Grant review | removed narrow heading/body caps, preserved one intentional phrase, localized `shortlist` and `modal` UI copy, and moved secondary dialog status below the full-width mobile title track |
 
-The first repaired browser pass found two more signals. Oral-history prose was still too wide and received one additional repair. Grant-review mobile interaction timed out because the evaluator targeted a hidden desktop action; this was classified as an evaluator defect, fixed with a regression test, and rerun without changing the product for the false positive.
+Earlier repaired passes found additional signals: oral-history prose still needed correction, and grant-review mobile interaction timed out because the evaluator targeted a hidden desktop action. The evaluator defect received a regression test before the product cohort was rerun. Later false positives in CJK/Latin measure, parent-container flow, heading detection, task-peer layout and translated terminology were likewise corrected in the evaluator rather than hidden by product changes.
+
+A later Darwin-style candidate loop ran three complete `gpt-5.4-mini` generations and three 64-screenshot audits (192 PNG captures). `DESIGN.md` stayed 8/8 clean in every round, but the candidate finished with six targets carrying deterministic findings. Because it was worse than the accepted baseline, the ratchet rejected it and no candidate target or screenshot was promoted. The final publication instead repaired the accepted artifacts: it removed the packaging summary obstruction, converted the oral-history featured record into a real content/annotation split, sized footer surfaces around their reading measure, and made grant comparison/navigation hooks explicit in the public brief.
+
+The evaluator also stopped depending on unannounced implementation details: package size selection now operates a semantic enabled radio without assuming lowercase `value="s"`; repair and royalty transitions use observable state; grant comparison uses brief-owned A/B and next-proposal hooks. The Codex runner now selects references by caller model and case. For the eight mini cases the embedded trusted context fell from 190,732 bytes to 145,024–161,274 bytes (15.4–24.0% less). This is a measured input reduction, not yet a latency or quality claim; the routed prompt needs its own future generation cohort.
+
+Matched manual screenshot review then found a real defect the deterministic report had missed: grant-review status badges consumed the mobile dialog title track, leaving `策` alone on the final line. The evaluator was extended to reconstruct visible `h1–h3` line fragments and reject an accidental one-character CJK final line. Its first full 64-screenshot run immediately found the same class of defect in the type-foundry title, which was repaired with a tested mobile type step and balanced fallback. The second full run completed 64/64 with zero findings. This is a bounded counterexample-driven evaluator repair, not proof that every typographic craft defect is now machine-detectable.
 
 Final bounded evidence:
 
-- generation ledger: 8/8 current targets with repair/promotion provenance and source-manifest hashes;
+- generation ledger: 8/8 current targets with latest-Skill repair provenance, before/output hashes and source-manifest hashes;
 - official `@google/design.md@0.3.0` verifier: 8/8 clean, zero errors and warnings;
 - browser inventory: 64/64 PNG across desktop `1440×1000` DPR 1, tablet `834×1112` DPR 2, mobile `390×844` DPR 3, and compact mobile `360×800` DPR 3;
 - mobile profiles: Android Chromium UA, touch, `isMobile=true`, mobile screen and visual viewport—not width-only resize;
-- final findings: zero deterministic visual, runtime, network, forced-body-break, and non-wrapping-prose issues;
-- manual review: all final screenshot content inspected; byte-identical screenshots remained tied to the inspected prior pass by SHA-256.
+- final post-orphan-gate rerun: 64/64 screenshots and 8/8 targets with zero deterministic visual, runtime, network, body-flow, heading-flow, layout-flow, locale-flow, interaction or cross-page token-drift findings;
+- screenshot publication: all 64 final PNG files were replaced by the post-contract output and rebound to the auditor/report by SHA-256; no rejected-candidate screenshot was promoted.
 
 Artifacts: [`product-flow-v6-repaired-v2-generation-results.json`](product-flow-v6-repaired-v2-generation-results.json), [`product-flow-v6-repaired-v2-design-md-results.json`](product-flow-v6-repaired-v2-design-md-results.json), [`product-flow-v6-visual-results.json`](product-flow-v6-visual-results.json), [`product-flow-v6-repaired-v2-targets/`](product-flow-v6-repaired-v2-targets/), and [`../assets/product-flow-v6/`](../assets/product-flow-v6/).
 
@@ -38,6 +48,23 @@ python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py \
 ```
 
 This proves only this exact model/cohort, frozen evaluator, Chromium device emulation, and checked states. It does not certify physical phones, Safari/Firefox, OS assistive technology, formal WCAG conformance, real-user usability, production performance, or general model ranking.
+
+## Darwin advisory optimization audit
+
+The trusted `alchaincyf/darwin-skill` source was pinned at commit `7c7b7909b630dc3b5cbb91bd4bcb1b10bfb1f894`. Two independent judges applied its nine-dimension rubric and runtime-neutrality scan to the current Skill plus three dry-run prompts: a Traditional Chinese mobile disaster-information build, a React returns-dashboard retrofit, and a read-only vertical/ruby literature audit. Runtime red-light matches were 0; both judges selected checkpoint design as the weakest safe dimension. The accepted one-line candidate now pauses only for new authority or material side effects and explicitly keeps ordinary authorized repair automatic.
+
+The judges' advisory baseline totals differed (`89.7/100` and `83.1/100`); after the one-line candidate both independently returned `KEEP` (`90.3/100` and `84.3/100`). This disagreement and small delta demonstrate why the scalar is not an acceptance gate. Dry-run ratio was 100%, Darwin's published weights sum to 99 rather than the claimed 100, and no with-Skill/no-Skill rendered pair was produced. The candidate therefore remains subject to this repository's machine hard gates, complete unit/regression suite, evidence integrity, and human diff review. Generic Darwin suggestions to add frequent visual STOP markers, centralize duplicate blacklists, ban capability-bounded language, or let a weighted total choose the winner were rejected because they would worsen user experience, context cost, or evidence safety.
+
+## Model routing and runtime downgrade contract
+
+Research does not support a stable, self-reported `strong/weak` scalar. Agent Skills has no portable model selector; model routing studies show useful cost/quality trade-offs, but also distribution shift, model-recall gaps, and cases where simple baselines match complex routers. The repository therefore keeps model identity and initial routing outside the Skill:
+
+- schema-v2 capability cells are keyed by task, locale, surface and risk, and bind the exact Skill, adapter, toolchain and evaluator revisions;
+- only eligible independent runs count toward a higher lane; infrastructure failures are recorded separately;
+- runtime events can keep or lower a lane, never raise it; ordinary repair findings self-correct first, while the third consecutive identical failure triggers bounded handoff of the best artifact;
+- missing verification narrows the evidence claim, while missing safe mutation or a security/permission block changes the run to advisory.
+
+Focused unit cases for [`route_model.py`](../wow-frontend-design/scripts/route_model.py) and [`runtime_downgrade.py`](../wow-frontend-design/scripts/runtime_downgrade.py) passed locally. That proves the encoded state machine and schema invariants only; no new model profile was promoted, and the v6 `gpt-5.4-mini` cohort remains the only current published visual cohort.
 
 ## Codex v5 mini product-flow cohort
 

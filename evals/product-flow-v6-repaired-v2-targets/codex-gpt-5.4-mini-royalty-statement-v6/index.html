@@ -163,11 +163,9 @@
     }
 
     h1 {
-      max-width: 12ch;
       font-size: clamp(2.2rem, 5vw, 3.5rem);
       line-height: 1.06;
       letter-spacing: -0.03em;
-      text-wrap: balance;
     }
 
     .lede {
@@ -182,6 +180,7 @@
       display: grid;
       gap: var(--space-4);
       align-content: start;
+      min-width: 0;
     }
 
     .period-switch {
@@ -227,7 +226,7 @@
     .summary-grid {
       display: grid;
       gap: var(--space-4);
-      grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 0.9fr);
+      grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 0.85fr);
       align-items: start;
     }
 
@@ -296,7 +295,7 @@
     }
 
     .section-head p {
-      max-width: 34ch;
+      max-width: 38ch;
       color: rgba(26, 22, 19, 0.7);
       font-size: 0.92rem;
       line-height: 1.55;
@@ -311,8 +310,25 @@
     .surface-grid {
       display: grid;
       gap: var(--space-5);
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.95fr);
       align-items: start;
+    }
+
+    @media (min-width: 56.001rem) {
+      .hero {
+        grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.9fr);
+        align-items: end;
+      }
+
+      .hero-meta {
+        grid-column: 1;
+      }
+
+      .period-switch {
+        grid-column: 2;
+        justify-self: end;
+        align-self: end;
+      }
     }
 
     .chart-panel {
@@ -365,6 +381,12 @@
     .chart-mark:focus-visible .chart-bar-shell {
       transform: translateY(-2px);
       background: rgba(191, 220, 214, 0.18);
+    }
+
+    .chart-mark[aria-pressed="true"] .chart-bar-shell {
+      transform: translateY(-2px);
+      background: rgba(191, 220, 214, 0.22);
+      box-shadow: inset 0 0 0 1px rgba(24, 79, 74, 0.18);
     }
 
     .chart-bar {
@@ -709,8 +731,8 @@
       <div class="hero-meta">
         <p class="eyebrow">獨立音樂版稅結算</p>
         <div>
-          <h1>把來源、期別與異常放進同一張對帳台。</h1>
-          <p class="lede">這份頁面以示意資料展示版稅工作流：可切換本期與上期、讀取六筆來源、打開一筆異常款項，並用鍵盤或觸控查看圖表資料點說明。</p>
+          <h1>把六筆來源、期別切換與異常款項一起放進同一張對帳台。</h1>
+          <p class="lede">這份頁面以示意資料展示版稅作業流程：可切換本期與上期、讀取六筆來源、打開一筆異常款項，並用鍵盤或觸控查看圖表資料點說明。</p>
         </div>
       </div>
 
@@ -725,7 +747,7 @@
         <div class="summary-copy">
           <p id="summary-title" class="summary-label">目前顯示本期</p>
           <div class="summary-total" data-eval="summary-total" aria-live="polite">NT$ 1,284,600</div>
-          <p class="summary-note">金額採示意資料與 tabular 數字格式，重點是讓期別切換後的總額、圖表與列狀態同步更新。</p>
+          <p class="summary-note">金額採示意資料與等寬數字格式，重點是讓期別切換後的總額、圖表與列狀態同步更新。</p>
         </div>
 
         <div class="summary-stats" aria-label="結算概覽">
@@ -752,32 +774,32 @@
             <h2 id="chart-title">來源分布</h2>
             <p>點選或聚焦任一資料點，即可在下方查看來源說明與期別比較。</p>
           </div>
-          <p class="period-label">資料視覺不是唯一編碼</p>
+          <p class="period-label">資料視覺不是唯一呈現方式</p>
         </div>
 
         <div class="chart-stage">
           <div class="chart-rail" id="chart-rail" aria-label="來源圖表">
-            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="1" data-index="0" aria-label="串流平台 EchoWave，顯示本期 31 萬元，佔比 24%。">
+            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="1" data-index="0" aria-pressed="true" aria-label="串流平台 EchoWave，顯示本期 31 萬元，佔比 24%。">
               <span class="chart-bar-shell"><span class="chart-bar" style="--height: 72%"></span></span>
               <span class="chart-caption"><strong>EchoWave</strong><span>NT$ 310,000</span></span>
             </button>
-            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="2" data-index="1" aria-label="授權配樂 North Sync，顯示本期 26 萬元，佔比 20%。">
+            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="2" data-index="1" aria-pressed="false" aria-label="授權配樂 North Sync，顯示本期 26 萬元，佔比 20%。">
               <span class="chart-bar-shell"><span class="chart-bar" style="--height: 60%"></span></span>
               <span class="chart-caption"><strong>North Sync</strong><span>NT$ 260,000</span></span>
             </button>
-            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="3" data-index="2" aria-label="實體發行 Needle Run，顯示本期 22 萬元，佔比 17%。">
+            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="3" data-index="2" aria-pressed="false" aria-label="實體發行 Needle Run，顯示本期 22 萬元，佔比 17%。">
               <span class="chart-bar-shell"><span class="chart-bar" style="--height: 52%"></span></span>
               <span class="chart-caption"><strong>Needle Run</strong><span>NT$ 220,000</span></span>
             </button>
-            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="4" data-index="3" aria-label="海外版權 Harbor Rights，顯示本期 18 萬元，佔比 14%。">
+            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="4" data-index="3" aria-pressed="false" aria-label="海外版權 Harbor Rights，顯示本期 18 萬元，佔比 14%。">
               <span class="chart-bar-shell"><span class="chart-bar" style="--height: 44%"></span></span>
               <span class="chart-caption"><strong>Harbor Rights</strong><span>NT$ 180,000</span></span>
             </button>
-            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="5" data-index="4" aria-label="現場錄音 Live Room，顯示本期 14 萬元，佔比 11%。">
+            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="5" data-index="4" aria-pressed="false" aria-label="現場錄音 Live Room，顯示本期 14 萬元，佔比 11%。">
               <span class="chart-bar-shell"><span class="chart-bar" style="--height: 35%"></span></span>
               <span class="chart-caption"><strong>Live Room</strong><span>NT$ 140,000</span></span>
             </button>
-            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="6" data-index="5" aria-label="廣播與播客 City Air，顯示本期 11 萬元，佔比 9%。">
+            <button class="chart-mark" type="button" data-eval="chart-mark" data-tone="6" data-index="5" aria-pressed="false" aria-label="廣播與播客 City Air，顯示本期 11 萬元，佔比 9%。">
               <span class="chart-bar-shell"><span class="chart-bar" style="--height: 29%"></span></span>
               <span class="chart-caption"><strong>City Air</strong><span>NT$ 110,000</span></span>
             </button>
@@ -949,7 +971,7 @@
             </div>
           </article>
 
-          <article class="anomaly-card" data-eval="anomaly" data-record-id="manual-adjustment">
+          <article class="anomaly-card" data-eval="anomaly">
             <div class="anomaly-head">
               <div class="anomaly-copy">
                 <span class="tag danger">異常款項</span>
@@ -1068,6 +1090,9 @@
         const period = workspace.dataset.period || 'current';
         const payload = data[period];
         const [source, values, delta, note] = payload.tooltip[index];
+        marks.forEach((mark, markIndex) => {
+          mark.setAttribute('aria-pressed', String(markIndex === index));
+        });
         tooltipSource.textContent = source;
         tooltipCurrent.textContent = values;
         tooltipDelta.textContent = delta;

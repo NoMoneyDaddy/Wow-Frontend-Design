@@ -33,6 +33,7 @@ REQUIRED_CAPABILITY_IDS = {
     "claude-dashboard-pair",
     "cross-product-coverage",
     "deterministic-weak-model-guardrails",
+    "external-research-supply-chain",
     "framework-portability",
     "haiku-remediation-remake",
     "host-portability",

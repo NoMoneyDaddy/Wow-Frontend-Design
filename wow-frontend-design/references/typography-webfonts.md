@@ -30,6 +30,10 @@ family + source repository/release + version/hash + exact file + license + reser
 
 Strong open Pan-CJK starting points include the official [Noto CJK](https://notofonts.github.io/noto-docs/website/use/) and [Source Han Sans](https://github.com/adobe-fonts/source-han-sans) releases. They are candidates, not universal defaults; choose the correct Traditional Chinese Taiwan/Hong Kong region and test product vocabulary.
 
+Font roundups are discovery lists, not selection evidence. Figma's [website-font guide](https://www.figma.com/resource-library/best-fonts-for-websites/) usefully distinguishes type roles, web-safe/system fallback, variable fonts, multilingual coverage, pairing, and brand voice, but its named list is mostly Latin-centric and mutable. Do not select a `zh-Hant` product font because it appears in a popularity list. Start with script/locale coverage and the exact role, then verify the released binary, regional glyphs, metrics, license, delivery cost, fallback, and rendered task content.
+
+The same boundary applies to [PixelCake's Traditional Chinese font recommendations](https://pixelcake.com.tw/posts/chinese-font-recommendations/): its role/use warnings are useful candidate filters, but mixed-script editorial artifacts and second-hand claims about weights, browser behavior, maintenance, or licensing are not release evidence. Confirm the exact official font repository or vendor terms, Taiwan glyph coverage, shipped files, and required web/logo/app rights.
+
 ## 3. Build locale-aware fallback
 
 - Declare correct document and component language so shaping, glyph selection, line breaking, speech, and generic fallbacks can adapt.
@@ -69,7 +73,7 @@ DOM scope → fields excluded → exact characters sent → endpoint/operator �
 
 ### emfont assessment
 
-Pinned research source: [`elvisdragonmao/emfont@85158ad`](https://github.com/elvisdragonmao/emfont/tree/85158adc26313d73878b5ead0734d4540c46399a), service [font.emtech.cc](https://font.emtech.cc/fonts).
+Pinned research source: [`elvisdragonmao/emfont@85158ad`](https://github.com/elvisdragonmao/emfont/tree/85158adc26313d73878b5ead0734d4540c46399a), service [font.emtech.cc](https://font.emtech.cc/fonts). Repository HEAD was rechecked on 2026-07-15 and still resolved to this commit; the pin remains current for this assessment.
 
 - The service software repository contains Apache-2.0 text, but each hosted font still needs its own license and exact-file provenance.
 - Its documented CSS endpoint is convenient discovery/prototyping, but production still inherits third-party availability, CSP, cache, privacy, and version-drift risk.

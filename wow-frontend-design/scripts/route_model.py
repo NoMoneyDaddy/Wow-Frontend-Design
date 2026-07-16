@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Route a caller-owned model profile without trusting model self-assessment."""
+"""Route a caller-owned capability profile without model self-assessment."""
 
 from __future__ import annotations
 
@@ -18,6 +18,22 @@ LANES = {"CONSTRAINED", "STANDARD", "EXPLORATORY"}
 MUTATING_TASKS = {"BUILD", "RETROFIT", "POLISH", "REPAIR"}
 MIN_INDEPENDENT_RUNS = 3
 MAX_PROFILE_BYTES = 1_000_000
+RUNTIME_BINDINGS = (
+    "provider", "model", "model_version", "skill_revision",
+    "adapter_revision", "toolchain_revision", "evaluator_revision",
+)
+PROFILE_KEYS = {
+    "schema_version", "profile_id", "owner", "provider", "model",
+    "model_version", "adapter_revision", "toolchain_revision",
+    "evaluator_revision", "evaluated_at", "valid_until", "skill_revision",
+    "cells",
+}
+CELL_KEYS = {
+    "task", "locale", "surface", "max_risk", "required_capabilities",
+    "attempts", "eligible_runs", "contract_passes", "invariant_passes",
+    "unsupported_claim_failures", "infrastructure_failures",
+    "independent_evaluation", "recommended_lane",
+}
 
 
 class ProfileError(ValueError):
@@ -55,11 +71,25 @@ def parse_iso_date(value: str, key: str) -> date:
         raise ProfileError(f"{key} must use YYYY-MM-DD") from exc
 
 
+def runtime_mismatches(profile: dict[str, Any], runtime: dict[str, str]) -> list[str]:
+    mismatches: list[str] = []
+    for key in RUNTIME_BINDINGS:
+        actual = runtime.get(key)
+        if not isinstance(actual, str) or not actual.strip():
+            raise ProfileError(f"runtime {key} must be a non-empty string")
+        if actual != profile[key]:
+            mismatches.append(key)
+    return mismatches
+
+
 def validate_profile(profile: dict[str, Any]) -> None:
-    if profile.get("schema_version") != 1:
-        raise ProfileError("schema_version must be 1")
+    if set(profile) != PROFILE_KEYS:
+        raise ProfileError("capability profile has missing or unexpected keys")
+    if profile.get("schema_version") != 2:
+        raise ProfileError("schema_version must be 2")
     for key in (
         "profile_id", "owner", "provider", "model", "model_version",
+        "adapter_revision", "toolchain_revision", "evaluator_revision",
         "evaluated_at", "valid_until", "skill_revision",
     ):
         require_string(profile, key)
@@ -70,42 +100,57 @@ def validate_profile(profile: dict[str, Any]) -> None:
     cells = profile.get("cells")
     if not isinstance(cells, list) or not cells:
         raise ProfileError("cells must be a non-empty array")
+    seen_cells: set[tuple[str, str, str, str]] = set()
     for index, cell in enumerate(cells):
-        if not isinstance(cell, dict):
-            raise ProfileError(f"cells[{index}] must be an object")
+        if not isinstance(cell, dict) or set(cell) != CELL_KEYS:
+            raise ProfileError(f"cells[{index}] has missing or unexpected keys")
         if cell.get("task") not in TASKS | {"*"}:
             raise ProfileError(f"cells[{index}].task is invalid")
         if not isinstance(cell.get("locale"), str) or not cell["locale"]:
             raise ProfileError(f"cells[{index}].locale must be a string")
+        if not isinstance(cell.get("surface"), str) or not cell["surface"]:
+            raise ProfileError(f"cells[{index}].surface must be a string")
         if cell.get("max_risk") not in RISKS:
             raise ProfileError(f"cells[{index}].max_risk is invalid")
         capabilities = cell.get("required_capabilities")
-        if not isinstance(capabilities, list) or any(
+        if not isinstance(capabilities, list) or len(capabilities) != len(set(capabilities)) or any(
             not isinstance(value, str) or not value for value in capabilities
         ):
-            raise ProfileError(
-                f"cells[{index}].required_capabilities must be a string array"
-            )
+            raise ProfileError(f"cells[{index}].required_capabilities must be a unique string array")
         for key in (
-            "runs", "contract_passes", "invariant_passes",
-            "unsupported_claim_failures",
+            "attempts", "eligible_runs", "contract_passes",
+            "invariant_passes", "unsupported_claim_failures",
+            "infrastructure_failures",
         ):
             value = cell.get(key)
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 raise ProfileError(f"cells[{index}].{key} must be a non-negative integer")
+        if cell["attempts"] != cell["eligible_runs"] + cell["infrastructure_failures"]:
+            raise ProfileError(
+                f"cells[{index}].attempts must equal eligible_runs plus infrastructure_failures"
+            )
+        if any(cell[key] > cell["eligible_runs"] for key in (
+            "contract_passes", "invariant_passes", "unsupported_claim_failures"
+        )):
+            raise ProfileError(f"cells[{index}] result counts cannot exceed eligible_runs")
         if not isinstance(cell.get("independent_evaluation"), bool):
             raise ProfileError(f"cells[{index}].independent_evaluation must be boolean")
         if cell.get("recommended_lane") not in LANES:
             raise ProfileError(f"cells[{index}].recommended_lane is invalid")
+        identity = (cell["task"], cell["locale"], cell["surface"], cell["max_risk"])
+        if identity in seen_cells:
+            raise ProfileError(f"cells[{index}] duplicates a task/locale/surface/risk cell")
+        seen_cells.add(identity)
 
 
 def choose_cell(
-    cells: list[dict[str, Any]], task: str, locale: str, risk: str
+    cells: list[dict[str, Any]], task: str, locale: str, surface: str, risk: str
 ) -> dict[str, Any] | None:
     candidates = [
         cell for cell in cells
         if cell["task"] in {task, "*"}
         and cell["locale"] in {locale, "*"}
+        and cell["surface"] in {surface, "*"}
         and RISKS[risk] <= RISKS[cell["max_risk"]]
     ]
     if not candidates:
@@ -114,6 +159,7 @@ def choose_cell(
         key=lambda cell: (
             cell["task"] == task,
             cell["locale"] == locale,
+            cell["surface"] == surface,
             -RISKS[cell["max_risk"]],
         ),
         reverse=True,
@@ -122,7 +168,7 @@ def choose_cell(
 
 
 def route(
-    profile: dict[str, Any], *, task: str, locale: str, risk: str,
+    profile: dict[str, Any], *, task: str, locale: str, surface: str, risk: str,
     capabilities: set[str], as_of: date, allow_exploratory: bool,
 ) -> tuple[str, list[str], dict[str, Any] | None]:
     if task in MUTATING_TASKS and "write" not in capabilities:
@@ -134,7 +180,7 @@ def route(
     if risk in {"high", "critical"}:
         return "CONSTRAINED", ["high-risk work requires specialist or human review"], None
 
-    cell = choose_cell(profile["cells"], task, locale, risk)
+    cell = choose_cell(profile["cells"], task, locale, surface, risk)
     if cell is None:
         return "CONSTRAINED", ["no matching independent benchmark cell"], None
 
@@ -142,9 +188,9 @@ def route(
     missing = sorted(set(cell["required_capabilities"]) - capabilities)
     if missing:
         reasons.append("missing capabilities: " + ", ".join(missing))
-    runs = cell["runs"]
+    runs = cell["eligible_runs"]
     if runs < MIN_INDEPENDENT_RUNS:
-        reasons.append(f"fewer than {MIN_INDEPENDENT_RUNS} independent runs")
+        reasons.append(f"fewer than {MIN_INDEPENDENT_RUNS} eligible independent runs")
     if not cell["independent_evaluation"]:
         reasons.append("evaluation was not independent")
     if cell["contract_passes"] != runs:
@@ -167,11 +213,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("profile", type=Path)
     parser.add_argument("--task", required=True, choices=sorted(TASKS))
     parser.add_argument("--locale", required=True)
+    parser.add_argument("--surface", required=True)
     parser.add_argument("--risk", required=True, choices=sorted(RISKS))
     parser.add_argument("--capability", action="append", default=[])
     parser.add_argument("--as-of", default=date.today().isoformat())
     parser.add_argument("--allow-exploratory", action="store_true")
     parser.add_argument("--expected-profile-sha256")
+    for key in RUNTIME_BINDINGS:
+        parser.add_argument(f"--runtime-{key.replace('_', '-')}", required=True)
     return parser
 
 
@@ -183,11 +232,21 @@ def main(argv: list[str] | None = None) -> int:
         as_of = parse_iso_date(args.as_of, "as_of")
         if args.expected_profile_sha256 and digest != args.expected_profile_sha256:
             raise ProfileError("profile SHA-256 does not match evaluator-frozen value")
-        lane, reasons, cell = route(
-            profile, task=args.task, locale=args.locale, risk=args.risk,
-            capabilities=set(args.capability), as_of=as_of,
-            allow_exploratory=args.allow_exploratory,
-        )
+        runtime = {key: getattr(args, f"runtime_{key}") for key in RUNTIME_BINDINGS}
+        mismatches = runtime_mismatches(profile, runtime)
+        if mismatches:
+            lane, reasons, cell = (
+                "CONSTRAINED",
+                ["runtime differs from profiled " + ", ".join(mismatches)],
+                None,
+            )
+        else:
+            lane, reasons, cell = route(
+                profile, task=args.task, locale=args.locale, surface=args.surface,
+                risk=args.risk,
+                capabilities=set(args.capability), as_of=as_of,
+                allow_exploratory=args.allow_exploratory,
+            )
     except (OSError, ProfileError) as exc:
         print(json.dumps({"lane": "CONSTRAINED", "error": str(exc)}))
         return 2
@@ -200,10 +259,15 @@ def main(argv: list[str] | None = None) -> int:
         "provider": profile["provider"],
         "model": profile["model"],
         "model_version": profile["model_version"],
+        "adapter_revision": profile["adapter_revision"],
+        "toolchain_revision": profile["toolchain_revision"],
+        "evaluator_revision": profile["evaluator_revision"],
         "task": args.task,
         "locale": args.locale,
+        "surface": args.surface,
         "risk": args.risk,
         "matched_cell": cell,
+        "runtime_bindings": runtime,
     }, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 

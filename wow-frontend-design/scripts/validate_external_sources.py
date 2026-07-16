@@ -5,15 +5,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import stat
 import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 
 REVISION = re.compile(r"^[0-9a-f]{40}$")
-LICENSES = {"MIT", "Apache-2.0", "Apache-2.0-subdirectory", "NOASSERTION"}
+LICENSES = {
+    "MIT",
+    "MIT AND CC-BY-SA-4.0",
+    "Apache-2.0",
+    "Apache-2.0-subdirectory",
+    "NOASSERTION",
+}
 SOURCE_KEYS = {"repository", "revision", "license", "paths"}
+MAX_LOCK_BYTES = 1_000_000
 
 
 class SourceLockError(ValueError):
@@ -24,8 +33,20 @@ def load(path: Path) -> dict[str, Any]:
     if path.is_symlink():
         raise SourceLockError(f"refusing symlink lock: {path}")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode):
+                raise SourceLockError(f"lock is not a regular file: {path}")
+            if info.st_size > MAX_LOCK_BYTES:
+                raise SourceLockError(f"lock exceeds {MAX_LOCK_BYTES} bytes")
+            raw = stream.read(MAX_LOCK_BYTES + 1)
+            if len(raw) > MAX_LOCK_BYTES:
+                raise SourceLockError(f"lock exceeds {MAX_LOCK_BYTES} bytes")
+        value = json.loads(raw.decode("utf-8"))
+    except (OSError, RecursionError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise SourceLockError(f"cannot read valid JSON lock: {error}") from error
     if not isinstance(value, dict):
         raise SourceLockError("lock root must be an object")

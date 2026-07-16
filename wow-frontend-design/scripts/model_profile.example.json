@@ -1,10 +1,13 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "profile_id": "replace-with-evaluator-owned-id",
   "owner": "independent-evaluator",
   "provider": "replace-with-provider",
   "model": "replace-with-exact-model",
   "model_version": "unknown",
+  "adapter_revision": "replace-with-agent-wrapper-version-or-hash",
+  "toolchain_revision": "replace-with-tool-allowlist-and-version-hash",
+  "evaluator_revision": "replace-with-evaluator-policy-version-or-hash",
   "evaluated_at": "2026-07-14",
   "valid_until": "2026-08-13",
   "skill_revision": "replace-with-git-sha",
@@ -12,12 +15,15 @@
     {
       "task": "BUILD",
       "locale": "zh-Hant",
+      "surface": "product-ui",
       "max_risk": "medium",
       "required_capabilities": ["write", "command", "browser"],
-      "runs": 0,
+      "attempts": 0,
+      "eligible_runs": 0,
       "contract_passes": 0,
       "invariant_passes": 0,
       "unsupported_claim_failures": 0,
+      "infrastructure_failures": 0,
       "independent_evaluation": false,
       "recommended_lane": "CONSTRAINED"
     }

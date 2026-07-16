@@ -29,6 +29,14 @@
 
 另檢閱 r/UXDesign 的 [AI 工作流程](https://www.reddit.com/r/UXDesign/comments/1tf2yea/actual_ai_design_workflows_in_2026/)、[企業設計系統整合](https://www.reddit.com/r/UXDesign/comments/1tsy4sh/has_anyone_successfully_integrated_ai_into_a/) 與 [case study 長度](https://www.reddit.com/r/UXDesign/comments/1uwdqj5/can_we_please_talk_about_case_study_length/) 討論。這些是自選樣本的社群訊號，不是代表性研究；本專案沒有複製貼文內容。
 
+Layout、visual hierarchy、字型與色彩研究另檢閱 Figma Resource Library 的 [Website layout ideas](https://www.figma.com/resource-library/website-layout-ideas/)、[Visual hierarchy](https://www.figma.com/resource-library/what-is-visual-hierarchy/)、[Fonts for websites](https://www.figma.com/resource-library/best-fonts-for-websites/) 與 [Color combinations](https://www.figma.com/resource-library/color-combinations/)，以及 [YoungDay layout](https://www.youngday.com/breathtaking-web-design-layout.html)、[BFA 留白](https://www.bfa.com.tw/blog/5-design-skill-improve-blank) 與 [UXPilot visual hierarchy](https://uxpilot.ai/blogs/visual-hierarchy)。只採用依任務選 layout、關係型留白、alignment／proximity／contrast 與實際 locale／viewport 測試等方向；F/Z、三分法、固定字級比例、固定欄數、字型人氣與色彩心理不作注視、轉換、品牌適配或無障礙證明。
+
+Motion、icon、Lottie、clone、3D 與外部 Skill registry 的 GitHub 來源皆已鎖在 `external-sources.lock.json`。其中 `copyleftdev/sk1llz` 只提供 manifest／分類維護反例；其 persona 內容、mutable installer 與隱形 Unicode 沒有匯入。`material-components/material-web` 只作官方版本化 implementation evidence；本專案沒有再散布其元件或 tokens，也不把 maintenance-mode `main` 當成通用 Material 規範。
+
+模型路由與自動降級研究另參考 [Agent Skills specification](https://agentskills.io/specification)、[Agent Skills evaluation guidance](https://agentskills.io/skill-creation/evaluating-skills)、[Claude Code subagents](https://code.claude.com/docs/en/sub-agents)、[RouteLLM](https://arxiv.org/abs/2406.18665)、[LLMRouterBench](https://aclanthology.org/2026.findings-acl.1881/)、[FrugalGPT](https://arxiv.org/abs/2305.05176)、[Agent Skill Framework for small and medium models](https://arxiv.org/abs/2602.16653v3)、[LLM intrinsic self-correction study](https://openreview.net/forum?id=IkmD3fKBPQ) 與 [Amazon Bedrock prompt routing](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-routing.html)。只採用「編排層擁有模型選擇、重複 task-specific eval、外部 feedback、成本／品質與分布邊界」等方法；沒有把論文、網站文字、模型、router code 或 dataset 併入本專案，也不把 preprint／vendor 結果當成本 Skill 的模型能力證明。
+
+Skill repository 與自優化流程另檢閱鎖定 revision 的 [netresearch/skill-repo-skill](https://github.com/netresearch/skill-repo-skill)、[alchaincyf/darwin-skill](https://github.com/alchaincyf/darwin-skill) 與 [Microsoft SkillOpt](https://github.com/microsoft/SkillOpt)，以及可變動的 [CodeLove 工具比較文章](https://codelove.tw/@tony/post/3jAvJx)。只採用引用可達性、機械規則腳本化、基線比較、保留／回滾、獨立評估與 held-out validation 等方法；未複製上游文字、程式、圖片或模板。`darwin-skill` 的鎖定版本未找到 repository license，因此記為 `NOASSERTION`；CodeLove 只作次級研究線索，不能取代鎖定原始碼與授權檢查。
+
 ## Evaluator 開發依賴
 
 根目錄 `package-lock.json` 固定瀏覽器 evaluator 的開發依賴；它們不會被 `gh skill install` 複製進 `wow-frontend-design/`：

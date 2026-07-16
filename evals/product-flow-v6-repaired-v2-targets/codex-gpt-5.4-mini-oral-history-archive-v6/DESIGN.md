@@ -1,5 +1,5 @@
 ---
-version: alpha
+version: "1.0"
 name: 海岸口述歷史
 description: 以潮汐刻度、田野筆記與檔案紙建立的繁體中文三頁典藏視覺契約。
 colors:
@@ -7,8 +7,8 @@ colors:
   on-canvas: "#1F2A31"
   surface: "#FFF9F0"
   on-surface: "#1F2A31"
-  muted-surface: "#E7DDCB"
-  on-muted-surface: "#4F5D66"
+  surface-strong: "#E7DDCB"
+  on-surface-strong: "#4F5D66"
   primary: "#184E57"
   on-primary: "#F8F3E8"
 typography:
@@ -37,17 +37,13 @@ typography:
     lineHeight: 1.5
     letterSpacing: "0.02em"
 rounded:
-  sm: "10px"
   md: "16px"
   lg: "24px"
   pill: "999px"
 spacing:
-  xs: "6px"
-  sm: "10px"
   md: "16px"
   lg: "24px"
   xl: "32px"
-  xxl: "48px"
 components:
   page-shell:
     backgroundColor: "{colors.canvas}"
@@ -64,18 +60,18 @@ components:
   hero-panel:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
-    typography: "{typography.body}"
+    typography: "{typography.display}"
     rounded: "{rounded.lg}"
     padding: "{spacing.xl}"
   record-card:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
-    typography: "{typography.body}"
+    typography: "{typography.headline}"
     rounded: "{rounded.md}"
     padding: "{spacing.lg}"
   media-fallback:
-    backgroundColor: "{colors.muted-surface}"
-    textColor: "{colors.on-muted-surface}"
+    backgroundColor: "{colors.surface-strong}"
+    textColor: "{colors.on-surface-strong}"
     typography: "{typography.fine}"
     rounded: "{rounded.md}"
     padding: "{spacing.lg}"
@@ -113,14 +109,14 @@ components:
 
 - `canvas` 與 `surface` 是兩層紙感背景，讓頁面看起來像整理過的檔案，而不是空白容器。
 - `on-canvas` 與 `on-surface` 承擔正文與標題的主要閱讀對比。
-- `muted-surface` 與 `on-muted-surface` 只用在缺檔說明、補充註記與媒體替代區，避免它們與主要內容競爭。
+- `surface-strong` 與 `on-surface-strong` 只用在缺檔說明、補充註記與媒體替代區，避免它們與主要內容競爭。
 - `primary` 與 `on-primary` 只用在可採取行動的按鈕與關鍵導覽。
 
 色彩不承擔情緒保證；它的角色是清楚分層與清楚指向。紙面偏暖，墨色偏冷，讓「檔案」與「潮線」同時成立，但不把任何色相當作可信度或感受的證明。
 
 ## Typography
 
-展示標題使用襯線語氣，讓長篇口述具有節目單與編目頁的重量。內文使用穩定的無襯線中英混排堆疊，確保繁中長句、英文船名與年份都能在沒有外部字型時維持可讀性；正文長文以瀏覽器自動換行並保留多行對齊，不用手動換行去切斷閱讀節奏。
+展示標題使用襯線語氣，讓長篇口述具有節目單與編目頁的重量。內文使用穩定的無襯線中英混排堆疊，確保繁中長句、英文船名與年份都能在沒有外部字型時維持可讀性。
 
 - `display` 只用在首頁主標與故事頁大標。
 - `headline` 用在區塊標題與記錄名稱。
@@ -140,7 +136,7 @@ components:
 | 典藏索引 | 可掃描的條目列表 | 單欄順序列表 | 2 | 點入條目查看線索 | 任何假圖片或空白容器 |
 | 長篇故事 | 連續閱讀與註解側欄 | 單欄正文，註解順排 | 2 | 滾動與回到索引 | 只在桌面才可見的資訊 |
 
-內容寬度控制在適合繁中長文的範圍，桌面正文欄位以不超過 40em 的 font-relative measure 收斂，桌面以兩欄或單欄加側註為主，手機版改為單欄、較短標題與較低密度，避免首屏被大標題和裝飾區塊吞掉。
+內容寬度控制在適合繁中長文的範圍，桌面正文欄位收斂到約 36–38 個全形字，標題保留足夠寬度以形成完整閱讀軌道，不用過窄的字元上限切碎句子。桌面以兩欄或單欄加側註為主，手機版改為單欄、較短標題與較低密度，避免首屏被大標題和裝飾區塊吞掉。
 
 ## Elevation & Depth
 

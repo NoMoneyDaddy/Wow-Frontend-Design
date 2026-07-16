@@ -26,6 +26,7 @@ CASES = {
     "oral-history-archive-v6": ("index.html", "archive.html", "story.html"),
     "grant-review-board-v6": ("index.html",),
 }
+REPAIRED_CASES = set(CASES)
 VIEWPORTS = {
     "desktop": (1440, 1000, 1, False, False),
     "tablet": (834, 1112, 2, True, True),
@@ -61,6 +62,11 @@ def _artifact(root: Path, relative: Any, label: str, *, directory: bool = False)
     candidate = PurePosixPath(relative)
     if candidate.is_absolute() or ".." in candidate.parts:
         raise ProductFlowV6EvidenceError(f"{label} path is unsafe")
+    cursor = root
+    for part in candidate.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ProductFlowV6EvidenceError(f"{label} contains a symlink component")
     path = (root / candidate).resolve()
     try:
         path.relative_to(root)
@@ -76,15 +82,46 @@ def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _validate_source_manifest(root: Path, record: Any, label: str) -> None:
-    if not isinstance(record, dict):
+def _validate_source_manifest(
+    root: Path,
+    record: Any,
+    label: str,
+    case_id: str,
+) -> dict[str, Any]:
+    expected_path = f"evals/product-flow-v6-repaired-targets/{ALIAS}-{case_id}/run-manifest.json"
+    if not isinstance(record, dict) or record.get("path") != expected_path:
         raise ProductFlowV6EvidenceError(f"{label} provenance is missing")
     source = _artifact(root, record.get("path"), label)
     if record.get("sha256") != _digest(source):
         raise ProductFlowV6EvidenceError(f"{label} hash is stale")
+    manifest = _load(source, label)
+    expected_target = f"evals/product-flow-v6-repaired-targets/{ALIAS}-{case_id}"
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("status") != "completed"
+        or manifest.get("case") != {"id": case_id, "target": expected_target}
+        or manifest.get("model", {}).get("requested_identifier") != MODEL
+    ):
+        raise ProductFlowV6EvidenceError(f"{label} contract changed")
+    expected_outputs = {"DESIGN.md", *CASES[case_id]}
+    outputs = manifest.get("outputs")
+    if not isinstance(outputs, list) or {
+        item.get("path") for item in outputs if isinstance(item, dict)
+    } != expected_outputs:
+        raise ProductFlowV6EvidenceError(f"{label} output inventory changed")
+    source_root = source.parent
+    for output in outputs:
+        if not isinstance(output, dict) or output.get("path") not in expected_outputs:
+            raise ProductFlowV6EvidenceError(f"{label} output is malformed")
+        artifact = source_root / str(output["path"])
+        if artifact.is_symlink() or not artifact.is_file():
+            raise ProductFlowV6EvidenceError(f"{label} output is missing")
+        if output.get("bytes") != artifact.stat().st_size or output.get("sha256") != _digest(artifact):
+            raise ProductFlowV6EvidenceError(f"{label} output hash is stale")
+    return manifest
 
 
-def _validate_generation(root: Path, path: Path) -> None:
+def _validate_generation(root: Path, path: Path, visual_path: Path) -> None:
     ledger = _load(path, "generation ledger")
     if ledger.get("schema_version") != 1 or ledger.get("status") != "completed":
         raise ProductFlowV6EvidenceError("generation ledger is incomplete")
@@ -94,14 +131,16 @@ def _validate_generation(root: Path, path: Path) -> None:
         "requested": 8,
         "completed": 8,
         "failed": 0,
-        "repaired_cases": 1,
-        "promoted_clean_cases": 7,
+        "repaired_cases": 8,
+        "promoted_clean_cases": 0,
     }:
         raise ProductFlowV6EvidenceError("generation repair summary changed")
     contract = ledger.get("contract")
     if not isinstance(contract, dict):
         raise ProductFlowV6EvidenceError("generation contract is missing")
-    if Path(str(contract.get("artifact_root"))).resolve() != (root / ARTIFACT_ROOT).resolve():
+    recorded_root = Path(str(contract.get("artifact_root")))
+    resolved_root = (recorded_root if recorded_root.is_absolute() else root / recorded_root).resolve()
+    if resolved_root != (root / ARTIFACT_ROOT).resolve():
         raise ProductFlowV6EvidenceError("generation artifact root changed")
     briefs = contract.get("briefs")
     outputs_by_case = contract.get("outputs_by_case")
@@ -129,7 +168,7 @@ def _validate_generation(root: Path, path: Path) -> None:
             raise ProductFlowV6EvidenceError("generation case identity changed")
         seen.add(str(case_id))
         mode = result.get("evidence_mode")
-        expected_mode = "repair" if case_id == "oral-history-archive-v6" else "promoted_clean"
+        expected_mode = "repair" if case_id in REPAIRED_CASES else "promoted_clean"
         if (
             result.get("provider") != "codex"
             or result.get("model") != MODEL
@@ -166,11 +205,69 @@ def _validate_generation(root: Path, path: Path) -> None:
                 raise ProductFlowV6EvidenceError(f"manifest output is missing for {case_id}")
             if output.get("bytes") != artifact.stat().st_size or output.get("sha256") != _digest(artifact):
                 raise ProductFlowV6EvidenceError(f"manifest output hash is stale for {case_id}")
-        provenance = manifest.get("repair") if mode == "repair" else manifest.get("promotion")
+        provenance = manifest.get("skill_repair") if mode == "repair" else manifest.get("promotion")
         if not isinstance(provenance, dict):
             raise ProductFlowV6EvidenceError(f"repair provenance is missing for {case_id}")
-        _validate_source_manifest(root, provenance.get("source_manifest"), f"source manifest {case_id}")
-    if seen != set(CASES) or repair_cases != 1:
+        source_manifest = _validate_source_manifest(
+            root,
+            provenance.get("source_manifest"),
+            f"source manifest {case_id}",
+            str(case_id),
+        )
+        if mode == "repair":
+            skill = provenance.get("skill")
+            visual = provenance.get("visual_report")
+            note = provenance.get("research_note")
+            for record, expected_path, label in (
+                (skill, "wow-frontend-design/SKILL.md", f"repair Skill {case_id}"),
+                (note, "evals/product-flow-v6-latest-skill-repair.md", f"repair research note {case_id}"),
+            ):
+                if not isinstance(record, dict) or record.get("path") != expected_path:
+                    raise ProductFlowV6EvidenceError(f"{label} provenance changed")
+                artifact = _artifact(root, record.get("path"), label)
+                if record.get("sha256") != _digest(artifact):
+                    raise ProductFlowV6EvidenceError(f"{label} hash is stale")
+            if visual != {
+                "path": "evals/product-flow-v6-visual-results.json",
+                "bound_by": "generation_ledger",
+            }:
+                raise ProductFlowV6EvidenceError(f"repair visual report {case_id} provenance changed")
+            declared_visual = _artifact(root, visual["path"], f"repair visual report {case_id}")
+            if declared_visual != visual_path.resolve():
+                raise ProductFlowV6EvidenceError(
+                    f"repair visual report {case_id} does not match the validated report"
+                )
+            source_outputs = source_manifest.get("outputs")
+            if not isinstance(source_outputs, list):
+                raise ProductFlowV6EvidenceError(f"source output inventory is malformed for {case_id}")
+            source_hashes = {
+                item.get("path"): item.get("sha256")
+                for item in source_outputs
+                if isinstance(item, dict)
+            }
+            output_hashes = {
+                item.get("path"): item.get("sha256")
+                for item in manifest_outputs
+                if isinstance(item, dict)
+            }
+            if (
+                set(source_hashes) != expected_outputs
+                or any(not isinstance(value, str) or SHA256.fullmatch(value) is None for value in source_hashes.values())
+                or provenance.get("before_outputs") != source_hashes
+            ):
+                raise ProductFlowV6EvidenceError(f"repair before-output inventory is stale for {case_id}")
+            changed_outputs = provenance.get("changed_outputs")
+            derived_changes = {
+                name for name in expected_outputs if output_hashes.get(name) != source_hashes.get(name)
+            }
+            if (
+                not isinstance(changed_outputs, list)
+                or not changed_outputs
+                or len(changed_outputs) != len(set(changed_outputs))
+                or set(changed_outputs) != derived_changes
+            ):
+                raise ProductFlowV6EvidenceError(f"repair changed-output inventory is invalid for {case_id}")
+    if seen != set(CASES) or repair_cases != len(REPAIRED_CASES):
         raise ProductFlowV6EvidenceError("generation repair inventory changed")
 
 
@@ -223,8 +320,14 @@ def _expected_visual_results() -> set[tuple[str, str, str, str]]:
     return expected
 
 
-def _validate_visual(root: Path, path: Path) -> None:
+def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
     report = _load(path, "visual report")
+    generation_ref = report.get("generation_ledger")
+    if generation_ref != {
+        "path": GENERATION_PATH,
+        "sha256": _digest(generation_path),
+    }:
+        raise ProductFlowV6EvidenceError("visual report generation-ledger binding is stale")
     auditor = _artifact(root, AUDITOR_PATH, "visual auditor")
     auditor_ref = report.get("auditor")
     if (
@@ -251,6 +354,39 @@ def _validate_visual(root: Path, path: Path) -> None:
     actual_targets = {(item.get("caseId"), item.get("alias")) for item in targets if isinstance(item, dict)} if isinstance(targets, list) else set()
     if not isinstance(targets, list) or len(targets) != 8 or actual_targets != expected_targets:
         raise ProductFlowV6EvidenceError("visual target inventory changed")
+    target_inputs = report.get("target_inputs")
+    if not isinstance(target_inputs, list) or len(target_inputs) != len(CASES):
+        raise ProductFlowV6EvidenceError("visual target-input inventory changed")
+    seen_inputs: set[str] = set()
+    for record in target_inputs:
+        if not isinstance(record, dict) or record.get("caseId") not in CASES or record.get("alias") != ALIAS:
+            raise ProductFlowV6EvidenceError("visual target-input record is malformed")
+        case_id = str(record["caseId"])
+        if case_id in seen_inputs:
+            raise ProductFlowV6EvidenceError("visual target-input record is duplicated")
+        seen_inputs.add(case_id)
+        expected_target = f"{ARTIFACT_ROOT}/{ALIAS}-{case_id}"
+        if record.get("target") != expected_target:
+            raise ProductFlowV6EvidenceError(f"visual target-input path changed for {case_id}")
+        artifacts = record.get("artifacts")
+        expected_artifacts = ("DESIGN.md", *CASES[case_id])
+        if not isinstance(artifacts, list) or len(artifacts) != len(expected_artifacts):
+            raise ProductFlowV6EvidenceError(f"visual target-input artifacts changed for {case_id}")
+        seen_artifacts: set[str] = set()
+        for artifact_record in artifacts:
+            if not isinstance(artifact_record, dict) or artifact_record.get("path") not in expected_artifacts:
+                raise ProductFlowV6EvidenceError(f"visual target-input artifact is malformed for {case_id}")
+            artifact_name = str(artifact_record["path"])
+            if artifact_name in seen_artifacts:
+                raise ProductFlowV6EvidenceError(f"visual target-input artifact is duplicated for {case_id}")
+            seen_artifacts.add(artifact_name)
+            artifact = _artifact(root, f"{expected_target}/{artifact_name}", f"visual input {case_id}/{artifact_name}")
+            if artifact_record.get("bytes") != artifact.stat().st_size or artifact_record.get("sha256") != _digest(artifact):
+                raise ProductFlowV6EvidenceError(f"visual target-input artifact is stale for {case_id}/{artifact_name}")
+        if seen_artifacts != set(expected_artifacts):
+            raise ProductFlowV6EvidenceError(f"visual target-input artifact inventory changed for {case_id}")
+    if seen_inputs != set(CASES):
+        raise ProductFlowV6EvidenceError("visual target-input inventory is incomplete")
     expected = _expected_visual_results()
     results = report.get("results")
     if not isinstance(results, list) or len(results) != len(expected):
@@ -280,8 +416,31 @@ def _validate_visual(root: Path, path: Path) -> None:
         if metadata != ("image/png", width * scale, height * scale):
             raise ProductFlowV6EvidenceError(f"screenshot dimensions changed for {key}")
         body_flow = result.get("bodyFlow")
-        if not isinstance(body_flow, dict) or body_flow.get("forcedLineBreaks") != [] or body_flow.get("nonWrappingProse") != []:
+        if (
+            not isinstance(body_flow, dict)
+            or body_flow.get("forcedLineBreaks") != []
+            or body_flow.get("nonWrappingProse") != []
+            or body_flow.get("underfilledProseBlocks") != []
+        ):
             raise ProductFlowV6EvidenceError(f"body flow repair finding remains for {key}")
+        heading_flow = result.get("headingFlow")
+        if (
+            not isinstance(heading_flow, dict)
+            or heading_flow.get("compressedCjkHeadings") != []
+            or heading_flow.get("orphanedCjkHeadingLines") != []
+            or heading_flow.get("underfilledWideHeadings") != []
+        ):
+            raise ProductFlowV6EvidenceError(f"heading flow repair finding remains for {key}")
+        layout_flow = result.get("layoutFlow")
+        if (
+            not isinstance(layout_flow, dict)
+            or layout_flow.get("domOrderReversals") != []
+            or layout_flow.get("displacedIntroCopy") != []
+        ):
+            raise ProductFlowV6EvidenceError(f"layout flow repair finding remains for {key}")
+        locale_flow = result.get("localeFlow")
+        if not isinstance(locale_flow, dict) or locale_flow.get("untranslatedInterfaceCopy") != []:
+            raise ProductFlowV6EvidenceError(f"locale flow repair finding remains for {key}")
         if result.get("visualIssues") != [] or any(result.get(field) != [] for field in ("consoleErrors", "externalRequests", "badResponses")):
             raise ProductFlowV6EvidenceError(f"runtime or visual finding remains for {key}")
     actual_pngs = {_artifact(root, str(path.relative_to(root)), "published screenshot") for path in (root / SCREENSHOT_ROOT).glob("*.png")}
@@ -311,9 +470,12 @@ def validate(
     root = root.resolve()
     generation = generation_path or root / GENERATION_PATH
     design = design_path or root / DESIGN_PATH
-    _validate_generation(root, generation)
+    expected_visual = root / "evals/product-flow-v6-visual-results.json"
+    if visual_path.resolve() != expected_visual.resolve():
+        raise ProductFlowV6EvidenceError("validated visual report path is not the published report")
+    _validate_generation(root, generation, visual_path)
     _validate_design(root, design, generation)
-    _validate_visual(root, visual_path)
+    _validate_visual(root, visual_path, generation)
     return len(CASES)
 
 

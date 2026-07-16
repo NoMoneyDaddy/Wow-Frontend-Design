@@ -64,6 +64,8 @@ role × surface × default/hover/focus/active/selected/disabled/loading/error/su
 
 Color roles need non-color companions: label, icon, pattern, position, outline, or shape. Status and brand colors must not silently share a role when that makes decoration look actionable or makes an action look like an error.
 
+For an existing `@material/web` product, map project roles deliberately into its exact installed `--md-sys-color-*` foreground/background pairs and only then into component overrides. Material role names do not prove the resolved pair meets the project's contrast/state matrix, and a palette from Material Theme Builder does not replace browser evidence. CSS custom properties can consume supported CSS Color values, including an authored OKLCH value with fallback, but the package's generated token files and downstream tools may assume their own formats; verify the actual locked toolchain before changing the source color space.
+
 Keep independent record dimensions orthogonal. Urgency, lifecycle status, due state, assignment, and selection must not recolor one another's label. The same semantic value uses the same role and non-color cue wherever it appears; an overdue row may emphasize its due label or boundary, but must not silently turn an unchanged lifecycle status into an error state.
 
 Use Oklab/OKLCH when perceptually steadier ramps, interpolation, or controlled chroma are useful, with sRGB-compatible fallbacks and gamut testing. CSS Color 4 describes the spaces and their interpolation properties; it does not guarantee accessible contrast or device equivalence. See [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/).
@@ -86,6 +88,8 @@ Define:
 - a hue policy for action, status, data, and brand roles;
 - a gamut/fallback policy for wide-color values;
 - a data-palette policy for adjacency, labels, missing values, and print/export.
+
+Color-wheel harmonies—complementary, analogous, monochromatic, split-complementary, triadic, and tetradic—are palette-generation strategies, not semantic systems. Figma's [color-combination guide](https://www.figma.com/resource-library/color-combinations/) is useful for exploring hue relationships, value, saturation, temperature, and intended mood, but its named palettes and psychology descriptions do not prove brand fit, accessibility, or behavior. Map any candidate back to semantic roles, express controlled ramps in the project's source color space when useful, keep sRGB fallbacks, and test rendered contrast/state distinction before adoption.
 
 ## Appearance is a composition, not an inversion
 

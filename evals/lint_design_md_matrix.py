@@ -48,6 +48,7 @@ def parse_args() -> argparse.Namespace:
         dest="supplemental_retry",
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--overwrite", action="store_true", help="atomically replace an existing report")
     parser.add_argument("--timeout-seconds", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout_seconds <= 300:
@@ -64,12 +65,48 @@ def display_path(path: Path) -> str:
 
 def safe_target(value: str, artifact_root: Path) -> Path:
     candidate = Path(value)
-    target = (candidate if candidate.is_absolute() else ROOT / candidate).resolve()
+    unresolved = candidate if candidate.is_absolute() else ROOT / candidate
+    try:
+        relative = unresolved.relative_to(ROOT)
+    except ValueError as error:
+        raise ValueError(f"target escapes repository root: {value}") from error
+    if ".." in relative.parts:
+        raise ValueError(f"target path is unsafe: {value}")
+    cursor = ROOT
+    for part in relative.parts:
+        cursor /= part
+        if cursor.is_symlink():
+            raise ValueError(f"target contains a symlink component: {value}")
+    target = unresolved.resolve()
     if target.parent != artifact_root:
         raise ValueError(f"target escapes artifact root: {value}")
     if target.is_symlink() or not target.is_dir():
         raise ValueError(f"target is missing or unsafe: {value}")
     return target
+
+
+def artifact_root_from_contract(configured_root: object) -> Path:
+    candidate = Path(configured_root) if isinstance(configured_root, str) else ROOT / "evals"
+    unresolved = candidate if candidate.is_absolute() else ROOT / candidate
+    try:
+        relative = unresolved.relative_to(ROOT / "evals")
+    except ValueError as error:
+        raise ValueError("generation artifact root must stay inside repository evals") from error
+    if ".." in relative.parts:
+        raise ValueError("generation artifact root path is unsafe")
+    cursor = ROOT / "evals"
+    for part in relative.parts:
+        cursor /= part
+        if cursor.is_symlink():
+            raise ValueError("generation artifact root contains a symlink component")
+    artifact_root = unresolved.resolve()
+    try:
+        artifact_root.relative_to((ROOT / "evals").resolve())
+    except ValueError as error:
+        raise ValueError("generation artifact root escapes repository evals") from error
+    if not artifact_root.is_dir() or artifact_root.is_symlink():
+        raise ValueError("generation artifact root is missing or unsafe")
+    return artifact_root
 
 
 def write_report(path: Path, report: dict[str, object]) -> None:
@@ -89,7 +126,7 @@ def main() -> int:
     package_version = locked_package_version()
     ledger_path = args.ledger.expanduser().resolve()
     output = args.output.expanduser().resolve()
-    if output.exists():
+    if output.exists() and not args.overwrite:
         raise SystemExit(f"refusing to overwrite existing report: {output}")
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
     results = ledger.get("results")
@@ -98,9 +135,10 @@ def main() -> int:
 
     contract = ledger.get("contract")
     configured_root = contract.get("artifact_root") if isinstance(contract, dict) else None
-    artifact_root = Path(configured_root).resolve() if isinstance(configured_root, str) else (ROOT / "evals").resolve()
-    if not artifact_root.is_dir() or artifact_root.is_symlink():
-        raise SystemExit("generation artifact root is missing or unsafe")
+    try:
+        artifact_root = artifact_root_from_contract(configured_root)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
 
     supplemental_path = args.supplemental_retry.expanduser().resolve() if args.supplemental_retry else None
     supplemental: dict[str, object] | None = None
@@ -156,11 +194,18 @@ def main() -> int:
                 timeout=args.timeout_seconds,
                 check=False,
             )
+            if completed.returncode != 0:
+                raise ValueError(f"official linter exited with {completed.returncode}: {completed.stderr[:300]}")
             parsed = json.loads(completed.stdout)
-            summary = parsed.get("summary", {})
-            errors = int(summary.get("errors", 0))
-            warnings = int(summary.get("warnings", 0))
-            infos = int(summary.get("infos", 0))
+            if not isinstance(parsed, dict) or not isinstance(parsed.get("summary"), dict):
+                raise ValueError("official linter returned no summary")
+            summary = parsed["summary"]
+            values = tuple(summary.get(field) for field in ("errors", "warnings", "infos"))
+            if any(type(value) is not int or value < 0 for value in values):
+                raise ValueError("official linter returned a malformed summary")
+            if not isinstance(parsed.get("findings"), list):
+                raise ValueError("official linter returned no findings list")
+            errors, warnings, infos = values
             status = "clean" if errors == 0 and warnings == 0 else "findings"
             record.update(
                 status=status,

@@ -35,12 +35,21 @@ Before reusing a rule, record repository, full content-addressed commit, path, r
 | UI engineering | Addy Osmani frontend UI | state ownership, complete states, composition, rollback | React/Tailwind assumptions and arbitrary size/depth thresholds |
 | Quality audit | Addy web quality, AccessLint, GitHub reviewer, Vercel guidelines | exact tool provenance, live DOM, before/after, root-cause dedupe | automation as conformance, mutable runtime fetch, stash/checkout mutation, overflow hiding |
 | Framework adapter | Nuxt, Pinia, pnpm, UnoCSS, Slidev | only after exact installed version and conventions are detected | personal Antfu conventions as project law; cross-version syntax guesses |
+| Platform component adapter | official Material Web implementation | existing `@material/web` version, real component API, semantic token mapping, focus/forced-color tests | installing Material only for style, copying `main` tokens, treating maintenance-mode APIs as universal |
 | Candidate catalogue | UI Skills, UI UX Pro Max | retrieve candidates, then verify primary source/license/standard | stereotype lookup, false precision, duplicate aliases as consensus |
+| Skill registry or persona pack | sk1llz and similar manifests | machine-readable categories, tags, compact routing, contribution checks | persona imitation as authority, catalogue-wide ingestion, mutable installers, hidden formatting bytes |
 | Motion/Lottie | LottieFiles, Diffusion Studio | intent vocabulary, thin authoring route, semantic frames, loop seam | fixed personality recipes, mandatory ambient layers, player-specific behavior as portable |
 | SVG/icon assets | jezweb icon/favicons | inventory, style spec, optical-size render sheet | unsanitized AI SVG, automatic remote upload, universal `<title>` insertion |
 | Three.js/media | CloudAI-X recipes | subsystem discovery after version detection | copying stale API examples, unbounded loops, UA routing, incomplete teardown |
 
 Named sources are research coordinates, not installed dependencies or endorsements. See [github-skill-research.md](github-skill-research.md) and [ui-skills-ecosystem.md](ui-skills-ecosystem.md) for the critical review.
+
+### Registry and installer hygiene
+
+- Treat a remote manifest as untrusted input. Reject absolute paths, `..`, NUL bytes, platform path escapes, duplicate destinations, and links or symlinks that leave the staging root.
+- Resolve one pinned revision, verify expected content hashes, stage into a temporary directory, validate before promotion, and preserve the previous install for rollback. Never install from floating `main`, `master`, or `latest` content.
+- Inspect imported Markdown for invisible format characters such as U+200B, U+200C, U+200D, and U+2060. Reject unexplained bytes; normalize only when provenance and intended text remain auditable.
+- Require each adopted Skill rule to name a current primary source, executable check, or explicit author hypothesis. A famous-person persona, quote, repository size, or repeated claim is not evidence.
 
 ## 4. Resolve conflicts in this order
 

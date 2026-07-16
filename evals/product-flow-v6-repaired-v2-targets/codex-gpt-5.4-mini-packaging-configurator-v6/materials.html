@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant-TW">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -102,13 +102,12 @@
     .brand { display: grid; gap: 0.25rem; min-width: 0; }
     .brand__eyebrow {
       font: 600 12px/1.2 var(--font-label);
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
       color: var(--color-text-muted);
     }
     .brand__title {
-      font: 700 clamp(1.1rem, 2vw, 1.35rem)/1.1 var(--font-display);
-      letter-spacing: -0.03em;
+      font: 700 clamp(1.1rem, 2vw, 1.35rem)/1.15 var(--font-display);
+      letter-spacing: 0em;
       margin: 0;
     }
     .brand__meta { font-size: 0.92rem; color: var(--color-text-muted); }
@@ -137,7 +136,7 @@
     }
     .banner {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+      grid-template-columns: minmax(0, 1.24fr) minmax(250px, 0.76fr);
       gap: var(--space-section);
       align-items: stretch;
     }
@@ -168,9 +167,8 @@
     }
     .hero h1 {
       margin: 0;
-      font: 700 clamp(2rem, 4vw, 3.2rem)/1.06 var(--font-display);
-      letter-spacing: -0.03em;
-      max-width: 12ch;
+      font: 700 clamp(2rem, 4vw, 3.2rem)/1.12 var(--font-display);
+      letter-spacing: 0em;
       text-wrap: balance;
     }
     .hero p { margin: 0; max-width: 58ch; color: var(--color-text-muted); font-size: 1rem; }
@@ -242,7 +240,7 @@
     }
     .grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.84fr);
       gap: var(--space-section);
       align-items: start;
     }
@@ -254,14 +252,13 @@
     .section__head { display: grid; gap: 0.35rem; }
     .section__eyebrow {
       font: 600 12px/1.2 var(--font-label);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
       color: var(--color-text-muted);
     }
     .section h2 {
       margin: 0;
-      font: 700 clamp(1.25rem, 2.6vw, 1.8rem)/1.15 var(--font-display);
-      letter-spacing: -0.03em;
+      font: 700 clamp(1.25rem, 2.6vw, 1.8rem)/1.16 var(--font-display);
+      letter-spacing: 0em;
       text-wrap: balance;
     }
     .section p { margin: 0; color: var(--color-text-muted); max-width: 60ch; }
@@ -334,7 +331,7 @@
     .summary-card h3 {
       margin: 0;
       font: 700 1.1rem/1.25 var(--font-display);
-      letter-spacing: -0.02em;
+      letter-spacing: 0em;
     }
     .summary-list {
       display: grid;
@@ -484,7 +481,7 @@
       }
       .nav { width: 100%; justify-content: flex-start; }
       .choice-grid { grid-template-columns: 1fr; }
-      .hero h1 { max-width: 15ch; }
+      .hero h1 { max-width: none; }
       .figure { min-height: 15rem; }
       .summary-card {
         position: static;
@@ -508,7 +505,7 @@
     <header class="masthead">
       <div class="masthead__row">
         <div class="brand" aria-label="循環包材配置器">
-          <div class="brand__eyebrow">CIRCULAR PACKAGING / 繁中工作面</div>
+          <div class="brand__eyebrow">循環包材工作面（Circular Packaging）</div>
           <h1 class="brand__title">循環包材三頁配置器</h1>
           <div class="brand__meta">尺寸、用途、材質與回收條件同步保留</div>
         </div>
@@ -523,7 +520,7 @@
     <main id="main" class="grid">
       <section class="banner" aria-labelledby="hero-title">
         <article class="panel hero">
-          <div class="section__eyebrow">Step 2 / material + recovery</div>
+          <div class="section__eyebrow">步驟 2／材質與回收</div>
           <h1 id="hero-title">材質決定回收條件，也決定是否需要修正</h1>
           <p>這一頁會把材質、回收條件與尺寸/用途放在一起看。若選到衝突組合，會直接給出可恢復的修正方向。</p>
           <div class="flow" aria-label="材質說明">
@@ -553,7 +550,7 @@
 
       <section class="panel section" aria-labelledby="materials-title">
         <div class="section__head">
-          <div class="section__eyebrow">Materials</div>
+          <div class="section__eyebrow">材質與回收條件</div>
           <h2 id="materials-title">材質與回收條件</h2>
           <p>材質卡片會保留在同一份配置裡；切換後，衝突訊息與摘要都會一起更新。</p>
         </div>
@@ -600,7 +597,7 @@
 
       <aside class="panel summary-card" aria-labelledby="summary-title">
         <div class="compact-summary">
-          <div class="section__eyebrow">Current configuration</div>
+          <div class="section__eyebrow">目前配置</div>
           <h2 id="summary-title">目前配置摘要</h2>
           <div id="status-pill" class="status status--ok" role="status" aria-live="polite">材質可回收，方案可前往摘要</div>
           <dl class="info-grid">

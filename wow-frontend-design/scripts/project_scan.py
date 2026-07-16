@@ -11,7 +11,9 @@ import argparse
 import json
 import os
 import re
+import stat
 import sys
+import unicodedata
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
@@ -99,6 +101,8 @@ TEXT_EXTENSIONS = {
 
 CODE_EXTENSIONS = TEXT_EXTENSIONS | {".mjs", ".cjs"}
 MAX_READ_BYTES = 512_000
+MAX_WALK_DIRECTORIES = 20_000
+MAX_DIRECTORY_ENTRIES = 10_000
 
 PACKAGE_SIGNALS = {
     "@angular/core": "Angular",
@@ -256,43 +260,119 @@ def _is_sensitive(path: Path) -> bool:
     return any(part.lower() in {"secrets", "credentials"} for part in path.parts)
 
 
-def collect_files(root: Path, max_files: int) -> tuple[list[Path], bool]:
+class ProjectRootError(ValueError):
+    """Raised when a requested project root crosses its authorized boundary."""
+
+
+class UnsafeProjectFileError(ValueError):
+    """Raised when a project file is not a bounded regular file."""
+
+
+def resolve_project_root(requested: Path, authorized: Path) -> Path:
+    """Resolve a real project directory contained by an explicit authorized root."""
+    requested_absolute = Path(os.path.abspath(requested.expanduser()))
+    authorized_absolute = Path(os.path.abspath(authorized.expanduser()))
+    if authorized_absolute.is_symlink():
+        raise ProjectRootError(f"authorized root must not be a symlink: {authorized_absolute}")
+    if not authorized_absolute.is_dir():
+        raise ProjectRootError(f"authorized root must be a real directory: {authorized_absolute}")
+
+    try:
+        relative_requested = requested_absolute.relative_to(authorized_absolute)
+    except ValueError as error:
+        raise ProjectRootError(
+            f"project root escapes authorized root: {requested_absolute}"
+        ) from error
+
+    authorized_resolved = authorized_absolute.resolve()
+    cursor = authorized_resolved
+    for part in relative_requested.parts:
+        candidate = cursor / part
+        if candidate.is_symlink():
+            raise ProjectRootError(f"project root contains a symlink component: {candidate}")
+        cursor = candidate
+
+    try:
+        root = cursor.resolve(strict=True)
+    except OSError as error:
+        raise ProjectRootError(f"project root does not exist: {cursor}") from error
+    if not root.is_dir():
+        raise ProjectRootError(f"project root is not a directory: {root}")
+    try:
+        root.relative_to(authorized_resolved)
+    except ValueError as error:
+        raise ProjectRootError(f"project root escapes authorized root: {root}") from error
+    return root
+
+
+def _read_bounded_regular_bytes(path: Path, max_bytes: int = MAX_READ_BYTES) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    flags |= getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise UnsafeProjectFileError(f"{path} is not a regular file")
+        if info.st_size > max_bytes:
+            raise UnsafeProjectFileError(f"{path} exceeds {max_bytes} bytes")
+        raw = stream.read(max_bytes + 1)
+        if len(raw) > max_bytes:
+            raise UnsafeProjectFileError(f"{path} exceeds {max_bytes} bytes")
+        return raw
+
+
+def collect_files(
+    root: Path,
+    max_files: int,
+    max_directories: int = MAX_WALK_DIRECTORIES,
+    max_directory_entries: int = MAX_DIRECTORY_ENTRIES,
+) -> tuple[list[Path], bool]:
     files: list[Path] = []
-    truncated = False
+    visited_directories = 0
+    pending = [root]
 
-    for current, dirs, names in os.walk(root, followlinks=False):
-        current_path = Path(current)
-        kept_dirs = []
-        for dirname in sorted(dirs):
-            candidate = current_path / dirname
-            rel = candidate.relative_to(root).as_posix()
-            if candidate.is_symlink():
-                continue
-            if dirname in IGNORED_DIRS or rel in IGNORED_DIRS:
-                continue
-            if dirname.startswith(".") and dirname not in {".github", ".storybook"}:
-                continue
-            kept_dirs.append(dirname)
-        dirs[:] = kept_dirs
-
-        for name in sorted(names):
-            path = current_path / name
-            if path.is_symlink() or _is_sensitive(path):
-                continue
+    while pending:
+        current_path = pending.pop()
+        visited_directories += 1
+        if visited_directories > max_directories:
+            return files, True
+        directories: list[Path] = []
+        regular_files: list[Path] = []
+        try:
+            with os.scandir(current_path) as entries:
+                for entry_index, entry in enumerate(entries, start=1):
+                    if entry_index > max_directory_entries:
+                        return files, True
+                    candidate = Path(entry.path)
+                    if entry.is_symlink():
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        rel = candidate.relative_to(root).as_posix()
+                        if entry.name in IGNORED_DIRS or rel in IGNORED_DIRS:
+                            continue
+                        if entry.name.startswith(".") and entry.name not in {".github", ".storybook"}:
+                            continue
+                        directories.append(candidate)
+                    elif entry.is_file(follow_symlinks=False) and not _is_sensitive(candidate):
+                        regular_files.append(candidate)
+        except OSError:
+            continue
+        remaining_directory_budget = max_directories - visited_directories - len(pending)
+        if len(directories) > remaining_directory_budget:
+            return files, True
+        pending.extend(sorted(directories, reverse=True))
+        for path in sorted(regular_files):
             files.append(path)
             if len(files) >= max_files:
-                truncated = True
-                return files, truncated
+                return files, True
 
-    return files, truncated
+    return files, False
 
 
 def read_text(path: Path) -> str:
     try:
-        if path.stat().st_size > MAX_READ_BYTES:
-            return ""
-        return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
+        return _read_bounded_regular_bytes(path).decode("utf-8", errors="ignore")
+    except (OSError, UnsafeProjectFileError):
         return ""
 
 
@@ -306,8 +386,14 @@ def load_packages(root: Path, files: Iterable[Path]) -> tuple[list[tuple[str, di
     for path in package_paths:
         rel = path.relative_to(root).as_posix()
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raw = json.loads(_read_bounded_regular_bytes(path).decode("utf-8"))
+        except (
+            OSError,
+            RecursionError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            UnsafeProjectFileError,
+        ) as error:
             warnings.append(f"{rel} could not be parsed: {error}")
             continue
         if not isinstance(raw, dict):
@@ -514,13 +600,28 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
 
 
 def render_markdown(report: dict[str, Any]) -> str:
-    def joined(values: list[str]) -> str:
+    def literal(value: object) -> str:
+        escaped: list[str] = []
+        for character in str(value):
+            category = unicodedata.category(character)
+            if (
+                category in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+                or character in '\\`*_{}[]<>()#!|&"'
+            ):
+                escaped.append(f"\\u{ord(character):04x}")
+            else:
+                escaped.append(character)
+        return '"' + "".join(escaped) + '"'
+
+    def joined(values: list[str], *, untrusted: bool = False) -> str:
+        if untrusted:
+            return ", ".join(literal(value) for value in values) if values else "none detected"
         return ", ".join(values) if values else "none detected"
 
     lines = [
         "# Frontend project scan",
         "",
-        f"- Root: `{report['root']}`",
+        f"- Root: {literal(report['root'])}",
         f"- Mode hint: **{report['mode_hint']}**",
         f"- Files scanned: {report['file_count']}" + (" (truncated)" if report["scan_truncated"] else ""),
         f"- Frameworks: {joined(report['frameworks'])}",
@@ -532,21 +633,22 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Manifests and scripts",
         "",
-        f"- Manifests: {joined(report['manifests'])}",
-        f"- Lockfiles: {joined(report['lockfiles'])}",
-        f"- Package scripts: {joined(report['package_scripts'])}",
+        f"- Manifests: {joined(report['manifests'], untrusted=True)}",
+        f"- Lockfiles: {joined(report['lockfiles'], untrusted=True)}",
+        f"- Package scripts: {joined(report['package_scripts'], untrusted=True)}",
         "",
         "## Package evidence",
         "",
     ]
     if report["package_profiles"]:
         for profile in report["package_profiles"]:
-            manager = profile["package_manager"] or "not declared"
+            manager = literal(profile["package_manager"] or "not declared")
             versions = ", ".join(
-                f"{name}={version}" for name, version in profile["declared_versions"].items()
+                f"{literal(name)}={literal(version)}"
+                for name, version in profile["declared_versions"].items()
             ) or "none detected"
             lines.append(
-                f"- `{profile['path']}` — package manager: {manager}; declared ranges: {versions}"
+                f"- {literal(profile['path'])} — package manager: {manager}; declared ranges: {versions}"
             )
     else:
         lines.append("- No package.json evidence detected.")
@@ -563,13 +665,13 @@ def render_markdown(report: dict[str, Any]) -> str:
 
     lines.extend(["", "## Inspect next", ""])
     if report["priority_files"]:
-        lines.extend(f"- `{path}`" for path in report["priority_files"])
+        lines.extend(f"- {literal(path)}" for path in report["priority_files"])
     else:
         lines.append("- No source file candidates detected.")
 
     lines.extend(["", "## Observations", ""])
     if report["observations"]:
-        lines.extend(f"- {item}" for item in report["observations"])
+        lines.extend(f"- {literal(item)}" for item in report["observations"])
     else:
         lines.append("- No automatic warning signals detected. Manual rendered review is still required.")
 
@@ -580,7 +682,14 @@ def render_markdown(report: dict[str, Any]) -> str:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Safely inventory a frontend project before design work.")
     parser.add_argument("root", nargs="?", default=".", help="project root (default: current directory)")
-    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", help="emit machine-readable JSON (default)")
+    output.add_argument("--markdown", action="store_true", help="emit human-readable neutralized Markdown")
+    parser.add_argument(
+        "--authorized-root",
+        type=Path,
+        help="directory boundary containing the project root (default: current directory)",
+    )
     parser.add_argument("--max-files", type=int, default=2_500, help="maximum files to inspect (default: 2500)")
     args = parser.parse_args(argv)
     if args.max_files < 1:
@@ -590,23 +699,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
-    requested_root = Path(args.root).expanduser()
-    if requested_root.is_symlink():
-        print(f"error: refusing symlink project root: {requested_root}", file=sys.stderr)
-        return 2
-    root = requested_root.resolve()
-    if not root.exists():
-        print(f"error: project root does not exist: {root}", file=sys.stderr)
-        return 2
-    if not root.is_dir():
-        print(f"error: project root is not a directory: {root}", file=sys.stderr)
+    try:
+        root = resolve_project_root(
+            Path(args.root),
+            args.authorized_root if args.authorized_root is not None else Path.cwd(),
+        )
+    except ProjectRootError as error:
+        print(f"error: {error}", file=sys.stderr)
         return 2
 
     report = scan(root, args.max_files)
-    if args.json:
-        print(json.dumps(report, indent=2, ensure_ascii=False))
-    else:
+    if args.markdown:
         print(render_markdown(report))
+    else:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0
 
 

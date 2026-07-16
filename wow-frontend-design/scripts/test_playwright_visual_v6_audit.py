@@ -75,6 +75,16 @@ process.stdout.write(JSON.stringify({{
         self.assertTrue(result["mobile"]["usesCaseNavigation"])
         self.assertEqual(1, result["mobile"]["expectedVisibleRecords"])
 
+    def test_interactions_use_only_public_brief_hooks(self) -> None:
+        source = AUDITOR.read_text(encoding="utf-8")
+        brief = (ROOT / "evals" / "briefs" / "grant-review-board-v6.md").read_text(encoding="utf-8")
+        self.assertNotIn('[data-action="compare"]', source)
+        self.assertNotIn("#nextCase", source)
+        self.assertNotIn('input[value="s"]', source)
+        for hook in ('data-eval="compare-a-action"', 'data-eval="compare-b-action"', 'data-eval="next-proposal"'):
+            self.assertIn(hook, source)
+            self.assertIn(hook, brief)
+
     def test_traditional_chinese_language_variants_are_accepted(self) -> None:
         source = f"""
 const {{ issueCodes }} = require({json.dumps(str(AUDITOR))});
@@ -83,7 +93,10 @@ const base = {{
   hasHeading: true, horizontalOverflow: false, outsideViewport: [], shortActionFailures: [],
   clippedText: [], criticalTextCollisions: [], fixedStickyObstructions: [], viewport: 'mobile',
   smallTouchTargets: [], readingRhythm: {{ tooTight: [], tooWide: [] }}, narrowTextColumns: [],
-  bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [] }},
+  bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [], underfilledProseBlocks: [] }},
+  headingFlow: {{ compressedCjkHeadings: [], orphanedCjkHeadingLines: [], underfilledWideHeadings: [] }},
+  layoutFlow: {{ domOrderReversals: [], displacedIntroCopy: [] }},
+  localeFlow: {{ untranslatedInterfaceCopy: [] }},
   reducedMotionAnimations: [], consoleErrors: [], externalRequests: [], badResponses: [],
   caseId: 'wind-maintenance-dispatch-v6',
 }};
@@ -107,15 +120,67 @@ const base = {{
   shortActionFailures: [], clippedText: [], criticalTextCollisions: [], fixedStickyObstructions: [],
   viewport: 'desktop', smallTouchTargets: [], readingRhythm: {{ tooTight: [], tooWide: [] }},
   narrowTextColumns: [], reducedMotionAnimations: [], consoleErrors: [], externalRequests: [], badResponses: [],
+  headingFlow: {{ compressedCjkHeadings: [], orphanedCjkHeadingLines: [], underfilledWideHeadings: [] }},
+  layoutFlow: {{ domOrderReversals: [], displacedIntroCopy: [] }},
+  localeFlow: {{ untranslatedInterfaceCopy: [] }},
 }};
 process.stdout.write(JSON.stringify({{
   forced: issueCodes({{ ...base, bodyFlow: {{ forcedLineBreaks: [{{ breakCount: 1 }}], nonWrappingProse: [] }} }}),
   nowrap: issueCodes({{ ...base, bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [{{ whiteSpace: 'nowrap' }}] }} }}),
+  cjk: issueCodes({{ ...base, bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [] }}, headingFlow: {{ compressedCjkHeadings: [{{ lineCount: 5 }}] }} }}),
+  orphan: issueCodes({{ ...base, bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [] }}, headingFlow: {{ orphanedCjkHeadingLines: [{{ lineCount: 2, lastLineText: '策' }}] }} }}),
+  reorder: issueCodes({{ ...base, bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [] }}, layoutFlow: {{ domOrderReversals: [{{ upwardShift: 120 }}] }} }}),
 }}));
 """
         result = self.run_node(source)
         self.assertIn("forced_body_line_break", result["forced"])
         self.assertIn("body_copy_normal_wrap_disabled", result["nowrap"])
+        self.assertIn("cjk_heading_overcompressed", result["cjk"])
+        self.assertIn("cjk_heading_orphan_line", result["orphan"])
+        self.assertIn("visual_order_reverses_dom_flow", result["reorder"])
+
+    def test_track_utilization_intro_alignment_and_locale_become_repair_codes(self) -> None:
+        source = f"""
+const {{ issueCodes }} = require({json.dumps(str(AUDITOR))});
+const base = {{
+  interaction: {{ failures: [] }}, contractIssues: [], lang: 'zh-Hant-TW', hasMain: true,
+  visibleMainCount: 1, hasHeading: true, horizontalOverflow: false, outsideViewport: [],
+  shortActionFailures: [], clippedText: [], criticalTextCollisions: [], fixedStickyObstructions: [],
+  viewport: 'desktop', smallTouchTargets: [], readingRhythm: {{ tooTight: [], tooWide: [] }},
+  narrowTextColumns: [], reducedMotionAnimations: [], consoleErrors: [], externalRequests: [], badResponses: [],
+  bodyFlow: {{ forcedLineBreaks: [], nonWrappingProse: [], underfilledProseBlocks: [] }},
+  headingFlow: {{ compressedCjkHeadings: [], orphanedCjkHeadingLines: [], underfilledWideHeadings: [] }},
+  layoutFlow: {{ domOrderReversals: [], displacedIntroCopy: [] }},
+  localeFlow: {{ untranslatedInterfaceCopy: [] }},
+}};
+process.stdout.write(JSON.stringify({{
+  prose: issueCodes({{ ...base, bodyFlow: {{ ...base.bodyFlow, underfilledProseBlocks: [{{ ratio: 0.48 }}] }} }}),
+  heading: issueCodes({{ ...base, headingFlow: {{ ...base.headingFlow, underfilledWideHeadings: [{{ ratio: 0.42 }}] }} }}),
+  intro: issueCodes({{ ...base, layoutFlow: {{ ...base.layoutFlow, displacedIntroCopy: [{{ startRatio: 0.57 }}] }} }}),
+  locale: issueCodes({{ ...base, localeFlow: {{ untranslatedInterfaceCopy: [{{ text: 'Current configuration' }}] }} }}),
+}}));
+"""
+        result = self.run_node(source)
+        self.assertIn("prose_track_underfilled", result["prose"])
+        self.assertIn("wide_heading_track_underfilled", result["heading"])
+        self.assertIn("intro_copy_displaced_to_right_track", result["intro"])
+        self.assertIn("zh_hant_untranslated_interface_copy", result["locale"])
+
+    def test_locale_rule_keeps_terms_codes_and_names_but_rejects_raw_ui_copy(self) -> None:
+        source = f"""
+const {{ hasUnexplainedEnglish }} = require({json.dumps(str(AUDITOR))});
+process.stdout.write(JSON.stringify({{
+  explained: hasUnexplainedEnglish('等寬數字（tabular figures）格式'),
+  dispatch: hasUnexplainedEnglish('TW-OFW-204 葉片前緣補片 · T-14'),
+  namedAmount: hasUnexplainedEnglish('EchoWave NT$ 310,000'),
+  untranslated: hasUnexplainedEnglish('開啟決策 modal'),
+}}));
+"""
+        result = self.run_node(source)
+        self.assertFalse(result["explained"])
+        self.assertFalse(result["dispatch"])
+        self.assertFalse(result["namedAmount"])
+        self.assertTrue(result["untranslated"])
 
 
 if __name__ == "__main__":

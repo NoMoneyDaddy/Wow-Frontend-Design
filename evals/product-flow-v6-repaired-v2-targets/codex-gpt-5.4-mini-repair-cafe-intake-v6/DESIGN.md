@@ -1,139 +1,152 @@
 ---
 version: alpha
-name: 社區修繕咖啡館預約
-description: 以維修單與紙材氣質包裹的繁體中文預約流程，先說清楚物件，再選時段，最後在本機完成確認與回編輯。
+name: 社區修繕咖啡館
+description: 以維修單與紙材感支撐三步預約流程，讓手機上的物件預約清楚、可回頭修正、可完成確認。
 colors:
-  primary: "#6F3C27"
-  on-primary: "#FFF8F2"
-  surface: "#F8F1E8"
-  on-surface: "#241912"
-  muted-surface: "#ECE0D1"
-  muted-ink: "#665549"
-  error: "#A13D32"
-  on-error: "#FFF8F4"
-  success: "#2F694F"
-  on-success: "#F4FBF7"
+  primary: "#2E6F5E"
+  on-primary: "#FFFFFF"
+  canvas: "#F4EDE2"
+  on-canvas: "#2A221C"
+  surface: "#FFF9F1"
+  on-surface: "#3A2F28"
+  danger: "#8C4A3A"
+  on-danger: "#FFF8F5"
 typography:
-  headline:
-    fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif"
-    fontSize: 40px
+  display:
+    fontFamily: "\"Noto Serif TC\", \"PingFang TC\", \"Microsoft JhengHei\", serif"
+    fontSize: 44px
     fontWeight: 700
     lineHeight: 1.08
-    letterSpacing: "-0.02em"
-  body:
-    fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif"
+    letterSpacing: "0em"
+  reading:
+    fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif"
     fontSize: 16px
     fontWeight: 400
-    lineHeight: 1.6
+    lineHeight: 1.7
     letterSpacing: "0em"
-  label:
-    fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif"
+  functional:
+    fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", sans-serif"
     fontSize: 14px
     fontWeight: 600
-    lineHeight: 1.35
-    letterSpacing: "0.02em"
-  caption:
-    fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", \"Segoe UI\", sans-serif"
-    fontSize: 13px
-    fontWeight: 500
-    lineHeight: 1.45
-    letterSpacing: "0.01em"
-rounded:
-  sm: 8px
-  md: 14px
-  lg: 20px
+    lineHeight: 1.4
+    letterSpacing: "0em"
 spacing:
-  xs: 4px
-  sm: 8px
-  md: 16px
-  lg: 24px
-  xl: 32px
+  page: "24px"
+  panel: "20px"
+  cluster: "12px"
+  control: "16px"
+  chip: "8px"
+rounded:
+  sm: "10px"
+  md: "16px"
+  lg: "24px"
+  pill: "999px"
 components:
-  shell:
+  page-shell:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.on-canvas}"
+    typography: "{typography.reading}"
+    padding: "{spacing.page}"
+  booking-panel:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
-    typography: "{typography.body}"
+    typography: "{typography.reading}"
     rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  intro-card:
-    backgroundColor: "{colors.muted-surface}"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.body}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.lg}"
-  primary-button:
+    padding: "{spacing.panel}"
+  action-button:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.label}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.md}"
-  secondary-button:
-    backgroundColor: "{colors.muted-surface}"
-    textColor: "{colors.on-surface}"
-    typography: "{typography.label}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.md}"
-  field:
+    typography: "{typography.functional}"
+    rounded: "{rounded.pill}"
+    padding: "{spacing.control}"
+  step-chip:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
-    typography: "{typography.body}"
+    typography: "{typography.functional}"
+    rounded: "{rounded.pill}"
+    padding: "{spacing.chip}"
+  field-row:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface}"
+    typography: "{typography.reading}"
     rounded: "{rounded.md}"
-    padding: "{spacing.md}"
-  support-chip:
-    backgroundColor: "{colors.muted-surface}"
-    textColor: "{colors.muted-ink}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.sm}"
-    padding: "{spacing.sm}"
-  alert-error:
-    backgroundColor: "{colors.error}"
-    textColor: "{colors.on-error}"
-    typography: "{typography.caption}"
+    padding: "{spacing.cluster}"
+  error-note:
+    backgroundColor: "{colors.danger}"
+    textColor: "{colors.on-danger}"
+    typography: "{typography.functional}"
     rounded: "{rounded.md}"
-    padding: "{spacing.md}"
-  alert-success:
-    backgroundColor: "{colors.success}"
-    textColor: "{colors.on-success}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.md}"
+    padding: "{spacing.cluster}"
 ---
 
-# 社區修繕咖啡館預約
+# 社區修繕咖啡館
 
 ## Overview
 
-這是一個繁體中文單頁預約流程，面向帶著故障家電前來的社區使用者。整體氣質像修繕單與紙材，不追求華麗包裝，而是用安定、清楚、可回復的步驟，讓手機上的預約草稿先成形，再回頭慢慢編輯。
+主要使用者是帶著故障家電、腳步匆忙但需要把事情說清楚的人。介面要像維修單與工作臺標籤一樣可靠，語氣溫暖但不幼稚，讓使用者在手機上能先填物件、再選時段、最後回頭確認與修改。
+
+概念句：社區修繕咖啡館把維修單的紙材感轉成清楚的三步預約流程，讓手機上的預約既有秩序，也保留返回編輯的餘地。
 
 ## Colors
 
-主色只在使用者能採取行動、確認狀態或完成回饋時出現。`surface` 與 `muted-surface` 承載紙張與工作台的安靜層次，`on-surface` 與 `muted-ink` 保持主要內容可讀，`error` 與 `success` 只用來表達欄位錯誤、草稿確認與狀態回饋。這個配色的情緒判斷屬於 `HYPOTHESIS`：它支持溫暖、可信、務實的感受，但不把色相效果當成普遍心理定律。
+底色維持溫暖的紙張與桌面感，避免把整個畫面染成高飽和品牌色。
+
+- `canvas` 用於整頁背景與較寬的留白區。
+- `surface` 用於表單卡、步驟面板與摘要區。
+- `primary` 只用於主要行動、目前步驟與確認狀態。
+- `on-*` 色只用於對應底色上的文字與圖示。
+
+色彩的職責是分層與引導，不負責裝飾。選取、錯誤與完成狀態會再搭配形狀、邊框與文字說明，不讓顏色單獨承擔意思。
 
 ## Typography
 
-標題使用較緊的層級與稍低的字距，讓中文標語保有紙本標籤感。內文與欄位說明維持中性閱讀節奏，避免過度裝飾或全大寫眉頭式排版。標籤與按鈕用較高字重，確保在小螢幕與長字串下仍能掃讀。數字與時段資訊沿用同一閱讀字體，不另外引入分離的展示字族。
+標題可帶一點紙本標籤的分量，但正文必須保持清楚、自然、可快速掃讀。
+
+- `display` 用於頁面主標與步驟標題。
+- `reading` 用於說明文字、表單輔助語與確認摘要。
+- `functional` 用於按鈕、步驟標籤與數字型資訊。
+
+繁體中文文案以短句為主，保持正常換行與完整詞組，不用手工斷行去撐版面。長內容可以延伸，但不得把關鍵操作藏進狹窄欄位。
 
 ## Layout
 
-桌面版採雙欄：主要流程在左，草稿與提醒在右，讓使用者可一邊操作一邊確認內容。手機版改成單欄直向流程，先顯示任務與第一步，再把輔助說明與草稿摘要往下放，主要操作維持在容易碰到的位置。中文閱讀區保留約四十個全形字內的節奏，避免桌面與平板把段落拉得過長；步驟切換只改變可見區塊，不改變語意順序。
+桌面版採雙欄：左側是三步預約流程，右側是紙卡式提醒與摘要輔助。右欄提供背景說明與狀態檢查，不搶走主要表單。
+
+手機版改成單欄，先讓物件資訊與時段選擇連續出現，之後才顯示提醒與確認摘要。主要按鈕留在手指容易觸及的位置，避免固定底欄壓住輸入內容。
+
+頁面使用明確的內容寬度與分段間距，讓表單看起來像一份可完成的工作單，而不是一排等權重卡片。
 
 ## Elevation & Depth
 
-整體以平面紙材為主，靠邊線、留白與少量陰影分層。只有主要流程卡與確認摘要有較明顯的浮起感，其他輔助資訊保持更低的存在感。這讓修繕單的視覺秩序清楚，但不會把每個區塊都做成同樣重量的圓角卡片。
+層次主要靠紙感、邊框與色階差異建立，不依賴厚重陰影或玻璃效果。
+
+- 主容器比背景更亮，像疊在桌面上的工作單。
+- 摘要與提醒區使用較淺的底面與細邊框，表明它們是輔助資訊。
+- 錯誤狀態用邊框與文字共同提示，避免只有顏色變化。
 
 ## Shapes
 
-形狀語言偏方正、略柔和，像可書寫的工作單，而不是消費型儀表板。按鈕與欄位有一致的中等圓角；狀態標籤更小、更克制。確認摘要可以帶一點票根與修繕單的感覺，但不使用誇張氣泡、玻璃擬態或過度圓潤的裝飾。
+整體形狀以溫和圓角為主，呼應社區工坊的手寫標籤與貼紙感，但不走玩具化。
+
+- 面板使用中等圓角，讓內容像被整理好的單據。
+- 按鈕採較完整的膠囊或大圓角，方便觸控辨識。
+- 表單欄位保留清楚的邊界與足夠高度，讓修正輸入不費力。
 
 ## Components
 
-主要元件是主按鈕、次按鈕、文字欄位、支援標籤、錯誤提示、成功提示、流程卡與確認摘要。主按鈕只負責往下一步或完成草稿確認；次按鈕只負責回到編輯。欄位保持原生語意與清楚標籤，錯誤提示連結到對應欄位並可直接回焦點。確認摘要會在完成後保留已選物件與時段，並清楚標示尚未傳送遠端；操作列要占據自己的版面，不覆蓋欄位或提示文字。
+- 預約表單：單一主欄位先完成物件資訊，再進入時段選擇與確認摘要。
+- 步驟標籤：指出目前在第幾步，讓返回編輯時依然知道自己在哪裡。
+- 主要按鈕：只在可前進或可確認的時候使用主色。
+- 確認摘要：在本機畫面內呈現已整理好的內容，並提供返回編輯。
+- 錯誤提示：貼近欄位顯示，並在送出失敗時把焦點帶回需要修正的地方。
+
+行動版與桌面版共用同一組語意元件，只改排列與密度，不複製兩套不同真相。
 
 ## Do's and Don'ts
 
-- Do 保留可回頭編輯的草稿感，讓確認不是不可逆的終點。
-- Do 把錯誤放在欄位附近，並維持可鍵盤操作的流程。
-- Do 在手機上重新安排層級與空間，讓主要動作留在拇指可及處。
-- Don't 把這個流程說成已經遠端送出或完成正式預約。
-- Don't 用通用 SaaS 的玻璃、霓虹、英雄大圖或懸浮大卡片來包裝。
-- Don't 讓每個區塊都用同樣的圓角、陰影與密度，避免紙材感被抹平。
+- Do 使用自然的繁體中文欄位名與說明。
+- Do 保留返回編輯的路徑，讓使用者可以修正物件描述與時段。
+- Do 把主要按鈕放在清楚可見的位置，並維持足夠點按面積。
+- Don't 聲稱資料已送到遠端系統或店家後台。
+- Don't 把桌面式雙欄硬塞到手機上。
+- Don't 用裝飾性高飽和效果取代清楚的狀態提示。

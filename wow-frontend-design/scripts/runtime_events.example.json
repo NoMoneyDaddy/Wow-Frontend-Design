@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "run_id": "replace-with-evaluator-owned-run-id",
+  "initial_lane": "STANDARD",
+  "events": [
+    {
+      "sequence": 1,
+      "code": "INACTIVITY_TIMEOUT",
+      "failure_key": "capture:wind:attempt-1",
+      "consecutive": 1,
+      "progress_observed": true
+    },
+    {
+      "sequence": 2,
+      "code": "REPAIR_FINDING",
+      "failure_key": "layout:wind:heading-wrap",
+      "consecutive": 1,
+      "progress_observed": false
+    }
+  ]
+}

@@ -103,6 +103,8 @@ Surface treatment expresses grouping, elevation, interaction, and state:
 
 Do not merge Material Design, Apple HIG, Fluent, Carbon, GOV.UK, or another system into a universal visual style. Use the system already adopted by the product or treat each as a platform/context-specific reference.
 
+When a web product already uses `@material/web`, treat the installed package as a versioned adapter—not a visual preset. Preserve its real custom-element, form, focus, and state contracts; map project semantics through the supported system/component custom properties; and test the exact installed version in target browsers and assistive technology. The official Material Web repository is currently in maintenance mode, and its `tokens/versions` surface warns that minor and patch updates may break; pin exact versions before using that surface. Do not add Material Web only to obtain rounded components or copy mutable `main` token files into another stack.
+
 ## 7. Compose for desktop and mobile
 
 Desktop can expose persistent navigation, comparison, shortcuts, hover detail, batch tools, and master-detail context. Mobile should select the top task, change navigation/control placement, defer secondary detail, protect the virtual keyboard, and provide tap alternatives.

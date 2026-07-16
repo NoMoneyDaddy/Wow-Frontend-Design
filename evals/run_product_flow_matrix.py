@@ -53,14 +53,12 @@ EVALUATOR_INPUTS = (
     ROOT / "evals" / "playwright_visual_v6_audit.cjs",
     ROOT / "evals" / "run_claude_case.sh",
     ROOT / "evals" / "run_codex_case.sh",
+    ROOT / "evals" / "monitor_codex_progress.py",
     ROOT / "evals" / "validate_visual_web_output.py",
     ROOT / "evals" / "validate_design_md_clean.py",
     ROOT / "evals" / "validate_codex_log_policy.py",
 )
-PROVIDERS = {
-    "claude": ("haiku",),
-    "codex": ("gpt-5.4-mini", "gpt-5.4"),
-}
+PROVIDERS = {"codex": ("gpt-5.4-mini",)}
 MODELS = tuple(model for models in PROVIDERS.values() for model in models)
 OUTPUTS_BY_CASE = {
     "wind-maintenance-dispatch-v6": ("DESIGN.md", "index.html"),
@@ -72,6 +70,7 @@ OUTPUTS_BY_CASE = {
     "oral-history-archive-v6": ("DESIGN.md", "index.html", "archive.html", "story.html"),
     "grant-review-board-v6": ("DESIGN.md", "index.html"),
 }
+DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 
 
 def utc_now() -> str:
@@ -141,8 +140,27 @@ def outputs_for(case_id: str) -> tuple[str, ...]:
     return OUTPUTS_BY_CASE[case_id]
 
 
-def verified_existing(target: Path, case_id: str) -> dict[str, object] | None:
+def _manifest_receipt(target: Path, manifest: dict[str, object]) -> dict[str, object]:
+    outputs = manifest.get("outputs")
+    assert isinstance(outputs, list)
+    return {
+        "manifest_sha256": digest(target / "run-manifest.json"),
+        "outputs": {str(item["path"]): str(item["sha256"]) for item in outputs if isinstance(item, dict)},
+    }
+
+
+def verified_existing(
+    target: Path,
+    provider: str,
+    model: str,
+    case_id: str,
+    *,
+    expected_receipt: dict[str, object] | None = None,
+    verify_current_tools: bool = True,
+) -> dict[str, object] | None:
     outputs = outputs_for(case_id)
+    if target.is_symlink() or (target.exists() and not target.is_dir()):
+        raise ValueError(f"unsafe pre-existing target: {display_path(target)}")
     manifest_path = target / "run-manifest.json"
     present = [target / name for name in (*outputs, "run-manifest.json") if (target / name).exists()]
     if not present:
@@ -150,12 +168,55 @@ def verified_existing(target: Path, case_id: str) -> dict[str, object] | None:
     if len(present) != len(outputs) + 1 or any(path.is_symlink() or not path.is_file() for path in present):
         raise ValueError(f"partial or unsafe pre-existing output: {display_path(target)}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    declared = {item["path"]: item["sha256"] for item in manifest.get("outputs", [])}
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1 or manifest.get("status") != "completed":
+        raise ValueError(f"invalid manifest schema/status: {display_path(manifest_path)}")
+    case_record = manifest.get("case")
+    if not isinstance(case_record, dict) or case_record.get("id") != case_id:
+        raise ValueError(f"manifest case provenance mismatch: {display_path(manifest_path)}")
+    claimed_target = case_record.get("target")
+    if not isinstance(claimed_target, str) or not claimed_target:
+        raise ValueError(f"manifest target provenance is missing: {display_path(manifest_path)}")
+    claimed_path = Path(claimed_target)
+    claimed_path = (claimed_path if claimed_path.is_absolute() else ROOT / claimed_path).resolve()
+    if claimed_path != target.resolve():
+        raise ValueError(f"manifest target provenance mismatch: {display_path(manifest_path)}")
+    model_record = manifest.get("model")
+    model_field = "requested_alias" if provider == "claude" else "requested_identifier"
+    if not isinstance(model_record, dict) or model_record.get(model_field) != model:
+        raise ValueError(f"manifest model provenance mismatch: {display_path(manifest_path)}")
+    if provider == "codex" and manifest.get("provider") != "openai-first-party-chatgpt-oauth":
+        raise ValueError(f"manifest provider provenance mismatch: {display_path(manifest_path)}")
+    if verify_current_tools:
+        runner = ROOT / "evals" / ("run_claude_case.sh" if provider == "claude" else "run_codex_case.sh")
+        validator = ROOT / "evals" / "validate_visual_web_output.py"
+        for label, record, expected in (
+            ("runner", manifest.get("runner"), runner),
+            ("output validator", manifest.get("output_validator"), validator),
+        ):
+            if (
+                not isinstance(record, dict)
+                or record.get("path") != display_path(expected)
+                or record.get("sha256") != digest(expected)
+            ):
+                raise ValueError(f"manifest {label} provenance mismatch: {display_path(manifest_path)}")
+    manifest_outputs = manifest.get("outputs")
+    if (
+        not isinstance(manifest_outputs, list)
+        or len(manifest_outputs) != len(outputs)
+        or any(not isinstance(item, dict) for item in manifest_outputs)
+    ):
+        raise ValueError(f"invalid manifest outputs: {display_path(manifest_path)}")
+    declared = {item.get("path"): item.get("sha256") for item in manifest_outputs}
     if set(declared) != set(outputs):
         raise ValueError(f"invalid manifest output set: {display_path(manifest_path)}")
     for name in outputs:
-        if digest(target / name) != declared[name]:
+        artifact = target / name
+        record = next(item for item in manifest_outputs if item.get("path") == name)
+        if digest(artifact) != declared[name] or record.get("bytes") != artifact.stat().st_size:
             raise ValueError(f"manifest digest mismatch: {display_path(target / name)}")
+    receipt = _manifest_receipt(target, manifest)
+    if expected_receipt is not None and receipt != expected_receipt:
+        raise ValueError(f"matrix receipt mismatch: {display_path(manifest_path)}")
     return manifest
 
 
@@ -165,8 +226,6 @@ def command_for(provider: str, model: str, case_id: str) -> list[str]:
 
 
 def terminate_process_group(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
-        return
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -200,13 +259,25 @@ class ProgressTimeoutExpired(subprocess.TimeoutExpired):
         return f"{self.kind} timeout after {self.timeout:g} seconds"
 
 
+class OutputLimitExceeded(subprocess.TimeoutExpired):
+    def __init__(self, command: list[str], limit_bytes: int, *, output: str, stderr: str) -> None:
+        super().__init__(command, limit_bytes, output=output, stderr=stderr)
+        self.limit_bytes = limit_bytes
+
+    def __str__(self) -> str:
+        return f"combined output exceeded {self.limit_bytes} bytes"
+
+
 def run_isolated(
     command: list[str],
     timeout_seconds: float,
     *,
     hard_timeout_seconds: float | None = None,
     environment: dict[str, str] | None = None,
+    max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES,
 ) -> subprocess.CompletedProcess[str]:
+    if max_output_bytes < 1:
+        raise ValueError("max_output_bytes must be positive")
     process = subprocess.Popen(
         command,
         cwd=ROOT,
@@ -220,12 +291,13 @@ def run_isolated(
     started = time.monotonic()
     last_activity = started
     chunks: dict[str, list[bytes]] = {"stdout": [], "stderr": []}
+    captured_bytes = 0
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ, "stdout")
     selector.register(process.stderr, selectors.EVENT_READ, "stderr")
     timeout_kind: str | None = None
     try:
-        while selector.get_map():
+        while selector.get_map() or process.poll() is None:
             now = time.monotonic()
             idle_remaining = timeout_seconds - (now - last_activity)
             hard_remaining = hard_limit - (now - started)
@@ -235,18 +307,34 @@ def run_isolated(
             if hard_remaining <= 0:
                 timeout_kind = "hard-runtime"
                 break
-            events = selector.select(min(1.0, idle_remaining, hard_remaining))
+            wait_seconds = min(1.0, idle_remaining, hard_remaining)
+            if not selector.get_map():
+                time.sleep(min(0.05, wait_seconds))
+                continue
+            events = selector.select(wait_seconds)
             for key, _ in events:
                 data = os.read(key.fileobj.fileno(), 65536)
                 if data:
+                    remaining = max_output_bytes - captured_bytes
+                    if len(data) > remaining:
+                        if remaining:
+                            chunks[str(key.data)].append(data[:remaining])
+                            captured_bytes += remaining
+                        timeout_kind = "output-limit"
+                        break
                     chunks[str(key.data)].append(data)
+                    captured_bytes += len(data)
                     last_activity = time.monotonic()
                 else:
                     selector.unregister(key.fileobj)
+            if timeout_kind is not None:
+                break
         if timeout_kind is not None:
             terminate_process_group(process)  # type: ignore[arg-type]
             stdout = b"".join(chunks["stdout"]).decode("utf-8", errors="replace")
             stderr = b"".join(chunks["stderr"]).decode("utf-8", errors="replace")
+            if timeout_kind == "output-limit":
+                raise OutputLimitExceeded(command, max_output_bytes, output=stdout, stderr=stderr)
             limit = timeout_seconds if timeout_kind == "inactivity" else hard_limit
             raise ProgressTimeoutExpired(
                 command,
@@ -288,11 +376,40 @@ def classify_failure(exit_code: int | None, summary: str) -> str:
 
 
 COMPLETED_STATUSES = {"completed", "existing_completed"}
-RETRYABLE_STATUSES = {"timeout", "generation_failed", "output_policy_rejected"}
+RETRYABLE_STATUSES = {"generation_failed"}
+RETRYABLE_TIMEOUT_KINDS = {"inactivity"}
 
 
-def should_retry(status: str) -> bool:
+def should_retry(status: str, timeout_kind: str | None = None) -> bool:
+    if status == "timeout":
+        return timeout_kind in RETRYABLE_TIMEOUT_KINDS
     return status in RETRYABLE_STATUSES
+
+
+def should_retry_attempt(attempt: dict[str, object]) -> bool:
+    return should_retry(
+        str(attempt.get("status", "")),
+        str(attempt["timeout_kind"]) if attempt.get("timeout_kind") is not None else None,
+    )
+
+
+def apply_case_feedback(environment: dict[str, str], case_id: str, retry_feedback: str | None) -> None:
+    mapping_text = environment.pop("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE", "")
+    selected = retry_feedback
+    if selected is None and mapping_text:
+        try:
+            mapping = json.loads(mapping_text)
+        except json.JSONDecodeError as error:
+            raise ValueError("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE must be valid JSON") from error
+        if not isinstance(mapping, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in mapping.items()):
+            raise ValueError("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE must map case ids to strings")
+        selected = mapping.get(case_id)
+    environment.pop("PRODUCT_FLOW_RETRY_FEEDBACK", None)
+    if selected is None:
+        return
+    if len(selected) > 500 or "\n" in selected or "\r" in selected:
+        raise ValueError("case retry feedback must be one bounded line")
+    environment["PRODUCT_FLOW_RETRY_FEEDBACK"] = selected
 
 
 def attempt_from_record(record: dict[str, object]) -> dict[str, object]:
@@ -305,6 +422,7 @@ def attempt_from_record(record: dict[str, object]) -> dict[str, object]:
         "error_summary",
         "manifest",
         "timeout_kind",
+        "receipt",
     )
     return {field: record[field] for field in fields if field in record}
 
@@ -322,9 +440,9 @@ def run_case_attempt(
     attempt: dict[str, object] = {"started_at": utc_now()}
     started = time.monotonic()
     try:
-        manifest = verified_existing(target, case_id)
+        manifest = verified_existing(target, provider, model, case_id)
         if manifest is not None:
-            attempt.update(status="existing_completed", exit_code=None, manifest=f"{relative_target}/run-manifest.json")
+            raise ValueError(f"refusing unreceipted pre-existing output: {display_path(target)}")
         else:
             if target.exists():
                 if not target.is_dir() or target.is_symlink():
@@ -333,8 +451,7 @@ def run_case_attempt(
                 target.mkdir(mode=0o755)
             environment = os.environ.copy()
             environment["PRODUCT_FLOW_TARGET_ROOT"] = str(target.parent)
-            if retry_feedback:
-                environment["PRODUCT_FLOW_RETRY_FEEDBACK"] = retry_feedback[:500]
+            apply_case_feedback(environment, case_id, retry_feedback)
             completed = run_isolated(
                 command_for(provider, model, case_id),
                 timeout_seconds,
@@ -342,8 +459,15 @@ def run_case_attempt(
                 environment=environment,
             )
             if completed.returncode == 0:
-                verified_existing(target, case_id)
-                attempt.update(status="completed", exit_code=0, manifest=f"{relative_target}/run-manifest.json")
+                completed_manifest = verified_existing(target, provider, model, case_id)
+                if completed_manifest is None:
+                    raise ValueError(f"runner produced no completed manifest: {display_path(target)}")
+                attempt.update(
+                    status="completed",
+                    exit_code=0,
+                    manifest=f"{relative_target}/run-manifest.json",
+                    receipt=_manifest_receipt(target, completed_manifest),
+                )
             else:
                 summary = short_error(completed)
                 attempt.update(
@@ -353,7 +477,9 @@ def run_case_attempt(
                 )
     except subprocess.TimeoutExpired as error:
         attempt.update(status="timeout", exit_code=None, error_summary=short_error(None, error))
-        if isinstance(error, ProgressTimeoutExpired):
+        if isinstance(error, OutputLimitExceeded):
+            attempt["timeout_kind"] = "output-limit"
+        elif isinstance(error, ProgressTimeoutExpired):
             attempt["timeout_kind"] = error.kind
     except (OSError, ValueError, json.JSONDecodeError, KeyError, TypeError) as error:
         attempt.update(status="infrastructure_failure", exit_code=None, error_summary=str(error)[:500])
@@ -374,6 +500,7 @@ def apply_attempts(record: dict[str, object], attempts: list[dict[str, object]])
         "finished_at",
         "duration_seconds",
         "timeout_kind",
+        "receipt",
     ):
         if field in final:
             record[field] = final[field]
@@ -402,7 +529,7 @@ def run_case_with_retries(
 ) -> list[dict[str, object]]:
     attempts = [dict(attempt) for attempt in initial_attempts]
     while len(attempts) < max_attempts:
-        if attempts and not should_retry(str(attempts[-1].get("status"))):
+        if attempts and not should_retry_attempt(attempts[-1]):
             break
         if before_attempt is not None:
             before_attempt()
@@ -421,7 +548,7 @@ def run_case_with_retries(
         attempts.append(attempt)
         if on_attempt is not None:
             on_attempt(attempts)
-        if str(attempt["status"]) in COMPLETED_STATUSES or not should_retry(str(attempt["status"])):
+        if str(attempt["status"]) in COMPLETED_STATUSES or not should_retry_attempt(attempt):
             break
         if len(attempts) < max_attempts and retry_delay_seconds:
             sleeper(retry_delay_seconds)
@@ -480,7 +607,7 @@ def main() -> int:
             {"path": str(path.relative_to(ROOT)), "sha256": digest(path)} for path in EVALUATOR_INPUTS
         ],
         "outputs_by_case": {case_id: list(outputs) for case_id, outputs in OUTPUTS_BY_CASE.items()},
-        "artifact_root": str(target_root),
+        "artifact_root": display_path(target_root),
         "providers_are_separate_cohorts": True,
         "resolved_backend_snapshots_may_be_unreported": True,
         "generation_settings": {
@@ -489,6 +616,7 @@ def main() -> int:
             "codex_reasoning_summary": "none",
             "codex_internal_reasoning_disable_supported": False,
         },
+        "context_routing": "runner_selects_smallest_fixed_set_by_caller_model_and_case",
     }
     frozen_entries = [
         *expected_contract["briefs"].values(),  # type: ignore[union-attr]
@@ -528,6 +656,9 @@ def main() -> int:
         "max_attempts_per_case": args.max_attempts,
         "retry_delay_seconds": args.retry_delay_seconds,
         "retryable_statuses": sorted(RETRYABLE_STATUSES),
+        "retryable_timeout_kinds": sorted(RETRYABLE_TIMEOUT_KINDS),
+        "non_retryable_timeout_kinds": ["hard-runtime", "output-limit"],
+        "policy_rejection_requires_explicit_remediation": True,
         "incomplete_matrix_exit_code": 1,
     }
     prior_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
@@ -545,7 +676,10 @@ def main() -> int:
         relative_target = display_path(target)
         previous = prior_by_key.get((provider, model, case_id))
         if previous is not None and previous.get("status") in COMPLETED_STATUSES:
-            verified_existing(target, case_id)
+            receipt = previous.get("receipt")
+            if not isinstance(receipt, dict):
+                raise SystemExit(f"completed resume result has no evaluator receipt: {relative_target}")
+            verified_existing(target, provider, model, case_id, expected_receipt=receipt)
             print(f"preserving {provider} / {model} / {case_id}: {previous.get('status')}", flush=True)
             continue
         if previous is None:
@@ -586,7 +720,7 @@ def main() -> int:
                 flush=True,
             )
 
-        if len(attempts) < args.max_attempts and (not attempts or should_retry(str(attempts[-1].get("status")))):
+        if len(attempts) < args.max_attempts and (not attempts or should_retry_attempt(attempts[-1])):
             print(
                 f"attempting up to {args.max_attempts} total {provider} / {model} / {case_id}",
                 flush=True,

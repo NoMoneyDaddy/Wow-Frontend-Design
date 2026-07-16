@@ -24,6 +24,38 @@ function parseArguments(argv) {
   return options;
 }
 
+function matchesAllowedNetworkOrigin(value, allowedOrigin) {
+  try {
+    const parsed = new URL(value);
+    if (["data:", "about:"].includes(parsed.protocol)) return true;
+    if (parsed.protocol === "ws:") parsed.protocol = "http:";
+    if (parsed.protocol === "wss:") parsed.protocol = "https:";
+    return parsed.origin === allowedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+async function installExactOriginRoutes(context, allowedOrigin, externalRequests) {
+  await context.route("**/*", async (route) => {
+    const requestUrl = route.request().url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      return route.abort("blockedbyclient");
+    }
+    return route.continue();
+  });
+  await context.routeWebSocket("**/*", async (webSocket) => {
+    const requestUrl = webSocket.url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      await webSocket.close({ code: 1008, reason: "Blocked by evaluator origin policy" });
+      return;
+    }
+    webSocket.connectToServer();
+  });
+}
+
 const options = parseArguments(process.argv.slice(2));
 
 const targets = [
@@ -100,6 +132,7 @@ function acceptanceIssues(result) {
   if (!result.noPageOverflow) issues.push("page_overflow");
   if (result.reducedMotionRunningAnimationsAfter30ms !== 0) issues.push("reduced_motion_animation_running");
   if (result.consoleErrors.length) issues.push("console_errors");
+  if (result.externalRequests.length) issues.push("external_requests_attempted");
   if (result.requestFailures.length) issues.push("request_failures");
   if (result.badResponses.length) issues.push("http_error_responses");
   if (!result.detail.openAction.userClickSucceeded) issues.push("detail_control_not_user_clickable");
@@ -116,11 +149,15 @@ function acceptanceIssues(result) {
 }
 
 async function auditTarget(browser, target, viewport) {
+  const allowedOrigin = new URL(target.url).origin;
+  const externalRequests = [];
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     reducedMotion: "reduce",
     locale: "zh-TW",
+    serviceWorkers: "block",
   });
+  await installExactOriginRoutes(context, allowedOrigin, externalRequests);
   const page = await context.newPage();
   const consoleErrors = [];
   const requestFailures = [];
@@ -196,6 +233,7 @@ async function auditTarget(browser, target, viewport) {
     reducedMotionRunningAnimationsAfter30ms: layout.runningAnimations,
     detail: { overlayApplicable, openAction, opened, openFocus: openState, isolation, closed, closeFocus: closeState, focusReturned },
     consoleErrors,
+    externalRequests,
     requestFailures,
     badResponses,
   };

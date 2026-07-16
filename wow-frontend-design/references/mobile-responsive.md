@@ -61,6 +61,7 @@ Repeat the transformation table for reachable states, not only the default page.
 - Recompose art direction; do not merely scale the desktop crop.
 - Keep the proposition readable without waiting for animation.
 - Avoid a decorative full-height hero that pushes all proof below the fold.
+- Remove or background a decorative peer column when it squeezes the proposition or primary task. An `aria-hidden` region does not earn layout width merely because it looks like a diagram; use a real, provenance-checked asset when the visual is required.
 - Use `svh`/`dvh` carefully; content must survive browser chrome, landscape, and short screens.
 
 ### Dense information
@@ -126,6 +127,7 @@ At every size verify:
 - loading, empty, error, and success states;
 - no unexpected overflow.
 - no long prose squeezed below its script-aware useful measure, no tall multi-line command caused by a narrow track, and no large unexplained void or detached summary after state changes;
+- no Traditional Chinese heading compressed by a Latin `ch` cap, no four-plus-line fragment created while usable inline space remains, and no compact lexical unit split only because a progressive line-breaking feature failed;
 - short command labels remain intentionally one line unless the component contract explicitly allows wrapping; verify rendered line boxes and clipping, not only page overflow.
 - fixed/sticky UI leaves the current primary content and focused control unobscured, including safe areas and the virtual keyboard.
 - responsive alternatives preserve the same required content, semantics, and declared test/evaluator hook; only the presentation and interaction mode change.

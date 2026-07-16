@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -85,10 +86,57 @@ class MotionSvgAuditTests(unittest.TestCase):
             self.assertIn("MOTION001", rules)
             self.assertIn("MOTION007", rules)
 
+    def test_gsap_component_requires_runtime_reduced_path_and_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "App.tsx", 'gsap.timeline().to(".hero", { y: 0 });')
+
+            rules = self.rules(root)
+            self.assertIn("MOTION001", rules)
+            self.assertIn("MOTION007", rules)
+            self.assertIn("MOTION008", rules)
+
+    def test_scoped_gsap_runtime_with_reduced_branch_has_no_high_motion_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(
+                root,
+                "App.tsx",
+                'useGSAP(() => { const mm = gsap.matchMedia(); '
+                'mm.add("(prefers-reduced-motion: reduce)", () => gsap.set(".hero", { y: 0 })); '
+                'return () => mm.revert(); }, { scope: container });',
+            )
+
+            findings, _ = motion_svg_audit.audit(root)
+            self.assertFalse(any(item.severity == "high" for item in findings))
+
+    def test_scrolltrigger_markers_and_mount_cleanup_are_found(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(
+                root,
+                "page.vue",
+                'onMounted(() => { ctx && ctx.revert(); });\n'
+                'ScrollTrigger.create({ trigger: ".hero", markers: true });\n'
+                'matchMedia("(prefers-reduced-motion: reduce)");',
+            )
+
+            rules = self.rules(root)
+            self.assertIn("MOTION009", rules)
+            self.assertIn("MOTION010", rules)
+
     def test_large_file_reports_incomplete_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.write(root, "large.css", " " * (motion_svg_audit.MAX_FILE_BYTES + 1))
+
+            self.assertIn("AUDIT001", self.rules(root))
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX FIFOs")
+    def test_fifo_source_is_skipped_without_blocking(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            os.mkfifo(root / "blocked.css")
 
             self.assertIn("AUDIT001", self.rules(root))
 

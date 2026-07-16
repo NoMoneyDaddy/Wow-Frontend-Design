@@ -20,8 +20,8 @@ typography:
     fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
     fontSize: 40px
     fontWeight: 700
-    lineHeight: 1.1
-    letterSpacing: "-0.03em"
+    lineHeight: 1.12
+    letterSpacing: "0em"
     fontFeature: "\"kern\", \"liga\""
   body:
     fontFamily: "\"PingFang TC\", \"Noto Sans TC\", \"Microsoft JhengHei\", system-ui, sans-serif"
@@ -151,7 +151,7 @@ components:
 - `label` 用於選項名稱、按鈕、狀態標籤與導覽，讓控制面在小尺寸下仍能明確。
 - `mono` 用於尺寸、價格、規格與比例數字，讓比對更穩定。
 
-繁中內容一律維持直排外的水平閱讀；所有長文保持正常斷行，不把中文擠成單字元窄欄。短標題可在桌機展現 1 到 2 行，手機則優先保住可讀 measure 與按鈕可點擊性。
+繁中內容一律維持直排外的水平閱讀；所有長文保持正常斷行，不把中文擠成單字元窄欄。短標題可在桌機展現 1 到 2 行，手機則優先保住可讀 measure 與按鈕可點擊性。中文標題不使用 Latin `ch` 作為硬性上限；頁首與區塊標題應跟隨內容欄寬自然換行，避免把繁中標題壓成過窄的短欄。標題字距維持接近 0 的自然狀態，不用負 tracking 逼短行。
 
 ## Layout
 

@@ -26,10 +26,7 @@ OFFICIAL_UNSET_VARS=(
   AZURE_OPENAI_ENDPOINT
   AZURE_OPENAI_BASE_URL
 )
-CODEX_ENV=(env)
-for variable in "${OFFICIAL_UNSET_VARS[@]}"; do
-  CODEX_ENV+=(-u "$variable")
-done
+CODEX_ENV=(env -i)
 
 case "$MODEL" in
   gpt-5.4-mini|gpt-5.4|gpt-5.5) ;;
@@ -109,8 +106,9 @@ esac
 VALIDATOR="$ROOT/evals/validate_visual_web_output.py"
 DESIGN_VALIDATOR="$ROOT/evals/validate_design_md_clean.py"
 TRACE_VALIDATOR="$ROOT/evals/validate_codex_log_policy.py"
+RESOURCE_MONITOR="$ROOT/evals/monitor_codex_progress.py"
 
-for path in "$TARGET" "$BRIEF" "$VALIDATOR" "$DESIGN_VALIDATOR" "$TRACE_VALIDATOR"; do
+for path in "$TARGET" "$BRIEF" "$VALIDATOR" "$DESIGN_VALIDATOR" "$TRACE_VALIDATOR" "$RESOURCE_MONITOR"; do
   if [[ ! -e "$path" || -L "$path" ]]; then
     echo "missing or unsafe fixed input: $path" >&2
     exit 2
@@ -153,22 +151,36 @@ for name in outputs:
 PY
 fi
 
-CONTEXT_FILES=(
+BASE_CONTEXT_FILES=(
   "$ROOT/wow-frontend-design/SKILL.md"
   "$ROOT/wow-frontend-design/references/creative-direction.md"
   "$ROOT/wow-frontend-design/references/anti-ai-slop.md"
   "$ROOT/wow-frontend-design/references/mobile-responsive.md"
   "$ROOT/wow-frontend-design/references/localization.md"
-  "$ROOT/wow-frontend-design/references/typography-webfonts.md"
   "$ROOT/wow-frontend-design/references/typographic-layout.md"
   "$ROOT/wow-frontend-design/references/implementation.md"
-  "$ROOT/wow-frontend-design/references/component-composition.md"
-  "$ROOT/wow-frontend-design/references/quality-gates.md"
-  "$ROOT/wow-frontend-design/references/weak-model-playbook.md"
-  "$ROOT/wow-frontend-design/references/color-system-psychology.md"
   "$ROOT/wow-frontend-design/references/design-md-contract.md"
   "$ROOT/wow-frontend-design/assets/DESIGN.template.md"
 )
+CONTEXT_FILES=("${BASE_CONTEXT_FILES[@]}")
+if [[ "$MODEL" == "gpt-5.4-mini" ]]; then
+  CONTEXT_FILES+=("$ROOT/wow-frontend-design/references/weak-model-playbook.md")
+fi
+case "$CASE_ID" in
+  harbor-cold-chain-v4|plant-swap-one-line-v4|rail-rebooking-v5|subscription-audit-v5|community-translation-v5|wind-maintenance-dispatch-v6|repair-cafe-intake-v6|night-market-allergen-v6|royalty-statement-v6|packaging-configurator-v6|grant-review-board-v6)
+    CONTEXT_FILES+=("$ROOT/wow-frontend-design/references/component-composition.md")
+    ;;
+esac
+case "$CASE_ID" in
+  island-sound-archive-v4|ceramics-festival-one-line-v5|type-foundry-specimen-v6|oral-history-archive-v6)
+    CONTEXT_FILES+=("$ROOT/wow-frontend-design/references/typography-webfonts.md")
+    ;;
+esac
+case "$CASE_ID" in
+  wind-maintenance-dispatch-v6|night-market-allergen-v6|royalty-statement-v6|packaging-configurator-v6|grant-review-board-v6)
+    CONTEXT_FILES+=("$ROOT/wow-frontend-design/references/color-system-psychology.md")
+    ;;
+esac
 for context_file in "${CONTEXT_FILES[@]}"; do
   if [[ ! -f "$context_file" || -L "$context_file" ]]; then
     echo "missing or unsafe fixed context: $context_file" >&2
@@ -179,14 +191,23 @@ done
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/wow-codex-eval.XXXXXX")"
 LOG="$(mktemp "${TMPDIR:-/tmp}/wow-codex-log.XXXXXX")"
 ISOLATION_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/wow-codex-home.XXXXXX")"
+RUNNER_BASHPID="${BASHPID:-$$}"
 cleanup() {
   status=$?
+  if [[ "${BASHPID:-$$}" != "$RUNNER_BASHPID" ]]; then
+    return "$status"
+  fi
   set +e
   [[ -n "${MONITOR_PID:-}" ]] && kill "$MONITOR_PID" 2>/dev/null
-  [[ -n "${CODEX_PID:-}" ]] && kill "$CODEX_PID" 2>/dev/null
+  if [[ -n "${CODEX_PID:-}" ]]; then
+    kill -TERM -- "-$CODEX_PID" 2>/dev/null || kill -TERM "$CODEX_PID" 2>/dev/null
+    kill -KILL -- "-$CODEX_PID" 2>/dev/null || kill -KILL "$CODEX_PID" 2>/dev/null
+  fi
+  [[ -n "${CODEX_JOB_PID:-}" ]] && kill "$CODEX_JOB_PID" 2>/dev/null
   [[ -d "${STAGE:-}" && "$STAGE" == *"/wow-codex-eval."* ]] && rm -rf -- "$STAGE"
   [[ -f "${LOG:-}" && "$LOG" == *"/wow-codex-log."* ]] && rm -f -- "$LOG"
   [[ -d "${ISOLATION_ROOT:-}" && "$ISOLATION_ROOT" == *"/wow-codex-home."* ]] && rm -rf -- "$ISOLATION_ROOT"
+  [[ -n "${QUOTA_MARKER:-}" && -f "$QUOTA_MARKER" ]] && rm -f -- "$QUOTA_MARKER"
   return "$status"
 }
 trap cleanup EXIT
@@ -197,7 +218,7 @@ if [[ -n "$REPAIR_SOURCE" ]]; then
   done
 fi
 
-mkdir -m 0700 "$ISOLATION_ROOT/home" "$ISOLATION_ROOT/codex"
+mkdir -m 0700 "$ISOLATION_ROOT/home" "$ISOLATION_ROOT/codex" "$ISOLATION_ROOT/tmp"
 ORIGINAL_HOME="$HOME"
 ORIGINAL_CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 if [[ ! -f "$ORIGINAL_CODEX_HOME/auth.json" || -L "$ORIGINAL_CODEX_HOME/auth.json" ]]; then
@@ -211,8 +232,20 @@ if [[ -z "$CODEX_CLI" || ! -x "$CODEX_CLI" ]]; then
   echo "codex CLI is unavailable" >&2
   exit 2
 fi
+PYTHON_BIN="$(command -v python3 || true)"
+if [[ -z "$PYTHON_BIN" || ! -x "$PYTHON_BIN" ]]; then
+  echo "python3 is unavailable" >&2
+  exit 2
+fi
 SAFE_PATH="$(dirname "$CODEX_CLI"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-CODEX_ENV+=(HOME="$ISOLATION_ROOT/home" CODEX_HOME="$ISOLATION_ROOT/codex" PATH="$SAFE_PATH")
+CODEX_ENV+=(HOME="$ISOLATION_ROOT/home" CODEX_HOME="$ISOLATION_ROOT/codex" PATH="$SAFE_PATH" TMPDIR="$ISOLATION_ROOT/tmp")
+read -r SHELL_PATH_TOML SHELL_HOME_TOML < <(python3 - "$SAFE_PATH" "$STAGE" <<'PY'
+import json
+import sys
+
+print(json.dumps(sys.argv[1]), json.dumps(sys.argv[2]))
+PY
+)
 CODEX_VERSION="$("${CODEX_ENV[@]}" "$CODEX_CLI" --version | sed -n '1p')"
 if ! LOGIN_STATUS_RAW="$("${CODEX_ENV[@]}" "$CODEX_CLI" login status 2>&1)"; then
   echo "cannot verify Codex login status" >&2
@@ -273,8 +306,17 @@ emit_prompt() {
   printf '\n--- UNTRUSTED BRIEF DATA: END ---\n'
 }
 
+STAGE_QUOTA_BYTES=$((8 * 1024 * 1024))
+LOG_QUOTA_BYTES=$((16 * 1024 * 1024))
+# Permit a bounded temporary overshoot above the 1 MiB publication limit so the
+# aggregate monitor can classify the failure as a quota event before the child
+# process is terminated by RLIMIT_FSIZE.
+FILE_QUOTA_BYTES=$((2 * 1024 * 1024))
+QUOTA_MARKER="$TARGET/.quota-exceeded-$RUN_ID"
+CODEX_PID_FILE="$ISOLATION_ROOT/codex.pid"
 emit_prompt | "${CODEX_ENV[@]}" \
-  "$CODEX_CLI" exec \
+  "$PYTHON_BIN" -c 'import os, resource, sys; os.setsid(); limit = int(sys.argv[1]); resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit)); handle = os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600); os.write(handle, str(os.getpid()).encode()); os.close(handle); os.execv(sys.argv[3], sys.argv[3:])' \
+  "$FILE_QUOTA_BYTES" "$CODEX_PID_FILE" "$CODEX_CLI" exec \
     --model "$MODEL" \
     --sandbox workspace-write \
     --cd "$STAGE" \
@@ -292,31 +334,58 @@ emit_prompt | "${CODEX_ENV[@]}" \
     --ignore-user-config \
     --ignore-rules \
     --strict-config \
+    -c 'shell_environment_policy.inherit="none"' \
+    -c "shell_environment_policy.set={PATH=$SHELL_PATH_TOML,HOME=$SHELL_HOME_TOML}" \
     -c 'model_reasoning_summary="none"' \
     --color never \
     --json \
-    - >"$LOG" &
-CODEX_PID=$!
-monitor_codex_progress() {
-  local last_size=-1
-  local current_size
-  while kill -0 "$CODEX_PID" 2>/dev/null; do
-    current_size="$(wc -c <"$LOG" | tr -d '[:space:]')"
-    if [[ "$current_size" =~ ^[0-9]+$ && "$current_size" -gt "$last_size" ]]; then
-      printf 'codex-progress bytes=%s at=%s\n' "$current_size" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      last_size="$current_size"
-    fi
-    sleep 5
-  done
-}
-monitor_codex_progress &
+    - | command tee "$LOG" >/dev/null &
+CODEX_JOB_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  [[ -s "$CODEX_PID_FILE" ]] && break
+  kill -0 "$CODEX_JOB_PID" 2>/dev/null || break
+  sleep 0.05
+done
+CODEX_PID="$(command cat "$CODEX_PID_FILE" 2>/dev/null || true)"
+if [[ ! "$CODEX_PID" =~ ^[0-9]+$ ]] || ! kill -0 "$CODEX_PID" 2>/dev/null; then
+  echo "cannot establish isolated Codex process group" >&2
+  exit 1
+fi
+"$PYTHON_BIN" "$RESOURCE_MONITOR" monitor \
+  --pid "$CODEX_PID" \
+  --stage "$STAGE" \
+  --log "$LOG" \
+  --marker "$QUOTA_MARKER" \
+  --stage-limit "$STAGE_QUOTA_BYTES" \
+  --log-limit "$LOG_QUOTA_BYTES" \
+  --interval 0.5 &
 MONITOR_PID=$!
 set +e
-wait "$CODEX_PID"
+wait "$CODEX_JOB_PID"
 CODEX_STATUS=$?
 set -e
-kill "$MONITOR_PID" 2>/dev/null || true
-wait "$MONITOR_PID" 2>/dev/null || true
+set +e
+wait "$MONITOR_PID" 2>/dev/null
+MONITOR_STATUS=$?
+set -e
+if [[ "$MONITOR_STATUS" -ne 0 ]]; then
+  kill -KILL -- "-$CODEX_PID" 2>/dev/null || kill -KILL "$CODEX_PID" 2>/dev/null || true
+  echo "Codex resource monitor failed closed" >&2
+  exit 1
+fi
+if [[ -f "$QUOTA_MARKER" ]]; then
+  command cat "$QUOTA_MARKER" >&2
+  rm -f -- "$QUOTA_MARKER"
+  exit 1
+fi
+if [[ "$CODEX_STATUS" -ne 0 ]]; then
+  final_stage_size="$("$PYTHON_BIN" "$RESOURCE_MONITOR" measure --stage "$STAGE" --stage-limit "$STAGE_QUOTA_BYTES" 2>/dev/null || printf '%s' "$((STAGE_QUOTA_BYTES + 1))")"
+  final_log_size="$(wc -c <"$LOG" | tr -d '[:space:]')"
+  if [[ ! "$final_stage_size" =~ ^[0-9]+$ || "$final_stage_size" -gt "$STAGE_QUOTA_BYTES" || "$final_log_size" -gt "$LOG_QUOTA_BYTES" ]]; then
+    printf 'quota exceeded: stage=%s/%s log=%s/%s\n' "$final_stage_size" "$STAGE_QUOTA_BYTES" "$final_log_size" "$LOG_QUOTA_BYTES" >&2
+    exit 1
+  fi
+fi
 if [[ "$CODEX_STATUS" -ne 0 ]]; then
   echo "codex CLI failed for requested model $MODEL" >&2
   sed -n '1,80p' "$LOG" >&2
@@ -348,6 +417,11 @@ fi
 for output in "${OUTPUTS[@]}"; do
   if [[ ! -f "$STAGE/$output" || -L "$STAGE/$output" ]]; then
     echo "missing or unsafe output: $output" >&2
+    exit 1
+  fi
+  bytes="$(wc -c < "$STAGE/$output" | tr -d ' ')"
+  if [[ "$bytes" -lt 1 || "$bytes" -gt 1048576 ]]; then
+    echo "output size outside 1..1048576 bytes: $output ($bytes)" >&2
     exit 1
   fi
 done
@@ -411,7 +485,7 @@ manifest = {
     "provider": "openai-first-party-chatgpt-oauth",
     "authentication": {"status": login_status},
     "case": {"id": case_id, "target": os.path.relpath(target, root)},
-    "cli": {"path": cli_path, "version": cli_version},
+    "cli": {"path": Path(cli_path).name, "version": cli_version},
     "model": {"requested_identifier": model, "resolution_status": "requested_identifier_accepted_by_cli", "resolved_backend_snapshot": None},
     "isolation": {
         "sandbox": "workspace-write",
@@ -446,9 +520,16 @@ manifest = {
         "isolated_home": True,
         "user_skills_hidden_by_isolated_home": True,
         "path_sanitized": True,
+        "process_environment_inheritance": "none",
+        "model_shell_environment_inheritance": "none",
         "forbidden_host_path_audit": "passed",
     },
     "context": {
+        "routing": {
+            "policy": "caller_model_and_case",
+            "lane": "CONSTRAINED",
+            "selected_file_count": len(contexts),
+        },
         "brief": {"path": os.path.relpath(brief, root), "sha256": digest(brief)},
         "trusted_files": [{"path": os.path.relpath(path, root), "sha256": digest(path)} for path in contexts],
     },

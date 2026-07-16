@@ -66,6 +66,40 @@ function unique(values) {
   return [...new Set(values)];
 }
 
+function matchesAllowedNetworkOrigin(value, allowedOrigin) {
+  try {
+    const parsed = new URL(value);
+    if (["data:", "about:"].includes(parsed.protocol)) return true;
+    if (parsed.protocol === "ws:") parsed.protocol = "http:";
+    if (parsed.protocol === "wss:") parsed.protocol = "https:";
+    return parsed.origin === allowedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+async function installExactOriginRoutes(context, allowedOrigin, externalRequests) {
+  await context.route("**/*", async (route) => {
+    const requestUrl = route.request().url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      return route.abort("blockedbyclient");
+    }
+    const parsed = new URL(requestUrl);
+    if (parsed.pathname.endsWith("/favicon.ico")) return route.fulfill({ status: 204, body: "" });
+    return route.continue();
+  });
+  await context.routeWebSocket("**/*", async (webSocket) => {
+    const requestUrl = webSocket.url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      await webSocket.close({ code: 1008, reason: "Blocked by evaluator origin policy" });
+      return;
+    }
+    webSocket.connectToServer();
+  });
+}
+
 async function visibleCount(page, selector) {
   return page.locator(selector).evaluateAll((nodes) => nodes.filter((node) => {
     const style = getComputedStyle(node);
@@ -166,15 +200,17 @@ async function auditPage(browser, options, target, pageName, viewport) {
     hasTouch: viewport.hasTouch,
     locale: "zh-TW",
     reducedMotion: "reduce",
+    serviceWorkers: "block",
   };
   if (viewport.userAgent) contextOptions.userAgent = viewport.userAgent;
-  const context = await browser.newContext(contextOptions);
-  const page = await context.newPage();
   const targetUrl = new URL(pageName, target.url).href;
   const origin = new URL(target.url).origin;
   const consoleErrors = [];
   const externalRequests = [];
   const badResponses = [];
+  const context = await browser.newContext(contextOptions);
+  await installExactOriginRoutes(context, origin, externalRequests);
+  const page = await context.newPage();
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -184,17 +220,6 @@ async function auditPage(browser, options, target, pageName, viewport) {
       badResponses.push({ status: response.status(), url: response.url() });
     }
   });
-  await page.route("**/*", async (route) => {
-    const requestUrl = new URL(route.request().url());
-    if (["data:", "blob:"].includes(requestUrl.protocol)) return route.continue();
-    if (requestUrl.origin !== origin) {
-      externalRequests.push(route.request().url());
-      return route.abort("blockedbyclient");
-    }
-    if (requestUrl.pathname.endsWith("/favicon.ico")) return route.fulfill({ status: 204, body: "" });
-    return route.continue();
-  });
-
   await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(250);
   const interaction = await runCaseInteraction(page, target.caseId, viewport);

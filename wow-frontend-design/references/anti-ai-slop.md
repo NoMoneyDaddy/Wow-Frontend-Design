@@ -36,6 +36,7 @@ Missing product evidence means remove or simplify the effect. Existing-system ev
 - every route becoming `hero → feature cards → CTA`;
 - a gallery, card grid, carousel, or bento used where comparison, scanning, sequence, or bulk action requires a table, list, timeline, tree, or form;
 - decoration receiving more hierarchy than the primary task or current state.
+- a large `aria-hidden`/decorative track with no evidence, status, interaction, navigation, verified identity, or necessary-atmosphere role squeezing the real task; CSS/div art and empty illustration frames do not count as product evidence.
 
 ### 3. Composition defaults
 
@@ -82,7 +83,7 @@ Run these in order. A failure blocks polish until it is repaired.
 1. **Truth gate** — Mark each material fact `official`, `observed`, `inferred`, `placeholder`, or `unknown`. Remove fabricated proof and describe client-only outcomes honestly.
 2. **Task-surface gate** — Name the primary noun and verb. Confirm that the chosen surface supports them; a product dashboard must not inherit landing-page anatomy by default.
 3. **Product-swap gate** — Mentally swap the product name, logo, and accent color. If the concept and most copy still fit an unrelated product, derive the design again from product evidence.
-4. **Representation gate** — For every card/grid/carousel, name why it is better than list, table, form, timeline, tree, or open composition for this content and task.
+4. **Representation gate** — For every card/grid/carousel and dedicated visual track, name why it is better than list, table, form, timeline, tree, open composition, or a background treatment for this content and task. A large visual must also name its information/task role and asset provenance.
 5. **Silhouette gate** — Inspect grayscale and region silhouette. The reading order, task hierarchy, and density shifts must survive without accent color or decorative effects.
 6. **Earned-region gate** — Trace each distinctive region to a product noun, verb, material, dataset, cultural context, or verified brand invariant. Remove signatures with no trace.
 7. **Mobile-transformation gate** — Record what mobile reorders, replaces, defers, condenses, or moves into thumb reach. “Stack” alone is not a transformation.

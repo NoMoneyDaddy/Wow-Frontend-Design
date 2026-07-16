@@ -24,7 +24,7 @@
       --radius-md: 16px;
       --radius-lg: 24px;
       --radius-pill: 999px;
-      --measure: 40em;
+      --measure: 36rem;
       --shadow-soft: 0 18px 40px rgba(48, 35, 18, 0.08);
       --font-display: "Iowan Old Style", "Baskerville", "Songti TC", "Noto Serif TC", serif;
       --font-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
@@ -39,11 +39,6 @@
       color: var(--color-ink);
       color-scheme: light;
       hanging-punctuation: first last;
-    }
-
-    :lang(zh-Hant) {
-      line-break: strict;
-      word-break: normal;
     }
 
     body {
@@ -148,7 +143,6 @@
 
     .brand h1 {
       font-size: clamp(1.55rem, 2vw + 1rem, 2.55rem);
-      max-inline-size: 16ch;
     }
 
     .nav {
@@ -218,7 +212,6 @@
 
     .hero h2 {
       font-size: clamp(2.1rem, 3.8vw, 4.2rem);
-      max-inline-size: 11ch;
     }
 
     .hero p,
@@ -230,20 +223,8 @@
     .media-fallback p,
     .footnote p {
       margin: 0;
-      max-inline-size: min(var(--measure), 100%);
+      max-inline-size: var(--measure);
       overflow-wrap: break-word;
-    }
-
-    .hero p,
-    .panel p,
-    .card p,
-    .footer-card p,
-    .record-body,
-    .media-fallback p,
-    .footnote p {
-      text-align: justify;
-      text-justify: inter-character;
-      text-align-last: start;
     }
 
     .actions {
@@ -359,6 +340,8 @@
     .footer-card {
       display: grid;
       gap: 0.8rem;
+      inline-size: min(100%, 52rem);
+      justify-self: center;
     }
 
     .footer-card__links {
@@ -412,11 +395,6 @@
 
       .hero h2 {
         font-size: clamp(1.8rem, 7vw, 2.7rem);
-        max-inline-size: 14ch;
-      }
-
-      .brand h1 {
-        max-inline-size: 18ch;
       }
 
       .tide-label {
@@ -455,6 +433,7 @@
           <p class="kicker">首頁導言</p>
           <h2 id="hero-title">田野筆記像潮汐一樣回來，讓人物、船名與年份彼此對照。</h2>
           <p>這裡不是把歷史包成華麗封面，而是把口述、地點、年代和缺檔說明整理成可索引的閱讀路徑。先看潮線，再看條目，最後進入長篇。</p>
+          <p>如果你先想知道要從哪裡開始，這一頁會先把閱讀順序說清楚，再把每一個入口放到同一個視線高度，方便直接往下走。</p>
           <div class="actions" aria-label="主要行動">
             <a class="button button-primary" href="archive.html">先看典藏索引</a>
             <a class="button button-secondary" href="story.html">直接讀長篇故事</a>
@@ -463,9 +442,9 @@
         <aside class="hero-meter" aria-label="潮汐刻度">
           <div class="tide-label">潮汐刻度</div>
           <ol class="tide-scale">
-            <li><span>1950s</span><strong>第一批靠岸</strong></li>
-            <li><span>1970s</span><strong>碼頭與工班</strong></li>
-            <li><span>1990s</span><strong>記憶整理</strong></li>
+            <li><span>1950年代</span><strong>第一批靠岸</strong></li>
+            <li><span>1970年代</span><strong>碼頭與工班</strong></li>
+            <li><span>1990年代</span><strong>記憶整理</strong></li>
             <li><span>今日</span><strong>索引與回讀</strong></li>
           </ol>
         </aside>

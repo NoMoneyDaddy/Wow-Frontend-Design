@@ -51,6 +51,33 @@ Rhythm rules:
 - let content determine block height. Fixed-height text containers are exceptional and must survive font failure, translation, and text resize;
 - align repeated baselines when it improves scanning, but allow optical correction for CJK punctuation, icons, and dissimilar font metrics.
 
+Hierarchy and whitespace rules:
+
+- choose one intended focal anchor per task region, then let heading, supporting copy, evidence, and action descend in a stable order; several equally large, saturated, or isolated elements destroy the entry point;
+- use proximity semantically: keep a label, value, helper, and action close enough to read as one group, then use a larger outside gap before the next group;
+- make title-to-intro spacing smaller than intro-to-next-region spacing unless the product's editorial system explicitly says otherwise;
+- do not maximize occupancy. Quiet space is functional when it isolates the focal task or separates groups, but a narrow copy rail beside an empty track is still a defect;
+- evaluate scale relationships with the exact font and script. Fixed claims such as “headings are always 2–3× body text” are comparison prompts, not cross-locale pass thresholds.
+
+### Role-based type hierarchy
+
+Choose a small role ladder before styling elements. Semantic heading rank describes document structure; it does not force one global visual size. Map each rendered role to a shared token, then keep the mapping stable across equivalent components.
+
+| Role | Starting comparison | Typical job |
+| --- | --- | --- |
+| metadata/caption | `0.8125–0.9375rem`, `1.4–1.6` leading | short status, timestamp, helper; not extended prose |
+| UI/body | about `1rem`, `1.5–1.75` CJK leading | controls, instructions, normal product copy |
+| component title | `1.125–1.375rem`, `1.2–1.4` leading | card, field group, local decision block |
+| section/dialog title | `1.375–2rem`, `1.1–1.3` leading | task region or focused overlay |
+| page/display title | fluid from roughly `2rem`, `1.05–1.2` leading | one page-level focal anchor |
+
+These values are a bounded candidate set, not an accessibility standard. Calibrate them with the exact `zh-Hant` font, density, distance, fallback, and text-resize behavior. Use role, size, weight, color, and proximity together, but do not make every axis shout. Adjacent roles need a visible distinction; nearby one-pixel size changes usually do not establish hierarchy by themselves.
+
+- Give a dialog title its primary inline track before laying out badges, status, close controls, or helper metadata. On a narrow viewport, move secondary items below or into another region before reducing the title measure.
+- Keep badges and eyebrows visibly subordinate to the title. They may share a row only when the title still produces a deliberate 1–3-line composition with no stranded final fragment at every required width.
+- Use fluid type for expressive page headings and stable role tokens for dense product components. Do not make every heading fluid merely because `clamp()` is available.
+- Compare computed role relationships, not HTML names alone. An `h3` used as a compact card label can be visually smaller than nearby body copy only when another cue preserves its structural role and the result remains clear to sighted users.
+
 ## 3. Set Chinese tracking and wrapping deliberately
 
 - Keep ordinary Chinese body text at `letter-spacing: normal` or the font's intended solid setting. Do not spread every Han character to imitate Latin display typography.
@@ -58,13 +85,14 @@ Rhythm rules:
 - Reserve positive tracking for short display text, running heads, captions, poetry, or an audience-specific treatment that has been rendered and reviewed.
 - Set the correct `lang`; use `line-break: strict` only where target-browser behavior is verified, keep general prose at `white-space: normal` and `word-break: normal`, and apply `overflow-wrap: anywhere` only to genuinely unbroken data such as URLs or identifiers. Do not apply `word-break: keep-all` to all Chinese prose: it can make mixed Latin/CJK strings or constrained components overflow.
 - Keep semantic short units together—date + time, number + unit, a person's full short name—without wrapping entire sentences in `nowrap`.
-- Use `text-wrap: balance` for short headings and `text-wrap: pretty` for prose only as progressive enhancement. Verify the fallback because CSS Text Level 4 behavior and support continue to evolve.
+- Use `text-wrap: balance` for short headings and `text-wrap: pretty` for prose only as progressive enhancement. `word-break: auto-phrase` may improve CJK phrase segmentation in a supporting engine, but dictionaries and fallback behavior vary. Verify the exact phrase boundaries and the fallback because CSS Text Level 4 behavior and support continue to evolve.
 - Inspect line starts/ends for stranded punctuation, paired marks, ruby/annotation, Latin runs, and long user content. Manual `<br>` is allowed only when the content contract truly fixes the phrase and the responsive/fallback result is tested.
 
 ### Browser-owned body flow
 
 - Treat normal paragraphs like a word-processor or text-board content column: the container establishes stable left/right edges and the browser fills each line until a legal break. Source newlines and visual card boundaries must not decide ordinary body wrapping.
 - Choose the content column first, then let its paragraph use the available inline size. Do not set a narrow `max-width` on `p` while leaving most of its otherwise empty card unused. When a shorter measure is required, resize or align the containing region, or place real adjacent content in the remaining track.
+- Compare the rendered text track with the owning header/card, not only with the immediate parent. On a wide desktop region, roughly half-width title or intro copy plus hundreds of pixels of unused space needs review unless the remaining track contains real navigation, status, evidence, comparison, or task controls. A decorative split, empty peer, or ordinary paragraph moved to the right does not earn the space.
 - Use font-relative measures for font-relative reading goals. For horizontal CJK, prefer an `em`/verified `ic` cap plus rendered full-width-character checks; do not treat root-relative `rem` or Latin `ch` as a universal CJK measure.
 - Short UI copy, forms, tables, and dynamic text normally use `text-align: start`. Extended Traditional Chinese editorial prose may compare `text-align: justify` with `text-justify: auto` or `inter-character`, but keep the final line start-aligned (`text-align-last: start`) and inspect punctuation, mixed Latin, links, and narrow screens. Justification is a content-mode choice, not a global locale rule.
 - Do not insert `<br>` in paragraphs or list copy to imitate a screenshot. Split distinct ideas into semantic paragraphs and let the browser reflow them. A forced break belongs only to fixed display copy, a pull quote, poetry, or another explicit attention treatment; mark that intent in the component, provide an unforced fallback, and test every required width, locale, zoom level, and fallback font.
@@ -89,9 +117,12 @@ Choose the paragraph mode per content region; do not mix the signals accidentall
 - Let each paragraph carry one main idea or task consequence. Lead with the decision, state, or action; put conditions and supporting detail after it. Prefer concrete verbs and nouns over evaluator or marketing adjectives.
 - Keep product copy in the user's world. Do not write implementation claims such as “mobile-first,” “responsive,” or “crafted layout” into the interface.
 - Use realistic short, average, long, error, and translated copy during layout. Placeholder length cannot prove rhythm.
-- Treat headings as phrases, not arbitrary boxes. Inspect 1–3-line outcomes at adjacent widths and with fallback fonts; avoid orphaned particles, verbs detached from objects, stranded punctuation, and a final line containing only one short semantic fragment. If a forced display break earns attention on one width, verify a responsive unforced or differently composed version rather than preserving the same break everywhere.
+- Treat headings as phrases, not arbitrary boxes. Inspect 1–3-line outcomes at adjacent widths and with fallback fonts; avoid orphaned particles, verbs detached from objects, stranded punctuation, and especially a final line containing only one Han character. Do not use Latin `ch` as a hard CJK heading cap: the unit follows the zero glyph and can produce a roughly half-Han track. Size the containing region first, then use a rendered Han line count or verified `em`/`ic` measure. If a forced display break earns attention on one width, verify a responsive unforced or differently composed version rather than preserving the same break everywhere.
+- Inspect actual line rectangles and the owning track. If a multi-line heading's longest rendered line still occupies less than roughly `60%` of a wide empty track, first remove the artificial cap or rewrite the heading; balancing two equally short lines is not a successful composition. Short one-line titles may naturally end early and should not be stretched or justified.
 - Use `text-wrap: balance` as progressive enhancement for short headings. Insert manual breaks only for fixed, approved copy after every required width and locale has been checked; never encode a line break inside a reusable heading component by default.
 - Short action labels normally stay on one line. If the label wraps, either the component explicitly supports a multi-line action or the layout must recompose; do not squeeze a normal command into a tall narrow button.
+- For an ordinary one-line action, protect the label with an atomic inline box and keep the control from shrinking below its content; move, stack, or widen the action group before applying smaller type. Do not place `nowrap` on sentences or use it to conceal an undersized layout.
+- For normal multi-line Traditional Chinese product copy, compare a rendered line-height around `1.5–1.75` before choosing a tighter value. Display sizes, dense tables, and specialist reading modes may differ, but body paragraphs near `1.2–1.35` require explicit font/size/measure evidence and are a preflight risk.
 
 ### Punctuation, mixed scripts, and optical display alignment
 
@@ -100,7 +131,7 @@ Choose the paragraph mode per content region; do not mix the signals accidentall
 - Preserve line-start/line-end punctuation rules. Never add generated `<wbr>`, `<font>`, `<kbd>`, or hidden spaces after every Han character or punctuation mark. Those legacy workarounds predate current engines and damage semantics. Use correct `lang`, normal browser breaking, scoped `line-break`, and rendered boundary tests.
 - Do not use global `word-break: break-all`, `line-break: anywhere`, or `word-break: keep-all` to make the right edge look full. Keep prose at normal breaking. Apply `overflow-wrap: anywhere` or a comparably scoped escape hatch only to verified unbroken data such as a raw URL, hash, or identifier, then test intrinsic sizing and copy behavior.
 - Centered display headings can look optically offset when a full-width terminal punctuation glyph has asymmetric ink. Inspect the actual font and every wrap first. Prefer editing fixed display copy or a font-supported/predictable treatment; do not absolutely position live punctuation or add one-line padding without testing selection, copy, localization, zoom, and 1–3-line layouts.
-- Avoid a single short semantic fragment on the last heading line. Prefer copy editing or `text-wrap: balance`/`pretty` as enhancement. A short non-breaking span is acceptable only when it remains a compact semantic unit and cannot create overflow; do not wrap the last words of arbitrary body paragraphs in `nowrap`.
+- Avoid a single short semantic fragment on the last heading line. Prefer copy editing or `text-wrap: balance`/`pretty` as enhancement. If `auto-phrase` still splits a compact lexical unit, a short non-breaking span is acceptable only when that exact unit remains compact at every required width, locale, zoom, and fallback font and cannot create overflow; do not wrap the last words of arbitrary body paragraphs in `nowrap`.
 
 ## 4. Build real vertical writing
 
@@ -181,12 +212,13 @@ section ↔ section               largest
 Before choosing Grid/Flex tracks, write a compact placement record for each major region:
 
 ```text
-region → priority → min/ideal/max inline size → state changes
+region → priority → information/task role → min/ideal/max inline size → state changes
        → mobile placement → vertical-writing placement → failure signal
 ```
 
 - Use intrinsic sizing deliberately. Grid/flex automatic minimums and high-specificity state selectors can keep a desktop track alive on mobile, squeezing prose into a column without causing page overflow.
 - A layout can fail without clipping: a detached confirmation summary, a large unexplained void, an oversized mobile navigation block, or a narrow text rail beside empty space still damages task flow.
+- A dedicated visual track must earn its width through evidence, status, interaction, navigation, verified identity, or necessary atmosphere. Remove an `aria-hidden`/decorative peer column when it only forces a heading, form, table, or summary into an inferior measure. Do not replace a missing asset with CSS/div art or an empty frame.
 - Prefer `minmax(0, 1fr)` or an explicit intrinsic minimum where a flexible track may shrink, and give text-bearing children `min-inline-size: 0`; then verify that the resulting measure is still readable.
 - Recompose after interaction. Open panels, filtered result counts, validation messages, and success summaries need their own placement check instead of inheriting the default-state grid.
 
@@ -198,12 +230,13 @@ Capture and inspect:
 
 1. actual smallest supported phone, short phone, desktop, 200% text, and 400%/reflow;
 2. normal and failed/late custom font, every required weight, long `zh-Hant`, mixed Latin/numerals, rare names, and user content;
-3. representative short, average, and longest lines; punctuation at boundaries; headings wrapping to 2–3 lines;
+3. representative short, average, and longest lines; punctuation at boundaries; headings wrapping to 1–3 intentional lines without Latin-`ch` CJK caps, compressed four-line fragments, or split lexical units;
 4. vertical text with punctuation, Latin/numerals, the horizontal responsive equivalent, and preserved identity/test hook;
 5. every density mode; cards with empty/short/long/error states; menus/overlays closed on first capture;
 6. no text crop, horizontal overflow, fake truncation, fixed/sticky obstruction, or `overflow: hidden` used to conceal a failed measure.
 7. default, filtered, expanded, validation, and success states for unexplained voids, detached summaries, squeezed columns, bloated controls, and specificity-driven breakpoint regressions.
 8. ordinary paragraphs with browser-owned wrapping, no forced body `<br>`, no prose-wide `nowrap`/`keep-all`, aligned content-column edges, and no narrow paragraph floating inside an otherwise empty wide card.
+9. major header/grid direct children preserve a coherent DOM/visual reading sequence; no later label or heading renders above an earlier sibling without an intentional, accessible reorder.
 
 Record the tested font version, viewport, locale, content fixture, candidate values, selected tokens, and screenshot/result paths in the evidence. A clean token file without rendered evidence is not validation.
 
@@ -227,8 +260,11 @@ Record the tested font version, viewport, locale, content fixture, candidate val
 - [Eye movements of older and younger Chinese readers under inter-character spacing changes](https://jps.ecnu.edu.cn/EN/Y2020/V43/I1/68)
 - Context examples only: [Carbon spacing](https://carbondesignsystem.com/elements/spacing/overview/), [GOV.UK spacing](https://design-system.service.gov.uk/styles/spacing/), [USWDS typography](https://designsystem.digital.gov/components/typography/)
 - Context example only: [PixelCake 中文排版小技巧](https://pixelcake.com.tw/posts/chinese-typography-tips/) supports testing generous Chinese leading, near-normal body tracking, semantic paragraphing, and full-width punctuation. Its blanket alignment/line-breaking suggestions remain hypotheses; W3C CSS Text and CLReq control the interoperable rule.
+- Context examples only: [GogoShark 字體與排版應用指南](https://www.gogoshark.com/blog/design/web-design/%E2%80%8B%E8%A8%AD%E8%A8%88%E5%B8%AB%E5%BF%85%E7%9C%8B%E7%9A%84%E5%AD%97%E9%AB%94%E8%88%87%E6%8E%92%E7%89%88%E6%87%89%E7%94%A8%E6%8C%87%E5%8D%97/) and [PixelCake 中文字體推薦](https://pixelcake.com.tw/posts/chinese-font-recommendations/) motivate role-based type, restrained family count, readable body faces, title/body contrast, and rendered CJK testing. Their fixed point/pixel/weight recipes, font rankings, broad serif/sans readability claims, and secondary license summaries are discovery hypotheses; verify current platform guidance and each exact font's official release/license.
+- Context example only: VoltAgent's [Apple `DESIGN.md` analysis](https://github.com/VoltAgent/awesome-design-md/tree/main/design-md/apple) demonstrates role-named tokens and a responsive display ladder. Do not port its negative Latin tracking, fixed pixel sizes, proprietary SF Pro assumptions, micro-legal sizes, or breakpoint ladder to CJK. Its current unitless-zero and prose inconsistencies also show why gallery documents must be regenerated and passed through the pinned official linter.
 - Context examples only: [夜月七境：中文網頁排版優化](https://piv.ink/chinese-layout-optimization/), [我是鐵：舒適的中文文章 CSS 排版](https://www.iamtie.com/2020/09/cssarticlesetting.html?m=1), [BFA：十項中文長文原則](https://www.bfa.com.tw/blog/ten-rules-that-make-articles-better-understood), and [白湯四物：中文網頁排版設計建議](https://www.fournoas.com/posts/chinese-web-typesetting-design-suggestions/) provide historical/practitioner hypotheses about paragraph rhythm, type roles, punctuation, and measure. Their fixed values, hosted-font recipes, DOM-rewriting hacks, and broad `break-all` advice are not adopted as standards.
 - Context examples only: [Apple 中文排版細節](https://pudge1996.medium.com/apple-awsome-typographic-details-a5705d31417) and [探索 Web 字元換行規則](https://pudge1996.medium.com/wrap-rule-on-web-56a375c11043) motivate testing terminal-punctuation optical balance, orphan fragments, and unbroken URLs. Product-specific Apple/WeChat observations and 2021 browser behavior are not current cross-browser guarantees.
+- Context examples only: [BFA 留白的藝術](https://www.bfa.com.tw/blog/5-design-skill-improve-blank), Figma's [visual hierarchy](https://www.figma.com/resource-library/what-is-visual-hierarchy/), and UXPilot's [visual hierarchy guide](https://uxpilot.ai/blogs/visual-hierarchy) support testing focal order, proximity, inside/outside spacing, progressive disclosure, and restrained visual competition. Their fixed font-count, body-size, heading-ratio, first-viewport, grid, and eye-path advice are starting hypotheses, not universal thresholds. UXPilot is a mutable product article, not independent empirical evidence.
 
 ## Legal open reading references
 

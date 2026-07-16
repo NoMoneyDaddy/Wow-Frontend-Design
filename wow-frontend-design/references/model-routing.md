@@ -10,6 +10,16 @@ Use this reference when choosing models, orchestrating strong/weak builders and 
 
 Do not infer capability from a brand name such as “mini,” “Haiku,” “Pro,” or “Opus.” Model aliases, versions, tools, context limits, providers, and behavior change. Record the exact run provenance.
 
+### 結論：routing 不是假議題，model-name branching 才是
+
+模型路由確實能在特定分布上改善品質／成本，但「強／弱」不是穩定的一維排序。模型可能會寫 code，卻無法可靠選 Skill、操作工具、看圖、保留 locale 或完成長流程；同一模型也會因 adapter、context、effort、工具、權限與 evaluator 不同而改變表現。因此：
+
+- 不在 `SKILL.md` 內問模型「你是誰／你有多強」再分支；Agent Skills 規格本身也沒有標準 `model` frontmatter 欄位。
+- Claude Code 的 `model` 位於 subagent／host 設定，正好說明選模屬於編排層，不是 Skill 的自我認知。
+- 一個 generic probe 只證明那個 probe。不要用一次 tool call、小謎題或合法 JSON 就把所有設計／工具／locale 能力升級。
+- 用離線、held-out、任務相近的重複實測建立起始 profile；用真正任務中的 schema、工具、browser、invariant 與 evidence 結果做執行期降級。
+- 維持一份 canonical Skill 加漸進式 references。只有 host context 確實容不下完整 core 時才用 compact adapter，並視為不同 cohort；不要人工維護會漂移的 `skill-lite`／`skill-full` 兩份真相。
+
 ## 2. Inputs are caller-owned
 
 Before execution, freeze:
@@ -35,18 +45,22 @@ Tool presence is not tool success. A failed preflight routes the claim to `UNVER
 
 Do not ask “are you a strong model?” or infer a tier from confidence, fluent prose, reasoning length, a provider alias, or one successful page. The host supplies identity; an independent evaluator supplies capability evidence. If the host hides exact version resolution, record `unknown` rather than guessing.
 
-Build the profile from held-out, product-diverse cases using the same frozen skill revision and evaluator. Measure output-contract validity, invariant preservation, unsupported claims, deterministic behavior, locale/mobile failures, and blind craft review separately. Repeat runs because one seed is not a capability estimate. Keep infrastructure failures separate from design failures.
+Build the profile from held-out, product-diverse cases using the same frozen Skill, adapter, toolchain and evaluator revisions. Key each cell by `task × locale × surface × risk`; measure output-contract validity, invariant preservation, unsupported claims, deterministic behavior, locale/mobile failures, and blind craft review separately. Repeat runs because one seed is not a capability estimate. Record `attempts = eligible_runs + infrastructure_failures`; infrastructure failures never count as successful or failed model runs.
 
-The included `scripts/model_profile.example.json` is evaluator-owned input. `scripts/route_model.py` fails closed to `CONSTRAINED`, requires complete independent runs before `STANDARD`, prevents high-risk auto-upgrades, and can bind a frozen profile hash. Keep the profile and router outside the implementation model's writable surface.
+The included schema-v2 `scripts/model_profile.example.json` is evaluator-owned input. `scripts/route_model.py` fails closed to `CONSTRAINED`, requires at least three complete eligible independent runs before `STANDARD`, rejects evidence from another surface, separates infrastructure failures, prevents high-risk auto-upgrades, and can bind a frozen profile hash. Keep the profile and router outside the implementation model's writable surface.
 
 ```bash
 python3 scripts/route_model.py /evaluator/model-profile.json \
-  --task BUILD --locale zh-Hant --risk medium \
+  --task BUILD --locale zh-Hant --surface product-ui --risk medium \
   --capability write --capability command --capability browser \
+  --runtime-provider <provider> --runtime-model <exact-model-or-recorded-alias> \
+  --runtime-model-version <version-or-unknown> \
+  --runtime-skill-revision <hash> --runtime-adapter-revision <hash> \
+  --runtime-toolchain-revision <hash> --runtime-evaluator-revision <hash> \
   --expected-profile-sha256 <frozen-sha256>
 ```
 
-The caller injects the returned lane into the run contract. The model may report a missing capability and request a downgrade; it cannot promote itself.
+The router compares every runtime binding to the profiled identity and revisions; any drift caps the run at `CONSTRAINED`. The caller injects the returned lane into the run contract. The model may report a missing capability and request a downgrade; it cannot promote itself.
 
 The structured handoff must classify every supported capability as available or unavailable, then declare a non-overlapping evidence ceiling. `VERIFIED` and `OBSERVED` claims cannot exceed that ceiling. Missing browser capability caps browser behavior, manual accessibility, rendered localization, and dynamic security; missing visual capability caps rendered-visual claims. High-risk no-visual work cannot report `ready`: preserve and hand off the best artifact as `PARTIALLY VERIFIED`, or use an exact evaluator-owned acceptance record from policy schema v3. Use `scripts/weak_model_output.example.json` as the result v2 shape.
 
@@ -62,7 +76,31 @@ The structured handoff must classify every supported capability as available or 
 
 Lanes are roles, not prestige. A strong model can run `CONSTRAINED` for high-risk output; a small model can run `STANDARD` on a narrow, benchmarked edit. Security, transactions, formal accessibility conformance, legal/privacy, and destructive migrations need specialized or human review regardless of model tier.
 
-## 4. Deterministic routing algorithm
+## 4. Runtime automatic downgrade
+
+The start lane comes from the caller-owned profile. After execution begins, evaluator-observed events may keep or lower it; no event, self-report, confidence, successful retry, or fluent explanation can raise it inside the same run. Give every event a stable evaluator-owned `failure_key`; different layout, route, state, tool or root cause must not share the same three-attempt fuse.
+
+Use evaluator-owned [`../scripts/runtime_events.example.json`](../scripts/runtime_events.example.json) with [`../scripts/runtime_downgrade.py`](../scripts/runtime_downgrade.py):
+
+```bash
+python3 scripts/runtime_downgrade.py /evaluator/runtime-events.json
+```
+
+| Observed event | Automatic response |
+| --- | --- |
+| logs or evaluator artifacts still advance at inactivity timeout | extend the bounded timeout; do not downgrade |
+| transient tool failure or repair finding, attempts 1–2 | retry or repair, run the narrow check, keep the current lane |
+| same inactive/tool/repair failure reaches three consecutive attempts | cap at `CONSTRAINED`, stop blind retries, hand off the best artifact as partially verified |
+| output schema, preserve invariant, or evidence wording fails | cap at `CONSTRAINED`; narrow, restore, or remove the unsupported claim, then continue |
+| browser/visual/other verification capability is unavailable | cap at `CONSTRAINED`; continue safe implementation and mark only the affected gate `UNVERIFIED` |
+| safe mutation capability is missing, or security/permission policy blocks mutation | move to `ADVISORY`; stop mutation and preserve diagnostics |
+| implementation crosses evaluator-owned files or policy | cap at `CONSTRAINED`; discard that attempt and restart in a fresh isolated surface |
+
+An ordinary visual or test finding is not evidence that the whole model is weak; it stays in the self-repair loop. Downgrade on the measured failure class, not on the model's apology or confidence. Automatic downgrade changes scope, checkpoints and evidence ceiling—not the user's product requirements, safety policy, or evaluator gate.
+
+Do not auto-upgrade after recovery. A higher lane needs a new externally authorized run against a fresh, versioned profile built from independent eligible evidence.
+
+## 5. Deterministic routing algorithm
 
 ```text
 1. Freeze user scope, case id, inputs, evaluator, and mutation boundary.
@@ -88,7 +126,7 @@ Observable downgrade triggers include:
 
 These triggers come from evaluator results, not model confidence. Three repeated identical failures follow the host workflow's fuse policy; do not spend indefinitely.
 
-## 5. Reference/context routing
+## 6. Reference/context routing
 
 Weak models often degrade when every reference is loaded. Supply:
 
@@ -163,7 +201,7 @@ Local-model evaluation requires explicit per-run user approval. Before seeking a
 
 Multimodal generation and image-to-code are separate capabilities. A model that can create or inspect an image is not thereby reliable at DOM semantics, framework syntax, responsive transformation, licensing, or browser verification. Route image-first work through [visual-storytelling.md](visual-storytelling.md), then rebuild the decision as semantic production code.
 
-## 6. Strong/weak collaboration versus benchmarking
+## 7. Strong/weak collaboration versus benchmarking
 
 Production orchestration may use distinct roles:
 
@@ -181,7 +219,7 @@ Controlled model comparison is different:
 - blind screenshots and handoffs before subjective review; report seeds/runs, ties, failures, reviewer disagreement, and sample size;
 - never generalize “all models/platforms/locales” from one static page or one successful run.
 
-## 7. Provider mapping lives outside the skill
+## 8. Provider mapping lives outside the skill
 
 The skill defines roles and evidence requirements. The caller maps them to available models, for example through CLI flags, an API router, CI matrix, or organization policy. Keep this mapping versioned outside `SKILL.md` so model aliases and prices can change without changing design standards.
 
@@ -192,3 +230,16 @@ provider + exact model/version + alias resolution if known + effort/reasoning + 
 ```
 
 If exact version resolution is unavailable, say so. If a fallback occurred, record both models and exclude the run from a single-model comparison.
+
+## 9. Research basis and limits
+
+- [Agent Skills specification](https://agentskills.io/specification) defines Skill metadata, instructions and progressive resources, but no portable model selector. [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) place model selection in host-owned agent configuration.
+- [Agent Skills evaluation guidance](https://agentskills.io/skill-creation/evaluating-skills) recommends realistic cases, old/no-Skill baselines, repeated runs, timing/token evidence and investigation of variance; one successful demo is not a profile.
+- [Agent Skill Framework for small and medium models](https://arxiv.org/abs/2602.16653v3) reports that very small models struggled with Skill selection while some 30B–80B configurations benefited. It covers a limited task/model sample and does not create a universal parameter-count threshold.
+- [RouteLLM](https://arxiv.org/abs/2406.18665) demonstrates learned quality/cost routing, but its Arena-only router fell near random on out-of-distribution MMLU and GSM8K; training-distribution similarity mattered.
+- [LLMRouterBench](https://aclanthology.org/2026.findings-acl.1881/) confirms model complementarity while finding several complex/commercial routers did not reliably beat a simple baseline under unified evaluation, with persistent recall gaps and diminishing returns from larger pools.
+- [FrugalGPT](https://arxiv.org/abs/2305.05176) shows cascades can reduce cost and that cheaper models sometimes answer queries a nominally stronger model misses; models are not a strict total order.
+- [Large Language Models Cannot Self-Correct Reasoning Yet](https://openreview.net/forum?id=IkmD3fKBPQ) found intrinsic self-correction can fail or degrade reasoning without external feedback. This supports external gates, but its reasoning-task result is not proof that all self-repair is useless.
+- [Amazon Bedrock intelligent prompt routing](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-routing.html) is production evidence that external routing is feasible, while its documented English-only optimization and lack of application-specific performance inputs show why a generic vendor router cannot certify this Skill's `zh-Hant` product work.
+
+Treat paper and vendor results as routing hypotheses. Only this Skill's frozen cases, exact model/adapter/toolchain, target locale/surface and independent evaluator can promote a local profile.

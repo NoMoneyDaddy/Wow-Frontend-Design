@@ -8,6 +8,8 @@ Treat the machine-readable frontmatter as a small constrained DSL: parse/schema/
 
 Use the official examples only to understand structure, not as aesthetic recipes: [Atmospheric Glass](https://github.com/google-labs-code/design.md/blob/main/examples/atmospheric-glass/DESIGN.md), [Paws & Paths](https://github.com/google-labs-code/design.md/blob/main/examples/paws-and-paths/DESIGN.md), and [Totality Festival](https://github.com/google-labs-code/design.md/blob/main/examples/totality-festival/DESIGN.md).
 
+Third-party galleries are comparative research, not syntax authority. A polished sample can still contain unitless dimensional zeros, stale properties, unresolved references, contradictory prose, or product-specific values. Rebuild the intended project contract against the pinned official specification and require the project's exact linter to pass; never copy an entire gallery frontmatter block and repair only what the model notices.
+
 ## Ownership
 
 - Place one canonical `DESIGN.md` at the repository root unless an established monorepo convention proves that separately shipped brands need separate roots.
@@ -30,6 +32,8 @@ Keep optional YAML frontmatter followed by the applicable canonical sections in 
 8. `Do's and Don'ts`
 
 Use frontmatter for machine-readable color, typography, spacing, rounded, and component tokens supported by the pinned specification. Use `{group.token}` references instead of copying values when a component consumes an existing token. Keep responsive composition, localization behavior, motion purpose, data-visualization encodings, and page-specific exceptions in concise prose when the alpha token schema cannot represent them safely.
+
+Do not invent frontmatter for animation, icon-family geometry, Lottie, WebGL, or runtime packages. Put those contracts in the applicable Markdown sections: icon family/style and static fallback under `Components`; motion purpose, trigger, named duration/easing vocabulary, interrupt/cleanup, reduced result, and autoplay/loop policy under `Components` or `Do's and Don'ts`; runtime/version/license details in the implementation handoff. Mirror any named motion vocabulary in the real runtime tokens and verify representative states.
 
 Use only these typography properties in frontmatter: `fontFamily`, `fontSize`, `fontWeight`, `lineHeight`, `letterSpacing`, `fontFeature`, and `fontVariation`. Use only `px`, `em`, or `rem` for dimension tokens. Use a numeric or quoted numeric `fontWeight`; `lineHeight` may also be unitless.
 

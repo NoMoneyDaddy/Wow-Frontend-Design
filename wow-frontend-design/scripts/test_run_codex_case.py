@@ -18,6 +18,7 @@ RUNNER = ROOT / "evals" / "run_codex_case.sh"
 VALIDATOR = ROOT / "evals" / "validate_visual_web_output.py"
 DESIGN_VALIDATOR = ROOT / "evals" / "validate_design_md_clean.py"
 TRACE_VALIDATOR = ROOT / "evals" / "validate_codex_log_policy.py"
+RESOURCE_MONITOR = ROOT / "evals" / "monitor_codex_progress.py"
 CONTEXTS = (
     "wow-frontend-design/SKILL.md",
     "wow-frontend-design/references/creative-direction.md",
@@ -31,6 +32,17 @@ CONTEXTS = (
     "wow-frontend-design/references/quality-gates.md",
     "wow-frontend-design/references/weak-model-playbook.md",
     "wow-frontend-design/references/color-system-psychology.md",
+    "wow-frontend-design/references/design-md-contract.md",
+    "wow-frontend-design/assets/DESIGN.template.md",
+)
+BASE_CONTEXTS = (
+    "wow-frontend-design/SKILL.md",
+    "wow-frontend-design/references/creative-direction.md",
+    "wow-frontend-design/references/anti-ai-slop.md",
+    "wow-frontend-design/references/mobile-responsive.md",
+    "wow-frontend-design/references/localization.md",
+    "wow-frontend-design/references/typographic-layout.md",
+    "wow-frontend-design/references/implementation.md",
     "wow-frontend-design/references/design-md-contract.md",
     "wow-frontend-design/assets/DESIGN.template.md",
 )
@@ -57,6 +69,7 @@ class CodexRunnerTests(unittest.TestCase):
         shutil.copy2(VALIDATOR, root / "evals" / "validate_visual_web_output.py")
         shutil.copy2(DESIGN_VALIDATOR, root / "evals" / "validate_design_md_clean.py")
         shutil.copy2(TRACE_VALIDATOR, root / "evals" / "validate_codex_log_policy.py")
+        shutil.copy2(RESOURCE_MONITOR, root / "evals" / "monitor_codex_progress.py")
         shutil.copy2(ROOT / "package-lock.json", root / "package-lock.json")
         (root / "evals" / "briefs" / "harbor-cold-chain-v4.md").write_text("# Harbor cold-chain brief\n", encoding="utf-8")
         (root / "evals" / "briefs" / "island-sound-archive-v4.md").write_text("# Island sound archive brief\n", encoding="utf-8")
@@ -101,35 +114,48 @@ if [[ "${1:-}" == "login" && "${2:-}" == "status" ]]; then
   echo 'Logged in using ChatGPT'
   exit 0
 fi
-/usr/bin/env | sort > "$RUNNER_TEST_CAPTURE/env.txt"
-printf '%s\n' "$@" > "$RUNNER_TEST_CAPTURE/args.txt"
-command cat > "$RUNNER_TEST_CAPTURE/prompt.txt"
+TEST_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+CAPTURE="$TEST_ROOT/capture"
+/usr/bin/env | sort > "$CAPTURE/env.txt"
+printf '%s\n' "$@" > "$CAPTURE/args.txt"
+command cat > "$CAPTURE/prompt.txt"
 args=("$@")
 stage=""
+model=""
 for ((i=0; i<${#args[@]}; i++)); do
   if [[ "${args[$i]}" == "--cd" ]]; then stage="${args[$((i+1))]}"; fi
+  if [[ "${args[$i]}" == "--model" ]]; then model="${args[$((i+1))]}"; fi
 done
-if [[ -z "$stage" ]]; then exit 9; fi
-printf '%s' "$RUNNER_TEST_HTML" > "$stage/index.html"
-printf '%s' "$RUNNER_TEST_DESIGN" > "$stage/DESIGN.md"
-if [[ "$RUNNER_TEST_CASE_ID" == "plant-swap-one-line-v4" ]]; then
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/browse.html"
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/listing.html"
+if [[ -z "$stage" || -z "$model" ]]; then exit 9; fi
+html='<!doctype html><html lang="zh-Hant"><head><title>Test</title><style>body{color:#111}</style></head><body><main id="main"><a href="#main">Main</a></main><script>void 0;</script></body></html>'
+design=$'---\nversion: alpha\nname: Runner Test\ncolors:\n  primary: "#111111"\n---\n# Runner Test\n## Overview\nTest.\n'
+printf '%s' "$html" > "$stage/index.html"
+printf '%s' "$design" > "$stage/DESIGN.md"
+if grep -Fq 'browse.html' "$CAPTURE/prompt.txt"; then
+  printf '%s' "$html" > "$stage/browse.html"
+  printf '%s' "$html" > "$stage/listing.html"
 fi
-if [[ "$RUNNER_TEST_CASE_ID" == "ceramics-festival-one-line-v5" ]]; then
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/program.html"
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/visit.html"
+if grep -Fq 'program.html' "$CAPTURE/prompt.txt"; then
+  printf '%s' "$html" > "$stage/program.html"
+  printf '%s' "$html" > "$stage/visit.html"
 fi
-if [[ "$RUNNER_TEST_CASE_ID" == "packaging-configurator-v6" ]]; then
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/materials.html"
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/summary.html"
+if grep -Fq 'materials.html' "$CAPTURE/prompt.txt"; then
+  printf '%s' "$html" > "$stage/materials.html"
+  printf '%s' "$html" > "$stage/summary.html"
 fi
-if [[ "$RUNNER_TEST_CASE_ID" == "oral-history-archive-v6" ]]; then
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/archive.html"
-  printf '%s' "$RUNNER_TEST_HTML" > "$stage/story.html"
+if grep -Fq 'archive.html' "$CAPTURE/prompt.txt"; then
+  printf '%s' "$html" > "$stage/archive.html"
+  printf '%s' "$html" > "$stage/story.html"
 fi
-if [[ -n "${RUNNER_TEST_CODEX_LOG:-}" ]]; then
-  printf '%s\n' "$RUNNER_TEST_CODEX_LOG"
+if [[ -f "$CAPTURE/oversized-output" ]]; then
+  dd if=/dev/zero of="$stage/index.html" bs=1048576 count=2 2>/dev/null
+  for part in 1 2 3 4; do
+    dd if=/dev/zero of="$stage/quota-$part.tmp" bs=1048576 count=2 2>/dev/null
+  done
+  sleep 5
+fi
+if [[ -f "$CAPTURE/codex-log-line.txt" ]]; then
+  command cat "$CAPTURE/codex-log-line.txt"
 fi
 """,
             encoding="utf-8",
@@ -175,10 +201,14 @@ fi
                 "OPENAI_BASE_URL": "https://must-be-cleared.invalid",
                 "OPENAI_API_BASE": "https://must-also-be-cleared.invalid",
                 "CODEX_API_KEY": "must-be-cleared",
+                "DATABASE_URL": "postgres://must-not-reach-codex-process",
             }
         )
         if extra_env:
             environment.update(extra_env)
+            log_line = extra_env.get("RUNNER_TEST_CODEX_LOG")
+            if log_line is not None:
+                (capture / "codex-log-line.txt").write_text(log_line + "\n", encoding="utf-8")
         return subprocess.run(
             [str(root / "evals" / "run_codex_case.sh"), model, "--case", case_id],
             cwd=root,
@@ -244,6 +274,8 @@ fi
                     disabled,
                 )
                 self.assertIn('model_reasoning_summary="none"', arguments)
+                self.assertIn('shell_environment_policy.inherit="none"', arguments)
+                self.assertTrue(any(value.startswith("shell_environment_policy.set={PATH=") for value in arguments))
                 self.assertNotIn("model_reasoning_effort", "\n".join(arguments))
                 prompt = (capture / "prompt.txt").read_text(encoding="utf-8")
                 self.assertIn("# Harbor cold-chain brief", prompt)
@@ -266,15 +298,35 @@ fi
                 self.assertNotIn("OPENAI_BASE_URL=", captured_environment)
                 self.assertNotIn("OPENAI_API_BASE=", captured_environment)
                 self.assertNotIn("CODEX_API_KEY=", captured_environment)
+                self.assertNotIn("DATABASE_URL=", captured_environment)
+                self.assertNotIn("RUNNER_TEST_", captured_environment)
                 self.assertIn("/wow-codex-home.", captured_environment)
                 self.assertNotIn("node_modules/.bin", captured_environment)
                 self.assertTrue(manifest["environment"]["user_skills_hidden_by_isolated_home"])
                 self.assertEqual("passed", manifest["environment"]["forbidden_host_path_audit"])
+                self.assertEqual("none", manifest["environment"]["process_environment_inheritance"])
+                self.assertEqual("none", manifest["environment"]["model_shell_environment_inheritance"])
                 self.assertFalse(manifest["isolation"]["builder_subagents"])
                 self.assertFalse(manifest["isolation"]["builder_browser_tools"])
                 self.assertFalse(manifest["isolation"]["builder_computer_tools"])
                 self.assertTrue(manifest["isolation"]["independent_visual_evaluator_required"])
-                self.assertEqual(len(CONTEXTS), len(manifest["context"]["trusted_files"]))
+                expected_count = len(BASE_CONTEXTS) + 1 + (1 if model == "gpt-5.4-mini" else 0)
+                self.assertEqual(expected_count, len(manifest["context"]["trusted_files"]))
+                self.assertEqual(
+                    {
+                        "policy": "caller_model_and_case",
+                        "lane": "CONSTRAINED",
+                        "selected_file_count": expected_count,
+                    },
+                    manifest["context"]["routing"],
+                )
+                selected_context = {item["path"] for item in manifest["context"]["trusted_files"]}
+                self.assertIn("wow-frontend-design/references/component-composition.md", selected_context)
+                self.assertNotIn("wow-frontend-design/references/quality-gates.md", selected_context)
+                self.assertEqual(
+                    model == "gpt-5.4-mini",
+                    "wow-frontend-design/references/weak-model-playbook.md" in selected_context,
+                )
                 self.assertEqual(
                     hashlib.sha256((root / "evals" / "run_codex_case.sh").read_bytes()).hexdigest(),
                     manifest["runner"]["sha256"],
@@ -340,6 +392,22 @@ fi
                 {"DESIGN.md", "index.html", "materials.html", "summary.html"},
                 {item["path"] for item in manifest["outputs"]},
             )
+            selected_context = {item["path"] for item in manifest["context"]["trusted_files"]}
+            self.assertIn("wow-frontend-design/references/component-composition.md", selected_context)
+            self.assertIn("wow-frontend-design/references/color-system-psychology.md", selected_context)
+            self.assertNotIn("wow-frontend-design/references/typography-webfonts.md", selected_context)
+
+    def test_type_case_routes_font_reference_without_component_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture = self.fixture(root)
+            completed = self.run_case(root, capture, "gpt-5.4-mini", "type-foundry-specimen-v6")
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            target = root / "evals" / "codex-gpt-5.4-mini-type-foundry-specimen-v6"
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            selected_context = {item["path"] for item in manifest["context"]["trusted_files"]}
+            self.assertIn("wow-frontend-design/references/typography-webfonts.md", selected_context)
+            self.assertNotIn("wow-frontend-design/references/component-composition.md", selected_context)
 
     def test_design_md_findings_are_rejected_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -394,6 +462,19 @@ fi
             )
             self.assertEqual(1, completed.returncode, completed.stderr)
             self.assertIn("controlled command policy", completed.stderr)
+            target = root / "evals" / "codex-gpt-5.4-harbor-cold-chain-v4"
+            self.assertEqual(set(), {path.name for path in target.iterdir()})
+
+    def test_runtime_stage_quota_terminates_oversized_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture = self.fixture(root)
+            (capture / "oversized-output").write_text("trigger\n", encoding="utf-8")
+
+            completed = self.run_case(root, capture, "gpt-5.4")
+
+            self.assertEqual(1, completed.returncode, completed.stderr)
+            self.assertIn("quota exceeded", completed.stderr)
             target = root / "evals" / "codex-gpt-5.4-harbor-cold-chain-v4"
             self.assertEqual(set(), {path.name for path in target.iterdir()})
 

@@ -23,14 +23,15 @@ Portable Agent Skill for designing, building, auditing, and refactoring distinct
 - 手機版會重排、替換、延後或改變互動，不只把桌面欄位改成直向。
 - 內建繁中、CJK、長翻譯、RTL、字型 fallback 與 locale QA。
 - 納入 WCAG 2.2 AA、Core Web Vitals、reduced motion、鍵盤、zoom、錯誤狀態與效能驗證。
-- 弱模型可依固定決策表與四個 checkpoint 執行，不必靠模糊的「設計感」。
+- 模型不自報強弱：外部、分任務能力 profile 決定起始 lane；實際 schema／工具／驗證結果只能自動降級，不能自行升級。
+- 維持一份精簡核心與按需載入的直接 references；不分叉 `lite`／`full` 兩套真相，短 context host 只作明示降級 adapter。
 - 內建 motion 技術階梯、SVG 信任／嵌入／授權管線與靜態風險稽核器。
 - 驗證失敗會自動回送 AI 修正並局部重驗，不把中間錯誤丟給使用者；始終保留最佳可預覽版本與截圖。
 - 缺少驗證工具時，優先沿用 lockfile；無 pin 才解析最新穩定相容版並鎖定到專案或 evaluator cache，再自動續跑。不做 global install，也不偷改產品 runtime dependencies。
 
 ## 成果展示
 
-目前發布的 v6 cohort 只使用 `gpt-5.4-mini`：8 個不同產品、12 個頁面、4 種裝置 profile，共 64 張 PNG。8/8 `DESIGN.md` 通過 pinned 官方 verifier；完成自動診斷與局部修復後，最終 deterministic visual、runtime、network 與 body-flow findings 都是 0。這只證明這一批固定案例，不代表實體手機、所有瀏覽器、正式 WCAG conformance 或所有模型。
+目前發布的 v6 development/regression cohort 只使用 `gpt-5.4-mini`：8 個不同產品、12 個頁面、4 種裝置 profile，共 64 張 PNG。8 案都依最新 Skill 完成自修正，8/8 `DESIGN.md` 通過 pinned 官方 verifier。人工並排檢閱曾找出補助對話框與字體樣張頁的中文標題孤字；加入逐行 gate、修正標題主軌與 mobile 字級後，最終完整重驗的 deterministic visual、runtime、network、文字流、標題流、layout 與 locale findings 都是 0。同一批案例曾參與規則與 evaluator 修正，因此不是 held-out validation；它只證明這批固定案例，不代表 Skill 已泛化、實體手機、所有瀏覽器、正式 WCAG conformance 或所有模型。
 
 | 桌機互動：風場派工 | 桌機互動：字體樣張 |
 | --- | --- |
@@ -44,63 +45,9 @@ Portable Agent Skill for designing, building, auditing, and refactoring distinct
 
 舊 v4／v5 截圖已清空；其原始 targets 只保留作歷史問題來源，不代表目前品質。
 
-## 原生 Host／Client 發現
+## 相容與安裝
 
-本專案遵循開放的 [Agent Skills specification](https://agentskills.io/specification)。依各 host/client 的官方文件，下列位置可供其發現 `SKILL.md` 技能；文件相容不等於本專案已完成每個 host 的整合測試：
-
-| 平台 | 專案安裝位置 | 個人安裝位置 | 常見呼叫方式 |
-| --- | --- | --- | --- |
-| OpenAI Codex | `.agents/skills/wow-frontend-design/` | `~/.agents/skills/wow-frontend-design/` | `$wow-frontend-design` 或自然語言 |
-| Claude Code | `.claude/skills/wow-frontend-design/` | `~/.claude/skills/wow-frontend-design/` | `/wow-frontend-design` 或自然語言 |
-| GitHub Copilot | `.github/skills/`、`.claude/skills/` 或 `.agents/skills/` | `~/.copilot/skills/` 或 `~/.agents/skills/` | 自然語言；Copilot CLI 可用 slash command |
-| Gemini CLI | `.gemini/skills/` 或 `.agents/skills/` | `~/.gemini/skills/` 或 `~/.agents/skills/` | 自然語言或 skills 指令 |
-
-官方依據：[Codex skills](https://learn.chatgpt.com/docs/build-skills)、[Claude Code skills](https://code.claude.com/docs/en/slash-commands)、[GitHub Copilot agent skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills)、[Gemini CLI agent skills](https://geminicli.com/docs/cli/using-agent-skills/)。本 repo 已實跑 Codex 與 Claude CLI；Copilot、Gemini CLI、Claude API 與 claude.ai 仍維持未整合實測狀態。
-
-不原生支援 Agent Skills 的模型仍可使用：把 [`SKILL.md`](wow-frontend-design/SKILL.md) 當成專案／系統指令，並依其中路由按需附上 `references/`；掃描器可獨立執行。
-
-## 安裝
-
-最快方式、官方 host 路徑、發現驗證、版本 pin、停用與卸載見 [`INSTALL.md`](INSTALL.md)。
-
-Codex 可直接交給 AI 安裝：
-
-```text
-Use GitHub CLI to preview and install wow-frontend-design from
-NoMoneyDaddy/Wow-Frontend-Design at commit <FULL_COMMIT_SHA> for Codex user scope.
-Do not overwrite an existing skill or execute bundled scripts during installation.
-```
-
-官方 GitHub CLI preview（需 `gh >= 2.90.0`；preview 介面可能變動）：
-
-```bash
-gh skill preview NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md
-gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md --agent codex --scope user
-```
-
-正式環境再加 `--pin <release-tag-or-full-sha>`。無 GitHub CLI 或採完全本機流程時，使用下方 clone/copy；不提供會執行第三方 package lifecycle 的 `npx` fallback。
-
-先取得專案：
-
-```bash
-git clone https://github.com/NoMoneyDaddy/Wow-Frontend-Design.git
-```
-
-以所有支援 `.agents/skills` 的平台為例，安裝到個人範圍：
-
-```bash
-mkdir -p ~/.agents/skills
-cp -R Wow-Frontend-Design/wow-frontend-design ~/.agents/skills/
-```
-
-Claude Code 個人範圍：
-
-```bash
-mkdir -p ~/.claude/skills
-cp -R Wow-Frontend-Design/wow-frontend-design ~/.claude/skills/
-```
-
-若只想套用到單一 repo，把同一個 `wow-frontend-design/` 複製到上表的專案位置。安裝目錄內含 MIT [`LICENSE`](wow-frontend-design/LICENSE)；複製、散布或修改 skill 時必須連同版權與授權聲明一起保留。安裝第三方 skill 前，先閱讀 `SKILL.md` 與 `scripts/`；此專案的掃描器為唯讀，且會略過環境變數、credentials、symlink、依賴與 generated output。
+本專案遵循開放的 [Agent Skills specification](https://agentskills.io/specification)，可供 Codex、Claude Code、GitHub Copilot、Gemini CLI 與自訂 wrapper 載入；相容不等於每個 host、模型與工具組合都已完成實測。安裝路徑、5 分鐘成功流程、remote sandbox、版本 pin、更新與卸載由 [`INSTALL.md`](INSTALL.md) 單一維護。
 
 ## 使用
 
@@ -120,6 +67,8 @@ Preserve routes, APIs, analytics, and the current framework. Verify mobile, erro
 
 不確定如何描述時，只要說明產品、使用者與主要任務；skill 會推導可逆的設計方向，只在答案會實質改變範圍或架構時提問。
 
+實際流程是：檢查專案與可用能力 → 分類建置／重構／修復範圍 → 建立設計 thesis 與 `DESIGN.md` → 實作真實狀態與 mobile transformation → 驗證 → 自動修正 → 交付最佳可預覽版本。Deterministic finding 會先回送 AI 修正，不要求使用者傳話；同一根因連續三次仍失敗才停止盲修，並保留產物、證據與下一個可執行動作，標為 `PARTIALLY VERIFIED`，而不是丟掉結果。
+
 多路由、新產品流程或資訊層級尚未收斂時，可先產生互相綁定的 `site-manifest.json` 與 `wireframe-plan.json`。它們分別描述 IA／權限／發現意圖，以及區域／內容極端值／狀態／互動／手機轉換；crawler 用的 XML Sitemap 是第三種獨立 artifact。低風險元件修補不強制 wireframe，實作需求也不能停在 wireframe。
 
 建立或變更視覺系統時，Skill 會在頁面組合前建立／更新 repository-root `DESIGN.md`。官方格式接受 quoted `oklch()`；production CSS 仍保留 sRGB fallback 與 rendered contrast 檢查。驗證器依 lockfile 使用精確固定的穩定版 `@google/design.md`，缺工具時安全補齊並續跑；無法安裝也不會丟掉網站產物。
@@ -128,6 +77,7 @@ Preserve routes, APIs, analytics, and the current framework. Verify mobile, erro
 
 - [安裝與 host 路徑](INSTALL.md)
 - [版本變更](CHANGELOG.md)
+- [資安回報政策](SECURITY.md)
 - [Skill 核心流程](wow-frontend-design/SKILL.md)
 - [評測方法與重現方式](evals/README.md)
 - [完整測試方案與執行紀錄](evals/TEST_PLAN.md)

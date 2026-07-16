@@ -12,7 +12,19 @@ from pathlib import Path
 
 NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-FORBIDDEN_NAMES = {".env", ".env.local", "credentials", "credentials.json", "id_rsa", "id_ed25519"}
+FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
+INLINE_CODE = re.compile(r"(`+).*?\1")
+FORBIDDEN_NAMES = {
+    ".env",
+    ".env.local",
+    ".npmrc",
+    ".pypirc",
+    "credentials",
+    "credentials.json",
+    "id_ed25519",
+    "id_rsa",
+    "secrets.json",
+}
 
 
 class InstallabilityError(ValueError):
@@ -47,6 +59,28 @@ def _ignored_by_git(path: Path, repository_root: Path) -> bool:
     return completed.returncode == 0
 
 
+def _markdown_link_targets(text: str) -> list[str]:
+    """Return real Markdown link targets, excluding fenced/indented/inline code."""
+    visible: list[str] = []
+    fence_character = ""
+    fence_length = 0
+    for line in text.splitlines():
+        marker = FENCE.match(line)
+        if fence_character:
+            if marker and marker.group(1)[0] == fence_character and len(marker.group(1)) >= fence_length:
+                fence_character = ""
+                fence_length = 0
+            continue
+        if marker:
+            fence_character = marker.group(1)[0]
+            fence_length = len(marker.group(1))
+            continue
+        if line.startswith(("    ", "\t")):
+            continue
+        visible.append(INLINE_CODE.sub("", line))
+    return LINK.findall("\n".join(visible))
+
+
 def validate(skill_root: Path, repository_root: Path | None = None) -> int:
     if skill_root.is_symlink() or not skill_root.is_dir():
         raise InstallabilityError(f"skill root must be a real directory: {skill_root}")
@@ -77,8 +111,9 @@ def validate(skill_root: Path, repository_root: Path | None = None) -> int:
         raise InstallabilityError("openai default_prompt must explicitly invoke the skill")
 
     checked_links = 0
+    linked_files: set[Path] = set()
     skill_text = skill_file.read_text(encoding="utf-8")
-    for raw_target in LINK.findall(skill_text):
+    for raw_target in _markdown_link_targets(skill_text):
         target = raw_target.split("#", 1)[0]
         if not target or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
             continue
@@ -89,7 +124,25 @@ def validate(skill_root: Path, repository_root: Path | None = None) -> int:
             raise InstallabilityError(f"relative link escapes skill root: {raw_target}") from error
         if not resolved.exists() or resolved.is_symlink():
             raise InstallabilityError(f"relative link is missing or a symlink: {raw_target}")
+        if resolved.is_file():
+            linked_files.add(resolved)
         checked_links += 1
+
+    routed_markdown: set[Path] = set()
+    for directory_name in ("references", "adapters"):
+        directory = skill_root / directory_name
+        if directory.is_dir():
+            routed_markdown.update(
+                path.resolve()
+                for path in directory.rglob("*.md")
+                if path.is_file() and not path.is_symlink()
+            )
+    unlinked = sorted(path.relative_to(skill_root).as_posix() for path in routed_markdown - linked_files)
+    if unlinked:
+        raise InstallabilityError(
+            "SKILL.md must directly link every Markdown reference/adapter; unlinked: "
+            + ", ".join(unlinked)
+        )
 
     repo = repository_root.resolve() if repository_root else None
     for path in skill_root.rglob("*"):
@@ -99,8 +152,11 @@ def validate(skill_root: Path, repository_root: Path | None = None) -> int:
             continue
         relative = path.relative_to(skill_root)
         forbidden_generated = "__pycache__" in relative.parts or path.suffix in {".pyc", ".pyo"}
-        forbidden_secret = path.name.casefold() in FORBIDDEN_NAMES
-        if forbidden_generated or forbidden_secret:
+        lowered_name = path.name.casefold()
+        forbidden_secret = lowered_name in FORBIDDEN_NAMES or lowered_name.startswith(".env.")
+        if forbidden_secret:
+            raise InstallabilityError(f"release skill contains forbidden file: {relative}")
+        if forbidden_generated:
             if repo is not None and _ignored_by_git(path, repo):
                 continue
             raise InstallabilityError(f"release skill contains forbidden file: {relative}")

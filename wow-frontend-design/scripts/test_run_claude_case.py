@@ -72,7 +72,6 @@ class ClaudeRunnerTests(unittest.TestCase):
             for model in ("haiku", "sonnet", "opus"):
                 showcase_target = fixed_target(root, model, "showcase")
                 showcase_target.mkdir()
-                (showcase_target / "BRIEF.md").write_text("# Fixed showcase test brief\n", encoding="utf-8")
                 fixed_target(root, model, "product-dashboard").mkdir()
                 fixed_target(root, model, "harbor-cold-chain-v4").mkdir()
                 fixed_target(root, model, "island-sound-archive-v4").mkdir()
@@ -85,6 +84,7 @@ class ClaudeRunnerTests(unittest.TestCase):
             shared_brief = root / "evals" / "briefs" / "product-dashboard.md"
             shared_brief.parent.mkdir()
             shared_brief.write_text("# Shared product dashboard test brief\n", encoding="utf-8")
+            (root / "evals" / "briefs" / "showcase.md").write_text("# Fixed showcase test brief\n", encoding="utf-8")
             (root / "evals" / "briefs" / "harbor-cold-chain-v4.md").write_text("# Harbor cold-chain test brief\n", encoding="utf-8")
             (root / "evals" / "briefs" / "island-sound-archive-v4.md").write_text("# Island sound archive test brief\n", encoding="utf-8")
             (root / "evals" / "briefs" / "plant-swap-one-line-v4.md").write_text("Build a plant swap website.\n", encoding="utf-8")

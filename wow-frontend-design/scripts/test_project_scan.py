@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import io
 import json
+import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -113,6 +116,53 @@ class ProjectScanTests(unittest.TestCase):
             self.assertTrue(report["scan_truncated"])
             self.assertEqual(report["file_count"], 2)
 
+    def test_directory_limit_stops_empty_tree_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index in range(4):
+                (root / f"empty-{index}").mkdir()
+
+            files, truncated = project_scan.collect_files(
+                root,
+                max_files=100,
+                max_directories=2,
+            )
+
+            self.assertEqual([], files)
+            self.assertTrue(truncated)
+
+    def test_per_directory_entry_limit_stops_wide_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for index in range(4):
+                (root / f"file-{index}.html").write_text("<main></main>", encoding="utf-8")
+
+            files, truncated = project_scan.collect_files(
+                root,
+                max_files=100,
+                max_directory_entries=2,
+            )
+
+            self.assertEqual([], files)
+            self.assertTrue(truncated)
+
+    def test_pending_directory_queue_never_exceeds_total_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ("a", "b"):
+                child = root / name
+                child.mkdir()
+                (child / "nested").mkdir()
+
+            files, truncated = project_scan.collect_files(
+                root,
+                max_files=100,
+                max_directories=3,
+            )
+
+            self.assertEqual([], files)
+            self.assertTrue(truncated)
+
     def test_detects_frameworks_in_nested_workspace_packages(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -144,6 +194,115 @@ class ProjectScanTests(unittest.TestCase):
             self.assertIn("site-manifest.json", report["manifests"])
             self.assertIn("wireframe-plan.json", report["manifests"])
             self.assertIn("DESIGN.md", report["manifests"])
+
+    def test_project_root_must_stay_inside_authorized_root_without_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            authorized = base / "authorized"
+            project = authorized / "project"
+            outside_project = base / "outside" / "project"
+            project.mkdir(parents=True)
+            outside_project.mkdir(parents=True)
+
+            self.assertEqual(
+                project.resolve(), project_scan.resolve_project_root(project, authorized)
+            )
+            with self.assertRaisesRegex(project_scan.ProjectRootError, "escapes authorized"):
+                project_scan.resolve_project_root(outside_project, authorized)
+
+            jump = authorized / "jump"
+            jump.symlink_to(base / "outside", target_is_directory=True)
+            with self.assertRaisesRegex(project_scan.ProjectRootError, "symlink component"):
+                project_scan.resolve_project_root(jump / "project", authorized)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX FIFOs")
+    def test_non_regular_project_entries_are_not_collected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            os.mkfifo(root / "package.json")
+            os.mkfifo(root / "hang.py")
+
+            files, truncated = project_scan.collect_files(root, max_files=10)
+
+            self.assertEqual([], files)
+            self.assertFalse(truncated)
+            for path in (root / "package.json", root / "hang.py"):
+                with self.assertRaises(project_scan.UnsafeProjectFileError):
+                    project_scan._read_bounded_regular_bytes(path)
+
+    def test_oversized_package_json_is_not_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            package = root / "package.json"
+            package.write_text(
+                json.dumps({"name": "oversized", "padding": "x" * project_scan.MAX_READ_BYTES}),
+                encoding="utf-8",
+            )
+
+            report = project_scan.scan(root)
+
+            self.assertEqual([], report["package_profiles"])
+            self.assertTrue(any("exceeds" in warning for warning in report["observations"]))
+
+    def test_deep_package_json_is_reported_instead_of_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "package.json").write_text("[" * 1_100 + "]" * 1_100, encoding="utf-8")
+
+            report = project_scan.scan(root)
+
+            self.assertEqual([], report["package_profiles"])
+            self.assertTrue(any("could not be parsed" in warning for warning in report["observations"]))
+
+    def test_oversized_code_file_is_not_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "page.tsx"
+            source.write_text(
+                '<html lang="unsafe">' + "x" * project_scan.MAX_READ_BYTES,
+                encoding="utf-8",
+            )
+
+            report = project_scan.scan(root)
+
+            self.assertEqual("RETROFIT", report["mode_hint"])
+            self.assertNotIn("unsafe", report["language_tags"])
+
+    def test_markdown_neutralizes_project_control_characters(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "scripts": {"build\n\n## forged script directive\u202e": "noop"},
+                        "packageManager": "npm@1\n\n## forged package evidence",
+                        "dependencies": {"react": "1\n\n## forged version gate"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            injected_path = root / "page\n\n## forged inspect directive.tsx"
+            injected_path.write_text("<main/>", encoding="utf-8")
+
+            markdown = project_scan.render_markdown(project_scan.scan(root))
+
+            self.assertNotIn("\n## forged", markdown)
+            self.assertIn("\\u000a\\u000a\\u0023\\u0023 forged", markdown)
+            self.assertIn("\\u202e", markdown)
+
+    def test_cli_defaults_to_json_machine_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "index.html").write_text("<main></main>", encoding="utf-8")
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                exit_code = project_scan.main(
+                    [str(root), "--authorized-root", str(root)]
+                )
+
+            self.assertEqual(0, exit_code)
+            self.assertEqual(str(root.resolve()), json.loads(output.getvalue())["root"])
 
 
 if __name__ == "__main__":

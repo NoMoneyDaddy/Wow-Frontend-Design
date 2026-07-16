@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "run_id": "20260715T115054Z-71415-10577",
+  "run_id": "20260715T183359Z-78621-1244-latest-skill-repair",
   "status": "completed",
-  "started_at": "2026-07-15T11:50:54Z",
-  "finished_at": "2026-07-15T11:54:34Z",
+  "started_at": "2026-07-15T18:34:00Z",
+  "finished_at": "2026-07-16T02:04:45.975Z",
   "provider": "openai-first-party-chatgpt-oauth",
   "authentication": {
     "status": "Logged in using ChatGPT"
@@ -13,7 +13,7 @@
     "target": "evals/product-flow-v6-repaired-v2-targets/codex-gpt-5.4-mini-oral-history-archive-v6"
   },
   "cli": {
-    "path": "/opt/homebrew/bin/codex",
+    "path": "codex",
     "version": "codex-cli 0.142.0"
   },
   "model": {
@@ -40,7 +40,7 @@
   },
   "runner": {
     "path": "evals/run_codex_case.sh",
-    "sha256": "54dfe6f1b9af6b11f6d73c662bc3ac1ed37b9730e9c4eb76a78f7c9fa76f6f72"
+    "sha256": "672d715f9f34a0c927e63b3894f2bb3c5b209658aea3dab288f894bca81f8dbb"
   },
   "output_validator": {
     "path": "evals/validate_visual_web_output.py",
@@ -55,7 +55,7 @@
   },
   "trace_policy_gate": {
     "path": "evals/validate_codex_log_policy.py",
-    "sha256": "9daf52fc38c7914a90f0e45567e6946eed9f1e86e7ddb850695498401d358214",
+    "sha256": "a0e86b69c488dbf0390fdb8bda6324fc21fb30e30d2628de3c5157787a3e09e7",
     "required_result": "no_forbidden_commands_or_tools"
   },
   "environment": {
@@ -74,6 +74,8 @@
     "isolated_home": true,
     "user_skills_hidden_by_isolated_home": true,
     "path_sanitized": true,
+    "process_environment_inheritance": "none",
+    "model_shell_environment_inheritance": "none",
     "forbidden_host_path_audit": "passed"
   },
   "context": {
@@ -84,7 +86,7 @@
     "trusted_files": [
       {
         "path": "wow-frontend-design/SKILL.md",
-        "sha256": "b2690afe84f76d5bd88a02ac087749d196f6fa27765f587d114e659bfe6adcaf"
+        "sha256": "b78be5dab051ebd704733a17cb32835fb4637595d25dfc819cee57fe73226d6c"
       },
       {
         "path": "wow-frontend-design/references/creative-direction.md",
@@ -92,23 +94,23 @@
       },
       {
         "path": "wow-frontend-design/references/anti-ai-slop.md",
-        "sha256": "796fc85dfbec4b5823ac4ecfdcce33e6c2e6ce9aca660f9b7cd364bd0c0e922b"
+        "sha256": "f05a5e15c7d3d9c00c4225c3f902401629b5da701200b742fe6a382178ed2e41"
       },
       {
         "path": "wow-frontend-design/references/mobile-responsive.md",
-        "sha256": "133d8df3887922d9ef133119577b83affae2f915fcee6b6005b3fe883ff2e186"
+        "sha256": "ca67b3a22f4b284a3e38e9ae69ef53651c710e18a008a7348fda2a9b30fc4dba"
       },
       {
         "path": "wow-frontend-design/references/localization.md",
-        "sha256": "3eb817b38ca717d4e9ac154bccc5bd662319266478705e92e6c138e759becda5"
+        "sha256": "acdd67b848eb2ec12e41d94a7020f19c348a71c386292a589f5faf89152403f2"
       },
       {
         "path": "wow-frontend-design/references/typography-webfonts.md",
-        "sha256": "9d946351ad7a07c0a1eb9cfd3069387e9afa2fa4996b5616c82f8c11c1d30b5c"
+        "sha256": "2d4f5505f21603abcb0d10f64b22b61e8ffed902d8a3ec70e9bfe2ba9b0ecb4f"
       },
       {
         "path": "wow-frontend-design/references/typographic-layout.md",
-        "sha256": "adb607257a234cb1809759bbbdde8c67bea6442db395029c4f89b3a3a6c85c78"
+        "sha256": "619474ac28cc55d2552facc7fa3a43d4ddc32873981dbf155cd7ad6437725e76"
       },
       {
         "path": "wow-frontend-design/references/implementation.md",
@@ -116,11 +118,11 @@
       },
       {
         "path": "wow-frontend-design/references/component-composition.md",
-        "sha256": "688cc24e5117eaaaa8037546cf73d9972af249b8bcecbd3bf180b22f4dadab78"
+        "sha256": "3d9ac53f4dbb1537fdddd5a73d9913f2a120600a859b4d042498ccd2792174d9"
       },
       {
         "path": "wow-frontend-design/references/quality-gates.md",
-        "sha256": "a92248db6cf063aaa1c3fd6d1532fcc4f55d60ed3533c452c175193e6bf4f731"
+        "sha256": "d680218da2bd4971151b2318d45681e9069a48d4fcaf4f50f44fefe52d17375f"
       },
       {
         "path": "wow-frontend-design/references/weak-model-playbook.md",
@@ -128,11 +130,11 @@
       },
       {
         "path": "wow-frontend-design/references/color-system-psychology.md",
-        "sha256": "08c018fa2fcd4e283af877bd804c9c97cb4ab3cc4cc24d896b8ab55f44d22d72"
+        "sha256": "b5206e184cfd323d329b4920be991d7bbed15244de6f5c4285e9f452bbd0caaa"
       },
       {
         "path": "wow-frontend-design/references/design-md-contract.md",
-        "sha256": "63c2ef3c0417ffef151a7a0f2b6aff35fa6b8ad3f3f4bf77e5ecc35767c20080"
+        "sha256": "ac680dbf10a61f2cf6cdd1a9364e47a726dd9342f4134b915815e6c43b7ce7ce"
       },
       {
         "path": "wow-frontend-design/assets/DESIGN.template.md",
@@ -143,32 +145,51 @@
   "outputs": [
     {
       "path": "DESIGN.md",
-      "bytes": 7866,
-      "sha256": "3b5ad1f31cead7803a9bff6f11acf59a9b9d565edf451e6ae82e42ca57efef66"
+      "bytes": 7804,
+      "sha256": "562ea9ce77ae68183330b13f80503b14073267685ce0563a5bfd94ab08ad7d6a"
     },
     {
       "path": "index.html",
-      "bytes": 13101,
-      "sha256": "28b3072527eaf05152d4d20c0f62add9d2a500c8341810732311bab13bb76f1c"
+      "bytes": 12901,
+      "sha256": "49c3b7c9d5aaec98c4a890f7578a5d305b9e6b47a735906bf06abc6a31925574"
     },
     {
       "path": "archive.html",
-      "bytes": 17725,
-      "sha256": "c172834dcdade8cd1bcb35d1a36568a7b5109c3df46510492a013f2bbd31980f"
+      "bytes": 18138,
+      "sha256": "b47d07abeadd6bf9bc3279c4fd6e22e11e87da5e20fc286b677460d58a5d2350"
     },
     {
       "path": "story.html",
-      "bytes": 18870,
-      "sha256": "7c53e31a63d50b684c1831733b650aa96eea9f21f1d13a36e7b7a9556ac8b9de"
+      "bytes": 18598,
+      "sha256": "d5abb65cd9b5b27ea091e03f506666d5423e1adce906cde61a63007a88ea9e61"
     }
   ],
   "mode": "repair",
   "repair": {
     "source_manifest": {
+      "path": "evals/product-flow-v6-repaired-v2-targets.failed-attempt-2/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
+      "sha256": "a288d15e4cf8928570a2a9ff612fe2eef620d9cdcecd588664594a12eedee0fe"
+    },
+    "diagnostic": "REPAIR REQUIRED: prose_track_underfilled. Preserve working behavior and direction; do not edit or weaken the evaluator.",
+    "before_outputs": {
+      "DESIGN.md": "562ea9ce77ae68183330b13f80503b14073267685ce0563a5bfd94ab08ad7d6a",
+      "index.html": "4a9d38951999182be63a90c9096cd1e8d954d4c005ec855d95d6a54a55ec3566",
+      "archive.html": "baba17aaaa3eb482d7ad255772ecfec93fe8e66acad13f5e15eec0779dffd6fd",
+      "story.html": "94d0b91e8628430332c2f170f5fe6e3ee26464c0168ddb046947625b018d2b98"
+    },
+    "changed_outputs": [
+      "archive.html",
+      "index.html",
+      "story.html"
+    ]
+  },
+  "promotion": null,
+  "skill_repair": {
+    "reason": "latest_skill_self_repair_after_typography_layout_locale_and_visual_audit",
+    "source_manifest": {
       "path": "evals/product-flow-v6-repaired-targets/codex-gpt-5.4-mini-oral-history-archive-v6/run-manifest.json",
       "sha256": "e2afb50759e9a0f80c2dc6259652737158c923439f588a79f31d1922c9182912"
     },
-    "diagnostic": "Body copy must use its full aligned content column, browser auto wrap, and CJK justification for multiline prose; no manual br or copy truncation. Replace rem-based paragraph caps with font-relative <=40em. If a wide card leaves a large empty right side, resize or align the card, or place meaningful adjacent content instead of narrowing only its p. Forced wraps are only for intentional display headings or quotes and must work per viewport. Preserve all content, shell, behavior and mobile order.",
     "before_outputs": {
       "DESIGN.md": "dab6da2452cc3ac0d1775870cb7d0d5bc0a682e2f788d19083e9bf24593eaa26",
       "index.html": "2a2ca70c18d2b69650240c9921409984a3a898ff6e95aaca7c175c1134b692a0",
@@ -177,9 +198,21 @@
     },
     "changed_outputs": [
       "DESIGN.md",
-      "archive.html",
       "index.html",
+      "archive.html",
       "story.html"
-    ]
+    ],
+    "skill": {
+      "path": "wow-frontend-design/SKILL.md",
+      "sha256": "8d987fa54182ee4359fd7f1e309cab3462ca01a4e5d7098d5a935e873e26c6c5"
+    },
+    "visual_report": {
+      "path": "evals/product-flow-v6-visual-results.json",
+      "bound_by": "generation_ledger"
+    },
+    "research_note": {
+      "path": "evals/product-flow-v6-latest-skill-repair.md",
+      "sha256": "e907761c24dd3442227107e81e155a113795ae6b097b18c9f3e7737a4d0b0dea"
+    }
   }
 }

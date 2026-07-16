@@ -32,6 +32,38 @@ function pngSize(file) {
   return `${header.readUInt32BE(16)}x${header.readUInt32BE(20)}`;
 }
 
+function matchesAllowedNetworkOrigin(value, allowedOrigin) {
+  try {
+    const parsed = new URL(value);
+    if (["data:", "about:"].includes(parsed.protocol)) return true;
+    if (parsed.protocol === "ws:") parsed.protocol = "http:";
+    if (parsed.protocol === "wss:") parsed.protocol = "https:";
+    return parsed.origin === allowedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+async function installExactOriginRoutes(context, allowedOrigin, externalRequests) {
+  await context.route("**/*", async (route) => {
+    const requestUrl = route.request().url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      return route.abort("blockedbyclient");
+    }
+    return route.continue();
+  });
+  await context.routeWebSocket("**/*", async (webSocket) => {
+    const requestUrl = webSocket.url();
+    if (!matchesAllowedNetworkOrigin(requestUrl, allowedOrigin)) {
+      externalRequests.push(requestUrl);
+      await webSocket.close({ code: 1008, reason: "Blocked by evaluator origin policy" });
+      return;
+    }
+    webSocket.connectToServer();
+  });
+}
+
 (async () => {
   const launch = { headless: true };
   if (process.env.CHROME_EXECUTABLE_PATH) launch.executablePath = process.env.CHROME_EXECUTABLE_PATH;
@@ -41,6 +73,8 @@ function pngSize(file) {
   const results = [];
   try {
     for (const capture of captures) {
+      const targetOrigin = new URL(url).origin;
+      const externalRequests = [];
       const context = await browser.newContext({
         viewport: capture.viewport,
         deviceScaleFactor: 1,
@@ -48,19 +82,16 @@ function pngSize(file) {
         timezoneId: "Asia/Taipei",
         colorScheme: capture.theme,
         reducedMotion: "reduce",
+        serviceWorkers: "block",
       });
+      await installExactOriginRoutes(context, targetOrigin, externalRequests);
       await context.addInitScript((theme) => localStorage.setItem("wow-theme", theme), capture.theme);
       const page = await context.newPage();
       const consoleErrors = [];
       const requestFailures = [];
       const badResponses = [];
-      const externalRequests = [];
-      const targetOrigin = new URL(url).origin;
       page.on("console", (message) => {
         if (message.type() === "error") consoleErrors.push(message.text());
-      });
-      page.on("request", (request) => {
-        if (new URL(request.url()).origin !== targetOrigin) externalRequests.push(request.url());
       });
       page.on("requestfailed", (request) => requestFailures.push(request.url()));
       page.on("response", (response) => {

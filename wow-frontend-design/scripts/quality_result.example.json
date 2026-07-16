@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "run_valid": true,
+  "run_reason": "Frozen brief, implementation, evaluator, and evidence hashes are present.",
+  "hard_gates": [
+    {
+      "id": "primary-task",
+      "required": true,
+      "applicable": true,
+      "status": "PASS",
+      "evidence": ["browser-primary-task.json"],
+      "reason": ""
+    },
+    {
+      "id": "rendered-mobile-layout",
+      "required": true,
+      "applicable": true,
+      "status": "PASS",
+      "evidence": ["mobile-default.png", "mobile-interaction.png"],
+      "reason": ""
+    }
+  ],
+  "eligible": true,
+  "coverage": {
+    "required_applicable": 2,
+    "required_passed": 2,
+    "evidence_items": 3
+  },
+  "craft": {
+    "evaluator_id": "independent-reviewer-example",
+    "independent": true,
+    "rubric_version": "wow-core-craft-v1",
+    "dimensions": [
+      {"id": "concept-coherence", "status": "ACCEPTABLE", "evidence": ["desktop-default.png"], "uncertainty": "One route sampled."},
+      {"id": "visual-typography", "status": "ACCEPTABLE", "evidence": ["desktop-default.png", "mobile-default.png"], "uncertainty": "No physical-device font rendering."},
+      {"id": "usability-content", "status": "ACCEPTABLE", "evidence": ["browser-primary-task.json"], "uncertainty": "No real-user study."},
+      {"id": "mobile-experience", "status": "ACCEPTABLE", "evidence": ["mobile-default.png", "mobile-interaction.png"], "uncertainty": "Browser device emulation only."},
+      {"id": "originality", "status": "ACCEPTABLE", "evidence": ["desktop-default.png"], "uncertainty": "Subjective independent review."},
+      {"id": "accessibility", "status": "UNVERIFIED", "evidence": [], "uncertainty": "Formal conformance was out of scope."},
+      {"id": "localization", "status": "ACCEPTABLE", "evidence": ["mobile-default.png"], "uncertainty": "Only zh-Hant sampled."},
+      {"id": "performance-resilience", "status": "UNVERIFIED", "evidence": [], "uncertainty": "No production RUM."},
+      {"id": "code-quality", "status": "ACCEPTABLE", "evidence": ["build.log"], "uncertainty": "Focused project checks only."}
+    ]
+  },
+  "weighted_total": null,
+  "award_lens": null,
+  "release": "VERIFIED",
+  "handoff": {
+    "artifact": "dist/index.html",
+    "launch_command": "npm run preview",
+    "rendered_evidence": {
+      "status": "OBSERVED",
+      "paths": ["desktop-default.png", "mobile-default.png", "mobile-interaction.png"],
+      "reason": ""
+    },
+    "remaining_risks": ["Physical devices and real users were not tested."],
+    "next_action": "Open the preview and run the declared release matrix before production deployment."
+  }
+}

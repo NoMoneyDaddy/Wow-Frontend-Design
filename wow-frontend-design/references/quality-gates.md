@@ -7,7 +7,7 @@ Use this reference to verify and automatically repair a frontend before calling 
 1. Required evidence
 2. Three-pass review
 3. Viewport and state matrix
-4. Independent scorecard
+4. Layered quality decision
 5. Internal completion gates
 
 ## 1. Required evidence
@@ -37,6 +37,8 @@ For every audit tool, record the exact version, browser/runtime, configuration, 
 Record executable checks with an evaluator-initialized `scripts/evidence_ledger.py` run and frozen evidence policy when available. Use one evaluator-owned root containing sibling `ledger.json`, `policy.json`, `artifacts/`, and a child `workspace/`; the implementation model may write only `workspace/`. Every ledger `run` must pass `--cwd <evaluator-root>/workspace` (or a descendant), every policy command `cwd` must resolve inside that workspace, and observed artifacts must remain under the evaluator root but outside the workspace. Pass the same child to scorer `--workspace-root`; never place ledger or policy in the implementation checkout. In the handoff, mark every material claim `VERIFIED`, `OBSERVED`, `INFERRED`, or `UNVERIFIED`, plus its semantic `claim_type`. A self-issued score is never verification; subjective craft needs actual rendered review and benefits from an independent reviewer.
 
 Keep acceptance independent from implementation. Freeze evaluator-owned tests and schemas before asking a weak model to edit the product. Prefer browser outcomes over source keywords; pair unavoidable static assertions with behavior checks, strip comments first, and include separately owned or undisclosed checks. Any attempt to edit the gate, insert test-only keywords, fabricate an artifact, or weaken an assertion is a failed evaluation even when the command exits zero. A failed check returns structured evidence to the repair loop automatically; it does not require the user to resubmit the request.
+
+An evaluator may depend on exact hooks only when the brief or integration contract names them. Do not hardcode unannounced IDs, value casing, wrapper structure, slots, or state attributes. Drive semantic inputs and judge observable task outcomes; when deterministic automation truly needs another hook, add it to the public brief and regression-test the contract before the next frozen cohort.
 
 Preserve a usable preview after every attempt. Classify findings before acting:
 
@@ -81,10 +83,14 @@ Verify:
 
 - concept is visible beyond the hero;
 - type roles, line length, wrapping, optical alignment, and numeric treatment;
+- CJK display headings use script-aware measures, preserve compact lexical units, and do not depend on Latin `ch`, one browser's `auto-phrase`, or an unverified `nowrap` patch;
+- wide headers/cards have no underfilled title or intro track, displaced right-column intro, or balanced short lines hiding a large unused region without a task-bearing peer;
+- Traditional Chinese interface chrome and dynamic states are Chinese-first; preserved English terms are proper names/codes or appear after a Chinese term in first-use parentheses;
 - spacing rhythm varies intentionally with content density;
 - color obeys its declared semantic rule;
 - supported appearances independently preserve semantic surface/text/border/action/status hierarchy; dark mode is not a mechanical inversion and a lone media-query token block is not accepted as complete behavior;
 - imagery, icons, radii, borders, depth, and texture form one language;
+- each large visual or dedicated track has a named information/task role and provenance; decorative/`aria-hidden` regions do not displace the primary task or create a narrow text rail;
 - border roles, type axes, component state colors, light direction, shadows, transparency/effect budget, and motion physics agree with the declared material system;
 - any in-scope signature feels authored rather than library-default; focused repairs preserve identity without inventing a new effect;
 - motion timing has hierarchy and a meaningful reduced-motion equivalent;
@@ -127,29 +133,59 @@ Build a compact matrix for the routes in scope. Use three layers instead of clai
 
 Adapt rows to the product. Record why a row/cell is applicable, sampled, or excluded. Never test only the happy homepage, and never turn a sampled matrix into an all-routes or formal-conformance claim.
 
-## 4. Independent scorecard
+## 4. Layered quality decision
 
-Only an evaluator independent from the implementation may calculate an acceptance score, and only after evidence collection. The implementation model may use the dimensions as a review prompt, but cannot total its own work, set missing evidence to full credit, or declare the threshold passed. If no independent evaluator is available, report the score as `UNVERIFIED` and use the Boolean internal completion gates.
+Do not collapse validity, product quality, award comparison, and Skill efficiency into one score. They answer different questions and must remain separate.
 
-| Dimension | Weight | Passing evidence |
-| --- | ---: | --- |
-| Concept and coherence | 15 | One thesis governs type, color, composition, imagery, and motion |
-| Visual design and typography | 20 | Clear hierarchy, crafted rhythm, robust type and color system |
-| Usability and content | 15 | Top tasks and reading order work across states |
-| Mobile experience | 15 | Distinct composition and input model; no shrink-and-stack shortcut |
-| Originality and authored distinction | 10 | Product-specific identity proportional to scope; no forced effect in focused repair |
-| Accessibility | 10 | Automated/manual evidence; separate all-applicable-A/AA gate when conformance is required |
-| Localization | 5 | `zh-Hant`, expansion, mixed script, and claimed RTL behavior checked |
-| Performance and resilience | 5 | Core Web Vitals targets, failure states, progressive enhancement |
-| Code quality | 5 | Existing conventions preserved; build/tests pass; diff is focused |
+### A. Run validity and infrastructure
 
-Do not ship a universal numeric threshold with the skill. A project or controlled benchmark may freeze its own evaluator-owned calibration target before implementation, but the implementing model cannot choose it, change it, or fill missing evidence with points. Record rubric version, evaluator, artifacts, uncertainty, reviewer disagreement, and release blockers; compare models only under the same brief and evidence. A score is not a WCAG conformance result, award prediction, or external certification. When WCAG 2.2 AA is required, every applicable A and AA criterion must separately pass; no weighted score can offset a failure.
+First establish that the requested model, frozen Skill/evaluator, artifact hashes, attempt history, and evidence chain are valid. Infrastructure failure is neither a product pass nor a product failure. An invalid run cannot enter release comparison.
+
+### B. Required completion gates
+
+Record every required, applicable gate as `PASS`, `FAIL`, or `UNVERIFIED`; use `NOT_APPLICABLE` only with a reason. Any required applicable `FAIL` or `UNVERIFIED` means:
+
+```text
+eligible = false
+weighted_total = null
+release != VERIFIED
+```
+
+This rule is machine-enforced when a structured result is requested. A high craft judgment can never compensate for a broken primary task, inaccessible action, data/safety failure, missing required evidence, or invalid run.
+
+### C. Independent core craft vector
+
+Only a reviewer independent from the implementation may judge craft, and only from the frozen brief plus matched evidence. Report dimensions independently; do not total them by default.
+
+| Dimension | Review evidence |
+| --- | --- |
+| Concept and coherence | One thesis governs type, color, composition, imagery, and motion |
+| Visual design and typography | Clear hierarchy, crafted rhythm, robust type and color system |
+| Usability and content | Top tasks and reading order work across states |
+| Mobile experience | Distinct composition and input model; no shrink-and-stack shortcut |
+| Originality and authored distinction | Product-specific identity proportional to scope; no forced effect in focused repair |
+| Accessibility | Automated/manual evidence; separate all-applicable-A/AA gate when conformance is required |
+| Localization | `zh-Hant`, expansion, mixed script, and claimed RTL behavior checked |
+| Performance and resilience | Frozen project budgets, failure states, progressive enhancement |
+| Code quality | Existing conventions preserved; build/tests pass; diff is focused |
+
+Use `UNVERIFIED`, `CONCERN`, `ACCEPTABLE`, or `STRONG` with evidence and uncertainty. If a controlled benchmark needs numeric anchors, freeze the rubric, weights, missing-evidence policy, reviewer aggregation, and threshold outside the implementation context before the run. Do not expose held-out prompts, selectors, exact benchmark failure catalogues, weights, or release thresholds to the builder. A numeric result remains evaluator-specific and must be `null` whenever layer A or B is ineligible.
+
+### D. Optional award-program lens
+
+When the user explicitly requests award-quality, immersive, cinematic, portfolio, campaign, FWA, CSSDA, CSS Winner, or Awwwards comparison, additionally apply [award-quality-lens.md](award-quality-lens.md) after layers A–C. Keep one selected program's published dimensions in a separate view. Award-lens observations can trigger repair when evidence is clear, but cannot certify an award, predict selection, or compensate for a core gate failure.
+
+### E. Maintainer efficiency and Skill optimization
+
+Context bytes/tokens, selected reference count, first usable artifact latency, wall time, retries, repairs, tool installs, test runtime, flake rate, evidence coverage, recurrence, and user-relay count are maintainer metrics. They may break ties only after safety, data integrity, required gates, evidence coverage, and independent craft are non-inferior. They are not product-quality points.
+
+Record rubric version, evaluator, artifacts, uncertainty, reviewer disagreement, and release blockers; compare models only under the same brief and evidence. A review is not a WCAG conformance result, award prediction, or external certification. When WCAG 2.2 AA is required, every applicable A and AA criterion must separately pass.
 
 For accessibility, define the evidence matrix separately: automated rules; keyboard and zoom; Chromium accessibility-tree checks where available; and named screen-reader/browser combinations for the product's declared support. An AX tree is not VoiceOver, NVDA, JAWS, TalkBack, or Narrator evidence. Do not claim assistive-technology support that was not actually operated.
 
 For performance, freeze project-specific budgets before implementation: route/asset JavaScript and CSS, image/font/media weight, main-thread/animation behavior, and applicable Core Web Vitals or lab diagnostics. A default budget copied from another product is a hypothesis, not a release fact.
 
-This is an independent internal quality model spanning design, usability, creativity, content, responsive implementation, accessibility, semantics, animation, and performance. It is not mapped to Awwwards scoring or any other award system.
+The core craft vector spans design, usability, creativity, content, responsive implementation, accessibility, semantics, animation, and performance. It is not mapped to Awwwards scoring or any other award system.
 
 ## 5. Internal completion gates
 
@@ -161,6 +197,9 @@ Do not call the work verified with any of these. Route each reachable, in-scope 
 - accidental horizontal scroll or clipped core content at a required viewport;
 - unintentionally wrapped or clipped short action labels, or hidden responsive DOM copies that duplicate IDs, state, focus targets, or evaluator identities;
 - forced `<br>` or source-newline composition in ordinary body/list copy; prose disabled from normal wrapping; or a narrow paragraph cap that leaves most of an otherwise empty wide content surface unused;
+- a Traditional Chinese display heading hard-capped with Latin `ch`, compressed into four or more lines while usable inline space remains, ending in an accidental one-character line, or patched with a non-breaking phrase that overflows another required width/locale/zoom/font;
+- secondary badges, metadata, or controls taking a heading's primary inline track and causing an avoidable orphan fragment; recompose the region before shrinking the title;
+- a later major header/grid child rendered above an earlier DOM sibling without an intentional accessible reorder, or a large decorative peer track that displaces the primary task without a named role;
 - global `break-all`, `line-break: anywhere`, `keep-all`, generated `<wbr>`, per-character spacer markup, or DOM text rewriting used to fake CJK alignment; emergency breaking must be scoped to verified unbroken data and preserve copy/search/selection;
 - a paragraph region that accidentally combines incompatible UI, web-editorial, book-like, or fixed-display spacing/indent/wrapping rules; or centered display punctuation/anti-orphan `nowrap` that breaks another width, locale, zoom level, or fallback font;
 - mobile navigation, primary content, focused control, or form blocked by fixed/sticky UI or the virtual keyboard;
