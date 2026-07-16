@@ -284,6 +284,11 @@ fi
                 self.assertIn("do not run git status, git diff", prompt)
                 self.assertIn("Do not discover or read installed skills", prompt)
                 self.assertIn("the independent evaluator owns browser interaction", prompt)
+                self.assertIn("Every executed shell command must use literal arguments and literal filenames", prompt)
+                self.assertIn(
+                    "Dollar signs, asterisks, question marks, square brackets, curly braces, and backticks are forbidden anywhere in the command string, including quoted code or regular expressions",
+                    prompt,
+                )
                 target = root / "evals" / f"codex-{model}-harbor-cold-chain-v4"
                 manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
                 self.assertEqual(model, manifest["model"]["requested_identifier"])
