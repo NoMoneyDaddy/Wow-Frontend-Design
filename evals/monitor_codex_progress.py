@@ -69,13 +69,15 @@ def regular_file_size(path: Path) -> int:
     return info.st_size
 
 
-def process_alive(pid: int) -> bool:
+def process_group_alive(pid: int) -> bool:
     try:
-        os.kill(pid, 0)
+        os.killpg(pid, 0)
     except ProcessLookupError:
         return False
-    except PermissionError as error:
-        raise ResourceMonitorError(f"cannot inspect monitored process: {error}") from error
+    except PermissionError:
+        # POSIX kill(..., 0) uses EPERM to signal that the group exists but is
+        # not currently signalable. Treat it as alive so monitoring fails closed.
+        return True
     return True
 
 
@@ -90,7 +92,7 @@ def terminate_process_group(pid: int) -> None:
         except ProcessLookupError:
             return
     for _ in range(10):
-        if not process_alive(pid):
+        if not process_group_alive(pid):
             return
         time.sleep(0.1)
     try:
@@ -132,7 +134,7 @@ def monitor(
     if pid < 1 or stage_limit < 1 or log_limit < 1 or not 0.1 <= interval <= 10:
         raise ResourceMonitorError("invalid monitor bounds")
     last_size = -1
-    while process_alive(pid):
+    while process_group_alive(pid):
         stage_size = stage_usage_bytes(stage, stage_limit)
         log_size = regular_file_size(log)
         if stage_size > stage_limit or log_size > log_limit:

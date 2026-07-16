@@ -347,7 +347,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
   sleep 0.05
 done
 CODEX_PID="$(command cat "$CODEX_PID_FILE" 2>/dev/null || true)"
-if [[ ! "$CODEX_PID" =~ ^[0-9]+$ ]] || ! kill -0 "$CODEX_PID" 2>/dev/null; then
+if [[ ! "$CODEX_PID" =~ ^[0-9]+$ ]]; then
   echo "cannot establish isolated Codex process group" >&2
   exit 1
 fi

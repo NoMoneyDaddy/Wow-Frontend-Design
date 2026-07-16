@@ -103,6 +103,7 @@ CODE_EXTENSIONS = TEXT_EXTENSIONS | {".mjs", ".cjs"}
 MAX_READ_BYTES = 512_000
 MAX_WALK_DIRECTORIES = 20_000
 MAX_DIRECTORY_ENTRIES = 10_000
+MAX_JSON_DEPTH = 128
 
 PACKAGE_SIGNALS = {
     "@angular/core": "Angular",
@@ -376,6 +377,20 @@ def read_text(path: Path) -> str:
         return ""
 
 
+def _json_depth_exceeds(value: Any, limit: int = MAX_JSON_DEPTH) -> bool:
+    """Return whether a decoded JSON tree exceeds an interpreter-neutral depth."""
+    pending: list[tuple[Any, int]] = [(value, 1)]
+    while pending:
+        current, depth = pending.pop()
+        if not isinstance(current, (dict, list)):
+            continue
+        if depth > limit:
+            return True
+        children = current.values() if isinstance(current, dict) else current
+        pending.extend((child, depth + 1) for child in children)
+    return False
+
+
 def load_packages(root: Path, files: Iterable[Path]) -> tuple[list[tuple[str, dict[str, Any]]], list[str]]:
     packages: list[tuple[str, dict[str, Any]]] = []
     warnings: list[str] = []
@@ -395,6 +410,11 @@ def load_packages(root: Path, files: Iterable[Path]) -> tuple[list[tuple[str, di
             UnsafeProjectFileError,
         ) as error:
             warnings.append(f"{rel} could not be parsed: {error}")
+            continue
+        if _json_depth_exceeds(raw):
+            warnings.append(
+                f"{rel} could not be parsed: JSON nesting exceeds {MAX_JSON_DEPTH} levels"
+            )
             continue
         if not isinstance(raw, dict):
             warnings.append(f"{rel} is not a JSON object")
