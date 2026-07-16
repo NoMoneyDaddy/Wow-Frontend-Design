@@ -6,9 +6,11 @@ Use this reference when maintaining the Skill, integrating upstream guidance, or
 
 Record a stable case ID, task/locale, Skill and adapter hashes, exact model/provider/alias resolution, auth mode, tools, prompt/context hashes, writable files, output manifest, commands, browser/version, viewports/preferences, raw findings, screenshots, and timestamps. Keep raw model output immutable. Put repairs in a new run or clearly separated corrected artifact.
 
-## Freeze platform evidence by stage
+## Freeze package and script-runtime evidence separately
 
-Treat host, operating system, remote environment, browser/device and model support as separate cells. For each cell, keep official documentation distinct from install → discovery → invocation → implementation → browser → visual evidence. A copied Skill directory is not discovery; discovery is not a successful implementation; browser emulation is not a physical-device result. Preserve `failed`, `partial`, `historic_only` and `not_run` instead of collapsing them into “supported”.
+Treat Agent Skills package compatibility as one standards contract. Do not create a model-brand support matrix or fork the Skill for Codex, Claude, Copilot or Gemini. Host-specific installation and discovery remain integration checks; model quality belongs to a separate evaluation cohort.
+
+Track only executable runtime differences here: installed Python scripts, OS, required commands, POSIX evaluator assumptions, browser backend and visual evidence. Keep static → unit → Linux → macOS → Windows → browser → visual stages distinct. A configured job is not a completed run; Chromium is not Firefox/WebKit; browser emulation is not a physical-device result. Preserve `failed`, `partial`, `not_supported` and `not_run` instead of collapsing them into “supported”. Every non-test Python entrypoint bundled under `scripts/` must appear exactly once in the runtime matrix.
 
 Before a portability run, capture privacy-bounded host provenance into evaluator-owned storage:
 
@@ -23,7 +25,7 @@ python3 <skill-dir>/scripts/capture_runtime_profile.py \
   --network available --browser available --screenshots available
 ```
 
-The helper does not inspect hostname, user, home, IP, environment variables, network or installed fonts, and does not execute external commands. Caller-supplied versions are declarations; bind them to setup logs, lockfiles or a browser report before promoting a claim. Keep mutable official coordinates in [platform-support-sources.json](platform-support-sources.json), and validate a repository-owned support matrix without adding an automatic recheck schedule. A newly configured CI cell remains `not_run` until its own completed run is preserved.
+The helper does not inspect hostname, user, home, IP, environment variables, network or installed fonts, and does not execute external commands. Caller-supplied versions are declarations; bind them to setup logs, lockfiles or a browser report before promoting a claim. Keep only Agent Skills, Python CI and browser-runtime source coordinates in [platform-support-sources.json](platform-support-sources.json), and validate the repository-owned script matrix without adding an automatic recheck schedule. A newly configured CI cell remains `not_run` until its own completed run is preserved.
 
 ## Classify the root cause
 

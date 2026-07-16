@@ -23,84 +23,50 @@ MATRIX_ROOT_KEYS = {"schema_version", "snapshot_at", "semantics", "source_snapsh
 TARGET_KEYS = {
     "id",
     "category",
-    "official_status",
     "repository_status",
+    "entrypoints",
+    "requirements",
     "checks",
     "source_ids",
     "artifacts",
     "boundary",
 }
-CHECK_KEYS = {"install", "discovery", "invocation", "implementation", "browser", "visual"}
+CHECK_KEYS = {"static", "unit", "linux", "macos", "windows", "browser", "visual"}
 APPROVED_SOURCE_HOSTS = {
     "agentskills.io",
-    "cli.github.com",
-    "developers.openai.com",
-    "docs.anthropic.com",
     "docs.github.com",
-    "geminicli.com",
-    "platform.claude.com",
     "playwright.dev",
 }
-CATEGORIES = {"host", "operating_system", "browser", "device", "environment", "model"}
+CATEGORIES = {"package", "installed_script", "ci", "evaluator_harness", "browser_backend"}
 PREFIXES = {
-    "host": "host-",
-    "operating_system": "os-",
-    "browser": "browser-",
-    "device": "device-",
-    "environment": "environment-",
-    "model": "model-",
-}
-OFFICIAL_STATUSES = {
-    "supported",
-    "preview",
-    "best_effort",
-    "model_variable",
-    "not_documented",
-    "not_applicable",
+    "package": "package-",
+    "installed_script": "script-",
+    "ci": "ci-",
+    "evaluator_harness": "evaluator-",
+    "browser_backend": "browser-",
 }
 REPOSITORY_STATUSES = {
     "browser_observed",
     "tested_in_ci",
     "partially_tested",
     "observed_failed",
-    "historic_only",
-    "documented_not_tested",
     "not_tested",
+    "not_supported",
 }
-CHECK_STATUSES = {"passed", "failed", "partial", "historic_only", "not_run", "not_applicable"}
+CHECK_STATUSES = {"passed", "failed", "partial", "not_run", "not_applicable", "not_supported"}
 REQUIRED_TARGET_IDS = {
+    "package-agent-skills-standard",
+    "script-portable-python-core",
+    "script-git-installability",
+    "script-command-evidence-ledger",
+    "ci-portable-python-matrix",
+    "evaluator-posix-runners",
+    "evaluator-windows-native",
+    "evaluator-windows-wsl",
+    "browser-chromium-evaluator",
     "browser-chrome-edge-channels",
-    "browser-chromium",
-    "browser-firefox",
-    "browser-webkit",
-    "device-physical-android-chrome",
-    "device-physical-ios-safari",
-    "environment-claude-code-remote",
-    "environment-github-actions-ubuntu",
-    "environment-local-workspace",
-    "environment-no-network-sandbox",
-    "environment-read-only-home",
-    "host-claude-ai",
-    "host-claude-api",
-    "host-claude-code",
-    "host-codex-chatgpt-desktop",
-    "host-codex-cli",
-    "host-codex-ide-extension",
-    "host-custom-agent-wrapper",
-    "host-gemini-cli",
-    "host-github-copilot-cli",
-    "host-github-copilot-jetbrains",
-    "host-github-copilot-vscode",
-    "model-claude-haiku-opus",
-    "model-gemini-offerings",
-    "model-github-copilot-offerings",
-    "model-gpt-5-4-mini",
-    "model-local-runtime",
-    "model-other-codex-models",
-    "os-linux-native",
-    "os-macos-native",
-    "os-windows-native",
-    "os-windows-wsl",
+    "browser-firefox-evaluator",
+    "browser-webkit-evaluator",
 }
 ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
@@ -183,7 +149,18 @@ def _safe_repo_file(raw: Any, root: Path, label: str) -> Path:
 
 
 def _string_list(value: Any, label: str) -> list[str]:
-    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item.strip() for item in value):
+    if (
+        not isinstance(value, list)
+        or not value
+        or len(value) > 256
+        or not all(
+            isinstance(item, str)
+            and item.strip()
+            and len(item) <= 512
+            and item.isprintable()
+            for item in value
+        )
+    ):
         raise PlatformSupportError(f"{label} must be a non-empty string array")
     if len(value) != len(set(value)):
         raise PlatformSupportError(f"{label} must contain unique values")
@@ -237,22 +214,46 @@ def _validate_target_consistency(target: dict[str, Any], label: str) -> None:
     values = target["checks"]
     if status == "browser_observed" and not (values["browser"] == "passed" and values["visual"] == "passed"):
         raise PlatformSupportError(f"{label} browser_observed requires passed browser and visual checks")
+    if status == "tested_in_ci" and not (
+        values["unit"] == "passed" and values["linux"] == "passed"
+    ):
+        raise PlatformSupportError(f"{label} tested_in_ci requires passed unit and Linux checks")
+    if status == "partially_tested" and not (
+        "passed" in values.values() and any(value in {"partial", "not_run"} for value in values.values())
+    ):
+        raise PlatformSupportError(f"{label} partially_tested requires both observed and incomplete checks")
     if status == "observed_failed" and "failed" not in values.values():
         raise PlatformSupportError(f"{label} observed_failed requires at least one failed check")
-    if status == "historic_only" and not all(
-        value in {"historic_only", "not_applicable"} for value in values.values()
-    ):
-        raise PlatformSupportError(f"{label} historic_only cannot contain current evidence")
-    if status in {"documented_not_tested", "not_tested"} and any(
-        value in {"passed", "failed", "partial", "historic_only"} for value in values.values()
+    if status == "not_tested" and any(
+        value in {"passed", "failed", "partial", "not_supported"} for value in values.values()
     ):
         raise PlatformSupportError(f"{label} untested status cannot contain observed evidence")
+    if status == "not_supported" and not (
+        "not_supported" in values.values()
+        and all(value in {"not_supported", "not_applicable"} for value in values.values())
+    ):
+        raise PlatformSupportError(f"{label} not_supported must be explicit and cannot contain test evidence")
+
+
+def _installed_script_inventory(root: Path) -> set[str]:
+    scripts = root / "wow-frontend-design" / "scripts"
+    try:
+        entries = list(scripts.iterdir())
+    except OSError as error:
+        raise PlatformSupportError(f"cannot enumerate installed scripts: {error}") from error
+    if len(entries) > 256:
+        raise PlatformSupportError("installed scripts directory exceeds the bounded inventory")
+    return {
+        entry.relative_to(root).as_posix()
+        for entry in entries
+        if entry.name.endswith(".py") and not entry.name.startswith("test_")
+    }
 
 
 def _validated_snapshot(matrix_path: Path, repository_root: Path) -> tuple[int, int, dict[str, Any]]:
     root = repository_root.resolve(strict=True)
     matrix = _load_json(matrix_path, "platform matrix")
-    if set(matrix) != MATRIX_ROOT_KEYS or matrix.get("schema_version") != 1:
+    if set(matrix) != MATRIX_ROOT_KEYS or matrix.get("schema_version") != 2:
         raise PlatformSupportError("platform matrix root or schema_version is invalid")
     _date(matrix["snapshot_at"], "platform matrix snapshot_at")
     if not isinstance(matrix["semantics"], str) or len(matrix["semantics"].strip()) < 80:
@@ -269,6 +270,7 @@ def _validated_snapshot(matrix_path: Path, repository_root: Path) -> tuple[int, 
         raise PlatformSupportError("targets must be a non-empty array")
     ids: set[str] = set()
     used_source_ids: set[str] = set()
+    installed_entrypoints: set[str] = set()
     for index, target in enumerate(targets):
         label = f"targets[{index}]"
         if not isinstance(target, dict) or set(target) != TARGET_KEYS:
@@ -285,10 +287,19 @@ def _validated_snapshot(matrix_path: Path, repository_root: Path) -> tuple[int, 
         ):
             raise PlatformSupportError(f"{label} id/category is invalid or duplicated")
         ids.add(target_id)
-        if not isinstance(target["official_status"], str) or target["official_status"] not in OFFICIAL_STATUSES:
-            raise PlatformSupportError(f"{label}.official_status is invalid")
         if not isinstance(target["repository_status"], str) or target["repository_status"] not in REPOSITORY_STATUSES:
             raise PlatformSupportError(f"{label}.repository_status is invalid")
+        entrypoints = _string_list(target["entrypoints"], f"{label}.entrypoints")
+        for entrypoint in entrypoints:
+            resolved_entrypoint = _safe_repo_file(entrypoint, root, f"{label}.entrypoints")
+            if not resolved_entrypoint.is_file():
+                raise PlatformSupportError(f"{label}.entrypoints must contain regular files")
+        if category == "installed_script":
+            duplicated = installed_entrypoints.intersection(entrypoints)
+            if duplicated:
+                raise PlatformSupportError(f"{label}.entrypoints duplicates installed scripts: {sorted(duplicated)}")
+            installed_entrypoints.update(entrypoints)
+        _string_list(target["requirements"], f"{label}.requirements")
         checks = target["checks"]
         if not isinstance(checks, dict) or set(checks) != CHECK_KEYS:
             raise PlatformSupportError(f"{label}.checks must contain exactly {sorted(CHECK_KEYS)}")
@@ -310,6 +321,11 @@ def _validated_snapshot(matrix_path: Path, repository_root: Path) -> tuple[int, 
         missing = sorted(REQUIRED_TARGET_IDS - ids)
         unexpected = sorted(ids - REQUIRED_TARGET_IDS)
         raise PlatformSupportError(f"platform inventory drift; missing={missing}, unexpected={unexpected}")
+    expected_scripts = _installed_script_inventory(root)
+    if installed_entrypoints != expected_scripts:
+        missing = sorted(expected_scripts - installed_entrypoints)
+        unexpected = sorted(installed_entrypoints - expected_scripts)
+        raise PlatformSupportError(f"installed script inventory drift; missing={missing}, unexpected={unexpected}")
     if used_source_ids != source_ids:
         raise PlatformSupportError(f"unused official source ids: {sorted(source_ids - used_source_ids)}")
     return len(targets), len(source_ids), matrix
@@ -329,11 +345,22 @@ def build_gap_report(matrix_path: Path, repository_root: Path) -> dict[str, Any]
         target["id"]
         for target in targets
         if target["repository_status"] not in {"browser_observed", "tested_in_ci"}
-        or any(value in {"failed", "partial", "historic_only", "not_run"} for value in target["checks"].values())
+        or any(value in {"failed", "partial", "not_run", "not_supported"} for value in target["checks"].values())
     )
     failed = sorted(
         target["id"] for target in targets if "failed" in target["checks"].values()
     )
+    unsupported = sorted(
+        target["id"] for target in targets if target["repository_status"] == "not_supported"
+    )
+    gaps_by_check = {
+        check: sorted(
+            target["id"]
+            for target in targets
+            if target["checks"][check] in {"failed", "partial", "not_run", "not_supported"}
+        )
+        for check in sorted(CHECK_KEYS)
+    }
     targets_by_status = {
         status: sorted(target["id"] for target in targets if target["repository_status"] == status)
         for status in sorted(statuses)
@@ -343,12 +370,17 @@ def build_gap_report(matrix_path: Path, repository_root: Path) -> dict[str, Any]
         "snapshot_at": matrix["snapshot_at"],
         "target_count": target_count,
         "official_source_count": source_count,
+        "installed_script_entrypoint_count": sum(
+            len(target["entrypoints"]) for target in targets if target["category"] == "installed_script"
+        ),
         "category_counts": dict(sorted(categories.items())),
         "repository_status_counts": dict(sorted(statuses.items())),
         "target_ids_by_repository_status": targets_by_status,
         "incomplete_target_ids": incomplete,
         "failed_target_ids": failed,
-        "boundary": "This report summarizes validated declarations and checked-in evidence stages. It does not execute missing platform cells or promote their status.",
+        "unsupported_target_ids": unsupported,
+        "target_ids_by_incomplete_check": gaps_by_check,
+        "boundary": "This report covers Agent Skills package structure, installed scripts, evaluator runtimes and mainstream browser backends. It does not rank or certify model brands, execute missing runtime cells or promote their status.",
     }
 
 

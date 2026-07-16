@@ -67,7 +67,7 @@ v6 report 把 screenshot、route、state、viewport、DPR、browser、source、a
 - `briefs/*-v6.md`、`product-flow-v6-repaired-v2-targets/`、`product-flow-v6-visual-results.json` 與 `../assets/product-flow-v6/`：目前 8 案自修復 cohort 的 brief、最終網站、browser report 與 64 張發布截圖。
 - `claude-haiku-product-dashboard-remake/`：唯一一次 anti-slop remediation invocation 的拒絕紀錄；輸出政策在 publish 前熔斷，沒有可接受網站產物。
 - `capability-status.json`：公開 claim ledger。每項能力都要有現存 artifact 與明示 boundary；validator 只確保狀態結構與路徑未腐化，不替內容升級證據。
-- `platform-support.json`：本版一次性平台快照。32 格分開 host／OS／browser／device／environment／model 的官方狀態與 install → discovery → invocation → implementation → browser → visual 證據；沒有下次查核日期，未跑過的格子維持 `not_run`。
+- `platform-support.json`：本版一次性 script runtime 快照。Agent Skills package 依標準驗證，不按模型品牌分格；12 格只追蹤 23 個 installed Python entrypoints、CI／POSIX evaluator 與 Chromium、Chrome／Edge、Firefox、WebKit backend。沒有下次查核日期，未跑過的格子維持 `not_run`。
 - `../wow-frontend-design/scripts/capture_runtime_profile.py`：只輸出 privacy-bounded OS／Python 與 caller declarations，不讀 hostname／user／home／IP／完整 environment，也不執行 command 或 network probe。跨 OS CI smoke 會執行它與 portable contract tests，但新 cell 必須等 workflow 真正完成才可升級。
 - `../wow-frontend-design/scripts/model_profile.example.json`、`route_model.py`：由 evaluator 依 task／locale／surface／risk 與精確環境 revision 決定起始 lane；模型不能自報強弱。
 - `../wow-frontend-design/scripts/runtime_events.example.json`、`runtime_downgrade.py`：把真實 schema／工具／repair／timeout／權限結果轉成單向降級；不允許同一 run 自動升級。

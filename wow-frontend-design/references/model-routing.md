@@ -10,6 +10,8 @@ Use this reference when choosing models, orchestrating strong/weak builders and 
 
 Do not infer capability from a brand name such as “mini,” “Haiku,” “Pro,” or “Opus.” Model aliases, versions, tools, context limits, providers, and behavior change. Record the exact run provenance.
 
+Model routing is an evaluator optimization, not an Agent Skills compatibility layer. The installed Skill package stays model-neutral; only executable script/runtime requirements belong in the support matrix.
+
 ### 結論：routing 不是假議題，model-name branching 才是
 
 模型路由確實能在特定分布上改善品質／成本，但「強／弱」不是穩定的一維排序。模型可能會寫 code，卻無法可靠選 Skill、操作工具、看圖、保留 locale 或完成長流程；同一模型也會因 adapter、context、effort、工具、權限與 evaluator 不同而改變表現。因此：

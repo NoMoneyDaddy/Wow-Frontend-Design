@@ -7,7 +7,7 @@
 ### Added
 
 - Portable CI contract smoke：用固定 Python 3.12 在 `ubuntu-latest`、`macos-latest`、`windows-latest` 驗 Skill installability、平台／capability ledger 與 focused tests；新增不讀 hostname／user／home／IP／environment、不執行外部 probe 的 runtime provenance helper，以及 `--report` 機器可讀缺口摘要。Workflow 尚未完成的 cell 不會自動升級。
-- 一次性平台／OS／environment／browser／device／model 支援快照：32 個固定 cell 分開官方文件與 install、discovery、invocation、implementation、browser、visual 證據，綁定 22 個官方來源座標；validator 拒絕未知來源、路徑逃逸、stage 矛盾與任何下次查核日期欄位。
+- 一次性 script runtime 支援快照：Agent Skills package 依標準驗證，不按模型品牌分格；12 個固定 cell 精確涵蓋 23 個 installed Python entrypoint、CI／POSIX evaluator 與主流 browser backend，綁定 5 個官方來源座標。Validator 拒絕漏列／重複 script、未知來源、路徑逃逸、stage 矛盾與任何下次查核日期欄位。
 - 中文標題逐行量測 gate：重建 `h1–h3` 可見字元行，將意外的一字末行回送自動修復，並納入 v6 evidence validator。
 - 角色字級與字型研究：補入 GogoShark、PixelCake、Apple／Notion／Claude／Stripe／Uber／Mastercard `DESIGN.md`、MindStudio 選型文章、`getdesign@0.6.24`、`design-ai` 與 `emfont` 的可取模式及 schema／授權／預覽失敗／npm-repo 漂移／隱私邊界。
 - `sk1llz` registry 與官方 Material Web 的 pinned 稽核：加入 manifest／分類可取模式、remote installer path／hash／symlink／staging／rollback／隱形 Unicode 防護，並明示 Material Web maintenance mode 與 exact-version adapter 邊界。
@@ -24,7 +24,7 @@
 
 ### Changed
 
-- Skill 維護與 model-routing 流程把 host／OS／remote／browser／model 支援拆成逐階段 ratchet，並要求 privacy-bounded runtime profile；caller declaration 不再能單獨升級為實測證據。
+- Skill 維護流程把 standards-compatible package 與 executable runtime 分離；model routing 只屬於 evaluator 品質策略。Python／OS／POSIX evaluator／browser 支援採逐階段 ratchet，並要求 privacy-bounded runtime profile；caller declaration 不再能單獨升級為實測證據。
 - README、INSTALL、平台說明、評測文件、公開 capability ledger 與 CI 改為引用同一份有界支援快照，未實跑平台維持未驗證；`SKILL.md` 核心不綁定這份一次性外部狀態，避免把安裝研究載入每個設計任務或冒充既有 v6 已用新版核心重跑。
 - CI 更新並固定至官方最新穩定版 `actions/checkout@v7.0.0`、`actions/setup-python@v6.3.0`、`actions/setup-node@v7.0.0` 與 GitHub CLI `v2.96.0`，移除舊版 Node.js 20 Action 警告並保持可重現安裝。
 - `SKILL.md` 由 333 行／約 5,942 words 收斂為 211 行／約 2,939 words：只保留 trigger、不可違反規則、reference router、七階段狀態機、自修復與 terminal behavior；詳細排版、元件、模型、驗證與研究規則維持在直接 references／scripts。
@@ -32,7 +32,7 @@
 - 最新繁中排版／layout／hierarchy／字型／色彩研究落實到 Skill 與全部 8 個 v6 網站；最終 ledger 為 8 repairs／0 promotions，公開契約修正後重新發布 64 張截圖。
 - model profile 升級為 schema v2：依 task／locale／surface／risk、Skill／adapter／toolchain／evaluator revision 與 eligible run 路由；infrastructure failure 不計入模型成績。
 - Codex case runner 依 caller model 與案例載入最小固定 context；v6 mini 實際輸入由 190,732 bytes 降至 145,024–161,274 bytes，manifest 保留選取清單，尚不宣稱速度改善。
-- README 只保留產品說明、成果與實際使用流程；host matrix、remote sandbox、pin、更新與卸載集中到 `INSTALL.md`，並新增 5 分鐘 discovery smoke。
+- README 只保留產品說明、成果與實際使用流程；host 安裝範例、remote sandbox、pin、更新與卸載集中到 `INSTALL.md`，並新增 5 分鐘 discovery smoke。
 - 評分改為 run validity → required hard gates → independent craft vector → optional award lens → maintainer efficiency 五層決策；v6 明確標為 development/regression closure，不再暗示 held-out validation。
 - 以 pinned `darwin-skill` 與兩個獨立 judge 做 advisory ratchet；只採用「新 authority／material side effect 才停下確認」的 bounded checkpoint，拒絕頻繁 STOP、單一總分與重複 blacklist 等會降低 UX／證據完整性的 generic 建議。
 

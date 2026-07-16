@@ -2,7 +2,7 @@
 
 `wow-frontend-design/` 本身就是符合 Agent Skills 格式的 skill 目錄。安裝只代表 host 能發現 metadata；不代表特定模型、工具、框架或品質已通過實測。
 
-本版的 host、OS、browser、remote environment 與 model 邊界先看 [`PLATFORM_SUPPORT.md`](PLATFORM_SUPPORT.md)，機器證據收錄在 [`evals/platform-support.json`](evals/platform-support.json)，官方來源座標固定在 [`platform-support-sources.json`](wow-frontend-design/references/platform-support-sources.json)。這是一次性版本快照，沒有下次查核日期。先看每格 `checks`：installer 能放置檔案不等於 host 已發現，host 能呼叫也不等於生成、browser 或 visual 已通過。
+Package 相容性以 [Agent Skills specification](https://agentskills.io/specification) 為準，不按模型品牌維護不同版本。Host 安裝路徑、scope 與 discovery UI 仍可能不同；installer 能放置檔案不等於當次 session 已載入。Python、OS、POSIX evaluator 與主流 browser backend 的實測邊界見 [`PLATFORM_SUPPORT.md`](PLATFORM_SUPPORT.md)與 [`evals/platform-support.json`](evals/platform-support.json)。
 
 ## 5 分鐘成功路徑
 

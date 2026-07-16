@@ -44,7 +44,7 @@ python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py \
 - `@google/design.md@0.3.0`、`playwright@1.61.1`，或執行前經官方 stable channel 確認後另開變更，不在 active run 中升級。
 - Node、Python、Codex CLI、OS、browser engine revision、locale、timezone 與字型環境。
 - implementation builder 停用 browser/computer/subagent；外層 evaluator 獨立擁有瀏覽器、截圖與判定。
-- 平台／OS／environment／model 支援只以本版 `platform-support.json` 的 stage-by-stage evidence 宣稱；官方文件與 repo 實測不得互相代替。這是一次性快照，不排定下次查核日期。
+- Agent Skills package 相容性只依標準與 installability gate；不按模型品牌分支。Python scripts、OS、POSIX evaluator 與主流 browser backend 只以本版 `platform-support.json` 的 stage-by-stage evidence 宣稱；官方文件與 repo 實測不得互相代替。這是一次性快照，不排定下次查核日期。
 
 Active gate 開始後不得修改期待值或 auditor。發現 evaluator defect 時，該 run 標記無效；修 evaluator、補 counterexample test、重新凍結後再開新 run。
 
