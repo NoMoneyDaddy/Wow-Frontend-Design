@@ -154,6 +154,27 @@ class V7PreflightTests(unittest.TestCase):
             with self.assertRaisesRegex(preflight.PreflightError, "editable path"):
                 preflight.build_manifest(config_path, root, "2026-07-16T00:00:00Z")
 
+    def test_candidate_id_allows_positive_iteration_number(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, config_path, config, _ = self._repository(directory)
+            config["candidate"]["id"] = "v7-a2"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            manifest = preflight.build_manifest(config_path, root, "2026-07-16T00:00:00Z")
+            self.assertEqual("v7-a2", manifest["candidate"]["id"])
+            config["candidate"]["id"] = "v7-a0"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(preflight.PreflightError, "positive integer"):
+                preflight.build_manifest(config_path, root, "2026-07-16T00:00:00Z")
+
+    def test_pilot_can_use_observed_timeout_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, config_path, config, _ = self._repository(directory)
+            for timeout in config["timeouts"].values():
+                timeout["source"] = "observed-after-pilot"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            manifest = preflight.build_manifest(config_path, root, "2026-07-16T00:00:00Z")
+            self.assertEqual("observed-after-pilot", manifest["timeouts"]["generation"]["source"])
+
     def test_evaluator_drift_invalidates_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root, config_path, _, _ = self._repository(directory)

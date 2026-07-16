@@ -5,7 +5,7 @@
   "baseline_commit": "5b7dfdcda200870f1c4ef3b63692818902adfafb",
   "candidate": {
     "id": "v7-a2",
-    "hypothesis": "把長繁中產品標題設為優先跨欄，只有必須同時可見且實際占用版面的任務內容才能取得側軌，並在桌機與手機檢查一至兩字短尾，可減少標題窄長、末行孤字與右側無效留白。",
+    "hypothesis": "把長繁中產品標題設為優先跨欄，只有必須同時可見且實際占用版面的任務內容才能取得側軌，並在桌機與手機檢查一至兩字短尾，可減少標題窄長、末行孤字與右側無效留白，同時保留文章閱讀欄、直排展示與真正任務側欄的合理窄軌。",
     "editable_paths": [
       "wow-frontend-design/references/typographic-layout.md"
     ],
@@ -28,17 +28,17 @@
     "generation": {
       "inactivity_seconds": 300,
       "hard_seconds": 1800,
-      "source": "round-1-observed"
+      "source": "observed-after-pilot"
     },
     "lint": {
       "inactivity_seconds": 30,
       "hard_seconds": 180,
-      "source": "round-1-observed"
+      "source": "observed-after-pilot"
     },
     "capture": {
       "inactivity_seconds": 30,
       "hard_seconds": 180,
-      "source": "round-1-observed"
+      "source": "observed-after-pilot"
     }
   },
   "splits": {

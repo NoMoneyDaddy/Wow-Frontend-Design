@@ -215,8 +215,8 @@ def _validate_config(data: dict[str, Any], root: Path) -> dict[str, Any]:
     candidate = data["candidate"]
     if not isinstance(candidate, dict) or set(candidate) != CANDIDATE_KEYS:
         raise PreflightError("candidate contract is invalid")
-    if candidate["id"] != "v7-a1":
-        raise PreflightError("candidate.id must equal v7-a1")
+    if not isinstance(candidate["id"], str) or re.fullmatch(r"v7-a[1-9][0-9]*", candidate["id"]) is None:
+        raise PreflightError("candidate.id must match v7-a followed by a positive integer")
     _string(candidate["hypothesis"], "candidate.hypothesis", minimum=80, maximum=1_500)
     editable_paths = _string_list(candidate["editable_paths"], "candidate.editable_paths")
     if editable_paths != [EXPECTED_EDITABLE_PATH]:
@@ -252,7 +252,7 @@ def _validate_config(data: dict[str, Any], root: Path) -> dict[str, Any]:
         hard = contract["hard_seconds"]
         if not isinstance(idle, int) or not isinstance(hard, int) or not 30 <= idle <= hard <= 14_400:
             raise PreflightError(f"timeouts.{stage} must satisfy 30 <= inactivity <= hard <= 14400")
-        if contract["source"] not in {"provisional-before-pilot", "frozen-after-pilot"}:
+        if contract["source"] not in {"provisional-before-pilot", "observed-after-pilot", "frozen-after-pilot"}:
             raise PreflightError(f"timeouts.{stage}.source is invalid")
         if data["stage"] == "frozen" and contract["source"] != "frozen-after-pilot":
             raise PreflightError("a frozen cohort cannot retain provisional timeout values")
