@@ -132,10 +132,28 @@ def validate_target_provenance(
         artifact = target_root / item["path"]
         if not artifact.is_file() or artifact.is_symlink() or artifact.stat().st_size != item["bytes"] or _digest(artifact) != item["sha256"]:
             raise V7VisualRunnerError(f"generation output hash is stale for {variant}/{case_id}")
+    brief_sha256 = run_manifest.get("brief_sha256")
+    if not isinstance(brief_sha256, str) or preflight.SHA256_PATTERN.fullmatch(brief_sha256) is None:
+        raise V7VisualRunnerError(f"generation brief binding is invalid for {variant}/{case_id}")
     return {
         "materialized_tree_sha256": package["materialized_tree_sha256"],
         "editable_sha256": package["editable_sha256"],
+        "brief_sha256": brief_sha256,
     }
+
+
+def validate_generation_cohort(
+    records: dict[tuple[str, str], dict[str, str]], public_cases: set[str]
+) -> None:
+    package_records: dict[str, set[tuple[str, str]]] = {variant: set() for variant in evidence.VARIANTS}
+    for (variant, _case_id), record in records.items():
+        package_records[variant].add((record["materialized_tree_sha256"], record["editable_sha256"]))
+    if any(len(items) != 1 for items in package_records.values()):
+        raise V7VisualRunnerError("all cases of each variant must use one identical Skill package")
+    for case_id in public_cases:
+        brief_hashes = {records[(variant, case_id)]["brief_sha256"] for variant in evidence.VARIANTS}
+        if len(brief_hashes) != 1:
+            raise V7VisualRunnerError(f"accepted and candidate briefs differ for {case_id}")
 
 
 def load_hidden_matrix(
@@ -292,14 +310,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     roots = [Path(target["root"]).resolve(strict=True) for target in targets.values()]
     if len(roots) != len(set(roots)):
         raise V7VisualRunnerError("accepted and candidate targets must use distinct roots")
-    package_records: dict[str, set[tuple[str, str]]] = {variant: set() for variant in evidence.VARIANTS}
+    generation_records: dict[tuple[str, str], dict[str, str]] = {}
     for (variant, case_id), target in targets.items():
-        record = validate_target_provenance(
+        generation_records[(variant, case_id)] = validate_target_provenance(
             Path(target["root"]), variant, case_id, cohort, manifest_path, root
         )
-        package_records[variant].add((record["materialized_tree_sha256"], record["editable_sha256"]))
-    if any(len(records) != 1 for records in package_records.values()):
-        raise V7VisualRunnerError("all cases of each variant must use one identical Skill package")
+    validate_generation_cohort(generation_records, {item["id"] for item in cohort["splits"][args.split]})
     input_records = [
         {
             "variant": variant,

@@ -40,6 +40,14 @@ class CodexLogPolicyTests(unittest.TestCase):
             )
             self.assertEqual(3, policy.validate(trace, root))
 
+    def test_command_free_mode_rejects_even_safe_local_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trace = root / "trace.jsonl"
+            trace.write_text(event("node --check app.js") + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(policy.PolicyError, "command execution is forbidden"):
+                policy.validate(trace, root, allow_commands=False)
+
     def test_rejects_package_manager_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

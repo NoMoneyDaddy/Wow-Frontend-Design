@@ -74,6 +74,7 @@ class V7CodexRunnerTests(unittest.TestCase):
         self.assertIn("UNTRUSTED PRIOR ATTEMPT DIAGNOSTIC", prompt)
         self.assertNotIn("candidate", prompt.casefold())
         self.assertNotIn("accepted", prompt.casefold())
+        self.assertIn("file-change tools only", prompt)
 
     def test_only_completed_tool_events_count_as_progress(self) -> None:
         lines = [
@@ -97,6 +98,33 @@ class V7CodexRunnerTests(unittest.TestCase):
         self.assertEqual("sealed_validation", runner._case_split(manifest, "sealed-case"))
         with self.assertRaisesRegex(runner.V7CodexRunnerError, "exactly once"):
             runner._case_split(manifest, "missing-case")
+
+    def test_login_status_accepts_codex_stderr_channel(self) -> None:
+        result = subprocess.CompletedProcess(
+            args=["codex", "login", "status"],
+            returncode=0,
+            stdout="",
+            stderr="Logged in using ChatGPT\n",
+        )
+        self.assertIsNone(runner._validate_first_party_login(result))
+
+    def test_login_status_rejects_ambiguous_or_failed_output(self) -> None:
+        ambiguous = subprocess.CompletedProcess(
+            args=["codex", "login", "status"],
+            returncode=0,
+            stdout="Logged in using ChatGPT\n",
+            stderr="warning\n",
+        )
+        with self.assertRaisesRegex(runner.V7CodexRunnerError, "not first-party"):
+            runner._validate_first_party_login(ambiguous)
+        failed = subprocess.CompletedProcess(
+            args=["codex", "login", "status"],
+            returncode=1,
+            stdout="",
+            stderr="Logged in using ChatGPT\n",
+        )
+        with self.assertRaisesRegex(runner.V7CodexRunnerError, "not first-party"):
+            runner._validate_first_party_login(failed)
 
     def test_design_lint_uses_preinstalled_locked_tool(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

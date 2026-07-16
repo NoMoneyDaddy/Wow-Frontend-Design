@@ -186,8 +186,9 @@ def build_prompt(brief: str, retry_diagnostic: str = "") -> str:
         "Create exactly DESIGN.md and one self-contained index.html in the current empty directory. "
         "Put CSS and necessary JavaScript inline. Do not add any other file.\n"
         "DESIGN.md must pass the pinned official @google/design.md linter with zero errors and zero warnings.\n"
-        "Do not use network, external assets, package managers, package installation, git, browser, screenshots, "
-        "computer tools, MCP, plugins, apps or subagents. The independent evaluator owns those checks.\n"
+        "Do not use network, external assets, package managers, package installation, git, shell commands, browser, "
+        "screenshots, computer tools, MCP, plugins, apps or subagents. Use file-change tools only; the independent "
+        "evaluator owns lint and runtime checks.\n"
         "Do not read or write outside the current directory. Do not inspect authentication, runtime configuration, "
         "other skills or host files. Browser results remain UNVERIFIED until the evaluator runs.\n"
         f"{diagnostic}"
@@ -462,13 +463,27 @@ def _isolated_environment(skill_source: Path) -> tuple[Path, dict[str, str], str
             "LC_ALL": "C.UTF-8",
         }
         version = subprocess.run([codex, "--version"], env=environment, text=True, capture_output=True, check=True, timeout=15).stdout.strip()
-        login = subprocess.run([codex, "login", "status"], env=environment, text=True, capture_output=True, check=True, timeout=15).stdout.strip()
-        if login != "Logged in using ChatGPT":
-            raise V7CodexRunnerError(f"Codex login status is not first-party ChatGPT: {login}")
+        login_result = subprocess.run(
+            [codex, "login", "status"],
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=15,
+        )
+        _validate_first_party_login(login_result)
         return isolation, environment, codex, version
     except BaseException:
         shutil.rmtree(isolation, ignore_errors=True)
         raise
+
+
+def _validate_first_party_login(result: subprocess.CompletedProcess[str]) -> None:
+    channels = [value.strip() for value in (result.stdout, result.stderr) if value and value.strip()]
+    status = "\n".join(channels)
+    if result.returncode != 0 or status != "Logged in using ChatGPT":
+        detail = " ".join(status.split())[:200]
+        raise V7CodexRunnerError(f"Codex login status is not first-party ChatGPT: {detail}")
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
@@ -520,6 +535,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "--cd", str(stage), "--skip-git-repo-check", "--ephemeral",
                 "--disable", "apps", "--disable", "multi_agent", "--disable", "browser_use",
                 "--disable", "computer_use", "--disable", "image_generation", "--disable", "plugins",
+                "--disable", "shell_tool",
                 "--disable", "skill_mcp_dependency_install", "--disable", "tool_call_mcp_elicitation",
                 "--disable", "tool_suggest", "--ignore-user-config", "--ignore-rules", "--strict-config",
                 "-c", 'shell_environment_policy.inherit="none"',
@@ -547,7 +563,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 attempt_history.append(attempt_record)
                 raise V7CodexRunnerError("generation log quota exceeded")
             try:
-                trace_policy.validate(stdout_log, stage)
+                trace_policy.validate(stdout_log, stage, allow_commands=False)
             except (OSError, UnicodeError, trace_policy.PolicyError) as error:
                 attempt_record["status"] = "security_rejection"
                 attempt_history.append(attempt_record)

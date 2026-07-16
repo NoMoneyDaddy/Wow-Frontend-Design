@@ -111,7 +111,7 @@ def _forbidden_credential_access(command: str) -> str | None:
     return None
 
 
-def validate(path: Path, stage: Path) -> int:
+def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
     stage = stage.resolve(strict=False)
     checked_commands = 0
     for event in _events(path):
@@ -123,6 +123,8 @@ def validate(path: Path, stage: Path) -> int:
             raise PolicyError(f"forbidden tool event: {item_type}")
         if item_type != "command_execution":
             continue
+        if not allow_commands:
+            raise PolicyError("command execution is forbidden in this controlled trace")
         command = item.get("command")
         if not isinstance(command, str) or not command:
             raise PolicyError("command_execution has no command")

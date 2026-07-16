@@ -59,6 +59,20 @@ class V7VisualMatrixTests(unittest.TestCase):
             self.assertEqual(4, len(loaded))
             self.assertTrue(Path(loaded[("candidate", "case-two")]["states"]["base"]["route"]).is_file())
 
+    def test_generation_cohort_requires_matching_briefs_and_stable_packages(self) -> None:
+        records = {}
+        for variant in runner.evidence.VARIANTS:
+            for case_id in ("case-one", "case-two"):
+                records[(variant, case_id)] = {
+                    "materialized_tree_sha256": variant * 8,
+                    "editable_sha256": variant * 8,
+                    "brief_sha256": case_id * 8,
+                }
+        self.assertIsNone(runner.validate_generation_cohort(records, {"case-one", "case-two"}))
+        records[("candidate", "case-two")]["brief_sha256"] = "different"
+        with self.assertRaisesRegex(runner.V7VisualRunnerError, "briefs differ"):
+            runner.validate_generation_cohort(records, {"case-one", "case-two"})
+
 
 if __name__ == "__main__":
     unittest.main()
