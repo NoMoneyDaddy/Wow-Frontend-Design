@@ -704,6 +704,23 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                                     ]
                                 },
                             },
+                            {
+                                "caseId": "grant-review-board-v6",
+                                "page": "index.html",
+                                "viewport": "tablet",
+                                "state": "base",
+                                "visualIssues": ["paragraph_measure_too_wide"],
+                                "readingRhythm": {
+                                    "tooWide": [
+                                        {
+                                            "text": "港口木船記憶工坊偏向材料可追蹤，河岸口述史錄音站偏向記錄方式清楚。",
+                                            "script": "cjk",
+                                            "estimatedCharacters": 51,
+                                            "limit": 48,
+                                        }
+                                    ]
+                                },
+                            },
                         ],
                         "crossPageComparisons": [],
                     },
@@ -717,6 +734,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                     "packaging-configurator-v6:codex-gpt-5.4-mini": ["fixed_or_sticky_content_obstruction"],
                     "layout-void-v6:codex-gpt-5.4-mini": ["layout_column_void"],
                     "small-text-v7:codex-gpt-5.4-mini": ["readable_text_below_12px"],
+                    "grant-review-board-v6:codex-gpt-5.4-mini": ["paragraph_measure_too_wide"],
                 },
                 report,
             )
@@ -724,6 +742,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
         packaging = feedback["packaging-configurator-v6"]
         layout_void = feedback["layout-void-v6"]
         small_text = feedback["small-text-v7"]
+        grant = feedback["grant-review-board-v6"]
         self.assertIn("archive.html/desktop/base", oral)
         self.assertIn("trackRatio=0.51", oral)
         self.assertIn("summary.html/desktop/base", packaging)
@@ -733,6 +752,13 @@ class ProductFlowEvaluationTests(unittest.TestCase):
         self.assertIn("target='article-copy'", layout_void)
         self.assertIn("details.html/mobile/base", small_text)
         self.assertIn("fontSize=11", small_text)
+        self.assertIn("index.html/tablet/base", grant)
+        self.assertIn("text='港口木船記憶工坊偏向材料可追蹤", grant)
+        self.assertIn("script=cjk", grant)
+        self.assertIn("estimatedCharacters=51", grant)
+        self.assertIn("limit=48", grant)
+        self.assertIn("narrow only this text element's inline measure", grant)
+        self.assertIn("do not shorten its copy or change unrelated prose", grant)
         self.assertTrue(all(len(value) <= 500 and "\n" not in value for value in feedback.values()))
 
     def test_visual_repair_feedback_normalizes_long_interaction_exception(self) -> None:

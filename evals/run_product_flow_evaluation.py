@@ -700,6 +700,16 @@ def _visual_issue_detail(result: dict[str, Any], code: str) -> str:
                 f"{code}@{location} text={_one_line(block.get('text', ''), 56)!r} "
                 f"trackRatio={block.get('trackRatio')} unusedInline={block.get('unusedInline')}"
             )
+    if code == "paragraph_measure_too_wide":
+        items = result.get("readingRhythm", {}).get("tooWide", [])
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            item = items[0]
+            return (
+                f"{code}@{location} text={_one_line(item.get('text', ''), 56)!r} "
+                f"script={item.get('script')} estimatedCharacters={item.get('estimatedCharacters')} "
+                f"limit={item.get('limit')} Action: narrow only this text element's inline measure "
+                f"to at most {item.get('limit')} estimated characters; do not shorten its copy or change unrelated prose."
+            )
     if code == "readable_text_below_12px":
         items = result.get("textScale", {}).get("undersizedReadableText", [])
         if isinstance(items, list) and items and isinstance(items[0], dict):
