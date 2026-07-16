@@ -139,13 +139,20 @@ Reuse a small duration and easing vocabulary. Motion should explain causality, p
 
 ## 5. Compose with hierarchy
 
-- Start with content priority, then use scale, position, contrast, density, and whitespace to express it.
-- Give each viewport and task region a legible hierarchy and clear continuation appropriate to the surface. A focused flow may have one primary next action; dashboards, documentation, and multi-workspace products may support several concurrent actions, so preserve grouping, current context, and task priority instead of inventing one global CTA.
-- Alternate pacing intentionally: dense evidence can follow a spacious proposition; not every section needs the same rhythm.
-- Use asymmetry with anchors. Align something precisely before breaking the grid.
-- Let important content escape generic containers when safe. Avoid a page made entirely of cards.
-- Make repeated units meaningfully comparable. If everything is unique, use editorial sequencing instead of a fake grid.
-- Test the silhouette in grayscale. If every section becomes an identical rectangle, the composition lacks a grammar.
+Before component markup, record one composition proof for each representative route/state in working notes or the `Layout` section of `DESIGN.md`, never in product copy:
+
+```text
+frame/state → F1 dominant anchor → F2 counterweight/support
+→ reading/action path → dense/quiet transition → anchored grid break, if earned
+→ mobile equivalent → explicit failure signal
+```
+
+- Derive `F1` from the top task or most valuable content. Use scale, position, contrast, density, and whitespace so an independent reviewer can find it without accent color. `F2` must support, compare with, or deliberately counterweight `F1`; it is not a second arbitrary hero.
+- Give every major region a place in the reading/action path. Focused flows may have one primary next action; dashboards, documentation, and multi-workspace products may preserve several grouped actions. Do not invent one global CTA.
+- Name one real density or pacing transition. Repeated units must remain comparable; unique content should use sequence instead of a fake equal grid. Important content may escape a generic container when safe.
+- Break alignment only from a visible anchor. A task-appropriate single column is valid; asymmetry, F/Z patterns, and a fixed number of regions are never quotas.
+
+After the first runnable slice and before color/effect polish, compare matched desktop and mobile frames with the same content. Blur, inspect in grayscale, and disable optional effects. Recompose the representation, order, track sizes, or grouping when `F1`/`F2` order disappears, major regions become equal in width/density/silhouette without a task reason, a grid break has no anchor, the page has no density shift, or mobile loses the reading/action path. Do not attempt to repair a failed composition proof by changing palette, adding shadows, increasing radius, or adding motion.
 
 ## 6. Create or preserve authored distinction
 
