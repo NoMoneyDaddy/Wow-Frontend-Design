@@ -4,6 +4,13 @@
 
 本 repository 將這一版的固定支援快照收在 [`evals/platform-support.json`](evals/platform-support.json)，官方來源座標則綁定於 [`platform-support-sources.json`](wow-frontend-design/references/platform-support-sources.json)。快照不含後續查核排程，只描述目前版本；若未來版本選擇重做研究，必須產生新的已審查快照，不能把會變動的上游網頁默認成永久事實。
 
+查詢目前尚未完成或曾失敗的 cell：
+
+```bash
+python3 wow-frontend-design/scripts/validate_platform_support.py \
+  evals/platform-support.json --repository-root . --report
+```
+
 ## 證據階段要逐字解讀
 
 - `official_status` 只表示上游官方文件怎麼寫，不是本 repository 的測試證據。
@@ -22,9 +29,11 @@
 
 ## 作業系統與 harness 邊界
 
-封裝的指引與 Python validators 比完整 evaluator 更容易攜帶。目前已發布的完整 generation／evidence harness 假設 POSIX Bash、process group、POSIX resource control、Node.js 22 與固定的 Playwright／Chromium evaluator。Native Windows 完整 harness 尚未驗證；WSL 或 Git Bash 的官方說明也不等於本 repo 測試。CI 目前只驗 Ubuntu、Python 3.12 與 Node.js 22。
+封裝的指引與 Python validators 比完整 evaluator 更容易攜帶。目前已發布的完整 generation／evidence harness 假設 POSIX Bash、process group、POSIX resource control、Node.js 22 與固定的 Playwright／Chromium evaluator。Native Windows 完整 harness 尚未驗證；WSL 或 Git Bash 的官方說明也不等於本 repo 測試。既有已發布 CI 證據仍只有 Ubuntu、Python 3.12 與 Node.js 22；workflow 已新增 macOS／Windows 的 Python 3.12 portable contract smoke，但在遠端 jobs 實際完成前不升級這兩格。
 
 新增 OS 證據前，先把 host OS／version、architecture、shell、Python、Node、package manager、browser revision、locale、timezone 與相關 fonts 寫進 checked-in 或 immutable evaluator artifact，再分別執行 install → discovery → invocation → implementation → browser → visual。
+
+`scripts/capture_runtime_profile.py` 可記錄安全的 OS／Python 與 caller declarations，不會讀取 hostname、username、home、IP、完整 environment，也不會自行執行 command 或 network probe。宣告的 Node／browser／font profile 仍需和 setup log、lockfile 或 browser report 綁定，不能單獨當成通過證據。
 
 ## Browser 與 mobile 邊界
 

@@ -116,6 +116,22 @@
       "claims": ["gh skill install targets", "gh skill installation scopes"]
     },
     {
+      "id": "github-actions-python",
+      "publisher": "GitHub",
+      "url": "https://docs.github.com/en/actions/tutorials/build-and-test-code/python",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["cross-operating-system Python matrix", "setup-python guidance"]
+    },
+    {
+      "id": "github-hosted-runners",
+      "publisher": "GitHub",
+      "url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "retrieved_at": "2026-07-16",
+      "mutable": true,
+      "claims": ["GitHub-hosted runner labels", "runner architecture boundary", "latest label boundary"]
+    },
+    {
       "id": "gemini-agent-skills",
       "publisher": "Google",
       "url": "https://geminicli.com/docs/cli/using-agent-skills/",

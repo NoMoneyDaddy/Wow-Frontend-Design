@@ -27,6 +27,14 @@ evidence ceiling. Do not edit files or install tools.
 
 成功條件不是只看 `gh skill list`：host 必須真的觸發 Skill，並回報 `AUDIT`、專案類型、能力與不誇大的 evidence ceiling。Claude Code 把 `--agent codex --scope user` 改為 `--agent claude-code --scope project`，然後以 `/wow-frontend-design` 執行同一 smoke。
 
+需要留下可比較的 host provenance 時，用不執行外部 probe 的 helper，把 stdout 重新導向 evaluator-owned artifact；`node`／browser／font 值是 caller declaration，仍須綁定 setup log 或 browser report：
+
+```bash
+python3 wow-frontend-design/scripts/capture_runtime_profile.py \
+  --environment-kind local --shell-name zsh \
+  --node-version v22.18.0 --network available
+```
+
 > Claude Code remote：本機 `~/.claude/skills/` 不會自動同步到 remote sandbox。最可靠做法是在 remote 內安裝到專案 `.claude/skills/wow-frontend-design/`。Remote 的 home 可能是暫時性或不可寫；沒有 browser／vision 時，Skill 應交付網站與靜態證據，但把 rendered claims 標為 `UNVERIFIED`。
 
 ## AI 直接安裝（Codex）

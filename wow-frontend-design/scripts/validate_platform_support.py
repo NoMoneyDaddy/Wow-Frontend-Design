@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import re
 import stat
@@ -248,7 +249,7 @@ def _validate_target_consistency(target: dict[str, Any], label: str) -> None:
         raise PlatformSupportError(f"{label} untested status cannot contain observed evidence")
 
 
-def validate(matrix_path: Path, repository_root: Path) -> tuple[int, int]:
+def _validated_snapshot(matrix_path: Path, repository_root: Path) -> tuple[int, int, dict[str, Any]]:
     root = repository_root.resolve(strict=True)
     matrix = _load_json(matrix_path, "platform matrix")
     if set(matrix) != MATRIX_ROOT_KEYS or matrix.get("schema_version") != 1:
@@ -311,19 +312,63 @@ def validate(matrix_path: Path, repository_root: Path) -> tuple[int, int]:
         raise PlatformSupportError(f"platform inventory drift; missing={missing}, unexpected={unexpected}")
     if used_source_ids != source_ids:
         raise PlatformSupportError(f"unused official source ids: {sorted(source_ids - used_source_ids)}")
-    return len(targets), len(source_ids)
+    return len(targets), len(source_ids), matrix
+
+
+def validate(matrix_path: Path, repository_root: Path) -> tuple[int, int]:
+    target_count, source_count, _matrix = _validated_snapshot(matrix_path, repository_root)
+    return target_count, source_count
+
+
+def build_gap_report(matrix_path: Path, repository_root: Path) -> dict[str, Any]:
+    target_count, source_count, matrix = _validated_snapshot(matrix_path, repository_root)
+    targets = matrix["targets"]
+    categories = Counter(target["category"] for target in targets)
+    statuses = Counter(target["repository_status"] for target in targets)
+    incomplete = sorted(
+        target["id"]
+        for target in targets
+        if target["repository_status"] not in {"browser_observed", "tested_in_ci"}
+        or any(value in {"failed", "partial", "historic_only", "not_run"} for value in target["checks"].values())
+    )
+    failed = sorted(
+        target["id"] for target in targets if "failed" in target["checks"].values()
+    )
+    targets_by_status = {
+        status: sorted(target["id"] for target in targets if target["repository_status"] == status)
+        for status in sorted(statuses)
+    }
+    return {
+        "schema_version": 1,
+        "snapshot_at": matrix["snapshot_at"],
+        "target_count": target_count,
+        "official_source_count": source_count,
+        "category_counts": dict(sorted(categories.items())),
+        "repository_status_counts": dict(sorted(statuses.items())),
+        "target_ids_by_repository_status": targets_by_status,
+        "incomplete_target_ids": incomplete,
+        "failed_target_ids": failed,
+        "boundary": "This report summarizes validated declarations and checked-in evidence stages. It does not execute missing platform cells or promote their status.",
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("matrix", type=Path)
     parser.add_argument("--repository-root", required=True, type=Path)
+    parser.add_argument("--report", action="store_true", help="emit a machine-readable gap report")
     args = parser.parse_args()
     try:
-        target_count, source_count = validate(args.matrix.expanduser(), args.repository_root.expanduser())
+        if args.report:
+            report = build_gap_report(args.matrix.expanduser(), args.repository_root.expanduser())
+        else:
+            target_count, source_count = validate(args.matrix.expanduser(), args.repository_root.expanduser())
     except (PlatformSupportError, OSError) as error:
         print(f"platform support invalid: {error}", file=sys.stderr)
         return 1
+    if args.report:
+        print(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2))
+        return 0
     print(f"platform support valid: {target_count} targets, {source_count} official source coordinates")
     return 0
 

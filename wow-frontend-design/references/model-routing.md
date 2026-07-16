@@ -28,6 +28,8 @@ Before execution, freeze:
 case/task id → mode/scope → risk class → model/provider/version/effort → context set/hash → tool allowlist → writable paths → budget → evaluator/policy version → fallback policy
 ```
 
+For a cross-host run, also emit `scripts/capture_runtime_profile.py` into evaluator-owned storage. It records OS/release/architecture, Python, encodings and timezone plus bounded caller declarations for environment kind, shell, Node, browser and font profile. It does not execute those tools or inspect host identity, environment variables or network; therefore declarations still need setup-log, lockfile or browser-report evidence. Do not infer remote/container/CI state from a vendor logo or ambient environment variable.
+
 The implementation model may report a missing tool or uncertainty and may invoke the Skill's exact-version, isolated verification-tool resolver. It may not grant itself a new host capability, select a stronger model, add product runtime dependencies, install globally, alter the evaluator, weaken the task, or convert confidence into a capability fact.
 
 Capability probes must be safe and observable:

@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -27,7 +28,28 @@ class PlatformSupportTests(unittest.TestCase):
         return path
 
     def test_repository_snapshot_is_valid(self) -> None:
-        self.assertEqual(validate_platform_support.validate(self.matrix_path, self.root), (32, 20))
+        self.assertEqual(validate_platform_support.validate(self.matrix_path, self.root), (32, 22))
+
+    def test_gap_report_is_bounded_and_does_not_promote_cells(self) -> None:
+        report = validate_platform_support.build_gap_report(self.matrix_path, self.root)
+        self.assertEqual(report["target_count"], 32)
+        self.assertEqual(report["official_source_count"], 22)
+        self.assertIn("os-windows-native", report["incomplete_target_ids"])
+        self.assertIn("environment-local-workspace", report["incomplete_target_ids"])
+        self.assertIn("host-claude-code", report["failed_target_ids"])
+        self.assertIn("os-windows-native", report["target_ids_by_repository_status"]["not_tested"])
+        self.assertNotIn("host-codex-cli", report["incomplete_target_ids"])
+
+    def test_gap_report_uses_the_same_validated_matrix_snapshot(self) -> None:
+        original = validate_platform_support._load_json
+        with mock.patch.object(validate_platform_support, "_load_json", wraps=original) as load:
+            validate_platform_support.build_gap_report(self.matrix_path, self.root)
+        matrix_reads = [
+            call
+            for call in load.call_args_list
+            if Path(call.args[0]).resolve() == self.matrix_path.resolve()
+        ]
+        self.assertEqual(len(matrix_reads), 1)
 
     def test_scheduled_recheck_field_is_rejected(self) -> None:
         data = copy.deepcopy(self.matrix)

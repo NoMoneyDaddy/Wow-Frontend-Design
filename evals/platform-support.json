@@ -120,7 +120,7 @@
       "official_status": "supported",
       "repository_status": "partially_tested",
       "checks": {"install": "partial", "discovery": "partial", "invocation": "partial", "implementation": "partial", "browser": "partial", "visual": "partial"},
-      "source_ids": ["codex-cli", "claude-code-setup", "gemini-installation", "playwright-installation"],
+      "source_ids": ["codex-cli", "claude-code-setup", "gemini-installation", "github-actions-python", "github-hosted-runners", "playwright-installation"],
       "artifacts": ["evals/product-flow-v6-visual-results.json", "evals/TEST_PLAN.md"],
       "boundary": "Development runs occurred on a macOS workspace, but published manifests do not bind host version, architecture, shell and font inventory. Treat the OS claim as partial rather than a reproducible macOS matrix pass."
     },
@@ -130,7 +130,7 @@
       "official_status": "supported",
       "repository_status": "tested_in_ci",
       "checks": {"install": "passed", "discovery": "partial", "invocation": "not_run", "implementation": "partial", "browser": "partial", "visual": "partial"},
-      "source_ids": ["codex-cli", "claude-code-setup", "gemini-installation", "playwright-installation"],
+      "source_ids": ["codex-cli", "claude-code-setup", "gemini-installation", "github-actions-python", "github-hosted-runners", "playwright-installation"],
       "artifacts": [".github/workflows/ci.yml"],
       "boundary": "Ubuntu CI validates packaging, unit tests, pinned Chromium installation and checked-in evidence. It does not generate the full cohort or invoke every documented host."
     },
@@ -140,7 +140,7 @@
       "official_status": "best_effort",
       "repository_status": "not_tested",
       "checks": {"install": "not_run", "discovery": "not_run", "invocation": "not_run", "implementation": "not_run", "browser": "not_run", "visual": "not_run"},
-      "source_ids": ["codex-windows", "gemini-installation", "playwright-installation"],
+      "source_ids": ["codex-windows", "gemini-installation", "github-actions-python", "github-hosted-runners", "playwright-installation"],
       "artifacts": ["evals/run_codex_case.sh", "evals/run_claude_case.sh"],
       "boundary": "Some upstream tools document native Windows, but the full repository evaluator depends on POSIX Bash, process groups and POSIX resource controls. Native Windows full-harness execution is unverified."
     },
@@ -230,9 +230,9 @@
       "official_status": "not_applicable",
       "repository_status": "tested_in_ci",
       "checks": {"install": "passed", "discovery": "passed", "invocation": "not_run", "implementation": "partial", "browser": "partial", "visual": "partial"},
-      "source_ids": ["github-cli-skill", "playwright-installation"],
+      "source_ids": ["github-actions-python", "github-cli-skill", "github-hosted-runners", "playwright-installation"],
       "artifacts": [".github/workflows/ci.yml"],
-      "boundary": "CI installs the Skill locally, validates source and evidence, and installs pinned Chromium on ubuntu-latest. It does not call cloud models or regenerate screenshots."
+      "boundary": "Ubuntu CI has validated the full repository job. A separate Python contract smoke is configured for ubuntu-latest, macos-latest and windows-latest, but individual OS cells remain unpromoted until completed workflow evidence exists. CI does not call cloud models or regenerate screenshots."
     },
     {
       "id": "environment-claude-code-remote",

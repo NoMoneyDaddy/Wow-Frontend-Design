@@ -6,6 +6,25 @@ Use this reference when maintaining the Skill, integrating upstream guidance, or
 
 Record a stable case ID, task/locale, Skill and adapter hashes, exact model/provider/alias resolution, auth mode, tools, prompt/context hashes, writable files, output manifest, commands, browser/version, viewports/preferences, raw findings, screenshots, and timestamps. Keep raw model output immutable. Put repairs in a new run or clearly separated corrected artifact.
 
+## Freeze platform evidence by stage
+
+Treat host, operating system, remote environment, browser/device and model support as separate cells. For each cell, keep official documentation distinct from install → discovery → invocation → implementation → browser → visual evidence. A copied Skill directory is not discovery; discovery is not a successful implementation; browser emulation is not a physical-device result. Preserve `failed`, `partial`, `historic_only` and `not_run` instead of collapsing them into “supported”.
+
+Before a portability run, capture privacy-bounded host provenance into evaluator-owned storage:
+
+```bash
+python3 <skill-dir>/scripts/capture_runtime_profile.py \
+  --environment-kind ci \
+  --shell-name github-actions \
+  --node-version v22.18.0 \
+  --browser-engine chromium \
+  --browser-version 150.0.7871.124 \
+  --font-profile-id ci-default-v1 \
+  --network available --browser available --screenshots available
+```
+
+The helper does not inspect hostname, user, home, IP, environment variables, network or installed fonts, and does not execute external commands. Caller-supplied versions are declarations; bind them to setup logs, lockfiles or a browser report before promoting a claim. Keep mutable official coordinates in [platform-support-sources.json](platform-support-sources.json), and validate a repository-owned support matrix without adding an automatic recheck schedule. A newly configured CI cell remains `not_run` until its own completed run is preserved.
+
 ## Classify the root cause
 
 ```text

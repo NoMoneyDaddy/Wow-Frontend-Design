@@ -70,8 +70,8 @@
       "id": "platform-environment-matrix",
       "status": "tested_in_repo",
       "claim": "A frozen one-version matrix separates official documentation from install, discovery, invocation, implementation, browser and visual repository evidence across hosts, operating systems, environments, browsers, devices and model families.",
-      "artifacts": ["PLATFORM_SUPPORT.md", "evals/platform-support.json", "wow-frontend-design/references/platform-support-sources.json", "wow-frontend-design/scripts/validate_platform_support.py", "wow-frontend-design/scripts/test_validate_platform_support.py"],
-      "boundary": "Validation proves a fixed inventory, approved official source coordinates, stage vocabulary and safe artifact paths only. It does not re-fetch mutable pages, test unrun cells or promote documented support into repository evidence; no future recheck is scheduled in this version snapshot."
+      "artifacts": [".github/workflows/ci.yml", "PLATFORM_SUPPORT.md", "evals/platform-support.json", "wow-frontend-design/references/platform-support-sources.json", "wow-frontend-design/references/research-validation-loop.md", "wow-frontend-design/scripts/capture_runtime_profile.py", "wow-frontend-design/scripts/test_capture_runtime_profile.py", "wow-frontend-design/scripts/validate_platform_support.py", "wow-frontend-design/scripts/test_validate_platform_support.py"],
+      "boundary": "Validation proves a fixed inventory, approved official source coordinates, stage vocabulary and safe artifact paths only. Runtime-profile fields supplied by the caller are declarations, and a configured CI matrix is not completed-run evidence. The system does not re-fetch mutable pages, test unrun cells or schedule a future recheck."
     },
     {
       "id": "framework-portability",

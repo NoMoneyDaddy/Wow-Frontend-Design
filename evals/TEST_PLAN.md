@@ -161,11 +161,13 @@ Finding 自動送回修復；只重跑該 target lint，再跑 8-case contract r
 
 在本機與一個無 writable home 假設的 remote-like sandbox 各做 smoke test：
 
+- 先用 `capture_runtime_profile.py` 記錄不含 host identity／environment dump 的 OS、architecture、Python、timezone 與 caller-declared shell／Node／browser／font profile；declaration 必須另綁 setup log 或 browser report。
 - 只允許 workspace、project cache 或 evaluator cache。
 - existing pin 優先；無 pin 才查官方 stable、排除 prerelease、解析相容版本並固定 exact version。
 - 禁止 global install、第二套 lockfile family、產品 runtime dependency 漂移與 lifecycle script。
 - tool-resolution record 包含 reason、source、version、scope、command、attempt 與 result。
 - `--resume` 只續跑缺失／失敗階段，不能覆蓋已通過證據。
+- GitHub Actions 另跑 `ubuntu-latest`、`macos-latest`、`windows-latest` 的 Python contract smoke；workflow 設定本身不能把未完成 cell 升級為通過。
 
 ### 8. Model routing and automatic downgrade
 
