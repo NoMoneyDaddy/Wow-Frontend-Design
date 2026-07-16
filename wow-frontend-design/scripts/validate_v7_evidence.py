@@ -26,6 +26,7 @@ PREFLIGHT_SPEC.loader.exec_module(preflight)
 
 
 SHA256 = re.compile(r"[0-9a-f]{64}")
+RECORD_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 VARIANTS = ("accepted", "candidate")
 GATES = ("fast", "full")
 FAST_PROFILES = ("desktop", "mobile")
@@ -218,6 +219,38 @@ def _validate_result(
     array_fields = ("interactions", "assertions", "consoleErrors", "pageErrors", "externalRequests", "issues")
     if any(not isinstance(runtime.get(field), list) for field in array_fields):
         raise V7EvidenceError(f"runtime arrays are malformed for {artifact_stem(key)}")
+    if key[2] == "interaction" and (not runtime["interactions"] or not runtime["assertions"]):
+        raise V7EvidenceError(f"interaction evidence must record at least one step and one assertion for {artifact_stem(key)}")
+    if key[2] == "interaction":
+        interaction_ids: list[str] = []
+        for item in runtime["interactions"]:
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"id", "action", "completed"}
+                or not isinstance(item.get("id"), str)
+                or RECORD_ID.fullmatch(item["id"]) is None
+                or item.get("action") not in {"click", "fill", "select", "press"}
+                or item.get("completed") is not True
+            ):
+                raise V7EvidenceError(f"interaction step evidence is malformed for {artifact_stem(key)}")
+            interaction_ids.append(item["id"])
+        assertion_ids: list[str] = []
+        for item in runtime["assertions"]:
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"id", "type", "count", "passed"}
+                or not isinstance(item.get("id"), str)
+                or RECORD_ID.fullmatch(item["id"]) is None
+                or item.get("type") not in {"visible", "hidden", "text"}
+                or isinstance(item.get("count"), bool)
+                or not isinstance(item.get("count"), int)
+                or item["count"] < 0
+                or type(item.get("passed")) is not bool
+            ):
+                raise V7EvidenceError(f"interaction assertion evidence is malformed for {artifact_stem(key)}")
+            assertion_ids.append(item["id"])
+        if len(interaction_ids) != len(set(interaction_ids)) or len(assertion_ids) != len(set(assertion_ids)):
+            raise V7EvidenceError(f"interaction evidence ids must be unique for {artifact_stem(key)}")
     if type(runtime.get("fontsReady")) is not bool or type(runtime.get("horizontalOverflow")) is not bool or type(runtime.get("eventOverflow")) is not bool:
         raise V7EvidenceError(f"runtime flags are malformed for {artifact_stem(key)}")
     page_bounds = runtime.get("pageBounds")

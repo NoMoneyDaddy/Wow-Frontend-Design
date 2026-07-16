@@ -182,6 +182,69 @@ class V7EvidenceTests(unittest.TestCase):
                 "clean",
                 evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"),
             )
+            interaction_key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            payload["identity"]["state"] = "interaction"
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            empty_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "interaction evidence must record"):
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    empty_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                )
+            payload["runtime"]["interactions"] = [{"id": "open-dialog", "action": "click", "completed": True}]
+            payload["runtime"]["assertions"] = [{"id": "dialog-visible", "type": "visible", "count": 1, "passed": True}]
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            passing_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "clean",
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    passing_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                ),
+            )
+            payload["runtime"]["assertions"][0]["passed"] = False
+            payload["verdict"] = "findings"
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            failing_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    failing_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                ),
+            )
+            payload["runtime"]["interactions"][0]["completed"] = False
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            malformed_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "interaction step evidence is malformed"):
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    malformed_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                )
+            payload["identity"]["state"] = "base"
+            payload["runtime"]["interactions"] = []
+            payload["runtime"]["assertions"] = []
+            payload["verdict"] = "clean"
             payload["typography"]["issues"] = [{"code": "tampered-finding"}]
             result.write_text(json.dumps(payload), encoding="utf-8")
             tampered_hash = hashlib.sha256(result.read_bytes()).hexdigest()

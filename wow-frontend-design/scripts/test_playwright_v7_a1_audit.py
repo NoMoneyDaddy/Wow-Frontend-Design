@@ -94,6 +94,35 @@ process.exit(1);
         self.assertEqual(0, completed.returncode)
         self.assertIn("loopback", completed.stdout)
 
+    def test_interaction_spec_requires_steps_and_assertions(self) -> None:
+        contracts = (
+            ("steps", [], [{"id": "dialog-visible", "type": "visible", "selector": "#dialog"}]),
+            ("assertions", [{"id": "open-dialog", "action": "click", "selector": "#open"}], []),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, steps, assertions in contracts:
+                with self.subTest(label=label):
+                    spec = {
+                        "schemaVersion": 1,
+                        "caseId": "fixture-case",
+                        "state": "interaction",
+                        "steps": steps,
+                        "assertions": assertions,
+                        "targets": [],
+                    }
+                    spec_path = root / f"{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec({json.dumps(str(spec_path))}, 'fixture-case', 'interaction'); }}
+catch (error) {{ process.stdout.write(error.message); process.exit(0); }}
+process.exit(1);
+"""
+                    completed = subprocess.run(["node", "-e", source], cwd=ROOT, text=True, capture_output=True)
+                    self.assertEqual(0, completed.returncode)
+                    self.assertIn(f"spec {label} must contain 1..20 entries", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

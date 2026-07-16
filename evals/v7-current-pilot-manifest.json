@@ -2,7 +2,7 @@
   "schema_version": 1,
   "cohort_id": "v7-a1-typographic-flow",
   "stage": "pilot_ready",
-  "frozen_at": "2026-07-16T16:10:00Z",
+  "frozen_at": "2026-07-16T17:26:25Z",
   "config": {
     "path": "evals/v7-a1-public-config.json",
     "bytes": 6286,
@@ -969,8 +969,8 @@
     },
     {
       "path": "evals/playwright_v7_a1_audit.cjs",
-      "bytes": 14859,
-      "sha256": "476605903265572f28de0ed0df63d203eac443725acd6571ddd430d81141a27e"
+      "bytes": 15055,
+      "sha256": "f329d68994b48b29db1a271cde93f6c83bf3a10103d9ddac3a143018a7e87720"
     },
     {
       "path": "evals/run_v7_visual_matrix.py",
@@ -984,8 +984,8 @@
     },
     {
       "path": "wow-frontend-design/scripts/validate_v7_evidence.py",
-      "bytes": 22434,
-      "sha256": "b8b0cff93e52c00f397965a820174c5436ca45ef7051b3b27b7b68d9fda5886a"
+      "bytes": 24350,
+      "sha256": "a4fe43cea45520ffd808ccfa97de41076c34d08669f29f365c442fec82a2f3d7"
     }
   ]
 }

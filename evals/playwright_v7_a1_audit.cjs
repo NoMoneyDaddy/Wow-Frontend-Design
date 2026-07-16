@@ -121,8 +121,13 @@ function loadSpec(file, expectedCase, expectedState) {
     fail("spec root contract is invalid");
   }
   if (data.caseId !== expectedCase || data.state !== expectedState) fail("spec identity does not match CLI identity");
-  if (!Array.isArray(data.steps) || data.steps.length > 20) fail("spec steps must contain 0..20 entries");
-  if (!Array.isArray(data.assertions) || data.assertions.length > 20) fail("spec assertions must contain 0..20 entries");
+  const minimumEntries = data.state === "interaction" ? 1 : 0;
+  if (!Array.isArray(data.steps) || data.steps.length < minimumEntries || data.steps.length > 20) {
+    fail(`spec steps must contain ${minimumEntries}..20 entries`);
+  }
+  if (!Array.isArray(data.assertions) || data.assertions.length < minimumEntries || data.assertions.length > 20) {
+    fail(`spec assertions must contain ${minimumEntries}..20 entries`);
+  }
   data.targets = validateSpecs(data.targets);
   data.steps = data.steps.map(validateStep);
   data.assertions = data.assertions.map(validateAssertion);
