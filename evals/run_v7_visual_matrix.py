@@ -405,7 +405,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "exit_code": exit_code,
                 "failure_class": failure_class,
             })
-        identity = dict(zip(("variant", "case_id", "state", "profile", "engine"), key, strict=True))
+        identity = dict(zip(("variant", "case_id", "state", "profile", "engine"), key))
         attempts.append({"key": identity, "attempts": history})
         if history[-1]["status"] != "completed":
             ledger = {

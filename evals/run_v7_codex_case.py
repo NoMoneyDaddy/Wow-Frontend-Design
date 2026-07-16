@@ -31,7 +31,7 @@ STAGE_LIMIT = 8 * 1024 * 1024
 LOG_LIMIT = 16 * 1024 * 1024
 FILE_LIMIT = 2 * 1024 * 1024
 MAX_ENTRIES = 16
-MEANINGFUL_ITEM_TYPES = {"command_execution", "file_change"}
+PROGRESS_EVENT_TYPES = {"thread.started", "turn.started", "item.started", "item.completed", "turn.completed", "turn.failed"}
 CASE_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
@@ -229,8 +229,7 @@ def meaningful_event_count(lines: list[str]) -> int:
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
-        item = event.get("item") if isinstance(event, dict) else None
-        if isinstance(item, dict) and event.get("type") == "item.completed" and item.get("type") in MEANINGFUL_ITEM_TYPES:
+        if isinstance(event, dict) and event.get("type") in PROGRESS_EVENT_TYPES:
             count += 1
     return count
 
@@ -299,7 +298,7 @@ def _run_codex(
                     last_fingerprint = fingerprint
                     last_progress = now
                     progress_events += 1
-                    print(f"v7 generation progress: stage changed ({len(fingerprint)} files)", flush=True)
+                    print(f"v7 生成進度：輸出區已變更（{len(fingerprint)} 個檔案）", flush=True)
                 if stdout_log.stat().st_size > log_offset:
                     with stdout_log.open("rb") as reader:
                         reader.seek(log_offset)
@@ -312,7 +311,7 @@ def _run_codex(
                     if meaningful:
                         last_progress = now
                         progress_events += meaningful
-                        print(f"v7 generation progress: {meaningful} completed tool event(s)", flush=True)
+                        print(f"v7 生成進度：收到 {meaningful} 個合法輸出事件", flush=True)
                 if _stage_bytes(stage) > STAGE_LIMIT or stdout_log.stat().st_size + stderr_log.stat().st_size > LOG_LIMIT:
                     reason = "resource_quota"
                     _terminate(process)

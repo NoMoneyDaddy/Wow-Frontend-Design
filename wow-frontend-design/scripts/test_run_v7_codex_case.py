@@ -76,15 +76,17 @@ class V7CodexRunnerTests(unittest.TestCase):
         self.assertNotIn("accepted", prompt.casefold())
         self.assertIn("file-change tools only", prompt)
 
-    def test_only_completed_tool_events_count_as_progress(self) -> None:
+    def test_valid_codex_output_events_count_as_progress(self) -> None:
         lines = [
+            json.dumps({"type": "thread.started", "thread_id": "test"}),
+            json.dumps({"type": "turn.started"}),
             json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
             json.dumps({"type": "item.started", "item": {"type": "command_execution"}}),
             json.dumps({"type": "item.completed", "item": {"type": "command_execution"}}),
             json.dumps({"type": "item.completed", "item": {"type": "file_change"}}),
             "not-json",
         ]
-        self.assertEqual(2, runner.meaningful_event_count(lines))
+        self.assertEqual(6, runner.meaningful_event_count(lines))
 
     def test_host_runner_rejects_sealed_case_split(self) -> None:
         manifest = {
