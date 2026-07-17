@@ -104,9 +104,17 @@ def validate(path: Path, repository_root: Path) -> int:
             if not isinstance(artifact, str) or not artifact:
                 raise CapabilityStatusError(f"{label}.artifacts contains an invalid path")
             candidate = PurePosixPath(artifact)
+            if candidate == PurePosixPath("."):
+                raise CapabilityStatusError(f"{label}.artifacts must name a bounded artifact: {artifact!r}")
             if candidate.is_absolute() or ".." in candidate.parts or "\x00" in artifact:
                 raise CapabilityStatusError(f"{label}.artifacts contains an unsafe path: {artifact!r}")
-            resolved = (root / candidate).resolve()
+            lexical = root.joinpath(*candidate.parts)
+            current = root
+            for part in candidate.parts:
+                current /= part
+                if current.is_symlink():
+                    raise CapabilityStatusError(f"{label}.artifacts is missing or a symlink: {artifact!r}")
+            resolved = lexical.resolve()
             try:
                 resolved.relative_to(root)
             except ValueError as error:

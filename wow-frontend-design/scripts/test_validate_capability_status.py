@@ -56,6 +56,45 @@ class CapabilityStatusTests(unittest.TestCase):
             with self.assertRaisesRegex(validate_capability_status.CapabilityStatusError, "inventory drift"):
                 validate_capability_status.validate(status, root)
 
+    def test_repository_root_cannot_substitute_for_bounded_artifact(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        data = json.loads((root / "evals" / "capability-status.json").read_text(encoding="utf-8"))
+        data["capabilities"][0]["artifacts"] = ["."]
+        with tempfile.TemporaryDirectory() as directory:
+            status = Path(directory) / "status.json"
+            status.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(validate_capability_status.CapabilityStatusError, "bounded artifact"):
+                validate_capability_status.validate(status, root)
+
+    def test_in_repository_symlink_cannot_substitute_for_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "evidence.json"
+            target.write_text("{}", encoding="utf-8")
+            (root / "evidence-link").symlink_to(target.name)
+            status = root / "status.json"
+            status.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "snapshot_at": "2026-07-14",
+                        "semantics": "Evidence paths must exist and claims remain explicitly bounded.",
+                        "capabilities": [
+                            {
+                                "id": "bad-link",
+                                "status": "not_tested",
+                                "claim": "This intentionally invalid capability uses a symbolic link.",
+                                "artifacts": ["evidence-link"],
+                                "boundary": "This fixture must reject indirect evidence before accepting claims.",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validate_capability_status.CapabilityStatusError, "symlink"):
+                validate_capability_status.validate(status, root)
+
 
 if __name__ == "__main__":
     unittest.main()
