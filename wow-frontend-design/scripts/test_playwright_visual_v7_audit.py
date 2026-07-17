@@ -55,6 +55,142 @@ process.stdout.write(JSON.stringify({{
         self.assertEqual(["index.html", "materials.html", "summary.html"], result["packagingInteractionPages"])
         self.assertEqual([], result["oralHistoryInteractionPages"])
 
+    def test_interaction_coverage_counts_rows_separately_from_captures(self) -> None:
+        source = f"""
+const {{ CASE_PAGES, INTERACTION_MANIFEST, INTERACTION_PAGES, buildInteractionCoverage }} = require({json.dumps(str(AUDITOR))});
+const targets = Object.keys(CASE_PAGES).map((caseId) => ({{ caseId, alias: 'pilot' }}));
+const results = [];
+const stateA = {{ writingMode: 'horizontal-tb', ariaPressed: 'false' }};
+const stateB = {{ writingMode: 'vertical-rl', ariaPressed: 'true' }};
+const sampledB = {{ actual: stateB, samples: [stateB, stateB, stateB], matches: true }};
+for (const [caseId, pages] of Object.entries(INTERACTION_PAGES)) {{
+  for (const page of pages) {{
+    for (const viewport of ['desktop', 'mobile']) {{
+      const manifest = INTERACTION_MANIFEST[`${{caseId}}:${{page}}`];
+      results.push({{
+        caseId, alias: 'pilot', page, viewport, state: 'interaction', screenshot: `${{caseId}}-${{page}}-${{viewport}}.png`, visualIssues: [],
+        interaction: manifest ? {{
+          attempted: true, page, manifestId: manifest.id, manifestCoverage: 'declared-pilot-row', failures: [],
+          hooks: {{ controlCount: 1, stateCount: 1, controlVisible: true, controlEnabled: true }},
+          A: stateA, B: stateB, restoredA: stateA, returnPath: manifest.returnAction, finalB: stateB,
+          roundTripVerified: true,
+          screenshotState: {{ expected: 'B', before: sampledB, after: sampledB, verified: true }},
+        }} : {{ failures: [] }},
+      }});
+    }}
+  }}
+}}
+process.stdout.write(JSON.stringify(buildInteractionCoverage(targets, results)));
+"""
+        result = self.run_node(source)
+        summary = result["summary"]
+        self.assertEqual("target-row", summary["unit"])
+        self.assertEqual(9, summary["applicable"])
+        self.assertEqual(1, summary["declared"])
+        self.assertEqual(1, summary["verified"])
+        self.assertEqual(8, summary["undeclared"])
+        self.assertEqual(2, summary["declaredExpectedCaptures"])
+        self.assertEqual(2, summary["declaredVerifiedCaptures"])
+        self.assertEqual(16, summary["legacyExecutedCaptures"])
+        self.assertEqual("1/9", summary["declarationCoverage"])
+        self.assertEqual("pilot_complete", summary["status"])
+        self.assertEqual("not_applicable", result["byTarget"]["oral-history-archive-v6:pilot"]["status"])
+
+    def test_interaction_coverage_keeps_failed_and_missing_dimensions(self) -> None:
+        source = f"""
+const {{ buildInteractionCoverage }} = require({json.dumps(str(AUDITOR))});
+const target = {{ caseId: 'type-foundry-specimen-v6', alias: 'pilot' }};
+const results = [{{
+  ...target, page: 'index.html', viewport: 'desktop', state: 'interaction', screenshot: 'desktop.png',
+  visualIssues: ['type_writing_mode_round_trip_failed'],
+  interaction: {{
+    manifestId: 'type-foundry-writing-mode-toggle', manifestCoverage: 'declared-pilot-row',
+    roundTripVerified: false, screenshotState: {{ verified: true }}, failures: ['type_writing_mode_round_trip_failed'],
+  }},
+}}];
+process.stdout.write(JSON.stringify(buildInteractionCoverage([target], results)));
+"""
+        result = self.run_node(source)
+        target = result["byTarget"]["type-foundry-specimen-v6:pilot"]
+        self.assertEqual("failed_incomplete", target["rows"][0]["status"])
+        self.assertEqual(["desktop"], target["rows"][0]["failedViewports"])
+        self.assertEqual(["mobile"], target["rows"][0]["missingViewports"])
+        self.assertEqual(1, target["failedDeclared"])
+        self.assertEqual(1, target["incompleteDeclared"])
+
+    def test_interaction_coverage_does_not_trust_flags_or_hide_legacy_failures(self) -> None:
+        source = f"""
+const {{ buildInteractionCoverage }} = require({json.dumps(str(AUDITOR))});
+const typeTarget = {{ caseId: 'type-foundry-specimen-v6', alias: 'pilot' }};
+const windTarget = {{ caseId: 'wind-maintenance-dispatch-v6', alias: 'pilot' }};
+const results = ['desktop', 'mobile'].flatMap((viewport) => [
+  {{
+    ...typeTarget, page: 'index.html', viewport, state: 'interaction', screenshot: `type-${{viewport}}.png`, visualIssues: [],
+    interaction: {{ manifestId: 'type-foundry-writing-mode-toggle', manifestCoverage: 'declared-pilot-row', roundTripVerified: true, screenshotState: {{ verified: true }}, failures: [] }},
+  }},
+  {{
+    ...windTarget, page: 'index.html', viewport, state: 'interaction', screenshot: `wind-${{viewport}}.png`, visualIssues: viewport === 'desktop' ? ['wind_filter_count_failed'] : [],
+    interaction: {{ failures: viewport === 'desktop' ? ['wind_filter_count_failed'] : [] }},
+  }},
+]);
+process.stdout.write(JSON.stringify(buildInteractionCoverage([typeTarget, windTarget], results)));
+"""
+        result = self.run_node(source)
+        self.assertEqual(0, result["byTarget"]["type-foundry-specimen-v6:pilot"]["verified"])
+        wind = result["byTarget"]["wind-maintenance-dispatch-v6:pilot"]
+        self.assertEqual("undeclared", wind["rows"][0]["status"])
+        self.assertEqual(["desktop"], wind["rows"][0]["failedViewports"])
+        self.assertEqual(["wind_filter_count_failed"], wind["rows"][0]["failuresByViewport"]["desktop"])
+        self.assertEqual(1, result["summary"]["legacyFailedRows"])
+        self.assertEqual(1, result["summary"]["legacyFailedCaptures"])
+
+    def test_interaction_coverage_preserves_duplicate_capture_records_and_failures(self) -> None:
+        source = f"""
+const {{ buildInteractionCoverage }} = require({json.dumps(str(AUDITOR))});
+const target = {{ caseId: 'wind-maintenance-dispatch-v6', alias: 'pilot' }};
+const capture = (viewport, suffix, issue = null) => ({{
+  ...target, page: 'index.html', viewport, state: 'interaction', screenshot: `${{viewport}}-${{suffix}}.png`,
+  visualIssues: issue ? [issue] : [], interaction: {{ failures: [] }},
+}});
+const results = [
+  capture('desktop', 'pass'),
+  capture('desktop', 'fail', 'wind_filter_count_failed'),
+  capture('mobile', 'pass'),
+];
+process.stdout.write(JSON.stringify(buildInteractionCoverage([target], results)));
+"""
+        result = self.run_node(source)
+        target = result["byTarget"]["wind-maintenance-dispatch-v6:pilot"]
+        row = target["rows"][0]
+        self.assertEqual(["desktop"], row["duplicateViewports"])
+        self.assertEqual(["desktop"], row["failedViewports"])
+        self.assertEqual(["wind_filter_count_failed"], row["failuresByViewport"]["desktop"])
+        self.assertEqual(["desktop-pass.png", "desktop-fail.png"], row["screenshotsByViewport"]["desktop"])
+        self.assertEqual(3, target["legacyExecutedCaptures"])
+        self.assertEqual(1, target["legacyFailedCaptures"])
+
+    def test_declared_duplicate_capture_is_not_verified_and_keeps_failures(self) -> None:
+        source = f"""
+const {{ buildInteractionCoverage }} = require({json.dumps(str(AUDITOR))});
+const target = {{ caseId: 'type-foundry-specimen-v6', alias: 'pilot' }};
+const results = [
+  {{ ...target, page: 'index.html', viewport: 'desktop', state: 'interaction', screenshot: 'one.png', visualIssues: [], interaction: {{ failures: [] }} }},
+  {{ ...target, page: 'index.html', viewport: 'desktop', state: 'interaction', screenshot: 'two.png', visualIssues: ['type_writing_mode_duplicate_failed'], interaction: {{ failures: [] }} }},
+  {{ ...target, page: 'index.html', viewport: 'mobile', state: 'interaction', screenshot: 'mobile.png', visualIssues: [], interaction: {{ failures: [] }} }},
+];
+process.stdout.write(JSON.stringify(buildInteractionCoverage([target], results)));
+"""
+        result = self.run_node(source)
+        target = result["byTarget"]["type-foundry-specimen-v6:pilot"]
+        row = target["rows"][0]
+        self.assertEqual("failed_incomplete", row["status"])
+        self.assertEqual([], row["verifiedViewports"])
+        self.assertEqual(["desktop"], row["duplicateViewports"])
+        self.assertEqual(["desktop", "mobile"], row["failedViewports"])
+        self.assertEqual(["type_writing_mode_duplicate_failed"], row["failuresByViewport"]["desktop"])
+        self.assertEqual(3, target["declaredObservedCaptures"])
+        self.assertEqual(3, target["declaredFailedCaptures"])
+
     def test_packaging_material_recovery_handler_is_required(self) -> None:
         source = f"""
 const {{ chromium }} = require('playwright');

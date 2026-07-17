@@ -66,6 +66,7 @@ const INTERACTION_MANIFEST = Object.freeze({
     evidence: Object.freeze(["computed-writing-mode", "aria-pressed"]),
   }),
 });
+const INTERACTION_REQUIRED_VIEWPORTS = Object.freeze(["desktop", "mobile"]);
 const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 const TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const LOCALE_RULES = {
@@ -4037,6 +4038,206 @@ function expectedScreenshotCount(targets) {
     + (INTERACTION_PAGES[target.caseId]?.length || 0) * 2, 0);
 }
 
+function manifestCaptureVerified(capture, manifest) {
+  const interaction = capture?.interaction;
+  const expectedKeys = [
+    "attempted", "page", "manifestId", "manifestCoverage", "failures", "hooks",
+    "A", "B", "restoredA", "returnPath", "finalB", "roundTripVerified", "screenshotState",
+  ];
+  if (!interaction || JSON.stringify(Object.keys(interaction).sort()) !== JSON.stringify([...expectedKeys].sort())) return false;
+  const expectedA = manifest.expectedStates.A;
+  const expectedB = manifest.expectedStates.B;
+  const hooks = interaction.hooks;
+  const transitionVerified = interaction.attempted === true
+    && interaction.page === manifest.page
+    && interaction.manifestId === manifest.id
+    && interaction.manifestCoverage === "declared-pilot-row"
+    && Array.isArray(interaction.failures)
+    && interaction.failures.length === 0
+    && hooks && Object.keys(hooks).length === 4
+    && Number.isInteger(hooks.controlCount) && hooks.controlCount === 1
+    && Number.isInteger(hooks.stateCount) && hooks.stateCount === 1
+    && hooks.controlVisible === true
+    && hooks.controlEnabled === true
+    && JSON.stringify(interaction.A) === JSON.stringify(expectedA)
+    && JSON.stringify(interaction.restoredA) === JSON.stringify(expectedA)
+    && JSON.stringify(interaction.B) === JSON.stringify(expectedB)
+    && JSON.stringify(interaction.finalB) === JSON.stringify(expectedB)
+    && interaction.returnPath === manifest.returnAction;
+  const screenshotState = interaction.screenshotState;
+  const sampleMatches = (sample) => sample
+    && JSON.stringify(Object.keys(sample).sort()) === JSON.stringify(["actual", "samples", "matches"].sort())
+    && Array.isArray(sample.samples)
+    && sample.samples.length === 3
+    && sample.samples.every((state) => JSON.stringify(state) === JSON.stringify(expectedB))
+    && JSON.stringify(sample.actual) === JSON.stringify(sample.samples.at(-1))
+    && sample.matches === true;
+  const screenshotVerified = screenshotState
+    && JSON.stringify(Object.keys(screenshotState).sort()) === JSON.stringify(["expected", "before", "after", "verified"].sort())
+    && screenshotState.expected === manifest.screenshotState
+    && sampleMatches(screenshotState.before)
+    && sampleMatches(screenshotState.after)
+    && screenshotState.verified === true;
+  const visualIssues = Array.isArray(capture.visualIssues) ? capture.visualIssues : [];
+  const hiddenInteractionIssue = visualIssues.some((issue) => ["type_writing_mode_", "interaction_"].some(
+    (prefix) => String(issue).startsWith(prefix),
+  ));
+  return transitionVerified && interaction.roundTripVerified === transitionVerified && screenshotVerified && !hiddenInteractionIssue;
+}
+
+function captureInteractionFailures(capture) {
+  const declaredFailures = Array.isArray(capture?.interaction?.failures) ? capture.interaction.failures : [];
+  const observedIssues = Array.isArray(capture?.visualIssues) ? capture.visualIssues : [];
+  return [...new Set([...declaredFailures, ...observedIssues].map(String))];
+}
+
+function buildInteractionCoverage(targets, results) {
+  const byTarget = {};
+  for (const target of targets) {
+    const targetKey = `${target.caseId}:${target.alias}`;
+    const rows = interactionPageNames(target.caseId).map((pageName) => {
+      const rowKey = `${target.caseId}:${pageName}`;
+      const manifest = INTERACTION_MANIFEST[rowKey] || null;
+      const captures = results.filter((result) => result.caseId === target.caseId
+        && result.alias === target.alias
+        && result.page === pageName
+        && result.state === "interaction"
+        && INTERACTION_REQUIRED_VIEWPORTS.includes(result.viewport));
+      const capturesByViewport = Object.fromEntries(INTERACTION_REQUIRED_VIEWPORTS.map((viewport) => [
+        viewport,
+        captures.filter((capture) => capture.viewport === viewport),
+      ]));
+      const observedViewports = INTERACTION_REQUIRED_VIEWPORTS.filter((viewport) => capturesByViewport[viewport].length > 0);
+      const duplicateViewports = INTERACTION_REQUIRED_VIEWPORTS.filter((viewport) => capturesByViewport[viewport].length > 1);
+      const screenshotsByViewport = Object.fromEntries(observedViewports.map((viewport) => [
+        viewport,
+        capturesByViewport[viewport].map((capture) => capture.screenshot || null),
+      ]));
+      if (!manifest) {
+        const failuresByViewport = {};
+        const failedViewports = [];
+        for (const viewport of INTERACTION_REQUIRED_VIEWPORTS) {
+          const failures = [...new Set(capturesByViewport[viewport].flatMap(captureInteractionFailures))];
+          if (failures.length > 0) {
+            failedViewports.push(viewport);
+            failuresByViewport[viewport] = failures;
+          }
+        }
+        return {
+          rowKey,
+          page: pageName,
+          manifestId: null,
+          declaration: "legacy",
+          requiredViewports: [...INTERACTION_REQUIRED_VIEWPORTS],
+          observedViewports,
+          verifiedViewports: [],
+          failedViewports,
+          missingViewports: INTERACTION_REQUIRED_VIEWPORTS.filter((viewport) => !observedViewports.includes(viewport)),
+          duplicateViewports,
+          failuresByViewport,
+          screenshotsByViewport,
+          observedCaptureCount: captures.length,
+          failedCaptureCount: captures.filter((capture) => captureInteractionFailures(capture).length > 0).length,
+          status: "undeclared",
+        };
+      }
+      const failuresByViewport = {};
+      const verifiedViewports = [];
+      const failedViewports = [];
+      for (const viewport of INTERACTION_REQUIRED_VIEWPORTS) {
+        const viewportCaptures = capturesByViewport[viewport];
+        if (viewportCaptures.length === 0) continue;
+        const failures = [...new Set(viewportCaptures.flatMap(captureInteractionFailures))];
+        const verified = viewportCaptures.length === 1 && manifestCaptureVerified(viewportCaptures[0], manifest);
+        if (verified) {
+          verifiedViewports.push(viewport);
+        } else if (viewportCaptures.length === 1 || failures.length > 0) {
+          failedViewports.push(viewport);
+          failuresByViewport[viewport] = failures.length ? failures : ["interaction_evidence_not_verified"];
+        }
+      }
+      const missingViewports = INTERACTION_REQUIRED_VIEWPORTS.filter((viewport) => capturesByViewport[viewport].length === 0);
+      const failed = failedViewports.length > 0;
+      const incomplete = missingViewports.length > 0 || duplicateViewports.length > 0;
+      return {
+        rowKey,
+        page: pageName,
+        manifestId: manifest.id,
+        declaration: "declared",
+        requiredViewports: [...INTERACTION_REQUIRED_VIEWPORTS],
+        observedViewports,
+        verifiedViewports,
+        failedViewports,
+        missingViewports,
+        duplicateViewports,
+        failuresByViewport,
+        screenshotsByViewport,
+        observedCaptureCount: captures.length,
+        failedCaptureCount: captures.filter((capture) => !manifestCaptureVerified(capture, manifest)).length,
+        status: failed && incomplete ? "failed_incomplete" : failed ? "failed" : incomplete ? "incomplete" : "verified",
+      };
+    });
+    const declaredRows = rows.filter((row) => row.declaration === "declared");
+    const legacyRows = rows.filter((row) => row.declaration === "legacy");
+    const counts = {
+      applicable: rows.length,
+      declared: declaredRows.length,
+      verified: declaredRows.filter((row) => row.status === "verified").length,
+      undeclared: legacyRows.length,
+      failedDeclared: declaredRows.filter((row) => row.failedViewports.length > 0).length,
+      incompleteDeclared: declaredRows.filter((row) => row.missingViewports.length > 0 || row.duplicateViewports.length > 0).length,
+      declaredExpectedCaptures: declaredRows.length * INTERACTION_REQUIRED_VIEWPORTS.length,
+      declaredObservedCaptures: declaredRows.reduce((count, row) => count + row.observedCaptureCount, 0),
+      declaredVerifiedCaptures: declaredRows.reduce((count, row) => count + row.verifiedViewports.length, 0),
+      declaredFailedCaptures: declaredRows.reduce((count, row) => count + row.failedCaptureCount, 0),
+      declaredMissingCaptures: declaredRows.reduce((count, row) => count + row.missingViewports.length, 0),
+      legacyExpectedCaptures: legacyRows.length * INTERACTION_REQUIRED_VIEWPORTS.length,
+      legacyExecutedCaptures: legacyRows.reduce((count, row) => count + row.observedCaptureCount, 0),
+      legacyFailedRows: legacyRows.filter((row) => row.failedViewports.length > 0).length,
+      legacyFailedCaptures: legacyRows.reduce((count, row) => count + row.failedCaptureCount, 0),
+    };
+    byTarget[targetKey] = {
+      status: counts.applicable === 0
+        ? "not_applicable"
+        : counts.declared === 0
+          ? "undeclared"
+          : counts.verified === counts.applicable
+            ? "cohort_complete"
+            : counts.verified === counts.declared && counts.failedDeclared === 0 && counts.incompleteDeclared === 0
+              ? "pilot_complete"
+              : "partial",
+      ...counts,
+      declarationCoverage: `${counts.declared}/${counts.applicable}`,
+      declaredRowVerification: `${counts.verified}/${counts.declared}`,
+      declaredCaptureVerification: `${counts.declaredVerifiedCaptures}/${counts.declaredExpectedCaptures}`,
+      rows,
+    };
+  }
+  const countFields = [
+    "applicable", "declared", "verified", "undeclared", "failedDeclared", "incompleteDeclared",
+    "declaredExpectedCaptures", "declaredObservedCaptures", "declaredVerifiedCaptures",
+    "declaredFailedCaptures", "declaredMissingCaptures", "legacyExpectedCaptures", "legacyExecutedCaptures",
+    "legacyFailedRows", "legacyFailedCaptures",
+  ];
+  const summary = { unit: "target-row", requiredViewports: [...INTERACTION_REQUIRED_VIEWPORTS] };
+  for (const field of countFields) {
+    summary[field] = Object.values(byTarget).reduce((count, target) => count + target[field], 0);
+  }
+  summary.declarationCoverage = `${summary.declared}/${summary.applicable}`;
+  summary.declaredRowVerification = `${summary.verified}/${summary.declared}`;
+  summary.declaredCaptureVerification = `${summary.declaredVerifiedCaptures}/${summary.declaredExpectedCaptures}`;
+  summary.status = summary.applicable === 0
+    ? "not_applicable"
+    : summary.declared === 0
+      ? "undeclared"
+    : summary.verified === summary.applicable
+        ? "cohort_complete"
+        : summary.verified === summary.declared && summary.failedDeclared === 0 && summary.incompleteDeclared === 0
+          ? "pilot_complete"
+          : "partial";
+  return { byTarget, summary };
+}
+
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   const launchOptions = { headless: true };
@@ -4117,6 +4318,8 @@ async function main() {
   const discoveryAdvisoryCount = Object.values(discoveryAdvisoriesByTarget).reduce((count, findings) => count + findings.length, 0);
   const evidenceGapCount = Object.values(evidenceGapsByTarget).reduce((count, gaps) => count + gaps.length, 0);
   const observedIssueCount = Object.values(byTarget).reduce((count, issues) => count + issues.length, 0);
+  const interactionCoverage = buildInteractionCoverage(options.targets, report.results);
+  report.interactionCoverageByTarget = interactionCoverage.byTarget;
   report.summary = {
     checkedPages: report.results.length,
     minimumExpectedScreenshots: Math.max(60, expectedScreenshotCount(options.targets)),
@@ -4130,6 +4333,7 @@ async function main() {
     evidenceGapCount,
     targetsWithEvidenceGaps: Object.keys(evidenceGapsByTarget).length,
     evidenceGapsByTarget,
+    interactionCoverage: interactionCoverage.summary,
     verdict: observedIssueCount
       ? "observed_issues"
       : evidenceGapCount
@@ -4144,6 +4348,8 @@ async function main() {
 
 module.exports = {
   CASE_PAGES,
+  buildInteractionCoverage,
+  manifestCaptureVerified,
   captureAuditedScreenshot,
   INTERACTION_MANIFEST,
   INTERACTION_PAGES,
