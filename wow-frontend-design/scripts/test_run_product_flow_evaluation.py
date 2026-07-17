@@ -890,6 +890,36 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 evaluation.visual_evidence_gaps(report),
             )
 
+    def test_evidence_only_issue_cannot_hide_in_cross_page_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "visual.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "results": [],
+                        "crossPageComparisons": [
+                            {
+                                "caseId": "wind-maintenance-dispatch-v6",
+                                "alias": "codex-gpt-5.4",
+                                "visualIssues": ["font_evidence_unavailable"],
+                            }
+                        ],
+                        "summary": {
+                            "verdict": "no_observed_issues",
+                            "evidenceGapCount": 0,
+                            "targetsWithEvidenceGaps": 0,
+                            "evidenceGapsByTarget": {},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                evaluation.EvaluationError,
+                "evidence-only visual issue must be attached to a page result",
+            ):
+                evaluation.blocking_visual_findings(report)
+
     def test_visual_advisories_are_disclosed_without_becoming_blockers(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / "visual.json"

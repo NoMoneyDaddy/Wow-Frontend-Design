@@ -216,6 +216,7 @@ Classify results:
 - MANUAL VISUAL: rendered craft judgment. Repair only when evidence and direction are clear; otherwise keep advisory.
 - ADVISORY: bounded/unproven risk; disclose without calling it a pass.
 - EVIDENCE UNAVAILABLE: a subcheck could not stabilize or record provenance; preserve the report and mark the affected claim `UNVERIFIED`, never abort the cohort or upgrade it to a pass.
+- Evidence-only visual issues are page-result scoped: bind each one to route/page, state, viewport, screenshot, and bounded error provenance; never move it into a cross-page comparison record or infer a gap without that source record.
 - EVALUATOR DEFECT: preserve the counterexample and fix/freeze the evaluator before changing product code.
 
 For repair-required findings, preserve the preview, send exact file/route/viewport/state/evidence/screenshot into the loop, make the smallest repair, run the narrow gate, then the affected matrix. DESIGN.md lint findings follow the same bounded loop before visual capture, with exact linter messages and case identity preserved as evidence. The user must not relay diagnostics or restart the Skill. Three consecutive failures with the same evaluator-owned failure key trigger the fuse: stop blind retries, preserve the best artifact/screenshots/logs, and return PARTIALLY VERIFIED with the unresolved evidence and next executable command. Use BLOCKED only for missing authority, unavailable required infrastructure, unsafe action, or unrecoverable build/runtime failure.

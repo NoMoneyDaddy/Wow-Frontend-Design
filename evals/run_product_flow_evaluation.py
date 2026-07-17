@@ -1004,6 +1004,8 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
             issues = result.get("visualIssues")
             if not isinstance(issues, list) or any(not isinstance(issue, str) or not issue for issue in issues):
                 raise EvaluationError(f"visual report {collection_name} issues are malformed")
+            if collection_name != "results" and any(issue in EVIDENCE_ONLY_VISUAL_ISSUES for issue in issues):
+                raise EvaluationError("evidence-only visual issue must be attached to a page result")
             if issues:
                 key = f"{result.get('caseId')}:{result.get('alias')}"
                 blocking_issues = [issue for issue in issues if issue not in EVIDENCE_ONLY_VISUAL_ISSUES]
