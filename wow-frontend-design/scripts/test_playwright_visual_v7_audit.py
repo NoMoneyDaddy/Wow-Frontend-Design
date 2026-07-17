@@ -87,6 +87,121 @@ const {{ runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
         result = self.run_node(source)
         self.assertIn("packaging_material_recovery_failed", result["failures"])
 
+    def test_type_foundry_manifest_proves_round_trip_and_preserves_interaction_state(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ INTERACTION_MANIFEST, runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <button data-eval="writing-toggle" type="button" aria-pressed="false">切換</button>
+    <div data-eval="specimen" style="writing-mode:horizontal-tb">字樣</div>
+    <script>
+      const toggle = document.querySelector('[data-eval="writing-toggle"]');
+      const specimen = document.querySelector('[data-eval="specimen"]');
+      toggle.addEventListener('click', () => {{
+        const active = toggle.getAttribute('aria-pressed') === 'true';
+        toggle.setAttribute('aria-pressed', String(!active));
+        specimen.style.writingMode = active ? 'horizontal-tb' : 'vertical-rl';
+      }});
+    </script>
+  `);
+  const evidence = await runCaseInteraction(page, 'type-foundry-specimen-v6', {{ name: 'desktop' }}, 'index.html');
+  const finalState = {{
+    writingMode: await page.locator('[data-eval="specimen"]').evaluate((node) => getComputedStyle(node).writingMode),
+    ariaPressed: await page.locator('[data-eval="writing-toggle"]').getAttribute('aria-pressed'),
+  }};
+  await browser.close();
+  process.stdout.write(JSON.stringify({{ manifest: INTERACTION_MANIFEST['type-foundry-specimen-v6:index.html'], evidence, finalState }}));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("none", result["manifest"]["sideEffect"])
+        self.assertEqual(
+            {"writingMode": "horizontal-tb", "ariaPressed": "false"},
+            result["manifest"]["expectedStates"]["A"],
+        )
+        self.assertEqual(
+            {"writingMode": "vertical-rl", "ariaPressed": "true"},
+            result["manifest"]["expectedStates"]["B"],
+        )
+        self.assertEqual("type-foundry-writing-mode-toggle", result["evidence"]["manifestId"])
+        self.assertEqual("declared-pilot-row", result["evidence"]["manifestCoverage"])
+        self.assertEqual([], result["evidence"]["failures"])
+        self.assertTrue(result["evidence"]["roundTripVerified"])
+        self.assertEqual(result["evidence"]["A"], result["evidence"]["restoredA"])
+        self.assertEqual(result["evidence"]["B"], result["evidence"]["finalB"])
+        self.assertEqual(result["evidence"]["B"], result["finalState"])
+
+    def test_type_foundry_round_trip_rejects_one_way_toggle(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <button data-eval="writing-toggle" type="button" aria-pressed="false">切換</button>
+    <div data-eval="specimen" style="writing-mode:horizontal-tb">字樣</div>
+    <script>
+      const toggle = document.querySelector('[data-eval="writing-toggle"]');
+      const specimen = document.querySelector('[data-eval="specimen"]');
+      toggle.addEventListener('click', () => {{
+        toggle.setAttribute('aria-pressed', 'true');
+        specimen.style.writingMode = 'vertical-rl';
+      }});
+    </script>
+  `);
+  const evidence = await runCaseInteraction(page, 'type-foundry-specimen-v6', {{ name: 'desktop' }}, 'index.html');
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertIn("type_writing_mode_round_trip_failed", result["failures"])
+
+    def test_type_foundry_capture_rejects_delayed_reversion(self) -> None:
+        source = f"""
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const {{ chromium }} = require('playwright');
+const {{ captureAuditedScreenshot, runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <button data-eval="writing-toggle" type="button" aria-pressed="false">切換</button>
+    <div data-eval="specimen" style="writing-mode:horizontal-tb">字樣</div>
+    <script>
+      const toggle = document.querySelector('[data-eval="writing-toggle"]');
+      const specimen = document.querySelector('[data-eval="specimen"]');
+      let clicks = 0;
+      toggle.addEventListener('click', () => {{
+        clicks += 1;
+        const active = toggle.getAttribute('aria-pressed') === 'true';
+        toggle.setAttribute('aria-pressed', String(!active));
+        specimen.style.writingMode = active ? 'horizontal-tb' : 'vertical-rl';
+        if (clicks === 3) setTimeout(() => {{
+          toggle.setAttribute('aria-pressed', 'false');
+          specimen.style.writingMode = 'horizontal-tb';
+        }}, 50);
+      }});
+    </script>
+  `);
+  const evidence = await runCaseInteraction(page, 'type-foundry-specimen-v6', {{ name: 'desktop' }}, 'index.html');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wow-round-trip-'));
+  await captureAuditedScreenshot(page, path.join(directory, 'capture.png'), evidence);
+  await browser.close();
+  fs.rmSync(directory, {{ recursive: true, force: true }});
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertIn("type_writing_mode_screenshot_state_failed", result["failures"])
+        self.assertFalse(result["screenshotState"]["verified"])
+
     def test_packaging_summary_replays_reset_then_resubmits(self) -> None:
         source = AUDITOR.read_text(encoding="utf-8")
         start = source.index('} else if (caseId === "packaging-configurator-v6" && pageName === "summary.html")')

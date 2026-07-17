@@ -44,6 +44,28 @@ const INTERACTION_PAGES = {
   "oral-history-archive-v6": [],
   "grant-review-board-v6": ["index.html"],
 };
+const INTERACTION_MANIFEST = Object.freeze({
+  "type-foundry-specimen-v6:index.html": Object.freeze({
+    id: "type-foundry-writing-mode-toggle",
+    caseId: "type-foundry-specimen-v6",
+    page: "index.html",
+    controlSelector: '[data-eval="writing-toggle"]',
+    stateSelector: '[data-eval="specimen"]',
+    startCondition: "writing-mode control is available with its initial aria-pressed state",
+    action: "activate writing-mode control",
+    returnAction: "activate the same control again",
+    expectedStates: Object.freeze({
+      A: Object.freeze({ writingMode: "horizontal-tb", ariaPressed: "false" }),
+      B: Object.freeze({ writingMode: "vertical-rl", ariaPressed: "true" }),
+    }),
+    sequence: Object.freeze(["B", "A", "B"]),
+    settleCondition: "computed writing-mode and aria-pressed equal the expected state",
+    timeoutMs: 1000,
+    screenshotState: "B",
+    sideEffect: "none",
+    evidence: Object.freeze(["computed-writing-mode", "aria-pressed"]),
+  }),
+});
 const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 const TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const LOCALE_RULES = {
@@ -2482,8 +2504,65 @@ async function waitForRenderedStateToSettle(page) {
   }
 }
 
+function interactionManifestById(manifestId) {
+  return Object.values(INTERACTION_MANIFEST).find((manifest) => manifest.id === manifestId) || null;
+}
+
+async function sampleManifestState(page, manifest, expectedState) {
+  const samples = await page.evaluate(async ({ controlSelector, stateSelector }) => {
+    const snapshot = () => {
+      const control = document.querySelector(controlSelector);
+      const state = document.querySelector(stateSelector);
+      return {
+        writingMode: state ? getComputedStyle(state).writingMode : null,
+        ariaPressed: control?.getAttribute("aria-pressed") ?? null,
+      };
+    };
+    const values = [snapshot()];
+    for (let frame = 0; frame < 2; frame += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      values.push(snapshot());
+    }
+    return values;
+  }, { controlSelector: manifest.controlSelector, stateSelector: manifest.stateSelector });
+  const expected = JSON.stringify(expectedState);
+  return {
+    actual: samples.at(-1),
+    samples,
+    matches: samples.every((sample) => JSON.stringify(sample) === expected),
+  };
+}
+
+async function captureAuditedScreenshot(page, screenshot, interaction) {
+  const manifest = interactionManifestById(interaction?.manifestId);
+  if (!manifest) {
+    await page.screenshot({ path: screenshot, fullPage: false, animations: "disabled", caret: "hide" });
+    return;
+  }
+  const expected = manifest.expectedStates[manifest.screenshotState];
+  const before = await sampleManifestState(page, manifest, expected);
+  await page.screenshot({ path: screenshot, fullPage: false, animations: "disabled", caret: "hide" });
+  const after = await sampleManifestState(page, manifest, expected);
+  interaction.screenshotState = {
+    expected: manifest.screenshotState,
+    before,
+    after,
+    verified: before.matches && after.matches,
+  };
+  if (!interaction.screenshotState.verified && !interaction.failures.includes("type_writing_mode_screenshot_state_failed")) {
+    interaction.failures.push("type_writing_mode_screenshot_state_failed");
+  }
+}
+
 async function runCaseInteraction(page, caseId, viewport, pageName) {
-  const evidence = { attempted: true, page: pageName, failures: [] };
+  const manifest = INTERACTION_MANIFEST[`${caseId}:${pageName}`] || null;
+  const evidence = {
+    attempted: true,
+    page: pageName,
+    manifestId: manifest?.id || null,
+    manifestCoverage: manifest ? "declared-pilot-row" : "undeclared-legacy-action",
+    failures: [],
+  };
   page.setDefaultTimeout(2500);
   try {
     if (caseId === "wind-maintenance-dispatch-v6") {
@@ -2500,14 +2579,72 @@ async function runCaseInteraction(page, caseId, viewport, pageName) {
       }
       if (!evidence.statusVisible) evidence.failures.push("wind_reassignment_feedback_missing");
     } else if (caseId === "type-foundry-specimen-v6") {
-      const toggle = page.locator('[data-eval="writing-toggle"]');
-      evidence.initialWritingMode = await page.locator('[data-eval="specimen"]').evaluate((node) => getComputedStyle(node).writingMode);
-      await toggle.click();
-      await page.waitForTimeout(100);
-      evidence.finalWritingMode = await page.locator('[data-eval="specimen"]').evaluate((node) => getComputedStyle(node).writingMode);
-      evidence.togglePressed = await toggle.getAttribute("aria-pressed");
-      if (evidence.initialWritingMode === evidence.finalWritingMode || evidence.togglePressed !== "true") {
-        evidence.failures.push("type_writing_mode_toggle_failed");
+      const toggle = page.locator(manifest.controlSelector);
+      const specimen = page.locator(manifest.stateSelector);
+      evidence.hooks = {
+        controlCount: await toggle.count(),
+        stateCount: await specimen.count(),
+        controlVisible: await toggle.count() === 1 && await toggle.isVisible(),
+        controlEnabled: await toggle.count() === 1 && await toggle.isEnabled(),
+      };
+      if (
+        evidence.hooks.controlCount !== 1
+        || evidence.hooks.stateCount !== 1
+        || !evidence.hooks.controlVisible
+        || !evidence.hooks.controlEnabled
+      ) {
+        evidence.failures.push("type_writing_mode_manifest_hook_invalid");
+      } else {
+        const snapshot = async () => ({
+          writingMode: await specimen.evaluate((node) => getComputedStyle(node).writingMode),
+          ariaPressed: await toggle.getAttribute("aria-pressed"),
+        });
+        const sameState = (actual, expected) => JSON.stringify(actual) === JSON.stringify(expected);
+        const activateAndCapture = async (step, expected, failureCode) => {
+          await toggle.click();
+          let settled = true;
+          try {
+            await page.waitForFunction(
+              ({ controlSelector, stateSelector, expectedState }) => {
+                const control = document.querySelector(controlSelector);
+                const state = document.querySelector(stateSelector);
+                return Boolean(control && state)
+                  && getComputedStyle(state).writingMode === expectedState.writingMode
+                  && control.getAttribute("aria-pressed") === expectedState.ariaPressed;
+              },
+              {
+                controlSelector: manifest.controlSelector,
+                stateSelector: manifest.stateSelector,
+                expectedState: expected,
+              },
+              { timeout: manifest.timeoutMs },
+            );
+          } catch {
+            settled = false;
+          }
+          const sampled = await sampleManifestState(page, manifest, expected);
+          settled = settled && sampled.matches;
+          if (!settled) evidence.failures.push(`${failureCode}_did_not_settle`);
+          const actual = sampled.actual;
+          evidence[step] = actual;
+          if (!sameState(actual, expected)) evidence.failures.push(failureCode);
+          return actual;
+        };
+        evidence.A = await snapshot();
+        if (!sameState(evidence.A, manifest.expectedStates.A)) {
+          evidence.failures.push("type_writing_mode_initial_state_failed");
+        }
+        await activateAndCapture("B", manifest.expectedStates.B, "type_writing_mode_toggle_failed");
+        await activateAndCapture("restoredA", manifest.expectedStates.A, "type_writing_mode_round_trip_failed");
+        evidence.returnPath = manifest.returnAction;
+        if (!sameState(evidence.restoredA, evidence.A)) {
+          evidence.failures.push("type_writing_mode_round_trip_snapshot_mismatch");
+        }
+        await activateAndCapture("finalB", manifest.expectedStates.B, "type_writing_mode_replay_failed");
+        if (!sameState(evidence.finalB, evidence.B)) {
+          evidence.failures.push("type_writing_mode_replay_snapshot_mismatch");
+        }
+        evidence.roundTripVerified = evidence.failures.length === 0;
       }
     } else if (caseId === "repair-cafe-intake-v6") {
       const step = await firstVisible(page, '[data-eval="booking-step"]');
@@ -2765,8 +2902,11 @@ async function runCaseInteraction(page, caseId, viewport, pageName) {
         evidence.failures.push("grant_retry_completion_failed");
       }
     }
-    const finalPageName = new URL(page.url()).pathname.split('/').pop() || "index.html";
-    if (finalPageName !== pageName) evidence.failures.push("interaction_left_declared_page");
+    const finalUrl = new URL(page.url());
+    if (["http:", "https:", "file:"].includes(finalUrl.protocol)) {
+      const finalPageName = finalUrl.pathname.split('/').pop() || "index.html";
+      if (finalPageName !== pageName) evidence.failures.push("interaction_left_declared_page");
+    }
   } catch (error) {
     evidence.failures.push(`interaction_exception:${String(error.message || error).slice(0, 160)}`);
   }
@@ -3834,7 +3974,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
   const pageSlug = pageName.replace(/\.html$/i, "");
   const screenshot = path.join(options.artifactDir, `${target.caseId}-${target.alias}-${pageSlug}-${state}-${viewport.name}.png`);
   if (fs.existsSync(screenshot)) throw new Error(`refusing to overwrite screenshot: ${screenshot}`);
-  await page.screenshot({ path: screenshot, fullPage: false, animations: "disabled", caret: "hide" });
+  await captureAuditedScreenshot(page, screenshot, interaction);
   const screenshotSha256 = crypto.createHash("sha256").update(fs.readFileSync(screenshot)).digest("hex");
 
   const result = {
@@ -4004,6 +4144,8 @@ async function main() {
 
 module.exports = {
   CASE_PAGES,
+  captureAuditedScreenshot,
+  INTERACTION_MANIFEST,
   INTERACTION_PAGES,
   runCaseInteraction,
   runKeyboardFocusProbe,
