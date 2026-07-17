@@ -91,6 +91,12 @@ Run these in order. A failure blocks polish until it is repaired.
 9. **Effect and dependency gate** — Give every effect and dependency one job, lifecycle, fallback, and cost boundary. Prefer the smallest runtime that does the job.
 10. **Evidence-ceiling gate** — A claim cannot exceed the strongest independent evidence. Static inspection cannot prove rendered, browser, touch, assistive-technology, or formal-conformance behavior.
 
+### Optional cross-output convergence telemetry
+
+When an evaluator owns two or more outputs from the same model/run cohort, it may collect a rendered macro fingerprint with `scripts/cross_output_template_audit.cjs` and compare only matching surface, viewport, and state observations across different `caseId` values. The fingerprint excludes copy, brand color, font identity, and asset source; it retains landmark order, normalized major-region geometry, flow/grid structure, radius buckets, and a representation histogram. Same-product routes are not cross-output candidates, and sharing a table, form, or other primitive is not enough when the region graph differs.
+
+The sidecar reports `cross_output_template_candidate` only for an exact normalized fingerprint match. Treat it as an advisory that requires product-evidence review and paired blind renders; it does not change the existing visual report, `visualIssues`, release eligibility, or completion verdict. It proves neither originality nor design quality and must not become a novelty quota or a reason to add decorative difference.
+
 ## Weak-model repair order
 
 Do not ask a weak model to “make it less generic” in one subjective step. Repair in this fixed order:
