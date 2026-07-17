@@ -3050,6 +3050,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       .filter((item) => item.containerWidth >= 760 && item.startRatio > 0.35)
       .slice(0, 20);
     const unfilledColumnVoids = [];
+    const unfilledColumnAdvisories = [];
     const measuredLayoutContainers = new Set();
     const horizontalOverlapRatio = (first, second) => {
       const overlap = Math.max(0, Math.min(first.right, second.right) - Math.max(first.left, second.left));
@@ -3090,6 +3091,37 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       const voidHeight = peerRect.bottom - subjectRect.bottom;
       const threshold = Math.max(240, window.innerHeight * 0.3);
       if (hasLowerFiller || voidHeight <= threshold) continue;
+      const contentNodes = [...subject.querySelectorAll(
+        "h1, h2, h3, h4, h5, h6, p, li, table, form, figure, img, [data-eval]",
+      )].filter(visible);
+      const interactiveNodes = [...subject.querySelectorAll(
+        "button, a, input, select, textarea, summary, [role='button']",
+      )].filter(visible);
+      const subjectText = (subject.innerText || subject.textContent || "").trim().replace(/\s+/g, " ");
+      // A tall neighbour is not enough to prove a broken composition: dashboards,
+      // reading layouts, and detail panes often have intentionally independent
+      // heights. Escalate only when the shorter column is genuinely sparse; keep
+      // dense independent columns as visual observations instead of repair blockers.
+      const sparseContent = contentNodes.length <= 2
+        && interactiveNodes.length <= 2
+        && [...subjectText].length <= 160;
+      if (!sparseContent) {
+        unfilledColumnAdvisories.push({
+          target: nameFor(subject).slice(0, 80),
+          voidHeight: Math.round(voidHeight),
+          threshold: Math.round(threshold),
+          subjectHeight: Math.round(subjectRect.height),
+          peerHeight: Math.round(peerRect.height),
+          parentDisplay: parentStyle.display,
+          parentWidth: Math.round(parentRect.width),
+          confidence: "dense-independent-column",
+          contentNodes: contentNodes.length,
+          interactiveNodes: interactiveNodes.length,
+          textLength: [...subjectText].length,
+        });
+        if (unfilledColumnAdvisories.length >= 20) break;
+        continue;
+      }
       measuredLayoutContainers.add(parent);
       unfilledColumnVoids.push({
         target: nameFor(subject).slice(0, 80),
@@ -3099,10 +3131,19 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
         peerHeight: Math.round(peerRect.height),
         parentDisplay: parentStyle.display,
         parentWidth: Math.round(parentRect.width),
+        confidence: "sparse-column",
+        contentNodes: contentNodes.length,
+        interactiveNodes: interactiveNodes.length,
+        textLength: [...subjectText].length,
       });
       if (unfilledColumnVoids.length >= 20) break;
     }
-    const layoutFlow = { domOrderReversals, displacedIntroCopy, unfilledColumnVoids };
+    const layoutFlow = {
+      domOrderReversals,
+      displacedIntroCopy,
+      unfilledColumnVoids,
+      unfilledColumnAdvisories,
+    };
 
     const localeCandidates = [...document.querySelectorAll([
       "button", "label", "summary", "nav a", "[role='button']",
@@ -3341,18 +3382,33 @@ async function main() {
   }
 
   const byTarget = {};
+  const advisoriesByTarget = {};
   for (const target of options.targets) {
     const key = `${target.caseId}:${target.alias}`;
-    const viewIssues = report.results.filter((result) => result.caseId === target.caseId && result.alias === target.alias).flatMap((result) => result.visualIssues);
+    const targetResults = report.results.filter((result) => result.caseId === target.caseId && result.alias === target.alias);
+    const viewIssues = targetResults.flatMap((result) => result.visualIssues);
     const crossIssues = report.crossPageComparisons.filter((result) => result.caseId === target.caseId && result.alias === target.alias).flatMap((result) => result.visualIssues);
     byTarget[key] = unique([...viewIssues, ...crossIssues]);
+    const advisories = targetResults.flatMap((result) => (result.layoutFlow?.unfilledColumnAdvisories || []).map((advisory) => ({
+      ...advisory,
+      page: result.page,
+      state: result.state,
+      viewport: result.viewport,
+      screenshot: result.screenshot,
+    })));
+    if (advisories.length) advisoriesByTarget[key] = advisories;
   }
+  const advisoryCount = Object.values(advisoriesByTarget).reduce((count, advisories) => count + advisories.length, 0);
+  const observedIssueCount = Object.values(byTarget).reduce((count, issues) => count + issues.length, 0);
   report.summary = {
     checkedPages: report.results.length,
     minimumExpectedScreenshots: 60,
     targetsWithObservedIssues: Object.values(byTarget).filter((issues) => issues.length).length,
     issuesByTarget: byTarget,
-    verdict: Object.values(byTarget).some((issues) => issues.length) ? "observed_issues" : "no_observed_issues",
+    advisoryCount,
+    targetsWithAdvisories: Object.keys(advisoriesByTarget).length,
+    advisoriesByTarget,
+    verdict: observedIssueCount ? "observed_issues" : advisoryCount ? "advisories_present" : "no_observed_issues",
   };
   fs.mkdirSync(path.dirname(options.output), { recursive: true });
   fs.writeFileSync(options.output, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", flag: "wx" });

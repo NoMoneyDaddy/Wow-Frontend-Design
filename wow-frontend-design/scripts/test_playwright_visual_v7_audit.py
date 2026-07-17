@@ -1393,6 +1393,14 @@ process.stdout.write(JSON.stringify({{
         self.assertIn("zh_hant_untranslated_interface_copy", result["locale"])
         self.assertIn("declared_primary_font_not_rendered", result["fontMismatch"])
 
+    def test_column_void_gate_requires_sparse_content_and_preserves_advisories(self) -> None:
+        source = AUDITOR.read_text(encoding="utf-8")
+        self.assertIn("const unfilledColumnAdvisories = [];", source)
+        self.assertIn('confidence: "sparse-column"', source)
+        self.assertIn('confidence: "dense-independent-column"', source)
+        self.assertIn("const sparseContent = contentNodes.length <= 2", source)
+        self.assertIn("unfilledColumnAdvisories", source)
+
     def test_locale_rule_keeps_terms_codes_and_names_but_rejects_raw_ui_copy(self) -> None:
         source = f"""
 const {{ hasUnexplainedEnglish }} = require({json.dumps(str(AUDITOR))});

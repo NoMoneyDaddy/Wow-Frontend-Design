@@ -915,6 +915,7 @@ def validate_design_completion(
 def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
     report = _load_json(visual_output, "visual report")
     by_target: dict[str, set[str]] = {}
+    advisories_from_results: dict[str, list[dict[str, Any]]] = {}
     for collection_name in ("results", "crossPageComparisons"):
         collection = report.get(collection_name)
         if not isinstance(collection, list):
@@ -928,11 +929,63 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
             if issues:
                 key = f"{result.get('caseId')}:{result.get('alias')}"
                 by_target.setdefault(key, set()).update(issues)
+            if collection_name == "results":
+                layout_flow = result.get("layoutFlow")
+                raw_advisories = layout_flow.get("unfilledColumnAdvisories", []) if isinstance(layout_flow, dict) else []
+                if not isinstance(raw_advisories, list):
+                    raise EvaluationError("visual report result advisory inventory is malformed")
+                if raw_advisories:
+                    key = f"{result.get('caseId')}:{result.get('alias')}"
+                    enriched = []
+                    for advisory in raw_advisories:
+                        if not isinstance(advisory, dict):
+                            raise EvaluationError("visual report result advisory evidence is malformed")
+                        enriched.append({
+                            **advisory,
+                            "page": result.get("page"),
+                            "state": result.get("state"),
+                            "viewport": result.get("viewport"),
+                            "screenshot": result.get("screenshot"),
+                        })
+                    advisories_from_results.setdefault(key, []).extend(enriched)
     normalized = {key: sorted(issues) for key, issues in sorted(by_target.items())}
     summary = report.get("summary")
     if not isinstance(summary, dict):
         raise EvaluationError("visual report summary is malformed")
-    expected_verdict = "observed_issues" if normalized else "no_observed_issues"
+    advisory_fields_present = any(field in summary for field in ("advisoryCount", "targetsWithAdvisories", "advisoriesByTarget"))
+    advisory_count = summary.get("advisoryCount", 0)
+    targets_with_advisories = summary.get("targetsWithAdvisories", 0)
+    advisories_by_target = summary.get("advisoriesByTarget", {})
+    if (
+        type(advisory_count) is not int
+        or advisory_count < 0
+        or type(targets_with_advisories) is not int
+        or targets_with_advisories < 0
+        or not isinstance(advisories_by_target, dict)
+    ):
+        raise EvaluationError("visual report advisory summary is malformed")
+    actual_advisory_count = 0
+    for target, advisories in advisories_by_target.items():
+        if not isinstance(target, str) or not isinstance(advisories, list):
+            raise EvaluationError("visual report advisory inventory is malformed")
+        for advisory in advisories:
+            if not isinstance(advisory, dict) or any(
+                not isinstance(advisory.get(field), str) or not advisory[field]
+                for field in ("page", "state", "viewport", "screenshot", "confidence")
+            ):
+                raise EvaluationError("visual report advisory evidence is malformed")
+        actual_advisory_count += len(advisories)
+    if actual_advisory_count != advisory_count:
+        raise EvaluationError("visual report advisory count disagrees")
+    if advisories_from_results != advisories_by_target:
+        raise EvaluationError("visual report advisory evidence disagrees with results")
+    if len(advisories_from_results) != targets_with_advisories:
+        raise EvaluationError("visual report advisory target count disagrees")
+    if advisory_fields_present and not advisories_from_results and (advisory_count or targets_with_advisories or advisories_by_target):
+        raise EvaluationError("visual report zero-advisory summary is malformed")
+    expected_verdict = "observed_issues" if normalized else (
+        "advisories_present" if advisory_count else "no_observed_issues"
+    )
     if summary.get("verdict") != expected_verdict:
         raise EvaluationError("visual report verdict disagrees with blocking issues")
     return normalized
@@ -940,6 +993,16 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
 
 def repair_summary(findings: dict[str, list[str]]) -> str:
     return "; ".join(f"{target}={','.join(codes)}" for target, codes in findings.items())
+
+
+def visual_advisory_count(visual_output: Path) -> int:
+    blocking_visual_findings(visual_output)
+    report = _load_json(visual_output, "visual report")
+    summary = report.get("summary")
+    count = summary.get("advisoryCount", 0) if isinstance(summary, dict) else None
+    if type(count) is not int or count < 0:
+        raise EvaluationError("visual report advisory count is malformed")
+    return count
 
 
 def _archive_failed_path(path: Path, attempt: int) -> Path:
@@ -1691,7 +1754,15 @@ def main() -> int:
                     screenshot_dir,
                     target_root,
                 )
-            print(f"product-flow execution complete and acceptance passed: {len(targets)} targets and {count} screenshots retained")
+            advisory_count = visual_advisory_count(visual_output)
+            if advisory_count:
+                print(
+                    f"product-flow execution complete with {advisory_count} advisory finding(s): "
+                    f"{len(targets)} targets and {count} screenshots retained; no clean acceptance claim",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"product-flow execution complete and acceptance passed: {len(targets)} targets and {count} screenshots retained")
             return 0
         tool_environment = resolve_visual_tools(args)
         with serve_targets(targets) as bases:
@@ -1730,10 +1801,18 @@ def main() -> int:
                                 screenshot_dir,
                                 target_root,
                             )
-                        print(
-                            f"product-flow execution complete and acceptance passed: "
-                            f"{len(targets)} targets and {count} screenshots captured"
-                        )
+                        advisory_count = visual_advisory_count(visual_output)
+                        if advisory_count:
+                            print(
+                                f"product-flow execution complete with {advisory_count} advisory finding(s): "
+                                f"{len(targets)} targets and {count} screenshots captured; no clean acceptance claim",
+                                file=sys.stderr,
+                            )
+                        else:
+                            print(
+                                f"product-flow execution complete and acceptance passed: "
+                                f"{len(targets)} targets and {count} screenshots captured"
+                            )
                         return 0
                 diagnostic = " ".join((completed.stderr or completed.stdout or "capture failed").split())[:500]
                 print(

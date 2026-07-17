@@ -30,6 +30,53 @@ class ProductFlowV6EvidenceTests(unittest.TestCase):
     def test_repository_v6_evidence_is_integrity_bound(self) -> None:
         self.assertEqual(8, validate_product_flow_v6_evidence.validate(self.visual, self.root))
 
+    def test_new_zero_advisory_summary_remains_backward_compatible(self) -> None:
+        data = json.loads(self.visual.read_text(encoding="utf-8"))
+        data["summary"].update(
+            {
+                "advisoryCount": 0,
+                "targetsWithAdvisories": 0,
+                "advisoriesByTarget": {},
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(data, directory, "visual.json")
+            validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
+
+    def test_positive_advisory_summary_is_bound_to_results_and_common_fields(self) -> None:
+        data = json.loads(self.visual.read_text(encoding="utf-8"))
+        result = data["results"][0]
+        advisory = {
+            "target": "示例欄位",
+            "voidHeight": 640,
+            "threshold": 300,
+            "confidence": "dense-independent-column",
+        }
+        result["layoutFlow"]["unfilledColumnAdvisories"] = [advisory]
+        key = f"{result['caseId']}:{result['alias']}"
+        enriched = {
+            **advisory,
+            "page": result["page"],
+            "state": result["state"],
+            "viewport": result["viewport"],
+            "screenshot": result["screenshot"],
+        }
+        data["summary"].update(
+            {
+                "advisoryCount": 1,
+                "targetsWithAdvisories": 1,
+                "advisoriesByTarget": {key: [enriched]},
+                "verdict": "advisories_present",
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(data, directory, "visual.json")
+            validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
+            data["summary"].pop("issuesByTarget")
+            tampered = self._write(data, directory, "tampered.json")
+            with self.assertRaisesRegex(validate_product_flow_v6_evidence.ProductFlowV6EvidenceError, "visual advisory summary"):
+                validate_product_flow_v6_evidence._validate_visual(self.root, tampered, self.generation)
+
     def test_stale_screenshot_hash_is_rejected(self) -> None:
         data = json.loads(self.visual.read_text(encoding="utf-8"))
         data["results"][0]["screenshotSha256"] = "0" * 64

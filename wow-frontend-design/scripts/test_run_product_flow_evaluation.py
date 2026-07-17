@@ -656,6 +656,53 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 evaluation.repair_summary(evaluation.blocking_visual_findings(report)),
             )
 
+    def test_visual_advisories_are_disclosed_without_becoming_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "visual.json"
+            advisory = {
+                "page": "index.html",
+                "state": "base",
+                "viewport": "desktop",
+                "screenshot": "/tmp/advisory.png",
+                "confidence": "dense-independent-column",
+                "voidHeight": 640,
+            }
+            report.write_text(
+                json.dumps(
+                    {
+                        "results": [
+                            {
+                                "caseId": "wind-maintenance-dispatch-v6",
+                                "alias": "codex-gpt-5.4",
+                                "page": "index.html",
+                                "state": "base",
+                                "viewport": "desktop",
+                                "screenshot": "/tmp/advisory.png",
+                                "visualIssues": [],
+                                "layoutFlow": {"unfilledColumnAdvisories": [advisory]},
+                            }
+                        ],
+                        "crossPageComparisons": [],
+                        "summary": {
+                            "verdict": "advisories_present",
+                            "advisoryCount": 1,
+                            "targetsWithAdvisories": 1,
+                            "advisoriesByTarget": {
+                                "wind-maintenance-dispatch-v6:codex-gpt-5.4": [advisory]
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual({}, evaluation.blocking_visual_findings(report))
+            self.assertEqual(1, evaluation.visual_advisory_count(report))
+            data = json.loads(report.read_text(encoding="utf-8"))
+            data["summary"]["verdict"] = "no_observed_issues"
+            report.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationError, "advisory count disagrees|advisory evidence disagrees|verdict disagrees"):
+                evaluation.blocking_visual_findings(report)
+
     def test_visual_findings_archive_evidence_and_start_fresh_repair(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

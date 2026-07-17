@@ -452,14 +452,60 @@ def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
     if not isinstance(comparisons, list) or any(not isinstance(item, dict) or item.get("visualIssues") != [] for item in comparisons):
         raise ProductFlowV6EvidenceError("cross-page visual findings remain")
     expected_issues = {f"{case_id}:{ALIAS}": [] for case_id in CASES}
-    if report.get("summary") != {
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        raise ProductFlowV6EvidenceError("visual summary is malformed")
+    advisory_by_target: dict[str, int] = {}
+    advisory_payload_by_target: dict[str, list[dict[str, object]]] = {}
+    for result in results:
+        layout_flow = result.get("layoutFlow")
+        advisories = layout_flow.get("unfilledColumnAdvisories", []) if isinstance(layout_flow, dict) else []
+        if not isinstance(advisories, list):
+            raise ProductFlowV6EvidenceError("visual advisory inventory is malformed")
+        if advisories:
+            key = f"{result.get('caseId')}:{result.get('alias')}"
+            advisory_by_target[key] = advisory_by_target.get(key, 0) + len(advisories)
+            payload = advisory_payload_by_target.setdefault(key, [])
+            for advisory in advisories:
+                if not isinstance(advisory, dict):
+                    raise ProductFlowV6EvidenceError("visual advisory evidence is malformed")
+                payload.append(
+                    {
+                        **advisory,
+                        "page": result.get("page"),
+                        "state": result.get("state"),
+                        "viewport": result.get("viewport"),
+                        "screenshot": result.get("screenshot"),
+                    }
+                )
+    advisory_count = sum(advisory_by_target.values())
+    common_summary = {
         "checkedPages": 64,
         "minimumExpectedScreenshots": 60,
         "targetsWithObservedIssues": 0,
         "issuesByTarget": expected_issues,
-        "verdict": "no_observed_issues",
-    }:
-        raise ProductFlowV6EvidenceError("visual summary changed or overstates acceptance")
+    }
+    if not advisory_count:
+        legacy_clean_summary = {**common_summary, "verdict": "no_observed_issues"}
+        explicit_clean_summary = {
+            **common_summary,
+            "advisoryCount": 0,
+            "targetsWithAdvisories": 0,
+            "advisoriesByTarget": {},
+            "verdict": "no_observed_issues",
+        }
+        if summary not in (legacy_clean_summary, explicit_clean_summary):
+            raise ProductFlowV6EvidenceError("visual summary changed or overstates acceptance")
+    else:
+        expected_advisory_summary = {
+            **common_summary,
+            "advisoryCount": advisory_count,
+            "targetsWithAdvisories": len(advisory_payload_by_target),
+            "advisoriesByTarget": advisory_payload_by_target,
+            "verdict": "advisories_present",
+        }
+        if summary != expected_advisory_summary:
+            raise ProductFlowV6EvidenceError("visual advisory summary is incomplete or overstates acceptance")
 
 
 def validate(
