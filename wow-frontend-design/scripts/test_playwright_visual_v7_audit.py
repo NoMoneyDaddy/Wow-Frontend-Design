@@ -443,6 +443,40 @@ const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
         self.assertEqual("candidate", result["outcome"])
         self.assertIn("focus-missing-indicators:1", result["evidence"])
 
+    def test_novel_focus_probe_composites_translucent_ancestor_background(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`<style>html,body {{ background: white; }} .panel {{ background: rgba(0,0,0,.5); padding: 8px; }} button:focus-visible {{ outline: 4px solid black; outline-offset: 3px; }}</style><div class="panel"><button>半透明面板</button></div>`);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("pass", result["outcome"])
+        self.assertIn("focus-missing-indicators:0", result["evidence"])
+
+    def test_novel_focus_probe_accounts_for_ancestor_opacity(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`<style>body {{ background: white; }} .panel {{ opacity: .5; }} button:focus-visible {{ outline: 4px solid rgb(100,100,100); }}</style><div class="panel"><button>半透明 focus</button></div>`);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-missing-indicators:1", result["evidence"])
+
     def test_novel_focus_probe_excludes_nonsequential_controls_from_coverage(self) -> None:
         source = f"""
 const {{ chromium }} = require('playwright');

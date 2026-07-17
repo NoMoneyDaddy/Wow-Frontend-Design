@@ -2841,28 +2841,65 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
       active.focus();
       const after = readStyle();
       let paintSuppressed = false;
+      let effectiveOpacity = 1;
       let accessibilityHidden = Boolean(active.closest("[aria-hidden='true']"));
       let backgroundColor = "transparent";
-      for (let node = active.parentElement; node && node.nodeType === 1; node = node.parentElement) {
+      let backgroundImageUnknown = false;
+      const ancestors = [];
+      for (let node = active.parentElement; node && node.nodeType === 1; node = node.parentElement) ancestors.unshift(node);
+      let backdrop = [255, 255, 255];
+      let knownBackdrop = false;
+      for (const node of ancestors) {
         const style = getComputedStyle(node);
-        if (backgroundColor === "transparent" && style.backgroundColor !== "transparent" && !/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(style.backgroundColor)) {
-          backgroundColor = style.backgroundColor;
-        }
+        if (style.backgroundImage !== "none") backgroundImageUnknown = true;
+        const match = style.backgroundColor.match(/rgba?\(([^)]*)\)/i);
+        if (!match) continue;
+        const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
+        if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) continue;
+        const alpha = parts.length > 3 && Number.isFinite(parts[3]) ? parts[3] : 1;
+        if (alpha <= 0) continue;
+        backdrop = parts.slice(0, 3).map((channel, index) => channel * alpha + backdrop[index] * (1 - alpha));
+        knownBackdrop = true;
+      }
+      if (knownBackdrop) {
+        backgroundColor = `rgb(${backdrop.map((channel) => Math.round(channel)).join(", ")})`;
+      } else {
+        backgroundColor = "transparent";
       }
       for (let node = active; node && node.nodeType === 1; node = node.parentElement) {
         const style = getComputedStyle(node);
         const opacity = Number.parseFloat(style.opacity);
+        effectiveOpacity *= Number.isFinite(opacity) ? opacity : 1;
+        const filterOpacity = style.filter.match(/opacity\(\s*([\d.]+)%?\s*\)/i);
+        if (filterOpacity) {
+          const value = Number.parseFloat(filterOpacity[1]);
+          effectiveOpacity *= style.filter.includes("%") ? value / 100 : value;
+        }
         const matrixValues = style.transform.match(/^matrix\(([^)]+)\)$/i)?.[1].split(",").map(Number);
         const transformCollapsed = matrixValues?.length === 6
           && (Math.hypot(matrixValues[0], matrixValues[1]) < 0.1 || Math.hypot(matrixValues[2], matrixValues[3]) < 0.1);
-        const insetValues = [...style.clipPath.matchAll(/(-?\d+(?:\.\d+)?)%/g)].map((match) => Number.parseFloat(match[1]));
-        const clipCollapsesPaint = (/^inset\(/i.test(style.clipPath) && insetValues.length > 0 && insetValues.every((value) => value >= 50))
+        const clipInset = style.clipPath.match(/^inset\((.*?)(?:\s+round\s+.*)?\)$/i);
+        const clipInsetValues = clipInset ? clipInset[1].trim().split(/\s+/) : [];
+        const expandedInsets = clipInsetValues.length === 1
+          ? [clipInsetValues[0], clipInsetValues[0], clipInsetValues[0], clipInsetValues[0]]
+          : clipInsetValues.length === 2
+            ? [clipInsetValues[0], clipInsetValues[1], clipInsetValues[0], clipInsetValues[1]]
+            : clipInsetValues.length === 3
+              ? [clipInsetValues[0], clipInsetValues[1], clipInsetValues[2], clipInsetValues[1]]
+              : clipInsetValues.slice(0, 4);
+        const box = node.getBoundingClientRect();
+        const toPx = (value, extent) => value?.endsWith("%") ? Number.parseFloat(value) / 100 * extent : Number.parseFloat(value);
+        const clipCollapsesPaint = expandedInsets.length === 4
+          && ((toPx(expandedInsets[0], box.height) + toPx(expandedInsets[2], box.height)) >= box.height
+            || (toPx(expandedInsets[1], box.width) + toPx(expandedInsets[3], box.width)) >= box.width)
           || /(?:circle|ellipse)\(\s*0(?:px|%|\s|\))/i.test(style.clipPath)
           || /polygon\(\s*0\s+0\s*,\s*0\s+0/i.test(style.clipPath);
+        const maskImage = style.maskImage || style.webkitMaskImage || "none";
+        const maskHasVisibleStop = /black|white|currentcolor|#[0-9a-f]{3,8}|rgba?\([^)]*(?:,|\/)\s*(?:[1-9]|1(?:\.0+)?)\s*(?:%|\)|$)/i.test(maskImage);
         if (opacity === 0 || style.visibility === "hidden" || style.display === "none"
           || /opacity\(\s*0(?:[.%]|\s|\))/i.test(style.filter)
           || clipCollapsesPaint
-          || /transparent|rgba?\([^)]*(?:,|\s|\/)0(?:%|\s|\)|$)/i.test(style.maskImage || style.webkitMaskImage || "")
+          || (maskImage !== "none" && !maskHasVisibleStop)
           || transformCollapsed) {
           paintSuppressed = true;
           break;
@@ -2884,6 +2921,8 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
         before,
         after,
         paintSuppressed,
+        effectiveOpacity,
+        backgroundImageUnknown,
         accessibilityHidden,
         backgroundColor,
       };
@@ -2919,12 +2958,13 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
       const alpha = parts.length > 3 ? parts[3] : 1;
       return alpha > 0 ? { rgb: parts.slice(0, 3), alpha } : null;
     };
-    const hasContrast = (value, background) => {
+    const hasContrast = (value, background, opacity = 1) => {
       const foreground = parseRgb(value);
       const backdrop = parseRgb(background);
       if (!backdrop) return true;
       if (!foreground) return false;
-      const composited = foreground.rgb.map((channel, index) => channel * foreground.alpha + backdrop.rgb[index] * (1 - foreground.alpha));
+      const alpha = foreground.alpha * opacity;
+      const composited = foreground.rgb.map((channel, index) => channel * alpha + backdrop.rgb[index] * (1 - alpha));
       const luminance = (rgb) => rgb.reduce((sum, channel, index) => {
         const normalized = channel / 255;
         const linear = normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
@@ -2934,31 +2974,32 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
         / (Math.min(luminance(composited), luminance(backdrop.rgb)) + 0.05);
       return ratio >= 3;
     };
-    const hasPaint = (value, background) => hasVisiblePaint(value) && hasContrast(value, background);
+    const hasPaint = (value, background, opacity) => hasVisiblePaint(value) && hasContrast(value, background, opacity);
     const hasIndicator = (observation) => {
+      if (observation.backgroundImageUnknown) return false;
       const before = observation.before.split("|");
       const after = observation.after.split("|");
       const outlineGeometryChanged = after[0] !== "none"
         && parsePx(after[1]) > 0
-        && hasPaint(after[3], observation.backgroundColor)
+        && hasPaint(after[3], observation.backgroundColor, observation.effectiveOpacity)
         && (before[0] !== after[0] || before[1] !== after[1] || before[2] !== after[2]);
       const shadowChanged = before[4] !== after[4]
         && after[4] !== "none"
-        && hasPaint(after[4], observation.backgroundColor)
+        && hasPaint(after[4], observation.backgroundColor, observation.effectiveOpacity)
         && [...after[4].matchAll(/(-?\d+(?:\.\d+)?)px/g)].some(([, value]) => Math.abs(Number.parseFloat(value)) > 0);
       const borderGeometryChanged = [0, 1, 2, 3].some((side) => {
         const styleChanged = after[5 + side] !== before[5 + side] && after[5 + side] !== "none";
         const widthChanged = after[9 + side] !== before[9 + side];
         return (styleChanged || widthChanged)
           && parsePx(after[9 + side]) > 0
-          && hasPaint(after[13 + side], observation.backgroundColor);
+          && hasPaint(after[13 + side], observation.backgroundColor, observation.effectiveOpacity);
       });
       const underlineChanged = after[17] !== before[17]
         && after[17].split(" ").includes("underline")
         && after[18] !== "none"
         && after[19] !== "0px"
         && after[19] !== "0"
-        && hasPaint(after[21], observation.backgroundColor);
+        && hasPaint(after[21], observation.backgroundColor, observation.effectiveOpacity);
       return !observation.paintSuppressed && !observation.accessibilityHidden
         && (outlineGeometryChanged || shadowChanged || borderGeometryChanged || underlineChanged);
     };
