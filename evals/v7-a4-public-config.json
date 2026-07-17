@@ -208,6 +208,8 @@
     "evals/playwright_v7_a1_audit.cjs",
     "evals/run_v7_visual_matrix.py",
     "evals/compile_v7_repair_packet.py",
+    "evals/v7-repair-support-contract.json",
+    "evals/v7_repair_policy.py",
     "evals/run_v7_repair_cycle.py",
     "wow-frontend-design/scripts/evidence_ledger.py",
     "wow-frontend-design/scripts/validate_v7_evidence.py"

@@ -2,7 +2,7 @@
 
 狀態：v6 固定 cohort `COMPLETED`（2026-07-15）；v7 roadmap `IN PROGRESS`。
 
-v7 狀態（2026-07-18）：development instrumentation 與 A4 pilot 已執行；A4 因 deterministic findings 增加及 civic desktop material regression，未晉級為全域品質改善。v7 尚未完成 sealed promotion。Playwright evidence 已可編譯為 bounded repair packet，P0 consumer 也已以合成 fixture 與契約回歸驗證 selective generation、packet-declared narrow retest、保守 frozen full fallback、append-only fuse receipt 與 transactional promotion；尚未執行 live model/browser repair cycle，因此自動修正能力維持 `PARTIALLY VERIFIED`。P1 affected-matrix selector 仍未完成；不得把「consumer 已實作」轉述成「live cohort 已修正」。
+v7 狀態（2026-07-18）：development instrumentation 與 A4 pilot 已執行；A4 因 deterministic findings 增加及 civic desktop material regression，未晉級為全域品質改善。v7 尚未完成 sealed promotion。Playwright evidence 已可編譯為 bounded repair packet；P0 consumer 與 P1 affected selector／best-artifact ratchet 已以合成 fixture 與契約回歸驗證 selective generation、actual-diff selection、target-full／cohort-full fallback、append-only fuse receipt 與 transactional promotion。尚未執行 live model/browser repair cycle，因此自動修正能力維持 `PARTIALLY VERIFIED`；不得把「runner 已實作」轉述成「live cohort 已修正」。
 
 方法定位：這 8 案同時參與缺陷發現、Skill／evaluator 修正、Darwin candidate 比較與最終回歸，因此是 **development/regression closure**，不是 held-out validation，也不證明 Skill 已泛化。下一次 promotion 必須另用未進 authoring context 的 sealed validation／test tasks，比較 accepted 與 candidate Skill，並對 stochastic case 重複執行。
 
@@ -310,8 +310,8 @@ Candidate 只有在以下全部成立時才能取代 accepted Skill：
 
 | 順序 | 單一能力缺口 | 候選邊界 | 必須證明的 exit criteria | 本輪不做 |
 | --- | --- | --- | --- | --- |
-| P0 | v7 repair packet 沒有 consumer | evaluator-owned `packet → selective regeneration → narrow retest` runner；只處理 packet 明示的 `variant × case_id`；narrow clean 後一律以已凍結 full matrix 作保守 fallback 並記錄原因 | 未失敗 target byte/hash 不變；同一 failure key 最多三輪；每輪保存 receipt；full-matrix fallback 通過才結束；任一未知 schema fail closed；不得在本輪推論相依關係或挑選「最佳」產物 | 新增 scanner、改 Skill 視覺規則、安裝套件、affected-set selector |
-| P1 | affected matrix 與最佳產物選擇尚未機械化 | 用 issue class、實際 diff、宣告支援矩陣映射取代 P0 的 full-matrix fallback；新增 lexicographic best-artifact contract | 原失敗格必重跑；shared token/layout 變更擴大到完整相依矩陣；未知範圍維持 full matrix；失敗時保留最佳可用 artifact 而非最後一次 artifact | 用 finding 總數抵銷核心任務／runtime regression |
+| P0 | repair packet consumer 已完成 | evaluator-owned `packet → selective regeneration → narrow retest` runner；只處理 packet 明示的 `variant × case_id`；P0 以 frozen full matrix 作保守 fallback | 合成測試已證未失敗 target byte/hash 不變、同一 failure key 三輪熔斷、append-only receipt、full fallback 與 transactional promotion；未執行 live cycle | 新增 scanner、改 Skill 視覺規則、安裝套件 |
+| P1 | affected matrix 與最佳產物選擇已機械化；待 live cycle | 用 issue class、實際 output receipt diff、宣告支援矩陣映射取代 P0 的常態 full-cohort fallback；新增 lexicographic best-artifact contract | 合成測試已證原失敗格必重跑；任何 rendered 變更擴大到完整 target matrix；未知範圍維持 full cohort；失敗保留 evaluator-owned deterministic best 而非最後產物。尚未取得 live model/browser receipt | 用 finding 總數抵銷核心任務／runtime regression；用 bytes/hash 抵銷 deterministic quality |
 | P2 | 已有 accessibility／contrast／source／Pretext 工具未形成同一 bounded issue registry | 一次只接一個已存在且 pinned 的 supporting probe；versioned allowlist、claim boundary、dedupe key | 注入 fixture 可走完整 repair cycle；工具不可用時降級而非偽造 pass；axe／lint 不得被稱為 WCAG 或視覺驗證 | 一次接入所有工具、讓 advisory 直接阻斷發布 |
 | P3 | 固定 viewport 可能漏掉 breakpoint 邊界；motion 只有穩定截圖模式 | 無截圖的 bounded breakpoint probe；僅對有 motion 的頁面比較 normal/reduce computed behavior | 只在觀測到 mode change 周圍收斂；不得無上限掃寬度；normal/reduce 結果可重現且不以 global `0.01ms` 規則代替產品行為 | 每個像素寬度截圖、以動畫數量評美感 |
 | P4 | 美感、色彩與排版仍需避免跨產品收斂 | 以 product thesis、產品證據、內容結構與 locale 為條件的 paired cohort；繁中 line fragments 與 task completeness 為硬 gate；每案產生可追溯的品牌／表面／文字／狀態／資料語意 color-role map 與 contrast pairs | deterministic vector 無退步；匿名 craft review 無 material loss；color-role map 服務 task/readability 且不同 brief 不複製同一角色映射；同一 Skill 在錯開產品 brief 不收斂成同 palette／grid／type treatment | 固定美學 preset、字型／色彩黑名單、用 novelty 抵銷 usability |
@@ -333,4 +333,4 @@ Candidate 只有在以下全部成立時才能取代 accepted Skill：
 - **同類 Skill（方法參考）**：[Microsoft frontend-design-review](https://github.com/microsoft/skills/blob/main/.github/skills/frontend-design-review/SKILL.md) 的 task/craft/trust 分層與 [gstack design-review](https://github.com/garrytan/gstack/blob/main/design-review/SKILL.md) 的 finding-level before/after／revert 紀錄有參考價值；固定點數、字型禁令、效果配方、runtime-specific orchestration 與把主觀 grade 當 promotion gate 不採用。
 - **Reddit 實務觀察（advisory only；擷取 2026-07-18）**：[AI-assisted Playwright workflow 討論](https://www.reddit.com/r/Playwright/comments/1umqvix/whats_missing_from_this_aidriven_e2e_testing/)提出 AI 較適合 evidence gathering／boilerplate，而非唯一 final skeptic；[E2E 投資範圍討論](https://www.reddit.com/r/webdev/comments/1r9ubwa/e2e_testing_for_frontend_developers_whats/)偏向保留 critical user flows、降低脆弱測試量。它們是未經本專案證明的實務假設，只用來設計反例；實際規則仍須由官方文件、固定 fixture 與本 repo evidence 證明。動態內容／字型 rasterization 的視覺噪音邊界直接採 Playwright 官方文件，不由 Reddit 推導。
 
-第一個功能候選固定為 P0 repair-cycle consumer。P0 接受前不啟動 P2–P5；如果 P0 在三次同因嘗試後仍無法用合成 fixture 完成 selective repair 與重測，保留現有 packet compiler，將自修正能力維持 `PARTIALLY VERIFIED`，不以更多規則掩蓋缺口。
+P0 repair-cycle consumer 與 P1 affected/best-artifact policy 已完成 synthetic acceptance。下一個候選從 P2 一次只接一個既有 supporting probe；在 live cycle 與 sealed promotion 完成前，自修正能力維持 `PARTIALLY VERIFIED`，不以更多規則或主觀分數掩蓋缺口。

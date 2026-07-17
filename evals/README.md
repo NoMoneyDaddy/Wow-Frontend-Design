@@ -79,11 +79,11 @@ npm run eval:v7-repair-packet -- \
   --gate full
 ```
 
-P0 repair cycle 只重生 packet 中的 `variant × case_id`，保留其他 target；先精確執行 `narrow_retest` 明示 rows。全部 narrow clean 後仍須重跑凍結的 full matrix；只有完整 evidence clean 才會批次 promotion，任何 generation、capture、full fallback 或 promotion 失敗都保留 append-only receipt 並停止。P1 才會以可證明的 affected selector 取代這個保守 fallback：
+P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue class、source/repaired output receipt 與凍結支援矩陣選取 affected rows。`index.html` 有變時，CSS、token、layout、文字與互動都保守擴大為該 target 的完整 15-row matrix；`index.html` 未變時仍重跑原 failure rows；分類未知或 target isolation 無法機械證明時回退完整 cohort。每輪只有 evaluator-owned deterministic vector 嚴格改善才成為 best artifact；新 interaction/runtime regression 不可被較少 composition findings、較小輸出或 hash 抵銷。所有選擇、rank、fuse 與 promotion 都保存 append-only receipt：
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-repair-cycle.json \
+  --manifest evals/v7-pilot-manifest-20260718-affected-repair-v3.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -98,7 +98,7 @@ npm run eval:v7-repair-cycle -- \
   --repository-root .
 ```
 
-`brief-map.json` 必須逐一綁定 development full matrix 的 evaluator-owned absolute brief path 與 SHA-256。Packet 是可執行回饋接口，不是修正成功證據；cycle 的 narrow receipt 也不能替代 full ledger。
+`brief-map.json` 必須逐一綁定 development full matrix 的 evaluator-owned absolute brief path 與 SHA-256。Packet 是可執行回饋接口，不是修正成功證據；affected receipt 只能證明其 SHA-256 綁定 rows，不能替代 release/full-support matrix。這個 runner 已通過 synthetic contract tests，但尚未執行 live model/browser repair cycle，因此自動修正能力仍是 `PARTIALLY VERIFIED`。
 
 ## 目前案例
 

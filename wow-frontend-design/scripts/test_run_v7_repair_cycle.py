@@ -165,6 +165,67 @@ class V7RepairCycleTests(unittest.TestCase):
                 write_receipt=lambda _value: None,
             )
 
+    def test_non_improving_candidate_retains_best_source_and_skips_verification(self) -> None:
+        target = _target()
+        receipts = []
+        full_calls = []
+        retained = []
+        with self.assertRaisesRegex(cycle.V7RepairCycleFuse, "lexicographic ratchet"):
+            cycle.execute_cycle(
+                _packet(target),
+                generate=lambda *_args: {
+                    "root": "/tmp/worse",
+                    "source_root": "/tmp/source",
+                    "receipt": {},
+                },
+                capture_narrow=lambda *_args: {
+                    "targets": [target],
+                    "packet": _packet(target),
+                    "receipt": {},
+                },
+                run_full=lambda *_args: full_calls.append(True),
+                promote=lambda *_args: {},
+                write_receipt=receipts.append,
+                rank_source=lambda _target_value: (*([0] * 10), "a" * 64),
+                rank_candidate=lambda *_args: (1, *([0] * 9), "b" * 64),
+                retain_best=lambda *args: retained.append(args),
+            )
+        self.assertEqual([], retained)
+        self.assertEqual([], full_calls)
+        self.assertEqual("non_improving_artifact", receipts[-1]["outcome"])
+        self.assertEqual("/tmp/source", receipts[-1]["retained_root"])
+
+    def test_full_cohort_selection_may_discover_a_foreign_target(self) -> None:
+        first = _target("case-one")
+        second = _target("case-two")
+        captured = []
+
+        def capture(item: dict, *_args) -> dict:
+            captured.append(item["case_id"])
+            targets = [second] if item["case_id"] == "case-one" else []
+            return {
+                "targets": targets,
+                "packet": _packet(*targets),
+                "selection": {"decision": "cohort-full-matrix"},
+                "receipt": {},
+            }
+
+        result = cycle.execute_cycle(
+            _packet(first),
+            generate=lambda item, *_args: {"root": f"/tmp/{item['case_id']}", "receipt": {}},
+            capture_narrow=capture,
+            run_full=lambda *_args: {
+                "packet": {"status": "clean"},
+                "receipt": {"mode": "affected"},
+                "verified_targets": {},
+            },
+            promote=lambda *_args: {"status": "promoted"},
+            write_receipt=lambda _value: None,
+        )
+        self.assertEqual(["case-one", "case-two"], captured)
+        self.assertEqual(0, result["full_runs"])
+        self.assertEqual(1, result["verification_runs"])
+
     def test_promotion_failure_rolls_back_all_canonical_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -232,6 +293,82 @@ class V7RepairCycleTests(unittest.TestCase):
                     expected_staged={key: verified_receipt},
                 )
             self.assertEqual("old", (canonical_root / "DESIGN.md").read_text())
+
+    def test_affected_selector_binds_current_artifact_and_rejects_later_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("candidate", "case-one")
+            source = root / "source"
+            staged = root / "staged"
+            _write_target(source, "old")
+            _write_target(staged, "improved")
+            source_receipt = cycle._source_receipt(source)
+            staged_receipt = cycle._source_receipt(staged)
+            inventory = [("candidate", "case-one", "base", "mobile", "chromium")]
+            target = {
+                "variant": "candidate",
+                "case_id": "case-one",
+                "occurrences": [{
+                    "state": "base",
+                    "profile": "mobile",
+                    "engine": "chromium",
+                    "findings": [{
+                        "classification": "composition",
+                        "code": "a1_prose_han_orphan",
+                        "locator": "copy",
+                    }],
+                }],
+            }
+            support_sha = "e" * 64
+            selector = cycle.policy.select_affected_rows(
+                target,
+                source_receipt,
+                staged_receipt,
+                inventory,
+                target_isolated=True,
+                support_contract_sha256=support_sha,
+            )
+            selector_path = root / "selector.json"
+            selector_path.write_text(json.dumps(selector), encoding="utf-8")
+            accepted = {key: {"path": str(selector_path), "sha256": cycle._digest(selector_path)}}
+            verified, bindings = cycle._verify_affected_targets(
+                {key: staged},
+                {key: source_receipt},
+                {key: staged_receipt},
+                accepted,
+                inventory,
+                support_sha,
+            )
+            self.assertEqual(staged_receipt, verified[key])
+            self.assertEqual(cycle._digest(selector_path), bindings[0]["selector_sha256"])
+            _rewrite_target(staged, "replaced-after-selector")
+            with self.assertRaisesRegex(cycle.V7RepairCycleError, "capture receipt is stale"):
+                cycle._verify_affected_targets(
+                    {key: staged},
+                    {key: source_receipt},
+                    {key: staged_receipt},
+                    accepted,
+                    inventory,
+                    support_sha,
+                )
+
+    def test_support_contract_drift_fails_closed(self) -> None:
+        with mock.patch.object(
+            cycle.policy,
+            "validate_support_contract",
+            return_value="b" * 64,
+        ):
+            with self.assertRaisesRegex(cycle.V7RepairCycleError, "drifted during the cycle"):
+                cycle._require_support_contract(Path("/tmp/contract.json"), ROOT, "a" * 64)
+
+    def test_invalid_support_contract_fails_closed(self) -> None:
+        with mock.patch.object(
+            cycle.policy,
+            "validate_support_contract",
+            side_effect=cycle.policy.V7RepairPolicyError("auditor binding is stale"),
+        ):
+            with self.assertRaisesRegex(cycle.V7RepairCycleError, "became invalid"):
+                cycle._require_support_contract(Path("/tmp/contract.json"), ROOT, "a" * 64)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ def _module(name: str, path: Path) -> Any:
 codex = _module("v7_cycle_codex", ROOT / "evals" / "run_v7_codex_case.py")
 visual = _module("v7_cycle_visual", ROOT / "evals" / "run_v7_visual_matrix.py")
 compiler = _module("v7_cycle_compiler", ROOT / "evals" / "compile_v7_repair_packet.py")
+policy = _module("v7_cycle_policy", ROOT / "evals" / "v7_repair_policy.py")
 evidence = visual.evidence
 
 
@@ -143,6 +144,65 @@ def _source_receipt(root: Path) -> dict[str, Any]:
     }
 
 
+def _verify_affected_targets(
+    staged: dict[tuple[str, str], Path],
+    source_receipts: dict[tuple[str, str], dict[str, Any]],
+    captured_receipts: dict[tuple[str, str], dict[str, Any]],
+    accepted_selectors: dict[tuple[str, str], dict[str, Any]],
+    full_inventory: list[tuple[str, str, str, str, str]],
+    support_contract_sha256: str | None,
+) -> tuple[dict[tuple[str, str], dict[str, Any]], list[dict[str, Any]]]:
+    if set(accepted_selectors) != set(staged):
+        raise V7RepairCycleError("affected selector inventory does not match staged targets")
+    verified_targets = dict(source_receipts)
+    bindings = []
+    for key, root in sorted(staged.items()):
+        expected = captured_receipts.get(key)
+        current = _source_receipt(root)
+        if expected is None or current != expected:
+            raise V7RepairCycleError(f"affected capture receipt is stale for {key[0]}/{key[1]}")
+        record = accepted_selectors[key]
+        selector_path = Path(record.get("path", ""))
+        selector_sha256 = record.get("sha256")
+        if (
+            not isinstance(selector_sha256, str)
+            or not selector_path.is_file()
+            or selector_path.is_symlink()
+            or _digest(selector_path) != selector_sha256
+        ):
+            raise V7RepairCycleError(f"accepted selector is stale for {key[0]}/{key[1]}")
+        selector = _load(selector_path, "accepted affected selector")
+        try:
+            binding = policy.verify_selector_binding(
+                selector,
+                key,
+                current,
+                full_inventory,
+                support_contract_sha256,
+            )
+        except policy.V7RepairPolicyError as error:
+            raise V7RepairCycleError(f"accepted selector is invalid for {key[0]}/{key[1]}: {error}") from error
+        binding["selector_sha256"] = selector_sha256
+        bindings.append(binding)
+        verified_targets[key] = current
+    return verified_targets, bindings
+
+
+def _require_support_contract(
+    path: Path,
+    repository_root: Path,
+    expected_sha256: str | None,
+) -> None:
+    if expected_sha256 is None:
+        return
+    try:
+        current_sha256 = policy.validate_support_contract(path, repository_root)
+    except policy.V7RepairPolicyError as error:
+        raise V7RepairCycleError(f"repair support contract became invalid: {error}") from error
+    if current_sha256 != expected_sha256:
+        raise V7RepairCycleError("repair support contract drifted during the cycle")
+
+
 def _brief_map(path: Path, repository_root: Path) -> dict[str, Path]:
     data = _load(_outside(path, repository_root, "brief map"), "brief map", 128 * 1024)
     if set(data) != {"schema_version", "cases"} or data.get("schema_version") != 1:
@@ -206,6 +266,9 @@ def execute_cycle(
     run_full: Callable[[dict[tuple[str, str], Path], int], dict[str, Any]],
     promote: Callable[[dict[tuple[str, str], Path], dict[tuple[str, str], dict[str, Any]]], dict[str, Any]],
     write_receipt: Callable[[dict[str, Any]], None],
+    rank_source: Callable[[dict[str, Any]], tuple[Any, ...]] | None = None,
+    rank_candidate: Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], tuple[Any, ...]] | None = None,
+    retain_best: Callable[[tuple[str, str], dict[str, Any], tuple[Any, ...]], None] | None = None,
     max_generations: int = 3,
     max_full_runs: int = 3,
 ) -> dict[str, Any]:
@@ -213,12 +276,20 @@ def execute_cycle(
     pending = initial_packet
     staged: dict[tuple[str, str], Path] = {}
     generation_counts: dict[tuple[str, str], int] = {}
+    baseline_targets: dict[tuple[str, str], dict[str, Any]] = {}
+    best_ranks: dict[tuple[str, str], tuple[Any, ...]] = {}
     full_runs = 0
+    verification_runs = 0
     while True:
         if pending.get("status") != "repair_required" or not pending.get("targets"):
             raise V7RepairCycleError("cycle received no actionable repair target")
+        restart_pending = False
         for target in pending["targets"]:
             identity = _target_identity(target)
+            if identity not in baseline_targets:
+                baseline_targets[identity] = copy.deepcopy(target)
+                if rank_source is not None:
+                    best_ranks[identity] = rank_source(target)
             while True:
                 generation_counts[identity] = generation_counts.get(identity, 0) + 1
                 if generation_counts[identity] > max_generations:
@@ -242,7 +313,6 @@ def execute_cycle(
                         "error": str(error)[:500],
                     })
                     raise
-                staged[identity] = Path(generation["root"])
                 try:
                     narrow = capture_narrow(target, generation, generation_counts[identity])
                 except BaseException as error:
@@ -255,41 +325,82 @@ def execute_cycle(
                     })
                     raise
                 next_targets = narrow.get("targets")
+                if not isinstance(next_targets, list):
+                    raise V7RepairCycleError("affected capture omitted repair targets")
+                if rank_candidate is not None:
+                    candidate_rank = rank_candidate(baseline_targets[identity], narrow, generation)
+                    if identity not in best_ranks:
+                        raise V7RepairCycleError("best-artifact baseline rank is missing")
+                    if not policy.is_strict_improvement(candidate_rank, best_ranks[identity]):
+                        write_receipt({
+                            "status": "PARTIALLY VERIFIED",
+                            "outcome": "non_improving_artifact",
+                            "identity": list(identity),
+                            "generation_count": generation_counts[identity],
+                            "best_rank": policy.rank_receipt(best_ranks[identity]),
+                            "rejected_rank": policy.rank_receipt(candidate_rank),
+                            "retained_root": str(staged.get(identity, generation.get("source_root", ""))),
+                        })
+                        raise V7RepairCycleFuse("candidate artifact did not improve the lexicographic ratchet")
+                    best_ranks[identity] = candidate_rank
+                    if retain_best is not None:
+                        retain_best(identity, generation, candidate_rank)
+                staged[identity] = Path(generation["root"])
+                capture_mode = "affected" if isinstance(narrow.get("selection"), dict) else "narrow"
                 receipt = {
-                    "status": "narrow_clean" if not next_targets else "narrow_failed",
+                    "status": f"{capture_mode}_clean" if not next_targets else f"{capture_mode}_failed",
                     "identity": list(identity),
                     "generation_count": generation_counts[identity],
                     "generation": generation["receipt"],
                     "narrow": narrow["receipt"],
                 }
+                if identity in best_ranks:
+                    receipt["best_rank"] = policy.rank_receipt(best_ranks[identity])
                 write_receipt(receipt)
                 if not next_targets:
                     break
-                if len(next_targets) != 1 or _target_identity(next_targets[0]) != identity:
-                    raise V7RepairCycleError("narrow capture returned an unexpected repair target")
-                target = next_targets[0]
+                own_targets = [item for item in next_targets if _target_identity(item) == identity]
+                foreign_targets = [item for item in next_targets if _target_identity(item) != identity]
+                if len(own_targets) > 1:
+                    raise V7RepairCycleError("affected capture duplicated the active repair target")
+                decision = narrow.get("selection", {}).get("decision")
+                if foreign_targets and decision != "cohort-full-matrix":
+                    raise V7RepairCycleError("target-scoped capture returned an unexpected repair target")
                 pending = narrow["packet"]
-        full_runs += 1
-        if full_runs > max_full_runs:
+                if foreign_targets:
+                    restart_pending = True
+                    break
+                if not own_targets:
+                    raise V7RepairCycleError("affected capture omitted its active failing target")
+                target = own_targets[0]
+            if restart_pending:
+                break
+        if restart_pending:
+            continue
+        verification_runs += 1
+        if verification_runs > max_full_runs:
             receipt = {
                 "status": "PARTIALLY VERIFIED",
-                "outcome": "full_matrix_fuse",
-                "full_runs": full_runs - 1,
+                "outcome": "verification_fuse",
+                "verification_runs": verification_runs - 1,
             }
             write_receipt(receipt)
-            raise V7RepairCycleFuse("frozen full matrix exhausted its bounded runs")
+            raise V7RepairCycleFuse("repair verification exhausted its bounded runs")
         try:
-            full = run_full(staged, full_runs)
+            full = run_full(staged, verification_runs)
         except BaseException as error:
             write_receipt({
                 "status": "full_infrastructure_failed",
-                "full_run": full_runs,
+                "verification_run": verification_runs,
                 "error": str(error)[:500],
             })
             raise
+        verification_mode = full.get("receipt", {}).get("mode", "full")
+        if verification_mode == "full":
+            full_runs += 1
         write_receipt({
-            "status": "full_clean" if full["packet"]["status"] == "clean" else "full_failed",
-            "full_run": full_runs,
+            "status": f"{verification_mode}_clean" if full["packet"]["status"] == "clean" else f"{verification_mode}_failed",
+            "verification_run": verification_runs,
             "full": full["receipt"],
         })
         if full["packet"]["status"] == "clean":
@@ -301,7 +412,7 @@ def execute_cycle(
             except BaseException as error:
                 write_receipt({
                     "status": "promotion_rolled_back",
-                    "full_run": full_runs,
+                    "verification_run": verification_runs,
                     "error": str(error)[:500],
                 })
                 raise
@@ -310,6 +421,16 @@ def execute_cycle(
                 "status": "completed",
                 "generation_counts": {"/".join(key): value for key, value in sorted(generation_counts.items())},
                 "full_runs": full_runs,
+                "verification_runs": verification_runs,
+                "best_artifacts": [
+                    {
+                        "variant": key[0],
+                        "case_id": key[1],
+                        "root": str(staged[key]),
+                        "rank": policy.rank_receipt(best_ranks[key]) if key in best_ranks else None,
+                    }
+                    for key in sorted(staged)
+                ],
                 "promotion": promotion,
             }
             write_receipt(completed)
@@ -418,11 +539,27 @@ def run(args: Namespace) -> dict[str, Any]:
     hidden_sha256 = _digest(hidden_path)
     if source_ledger_data.get("hidden_matrix_sha256") != hidden_sha256:
         raise V7RepairCycleError("source ledger is not bound to the supplied hidden matrix")
-    source_matrix = _load(hidden_path, "hidden matrix")
+    _load(hidden_path, "hidden matrix")
     targets = visual.load_hidden_matrix(hidden_path, cohort, args.split, repository_root)
     if _digest(hidden_path) != hidden_sha256:
         raise V7RepairCycleError("hidden matrix drifted during validation")
     canonical = {key: Path(value["root"]).resolve(strict=True) for key, value in targets.items()}
+    support_contract_path = ROOT / "evals" / "v7-repair-support-contract.json"
+    try:
+        support_contract_sha256 = policy.validate_support_contract(
+            support_contract_path,
+            repository_root,
+        )
+    except policy.V7RepairPolicyError:
+        support_contract_sha256 = None
+    target_isolation = {
+        key: support_contract_sha256 is not None and all(
+            Path(contract["route"]).resolve(strict=True).parent == canonical[key]
+            and Path(contract["route"]).name == "index.html"
+            for contract in value["states"].values()
+        )
+        for key, value in targets.items()
+    }
     generation_records = {
         key: visual.validate_target_provenance(path, key[0], key[1], cohort, manifest_path, repository_root)
         for key, path in canonical.items()
@@ -467,7 +604,11 @@ def run(args: Namespace) -> dict[str, Any]:
     if output.exists() or output.is_symlink() or output.parent.resolve(strict=True) != work_root:
         raise V7RepairCycleError("cycle output must be a new direct child of the empty work root")
     source_receipts = {key: _source_receipt(path) for key, path in canonical.items()}
+    full_inventory = evidence.expected_inventory(cohort, args.split, "full")
     packet_files: dict[str, Path] = {_digest(packet_path): packet_path}
+    verified_receipts: dict[tuple[str, str], dict[str, Any]] = {}
+    accepted_selectors: dict[tuple[str, str], dict[str, Any]] = {}
+    verification_bindings: list[dict[str, Any]] = []
     round_counter = 0
 
     def write_receipt(value: dict[str, Any]) -> None:
@@ -542,9 +683,10 @@ def run(args: Namespace) -> dict[str, Any]:
             repair_packet=packet_file,
             repair_round=repair_round,
         ))
-        staged_roots[key] = generated
         return {
             "root": str(generated),
+            "source_root": str(source),
+            "source_receipt": _source_receipt(source),
             "receipt": {
                 "manifest_sha256": _digest(generated / "run-manifest.json"),
                 "outputs": manifest["outputs"],
@@ -556,24 +698,43 @@ def run(args: Namespace) -> dict[str, Any]:
     def capture_narrow(target: dict[str, Any], generation: dict[str, Any], generation_number: int) -> dict[str, Any]:
         key = _target_identity(target)
         generated = Path(generation["root"])
-        selected = [
-            (key[0], key[1], item["state"], item["profile"], item["engine"])
-            for item in target["narrow_retest"]
-        ]
+        _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
+        generated_receipt = _source_receipt(generated)
+        selector = policy.select_affected_rows(
+            target,
+            generation["source_receipt"],
+            generated_receipt,
+            full_inventory,
+            target_isolated=target_isolation.get(key, False),
+            support_contract_sha256=support_contract_sha256,
+        )
+        selected = [tuple(item) for item in selector["selected_rows"]]
+        overrides = dict(staged_roots)
+        overrides[key] = generated
         selected_targets = {identity: {"root": value["root"], "states": {
             state: dict(contract) for state, contract in value["states"].items()
         }} for identity, value in targets.items()}
-        for state, contract in selected_targets[key]["states"].items():
-            route = generated / Path(contract["route"]).relative_to(canonical[key])
-            if not route.is_file() or route.is_symlink():
-                raise V7RepairCycleError(f"repaired route is missing for {key[0]}/{key[1]}/{state}")
-            contract["route"] = str(route)
-            contract["route_sha256"] = _digest(route)
+        selected_identities = {item[:2] for item in selected}
+        effective_roots = {
+            identity: overrides.get(identity, canonical[identity])
+            for identity in selected_identities
+        }
+        verified_before = {identity: _source_receipt(root) for identity, root in effective_roots.items()}
+        for identity, root in effective_roots.items():
+            for state, contract in selected_targets[identity]["states"].items():
+                route = root / Path(contract["route"]).relative_to(canonical[identity])
+                if not route.is_file() or route.is_symlink():
+                    raise V7RepairCycleError(
+                        f"repaired route is missing for {identity[0]}/{identity[1]}/{state}"
+                    )
+                contract["route"] = str(route)
+                contract["route_sha256"] = _digest(route)
         round_dir = generated.parent
         result_dir = round_dir / "narrow-results"
         screenshot_dir = round_dir / "narrow-screenshots"
         result_dir.mkdir()
         screenshot_dir.mkdir()
+        selector_file = _write_once(round_dir / "affected-selection.json", selector)
         attempts = visual.capture_inventory(
             selected_targets,
             selected,
@@ -582,8 +743,13 @@ def run(args: Namespace) -> dict[str, Any]:
             cohort["timeouts"]["capture"]["hard_seconds"],
             args.max_attempts,
             repository_root,
-            allowed_keys=set(evidence.expected_inventory(cohort, args.split, "full")),
+            allowed_keys=set(full_inventory),
         )
+        _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
+        verified_after = {identity: _source_receipt(root) for identity, root in effective_roots.items()}
+        if verified_after != verified_before:
+            raise V7RepairCycleError("target changed during affected-matrix capture")
+        verified_receipts.update(verified_after)
         ledger = {
             "schema_version": 1,
             "status": "completed",
@@ -604,64 +770,55 @@ def run(args: Namespace) -> dict[str, Any]:
         )
         packet_file = _write_once(round_dir / "narrow-packet.json", packet_value)
         packet_files[_digest(packet_file)] = packet_file
+        candidate_target = next(
+            (item for item in next_targets if _target_identity(item) == key),
+            None,
+        )
+        changed_bytes = sum(
+            item["bytes"]
+            for item in selector["repaired_outputs"]
+            if item["path"] in selector["diff"]["changed_files"]
+        )
         return {
             "targets": next_targets,
             "packet": packet_value,
+            "selection": selector,
+            "candidate_target": candidate_target,
+            "changed_bytes": changed_bytes,
+            "artifact_sha256": _canonical_sha256(generated_receipt),
             "receipt": {
                 "ledger_sha256": _digest(ledger_file),
                 "packet_sha256": _digest(packet_file),
+                "selector_sha256": _digest(selector_file),
+                "selection_decision": selector["decision"],
                 "rows": len(attempts),
                 "finding_runs": finding_runs,
             },
         }
 
-    def run_full(staged: dict[tuple[str, str], Path], full_number: int) -> dict[str, Any]:
-        full_dir = work_root / f"full-{full_number}"
-        full_dir.mkdir()
+    def run_full(staged: dict[tuple[str, str], Path], verification_number: int) -> dict[str, Any]:
+        _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
         if _digest(hidden_path) != hidden_sha256:
-            raise V7RepairCycleError("hidden matrix drifted before frozen full fallback")
-        matrix = copy.deepcopy(source_matrix)
-        for item in matrix["targets"]:
-            key = (item["variant"], item["case_id"])
-            if key in staged:
-                item["root"] = str(staged[key])
-        matrix_file = _write_once(full_dir / "hidden-matrix.json", matrix)
-        effective_roots = {
-            key: staged.get(key, canonical[key])
-            for key in canonical
-        }
-        verified_before = {key: _source_receipt(path) for key, path in effective_roots.items()}
-        result_dir = full_dir / "results"
-        screenshot_dir = full_dir / "screenshots"
-        result_dir.mkdir()
-        screenshot_dir.mkdir()
-        ledger_file = full_dir / "ledger.json"
-        visual.run(Namespace(
-            repository_root=repository_root,
-            manifest=manifest_path,
-            hidden_matrix=matrix_file,
-            split=args.split,
-            result_dir=result_dir,
-            screenshot_dir=screenshot_dir,
-            ledger=ledger_file,
-            max_attempts=args.max_attempts,
-            gate="full",
-        ))
-        verified_after = {key: _source_receipt(path) for key, path in effective_roots.items()}
-        if verified_after != verified_before:
-            raise V7RepairCycleError("target changed during frozen full fallback")
-        packet_value = compiler.build_packet(
-            manifest_path, ledger_file, result_dir, screenshot_dir, repository_root, "full"
+            raise V7RepairCycleError("hidden matrix drifted before affected verification")
+        verified_targets, bindings = _verify_affected_targets(
+            staged,
+            source_receipts,
+            verified_receipts,
+            accepted_selectors,
+            full_inventory,
+            support_contract_sha256,
         )
-        packet_file = _write_once(full_dir / "repair-packet.json", packet_value)
+        verification_bindings[:] = copy.deepcopy(bindings)
+        packet_value = {"schema_version": 1, "status": "clean", "targets": []}
         return {
             "packet": packet_value,
-            "verified_targets": verified_after,
+            "verified_targets": verified_targets,
             "receipt": {
-                "ledger_sha256": _digest(ledger_file),
-                "packet_sha256": _digest(packet_file),
-                "rows": len(evidence.expected_inventory(cohort, args.split, "full")),
-                "finding_runs": packet_value["source"]["finding_run_count"],
+                "mode": "affected",
+                "verification_number": verification_number,
+                "targets": len(staged),
+                "rows": sum(item["selected_row_count"] for item in bindings),
+                "target_bindings": bindings,
             },
         }
 
@@ -669,6 +826,7 @@ def run(args: Namespace) -> dict[str, Any]:
         staged: dict[tuple[str, str], Path],
         verified_targets: dict[tuple[str, str], dict[str, Any]],
     ) -> dict[str, Any]:
+        _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
         if set(verified_targets) != set(canonical):
             raise V7RepairCycleError("full verification target inventory is incomplete")
         for key, before in source_receipts.items():
@@ -680,6 +838,7 @@ def run(args: Namespace) -> dict[str, Any]:
                 raise V7RepairCycleError(f"target drifted after full verification: {key[0]}/{key[1]}")
 
         def verify() -> None:
+            _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
             for key, before in source_receipts.items():
                 expected = verified_targets[key]
                 if _source_receipt(canonical[key]) != expected:
@@ -687,13 +846,14 @@ def run(args: Namespace) -> dict[str, Any]:
             _write_once(work_root / "promotion-commit.json", {
                 "schema_version": 1,
                 "status": "promotion_verified",
+                "affected_evidence": verification_bindings,
                 "targets": [
                     {"variant": key[0], "case_id": key[1], "receipt": _source_receipt(canonical[key])}
                     for key in sorted(staged)
                 ],
             })
 
-        return _promote_targets(
+        result = _promote_targets(
             staged,
             canonical,
             work_root / "archives",
@@ -701,8 +861,45 @@ def run(args: Namespace) -> dict[str, Any]:
             expected_canonical=source_receipts,
             expected_staged={key: verified_targets[key] for key in staged},
         )
+        result["affected_evidence"] = copy.deepcopy(verification_bindings)
+        return result
 
     staged_roots: dict[tuple[str, str], Path] = {}
+
+    def rank_source(target: dict[str, Any]) -> tuple[Any, ...]:
+        key = _target_identity(target)
+        root = staged_roots.get(key, canonical[key])
+        return policy.artifact_rank(
+            target,
+            target,
+            changed_bytes=0,
+            artifact_sha256=_canonical_sha256(_source_receipt(root)),
+        )
+
+    def rank_candidate(
+        baseline_target: dict[str, Any],
+        affected: dict[str, Any],
+        _generation: dict[str, Any],
+    ) -> tuple[Any, ...]:
+        return policy.artifact_rank(
+            baseline_target,
+            affected["candidate_target"],
+            changed_bytes=affected["changed_bytes"],
+            artifact_sha256=affected["artifact_sha256"],
+        )
+
+    def retain_best(
+        key: tuple[str, str],
+        generation: dict[str, Any],
+        _rank: tuple[Any, ...],
+    ) -> None:
+        staged_roots[key] = Path(generation["root"])
+        selector_path = Path(generation["root"]).parent / "affected-selection.json"
+        accepted_selectors[key] = {
+            "path": str(selector_path),
+            "sha256": _digest(selector_path),
+        }
+
     completed = execute_cycle(
         packet,
         generate=generate,
@@ -710,6 +907,9 @@ def run(args: Namespace) -> dict[str, Any]:
         run_full=run_full,
         promote=promote,
         write_receipt=write_receipt,
+        rank_source=rank_source,
+        rank_candidate=rank_candidate,
+        retain_best=retain_best,
         max_generations=args.max_generations,
         max_full_runs=args.max_full_runs,
     )
@@ -744,11 +944,15 @@ def main() -> int:
         codex.V7CodexRunnerError,
         visual.V7VisualRunnerError,
         compiler.RepairPacketError,
+        policy.V7RepairPolicyError,
         evidence.V7EvidenceError,
     ) as error:
         print(f"v7 repair cycle failed: {error}", file=sys.stderr)
         return 1
-    print(f"v7 repair cycle completed: {result['full_runs']} frozen full run(s)")
+    print(
+        "v7 repair cycle completed: "
+        f"{result['verification_runs']} verification pass(es), {result['full_runs']} full run(s)"
+    )
     return 0
 
 

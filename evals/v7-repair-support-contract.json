@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "scope": "target-root",
+  "target_inventory": [
+    "DESIGN.md",
+    "index.html",
+    "run-manifest.json"
+  ],
+  "rendered_entry": "index.html",
+  "capture_module": {
+    "path": "evals/run_v7_visual_matrix.py",
+    "sha256": "cdf1ee54118be49759b78947576c7a3d927dd0f25ca3688502a8bb24d271f603"
+  },
+  "auditor": {
+    "path": "evals/playwright_v7_a1_audit.cjs",
+    "sha256": "f329d68994b48b29db1a271cde93f6c83bf3a10103d9ddac3a143018a7e87720"
+  },
+  "isolation": {
+    "capture": "opaque-copy-single-entry",
+    "external_requests": "blocked-and-reported",
+    "shared_runtime_files": false
+  },
+  "issue_scope": {
+    "composition": "target-full-on-rendered-change",
+    "interaction": "target-full-on-rendered-change",
+    "runtime": "target-full-on-rendered-change",
+    "unknown": "cohort-full"
+  }
+}
