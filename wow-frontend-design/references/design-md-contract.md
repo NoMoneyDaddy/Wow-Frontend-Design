@@ -18,6 +18,28 @@ Third-party galleries are comparative research, not syntax authority. A polished
 - For an audit, read and compare the file without mutating it. For a focused repair that neither changes the system nor has an existing file, do not manufacture unrelated documentation.
 - Treat token frontmatter as normative visual values. Treat prose as rationale and application guidance. Runtime shared tokens and components implement the contract; page-local copies do not.
 
+## Persist material decision traces without a new DSL
+
+When implementation creates or changes a material visual-system decision, retain a compact trace in `Overview` or the applicable canonical prose section so another route, session, agent, or tool can recover why the rule exists. A material decision changes normative color, type, spacing, geometry, material, component grammar, authored identity, or a rule shared across routes or states. Do not copy every working-note choice into the contract.
+
+```text
+decision → exact requirement/evidence locator + explicit/observed/inferred/unknown
+→ affected token/component/route/state → validation evidence or UNVERIFIED
+```
+
+An exact locator is a supplied brief heading, approved asset path, existing token/component, first-party route/state, research source plus its transfer assumption, or named constraint. A mood adjective, category stereotype, generated rationale, or the model's own confidence is not product evidence. When the source is absent or ambiguous, preserve `unknown` instead of inventing provenance.
+
+Keep the trace proportional:
+
+- no minimum row count, fixed identifier scheme, new section, or separate trace file is required;
+- merge decisions that share one source and one validation boundary;
+- an inherited convention needs no entry unless this task changes, rejects, or depends on it materially;
+- a focused repair records only the affected system decision and the evidence for preserving or changing it;
+- page-only information architecture, flow, and interaction state remain in the brief, site/wireframe plan, interaction manifest, and tests unless they establish a reusable visual-system rule;
+- a rationale explains intent but does not prove implementation, browser behavior, accessibility, product fit, or aesthetic quality.
+
+Update or remove a trace when its decision changes. A stale locator, missing affected surface, fabricated source, or `validated` wording without bound evidence is contract drift. The pinned DESIGN.md linter validates supported syntax; it does not validate trace truth. Confirm referenced files, runtime anchors, and claimed checks independently, and keep unresolved items `UNVERIFIED`.
+
 ## Required shape
 
 Keep optional YAML frontmatter followed by the applicable canonical sections in this order:
