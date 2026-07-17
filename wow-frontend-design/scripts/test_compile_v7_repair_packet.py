@@ -249,6 +249,34 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
             compiler.extract_findings(result)
 
+    def test_stale_completion_projects_only_confirmed_evaluator_id(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["stale_async_completion"],
+            "asyncCompletions": [{
+                "id": "old-item-completion", "status": "confirmed", "staleCompletion": True,
+                "mainReplay": "stale", "freshReplay": "stale",
+                "selector": "#must-not-leak", "value": "private-copy",
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "stale_async_completion", "classification": "runtime",
+            "locator": "old-item-completion", "evidence": {},
+        }], findings)
+        self.assertNotIn("private-copy", json.dumps(findings))
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("latest declared user intent", feedback)
+
+        result["runtime"].update({
+            "issues": ["stale_completion_verification_unavailable"],
+            "asyncCompletions": [],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+            compiler.extract_findings(result)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

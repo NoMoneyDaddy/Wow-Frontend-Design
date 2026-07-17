@@ -287,7 +287,7 @@ async function replayFocusTarget(browser, url, contextOptions, target, steps) {
 }
 
 async function auditFocusedControls(browser, url, contextOptions, spec, replayRunner = replayFocusTarget) {
-  if (spec.schemaVersion === 1) {
+  if (spec.schemaVersion !== 2) {
     return {
       focusCoverage: {
         status: "unavailable",

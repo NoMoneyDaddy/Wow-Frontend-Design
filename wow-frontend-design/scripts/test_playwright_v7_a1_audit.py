@@ -3,9 +3,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import http.server
+import importlib.util
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -14,9 +18,117 @@ ROOT = Path(__file__).resolve().parents[2]
 AUDITOR = ROOT / "evals" / "playwright_v7_a1_audit.cjs"
 FOCUS_AUDITOR = ROOT / "evals" / "v7_focus_obscuration.cjs"
 FIXTURE = ROOT / "evals" / "fixtures" / "v7-a1-typography.html"
+EVIDENCE_MODULE = ROOT / "wow-frontend-design" / "scripts" / "validate_v7_evidence.py"
+EVIDENCE_SPEC = importlib.util.spec_from_file_location("validate_v7_evidence_for_audit", EVIDENCE_MODULE)
+assert EVIDENCE_SPEC and EVIDENCE_SPEC.loader
+evidence_validator = importlib.util.module_from_spec(EVIDENCE_SPEC)
+EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v3_stale_completion_uses_two_controlled_replays_and_result_v4(self) -> None:
+        fixture_root = ROOT / "evals" / "fixtures"
+        class QuietHandler(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, directory=str(fixture_root), **kwargs)
+
+            def log_message(self, _format, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                declaration = {
+                    "id": "old-item-completion",
+                    "request": {"id": "old-item-request", "method": "GET", "path": "/api/old?item=alpha", "fulfill": {
+                        "status": 200, "contentType": "application/json", "body": json.dumps({"content": "OLD-SECRET-COPY"}),
+                    }},
+                    "initiationStepId": "start-load",
+                    "pending": {"id": "load-pending", "type": "visible", "selector": "#pending"},
+                    "interruptionStepId": "switch-identity",
+                    "freshness": {
+                        "identity": {"id": "new-identity", "type": "text", "selector": "#identity", "value": "beta"},
+                        "success": {"id": "old-success-hidden", "type": "hidden", "selector": "#success"},
+                        "content": {"id": "new-content", "type": "text", "selector": "#content", "value": "beta-ready"},
+                    },
+                }
+                spec = {
+                    "schemaVersion": 3, "caseId": "stale-case", "state": "interaction",
+                    "steps": [
+                        {"id": "start-load", "action": "click", "selector": "#initiate"},
+                        {"id": "switch-identity", "action": "click", "selector": "#interrupt"},
+                    ],
+                    "assertions": [{"id": "identity-updated", "type": "text", "selector": "#identity", "value": "beta"}],
+                    "targets": [{"id": "identity-copy", "selector": "#identity", "ownerSelector": "body", "role": "prose", "mode": "product"}],
+                    "asyncCompletion": declaration,
+                }
+                spec_path = root / "spec.json"
+                spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                for mode, expected_status, expected_issue in (
+                    ("correct", "clear", None),
+                    ("stale", "confirmed", "stale_async_completion"),
+                ):
+                    screenshot = root / f"{mode}.png"
+                    output = root / f"{mode}.json"
+                    completed = subprocess.run([
+                        "node", str(AUDITOR), "--url",
+                        f"http://127.0.0.1:{server.server_port}/v7-stale-completion.html?mode={mode}",
+                        "--variant", "candidate", "--case-id", "stale-case", "--state", "interaction",
+                        "--profile", "desktop", "--engine", "chromium", "--spec", str(spec_path),
+                        "--screenshot", str(screenshot), "--output", str(output),
+                    ], cwd=ROOT, text=True, capture_output=True)
+                    self.assertTrue(output.is_file(), completed.stderr)
+                    result = json.loads(output.read_text(encoding="utf-8"))
+                    self.assertEqual(4, result["schemaVersion"])
+                    self.assertEqual(expected_status, result["runtime"]["asyncCompletions"][0]["status"])
+                    self.assertEqual(1, result["runtime"]["asyncCoverage"]["mainReplays"])
+                    self.assertEqual(1, result["runtime"]["asyncCoverage"]["freshReplays"])
+                    self.assertEqual(expected_issue is not None, expected_issue in result["runtime"]["issues"] if expected_issue else False)
+                    self.assertEqual(0 if mode == "correct" else 2, completed.returncode, completed.stderr)
+                    self.assertNotIn("#initiate", json.dumps(result))
+                    self.assertNotIn("OLD-SECRET-COPY", json.dumps(result))
+                    self.assertEqual(result["verdict"], evidence_validator._validate_result(
+                        ("candidate", "stale-case", "interaction", "desktop", "chromium"),
+                        output, screenshot, hashlib.sha256(output.read_bytes()).hexdigest(),
+                        hashlib.sha256(screenshot.read_bytes()).hexdigest(),
+                        hashlib.sha256(spec_path.read_bytes()).hexdigest(), result["browser"]["playwright"],
+                    ))
+                    if mode == "correct":
+                        forged = json.loads(json.dumps(result))
+                        forged["runtime"]["asyncCoverage"].update({
+                            "status": "unavailable", "reason": "replay_unavailable", "completedActions": 0,
+                        })
+                        forged["runtime"]["asyncCompletions"][0].update({
+                            "status": "unavailable", "staleCompletion": False,
+                            "mainReplay": "unavailable", "freshReplay": "fresh", "reason": "replay_unavailable",
+                        })
+                        forged["runtime"]["interactions"][0] = {
+                            "id": "start-load", "action": "click", "completed": False,
+                            "reason": "async_verification_unavailable",
+                        }
+                        forged["runtime"]["assertions"] = [{
+                            "id": "identity-updated", "type": "text", "evaluated": False,
+                            "reason": "interaction_state_unavailable",
+                        }]
+                        forged["runtime"]["issues"] = ["stale_completion_verification_unavailable"]
+                        forged["verdict"] = "findings"
+                        output.write_text(json.dumps(forged), encoding="utf-8")
+                        with self.assertRaisesRegex(evidence_validator.V7EvidenceError, "not bound"):
+                            evidence_validator._validate_result(
+                                ("candidate", "stale-case", "interaction", "desktop", "chromium"),
+                                output, screenshot, hashlib.sha256(output.read_bytes()).hexdigest(),
+                                hashlib.sha256(screenshot.read_bytes()).hexdigest(),
+                                hashlib.sha256(spec_path.read_bytes()).hexdigest(), result["browser"]["playwright"],
+                            )
+                self.assertEqual(2, len(list(root.glob("*.png"))))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
     def test_profile_inventory_contains_six_distinct_compositions(self) -> None:
         source = f"""
 const {{ PROFILES }} = require({json.dumps(str(AUDITOR))});

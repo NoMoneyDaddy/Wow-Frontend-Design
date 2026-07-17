@@ -45,6 +45,8 @@ RUNTIME_CODES = {
     "page_errors",
     "page_horizontal_overflow",
     "runtime_event_limit_exceeded",
+    "stale_async_completion",
+    "stale_completion_verification_unavailable",
     "console_errors",
 }
 NUMERIC_EVIDENCE = {
@@ -217,7 +219,9 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError(f"unknown runtime issue code: {code!r}")
         if code == "focus_obscuration_verification_unavailable":
             raise RepairPacketError("focus obscuration verification is unavailable, not a product repair")
-        if code == "focused_control_obscured":
+        if code == "stale_completion_verification_unavailable":
+            raise RepairPacketError("stale completion verification is unavailable, not a product repair")
+        if code in {"focused_control_obscured", "stale_async_completion"}:
             continue
         findings.append(_finding(code, "runtime", "page", {}))
     focused_controls = runtime.get("focusedControls", [])
@@ -237,6 +241,21 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
         }))
     if ("focused_control_obscured" in runtime_issues) != bool(confirmed_focus):
         raise RepairPacketError("focused control issue and evidence disagree")
+    async_completions = runtime.get("asyncCompletions", [])
+    if not isinstance(async_completions, list):
+        raise RepairPacketError("async completion evidence is malformed")
+    confirmed_async = []
+    for record in async_completions:
+        if not isinstance(record, dict):
+            raise RepairPacketError("async completion record is malformed")
+        if record.get("status") != "confirmed":
+            continue
+        if record.get("staleCompletion") is not True or record.get("mainReplay") != "stale" or record.get("freshReplay") != "stale":
+            raise RepairPacketError("confirmed stale completion evidence is inconsistent")
+        confirmed_async.append(record)
+        findings.append(_finding("stale_async_completion", "runtime", record.get("id"), {}))
+    if ("stale_async_completion" in runtime_issues) != bool(confirmed_async):
+        raise RepairPacketError("stale completion issue and evidence disagree")
     if runtime.get("fontsReady") is not True:
         findings.append(_finding("fonts_not_ready", "runtime", "page", {}))
     assertions = runtime.get("assertions")
@@ -281,11 +300,18 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
+    async_repair = any(
+        finding.get("code") == "stale_async_completion"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
     suffix = " Preserve passed behavior and required content;"
     if focus_repair:
         suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
     if clip_repair:
         suffix += " for clipped required text, preserve the full copy and remove direct clipping or recompose its text track;"
+    if async_repair:
+        suffix += " for stale completion, preserve the latest declared user intent and prevent an older completion from overwriting newer state;"
     suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()

@@ -7,6 +7,7 @@ const path = require("node:path");
 const { chromium, firefox, webkit } = require("playwright");
 const { auditV7A1Typography, validateSpecs } = require("./v7_a1_typography_metrics.cjs");
 const { auditFocusedControls } = require("./v7_focus_obscuration.cjs");
+const { QUIESCENCE_MS, runStaleCompletionReplay, validateAsyncCompletion } = require("./v7_stale_completion.cjs");
 
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_PAGE_WIDTH = 10_000;
@@ -152,6 +153,7 @@ function loadSpec(file, expectedCase, expectedState) {
   const rootKeys = {
     1: ["assertions", "caseId", "schemaVersion", "state", "steps", "targets"],
     2: ["assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
+    3: ["assertions", "asyncCompletion", "caseId", "schemaVersion", "state", "steps", "targets"],
   };
   const expectedKeys = data && typeof data === "object" && !Array.isArray(data) ? rootKeys[data.schemaVersion] : null;
   if (!expectedKeys || Object.keys(data).sort().join("|") !== expectedKeys.sort().join("|")) {
@@ -173,6 +175,10 @@ function loadSpec(file, expectedCase, expectedState) {
     if (ids.length !== new Set(ids).size) fail(`${label} ids must be unique`);
   }
   if (data.schemaVersion === 2) data.focusTargets = validateFocusTargets(data.focusTargets, data.steps);
+  if (data.schemaVersion === 3) {
+    if (data.state !== "interaction") fail("spec schema 3 is reserved for interaction state");
+    data.asyncCompletion = validateAsyncCompletion(data.asyncCompletion, data.steps);
+  }
   return { absolute, data };
 }
 
@@ -251,6 +257,77 @@ function unavailableAssertions(assertions) {
   }));
 }
 
+const ASYNC_CLAIM_BOUNDARY = `two controlled same-origin replays with a ${QUIESCENCE_MS}ms post-release quiescence window`;
+
+async function replayStaleCompletionFresh(browser, url, contextOptions, declaration) {
+  let context;
+  try {
+    context = await browser.newContext(contextOptions);
+    let blocked = false;
+    await context.route("**/*", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const allowed = ["data:", "blob:"].includes(requestUrl.protocol) || requestUrl.origin === url.origin;
+      if (allowed) await route.continue();
+      else { blocked = true; await route.abort("blockedbyclient"); }
+    });
+    const page = await context.newPage();
+    await page.goto(url.href, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    const replay = await runStaleCompletionReplay(page, url, declaration);
+    return blocked ? { ...replay, freshness: "unavailable", reason: "external_request_blocked" } : replay;
+  } catch {
+    return { freshness: "unavailable", reason: "runtime_unavailable" };
+  } finally {
+    await context?.close().catch(() => {});
+  }
+}
+
+function aggregateStaleCompletion(declaration, mainReplay, freshReplay) {
+  const states = [mainReplay?.freshness, freshReplay?.freshness];
+  const status = states.every((value) => value === "fresh") ? "clear"
+    : states.every((value) => value === "stale") ? "confirmed" : "unavailable";
+  const reason = status === "clear" ? "fresh_completion_isolated"
+    : status === "confirmed" ? "stale_completion_reassigned"
+      : states.includes("unavailable") ? "replay_unavailable" : "replay_unstable";
+  const record = {
+    id: declaration.id,
+    requestId: declaration.request.id,
+    initiationStepId: declaration.initiationStepId,
+    pendingPredicateId: declaration.pending.id,
+    interruptionStepId: declaration.interruptionStepId,
+    freshnessPredicateIds: [declaration.freshness.identity.id, declaration.freshness.success.id, declaration.freshness.content.id],
+    status,
+    staleCompletion: status === "confirmed",
+    mainReplay: states[0] || "unavailable",
+    freshReplay: states[1] || "unavailable",
+    reason,
+  };
+  return {
+    asyncCoverage: {
+      status: status === "unavailable" ? "unavailable" : "complete",
+      reason: status === "unavailable" ? reason : null,
+      declaredActions: 1,
+      completedActions: status === "unavailable" ? 0 : 1,
+      mainReplays: 1,
+      freshReplays: 1,
+      claimBoundary: ASYNC_CLAIM_BOUNDARY,
+    },
+    asyncCompletions: [record],
+  };
+}
+
+function asyncInteractions(steps, replay) {
+  const initiationCompleted = ["held_once", "count_exceeded", "not_observed"].includes(replay?.request);
+  const interruptionCompleted = ["identity_changed", "not_changed"].includes(replay?.interruption);
+  return [
+    initiationCompleted
+      ? { id: steps[0].id, action: steps[0].action, completed: true }
+      : { id: steps[0].id, action: steps[0].action, completed: false, reason: "async_verification_unavailable" },
+    interruptionCompleted
+      ? { id: steps[1].id, action: steps[1].action, completed: true }
+      : { id: steps[1].id, action: steps[1].action, completed: false, reason: "prior_step_not_completed" },
+  ];
+}
+
 async function main() {
   const args = parseArguments(process.argv.slice(2));
   const spec = loadSpec(args.spec, args["case-id"], args.state);
@@ -319,6 +396,13 @@ async function main() {
     new Promise((resolve) => { fontTimer = setTimeout(() => resolve(false), 10_000); }),
   ]).finally(() => clearTimeout(fontTimer));
   const focusEvidence = await auditFocusedControls(browser, url, contextOptions, spec.data);
+  let asyncEvidence = null;
+  let mainAsyncReplay = null;
+  if (spec.data.schemaVersion === 3) {
+    mainAsyncReplay = await runStaleCompletionReplay(page, url, spec.data.asyncCompletion);
+    const freshAsyncReplay = await replayStaleCompletionFresh(browser, url, contextOptions, spec.data.asyncCompletion);
+    asyncEvidence = aggregateStaleCompletion(spec.data.asyncCompletion, mainAsyncReplay, freshAsyncReplay);
+  }
   const focusById = new Map(focusEvidence.focusedControls.map((control) => [control.id, control]));
   const confirmedClickStepIds = spec.data.schemaVersion === 2 && focusEvidence.focusCoverage.status === "complete"
     ? new Set(spec.data.focusTargets.filter((target) => {
@@ -328,7 +412,7 @@ async function main() {
       }).map((target) => target.stepId))
     : new Set();
   const blockedStepId = spec.data.steps.find((step) => confirmedClickStepIds.has(step.id))?.id || null;
-  const resultSchemaVersion = blockedStepId === null ? spec.data.schemaVersion : 3;
+  const resultSchemaVersion = spec.data.schemaVersion === 3 ? 4 : blockedStepId === null ? spec.data.schemaVersion : 3;
   const resultFocusEvidence = resultSchemaVersion === 3 ? {
     focusCoverage: focusEvidence.focusCoverage,
     focusedControls: focusEvidence.focusedControls.map((control) => ({
@@ -336,9 +420,11 @@ async function main() {
       stepId: spec.data.focusTargets.find((target) => target.id === control.id).stepId,
     })),
   } : focusEvidence;
-  const interactions = await applySteps(page, spec.data.steps, blockedStepId);
+  const interactions = spec.data.schemaVersion === 3
+    ? asyncInteractions(spec.data.steps, mainAsyncReplay)
+    : await applySteps(page, spec.data.steps, blockedStepId);
   await page.waitForTimeout(150);
-  const assertions = blockedStepId === null
+  const assertions = blockedStepId === null && interactions.every((item) => item.completed)
     ? await runAssertions(page, spec.data.assertions)
     : unavailableAssertions(spec.data.assertions);
   const typography = await page.evaluate(auditV7A1Typography, spec.data.targets);
@@ -354,6 +440,8 @@ async function main() {
   );
   const focusVerificationUnavailable = spec.data.schemaVersion === 2
     && focusEvidence.focusCoverage.status === "unavailable";
+  const staleCompletion = asyncEvidence?.asyncCompletions.some((item) => item.status === "confirmed") || false;
+  const staleCompletionUnavailable = asyncEvidence?.asyncCompletions.some((item) => item.status === "unavailable") || false;
   await page.screenshot({ path: screenshot, fullPage, animations: "disabled" });
   const evidence = {
     schemaVersion: resultSchemaVersion,
@@ -379,6 +467,7 @@ async function main() {
         focusCoverage: resultFocusEvidence.focusCoverage,
         focusedControls: resultFocusEvidence.focusedControls,
       } : {}),
+      ...(spec.data.schemaVersion === 3 ? asyncEvidence : {}),
       eventCounts: { consoleErrors: consoleErrorCount, pageErrors: pageErrorCount, externalRequests: externalRequestCount },
       issues: [
         ...(horizontalOverflow ? ["page_horizontal_overflow"] : []),
@@ -386,11 +475,14 @@ async function main() {
         ...(eventOverflow ? ["runtime_event_limit_exceeded"] : []),
         ...(focusedControlObscured ? ["focused_control_obscured"] : []),
         ...(focusVerificationUnavailable ? ["focus_obscuration_verification_unavailable"] : []),
+        ...(staleCompletion ? ["stale_async_completion"] : []),
+        ...(staleCompletionUnavailable ? ["stale_completion_verification_unavailable"] : []),
       ],
     },
     typography,
     verdict: fontsReady && fullPage && !horizontalOverflow && !eventOverflow && !focusedControlObscured
       && !focusVerificationUnavailable
+      && !staleCompletion && !staleCompletionUnavailable
       && assertions.every((item) => item.passed)
       && consoleErrors.length === 0 && pageErrors.length === 0 && externalRequests.length === 0
       && typography.issues.length === 0 ? "clean" : "findings",

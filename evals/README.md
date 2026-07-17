@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-required-text-v16.json \
+  --manifest evals/v7-pilot-manifest-20260718-stale-completion-v17.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -106,7 +106,7 @@ P7 paired decision compiler 把 promotion ratchet 固定為唯讀、無 promotio
 
 ```bash
 npm run eval:v7-paired-decision -- \
-  --manifest evals/v7-pilot-manifest-20260718-required-text-v16.json \
+  --manifest evals/v7-pilot-manifest-20260718-stale-completion-v17.json \
   --output "$DECISION_ROOT/v7-paired-decision.json" \
   --repository-root .
 ```
@@ -122,6 +122,8 @@ P9 focus-obscuration repair gate 使用 hidden spec v2 明示最多八個 task c
 P10 修補 P9 在 required `click` 被完整遮住時先撞上 Playwright actionability timeout、因而遺失 repair evidence 的消費端缺口。Auditor 先取得 P9 的兩次 fresh-context full-obscuration 證據；只有 coverage complete、confirmed control 與 hidden click step 三者精確綁定時，才輸出 outcome-specific result schema v3。它不執行也不 force blocked click：前置 step 誠實記 completed，blocked step 與相依後續 step 各以固定 reason 記 incomplete，assertions 全標示未評估；focused evidence 只新增 evaluator step ID，不帶 selector、value、產品文字或 raw Playwright error。沒有這個精確反例時仍輸出原 v1/v2 exact contract。v3 仍只保留原本一張 screenshot，repair packet 只投影既有 focus finding；這遵循 [Playwright actionability](https://playwright.dev/docs/actionability) 對 click 必須 Receives Events 的官方邊界，不把一般 timeout 或 selector defect猜成產品修正。
 
 P11 在既有 A1 typography evaluator 補上 required product heading／prose 的直接裁切反例。它只檢查 target 自身的 client box，先以 scroll/client delta 超過 line-height-derived tolerance 判定候選，再以每個 grapheme 的 `Range.getClientRects()` 證明文字 fragment 確實落在 box 外；只接受 `text-overflow: ellipsis`、直接 inline `clip`、`line-clamp` 與直接 block `hidden/clip` 四種 bounded mechanism。具備命名、可聚焦 region 的 scroll container 記為 accessible，其他 scroll container 只 advisory；transform、zoom、pseudo content、複雜 clip/mask/filter、未知 `text-overflow`、非 product intent 與超過預算都 fail closed。它不掃 ancestor、不新增 screenshot，也不宣稱 cross-engine、assistive technology、全文語意或整體排版品質；repair packet 只投影 bounded geometry/enums，要求保留完整 copy 並移除直接裁切或重組 text track。此反例依 [CSS Overflow Level 3 `text-overflow`](https://www.w3.org/TR/css-overflow-3/#text-overflow) 與 [CSS Overflow Level 4 `line-clamp`](https://www.w3.org/TR/css-overflow-4/#line-clamp) 的規範語意建立。
+
+P12 以 input schema v3／result schema v4 驗證一個 evaluator-declared stale completion：主頁與一個 fresh context 都只攔截同源 exact method/path 的第一筆 request，確認 pending predicate 後執行唯一 identity-changing interruption，再以固定 response `fulfill`、`response.finished()`、兩個 animation frame 與 750ms post-release quiescence window 檢查 identity／success／content freshness及延遲重複 request。兩次都 stale 才產生 `stale_async_completion`；任一 phase unavailable 或兩次不一致只會阻斷 clean，不得成為產品修正。Result 與 repair packet 只留 evaluator IDs／fixed enums，不帶 selector、path、value、body、copy 或 raw error；v1/v2 input 與 v1–v3 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。這遵循 [Playwright Network API](https://playwright.dev/docs/network) 與 [`Route.fulfill()`](https://playwright.dev/docs/api/class-route#route-fulfill)；claim 只涵蓋兩次 declared controlled replay 與明示 window，不外推到所有 backend race、timer、WebSocket 或 async UX。
 
 ## 目前案例
 

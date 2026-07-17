@@ -254,6 +254,70 @@ def _validate_focus_evidence(
     return confirmed > 0, unavailable > 0, confirmed_click_candidate_steps
 
 
+ASYNC_CLAIM_BOUNDARY = "two controlled same-origin replays with a 750ms post-release quiescence window"
+
+
+def _validate_async_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
+    coverage = runtime.get("asyncCoverage")
+    records = runtime.get("asyncCompletions")
+    coverage_keys = {
+        "status", "reason", "declaredActions", "completedActions", "mainReplays",
+        "freshReplays", "claimBoundary",
+    }
+    if not isinstance(coverage, dict) or set(coverage) != coverage_keys or not isinstance(records, list) or len(records) != 1:
+        raise V7EvidenceError(f"async completion evidence schema changed for {label}")
+    if coverage.get("claimBoundary") != ASYNC_CLAIM_BOUNDARY:
+        raise V7EvidenceError(f"async completion claim boundary changed for {label}")
+    if coverage.get("declaredActions") != 1 or coverage.get("mainReplays") != 1 or coverage.get("freshReplays") != 1:
+        raise V7EvidenceError(f"async completion replay bounds changed for {label}")
+    record = records[0]
+    keys = {
+        "id", "requestId", "initiationStepId", "pendingPredicateId", "interruptionStepId",
+        "freshnessPredicateIds", "status", "staleCompletion", "mainReplay", "freshReplay", "reason",
+    }
+    if not isinstance(record, dict) or set(record) != keys:
+        raise V7EvidenceError(f"async completion record schema changed for {label}")
+    ids = [record.get(name) for name in (
+        "id", "requestId", "initiationStepId", "pendingPredicateId", "interruptionStepId",
+    )]
+    predicates = record.get("freshnessPredicateIds")
+    if (
+        any(not isinstance(value, str) or RECORD_ID.fullmatch(value) is None for value in ids)
+        or not isinstance(predicates, list) or len(predicates) != 3
+        or any(not isinstance(value, str) or RECORD_ID.fullmatch(value) is None for value in predicates)
+        or len(set(predicates)) != 3
+    ):
+        raise V7EvidenceError(f"async completion ids are invalid for {label}")
+    status = record.get("status")
+    main = record.get("mainReplay")
+    fresh = record.get("freshReplay")
+    if status == "clear":
+        expected = (False, "fresh", "fresh", "fresh_completion_isolated", "complete", None, 1)
+    elif status == "confirmed":
+        expected = (True, "stale", "stale", "stale_completion_reassigned", "complete", None, 1)
+    elif status == "unavailable":
+        replay_values = {main, fresh}
+        reason = "replay_unavailable" if "unavailable" in replay_values else "replay_unstable"
+        if (
+            record.get("staleCompletion") is not False
+            or not replay_values <= {"fresh", "stale", "unavailable"}
+            or main == fresh != "unavailable" or record.get("reason") != reason
+            or coverage.get("status") != "unavailable" or coverage.get("reason") != reason
+            or coverage.get("completedActions") != 0
+        ):
+            raise V7EvidenceError(f"unavailable async completion derivation changed for {label}")
+        return False, True
+    else:
+        raise V7EvidenceError(f"async completion status is invalid for {label}")
+    actual = (
+        record.get("staleCompletion"), main, fresh, record.get("reason"), coverage.get("status"),
+        coverage.get("reason"), coverage.get("completedActions"),
+    )
+    if actual != expected:
+        raise V7EvidenceError(f"async completion derivation changed for {label}")
+    return status == "confirmed", False
+
+
 def _validate_result(
     key: tuple[str, str, str, str, str],
     result_path: Path,
@@ -292,10 +356,12 @@ def _validate_result(
     if set(evidence) != {"schemaVersion", "identity", "input", "browser", "runtime", "typography", "verdict", "screenshot"}:
         raise V7EvidenceError(f"result root schema changed for {artifact_stem(key)}")
     result_schema = evidence.get("schemaVersion")
-    if type(result_schema) is not int or result_schema not in {1, 2, 3} or identity != expected_identity:
+    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4} or identity != expected_identity:
         raise V7EvidenceError(f"result identity changed for {artifact_stem(key)}")
     if result_schema == 3 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 3 is reserved for blocked interaction evidence: {artifact_stem(key)}")
+    if result_schema == 4 and key[2] != "interaction":
+        raise V7EvidenceError(f"result schema 4 is reserved for async interaction evidence: {artifact_stem(key)}")
     if evidence.get("verdict") not in {"clean", "findings"}:
         raise V7EvidenceError(f"result verdict is invalid for {artifact_stem(key)}")
     screenshot = evidence.get("screenshot")
@@ -339,11 +405,11 @@ def _validate_result(
         "externalRequests", "pageBounds", "devicePixelArea", "horizontalOverflow", "eventOverflow",
         "eventCounts", "issues",
     }
-    expected_runtime_keys = (
-        base_runtime_keys
-        if result_schema == 1
-        else base_runtime_keys | {"focusCoverage", "focusedControls"}
-    )
+    expected_runtime_keys = base_runtime_keys
+    if result_schema in {2, 3}:
+        expected_runtime_keys |= {"focusCoverage", "focusedControls"}
+    elif result_schema == 4:
+        expected_runtime_keys |= {"asyncCoverage", "asyncCompletions"}
     if not isinstance(runtime, dict) or set(runtime) != expected_runtime_keys:
         raise V7EvidenceError(f"runtime schema changed for {artifact_stem(key)}")
     if not isinstance(typography, dict) or set(typography) != {
@@ -355,6 +421,9 @@ def _validate_result(
         raise V7EvidenceError(f"runtime arrays are malformed for {artifact_stem(key)}")
     focus_blocking, focus_unavailable, confirmed_click_candidate_steps = _validate_focus_evidence(
         runtime, artifact_stem(key), result_schema,
+    )
+    stale_completion, stale_unavailable = (
+        _validate_async_evidence(runtime, artifact_stem(key)) if result_schema == 4 else (False, False)
     )
     if key[2] == "interaction" and (not runtime["interactions"] or not runtime["assertions"]):
         raise V7EvidenceError(f"interaction evidence must record at least one step and one assertion for {artifact_stem(key)}")
@@ -371,9 +440,18 @@ def _validate_result(
             )
             if not base_valid:
                 raise V7EvidenceError(f"interaction step evidence is malformed for {artifact_stem(key)}")
-            if result_schema != 3:
+            if result_schema not in {3, 4}:
                 if set(item) != {"id", "action", "completed"} or item["completed"] is not True:
                     raise V7EvidenceError(f"interaction step evidence is malformed for {artifact_stem(key)}")
+            elif result_schema == 4:
+                if item["completed"] is True:
+                    if set(item) != {"id", "action", "completed"}:
+                        raise V7EvidenceError(f"async interaction step evidence is malformed for {artifact_stem(key)}")
+                elif (
+                    set(item) != {"id", "action", "completed", "reason"}
+                    or item.get("reason") not in {"async_verification_unavailable", "prior_step_not_completed"}
+                ):
+                    raise V7EvidenceError(f"async incomplete step evidence is malformed for {artifact_stem(key)}")
             elif item["completed"] is True:
                 if set(item) != {"id", "action", "completed"} or blocked_index is not None:
                     raise V7EvidenceError(f"completed interaction appears after a blocked step for {artifact_stem(key)}")
@@ -400,7 +478,10 @@ def _validate_result(
             )
             if not common_valid:
                 raise V7EvidenceError(f"interaction assertion evidence is malformed for {artifact_stem(key)}")
-            if result_schema == 3:
+            unevaluated = result_schema == 3 or (
+                result_schema == 4 and not all(step.get("completed") is True for step in runtime["interactions"])
+            )
+            if unevaluated:
                 if (
                     set(item) != {"id", "type", "evaluated", "reason"}
                     or item.get("evaluated") is not False
@@ -426,6 +507,20 @@ def _validate_result(
                 or focus_unavailable
             ):
                 raise V7EvidenceError(f"blocked interaction is not bound to complete focus evidence for {artifact_stem(key)}")
+        if result_schema == 4:
+            completion = runtime["asyncCompletions"][0]
+            if (
+                len(runtime["interactions"]) != 2
+                or runtime["interactions"][0]["id"] != completion["initiationStepId"]
+                or runtime["interactions"][1]["id"] != completion["interruptionStepId"]
+                or (runtime["interactions"][0]["completed"] is False and runtime["interactions"][1]["completed"] is not False)
+                or (
+                    runtime["interactions"][0]["completed"] is False
+                    and runtime["interactions"][1].get("reason") != "prior_step_not_completed"
+                )
+                or (completion["status"] in {"clear", "confirmed"} and not all(item["completed"] for item in runtime["interactions"]))
+            ):
+                raise V7EvidenceError(f"async evidence is not bound to interaction steps for {artifact_stem(key)}")
     if type(runtime.get("fontsReady")) is not bool or type(runtime.get("horizontalOverflow")) is not bool or type(runtime.get("eventOverflow")) is not bool:
         raise V7EvidenceError(f"runtime flags are malformed for {artifact_stem(key)}")
     page_bounds = runtime.get("pageBounds")
@@ -449,6 +544,8 @@ def _validate_result(
         *(["runtime_event_limit_exceeded"] if runtime["eventOverflow"] else []),
         *(["focused_control_obscured"] if focus_blocking else []),
         *(["focus_obscuration_verification_unavailable"] if focus_unavailable else []),
+        *(["stale_async_completion"] if stale_completion else []),
+        *(["stale_completion_verification_unavailable"] if stale_unavailable else []),
     ]
     if runtime.get("issues") != expected_runtime_issues:
         raise V7EvidenceError(f"runtime issue derivation changed for {artifact_stem(key)}")
@@ -462,6 +559,8 @@ def _validate_result(
         and runtime.get("eventOverflow") is False
         and not focus_blocking
         and not focus_unavailable
+        and not stale_completion
+        and not stale_unavailable
         and assertions_pass
         and runtime["consoleErrors"] == []
         and runtime["pageErrors"] == []

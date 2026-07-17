@@ -496,5 +496,35 @@ class V7EvidenceTests(unittest.TestCase):
                 evidence._validate_result(key, result, screenshot, tampered_hash, screenshot_hash, "0" * 64, "1.61.1")
 
 
+    def test_async_completion_evidence_requires_two_consistent_replays(self) -> None:
+        runtime = {
+            "asyncCoverage": {
+                "status": "complete", "reason": None, "declaredActions": 1,
+                "completedActions": 1, "mainReplays": 1, "freshReplays": 1,
+                "claimBoundary": evidence.ASYNC_CLAIM_BOUNDARY,
+            },
+            "asyncCompletions": [{
+                "id": "old-item-completion", "requestId": "old-item-request",
+                "initiationStepId": "start-load", "pendingPredicateId": "load-pending",
+                "interruptionStepId": "switch-identity",
+                "freshnessPredicateIds": ["new-identity", "old-success-hidden", "new-content"],
+                "status": "confirmed", "staleCompletion": True,
+                "mainReplay": "stale", "freshReplay": "stale",
+                "reason": "stale_completion_reassigned",
+            }],
+        }
+        self.assertEqual((True, False), evidence._validate_async_evidence(runtime, "fixture"))
+        forged = copy.deepcopy(runtime)
+        forged["asyncCompletions"][0]["freshReplay"] = "fresh"
+        with self.assertRaisesRegex(evidence.V7EvidenceError, "derivation"):
+            evidence._validate_async_evidence(forged, "fixture")
+        unavailable = copy.deepcopy(runtime)
+        unavailable["asyncCoverage"].update({"status": "unavailable", "reason": "replay_unstable", "completedActions": 0})
+        unavailable["asyncCompletions"][0].update({
+            "status": "unavailable", "staleCompletion": False, "freshReplay": "fresh", "reason": "replay_unstable",
+        })
+        self.assertEqual((False, True), evidence._validate_async_evidence(unavailable, "fixture"))
+
+
 if __name__ == "__main__":
     unittest.main()
