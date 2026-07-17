@@ -43,6 +43,76 @@ class ProductFlowV6EvidenceTests(unittest.TestCase):
             path = self._write(data, directory, "visual.json")
             validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
 
+    def test_zero_evidence_gap_summary_remains_backward_compatible(self) -> None:
+        data = json.loads(self.visual.read_text(encoding="utf-8"))
+        data["summary"].update(
+            {
+                "evidenceGapCount": 0,
+                "targetsWithEvidenceGaps": 0,
+                "evidenceGapsByTarget": {},
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(data, directory, "visual.json")
+            validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
+
+    def test_positive_evidence_gap_summary_is_bound_to_results(self) -> None:
+        data = json.loads(self.visual.read_text(encoding="utf-8"))
+        result = data["results"][0]
+        error = "active rendered-text animation prevented stable evidence"
+        result["fontEvidence"] = {
+            "status": "unavailable",
+            "error": error,
+            "roles": [],
+            "primaryMismatches": [],
+        }
+        result["visualIssues"] = ["font_evidence_unavailable"]
+        key = f"{result['caseId']}:{result['alias']}"
+        gap = {
+            "page": result["page"],
+            "state": result["state"],
+            "viewport": result["viewport"],
+            "screenshot": result["screenshot"],
+            "error": error,
+        }
+        data["summary"].update(
+            {
+                "advisoryCount": 0,
+                "targetsWithAdvisories": 0,
+                "advisoriesByTarget": {},
+                "evidenceGapCount": 1,
+                "targetsWithEvidenceGaps": 1,
+                "evidenceGapsByTarget": {key: [gap]},
+                "verdict": "evidence_unavailable",
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(data, directory, "visual.json")
+            validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
+            data["summary"]["evidenceGapsByTarget"][key][0]["error"] = "tampered"
+            tampered = self._write(data, directory, "tampered.json")
+            with self.assertRaisesRegex(
+                validate_product_flow_v6_evidence.ProductFlowV6EvidenceError,
+                "visual evidence-gap summary",
+            ):
+                validate_product_flow_v6_evidence._validate_visual(self.root, tampered, self.generation)
+
+    def test_unavailable_font_evidence_cannot_hide_behind_clean_summary(self) -> None:
+        data = json.loads(self.visual.read_text(encoding="utf-8"))
+        data["results"][0]["fontEvidence"] = {
+            "status": "unavailable",
+            "error": "active rendered-text animation prevented stable evidence",
+            "roles": [],
+            "primaryMismatches": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(data, directory, "visual.json")
+            with self.assertRaisesRegex(
+                validate_product_flow_v6_evidence.ProductFlowV6EvidenceError,
+                "font evidence unavailable status",
+            ):
+                validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
+
     def test_positive_advisory_summary_is_bound_to_results_and_common_fields(self) -> None:
         data = json.loads(self.visual.read_text(encoding="utf-8"))
         result = data["results"][0]
@@ -76,6 +146,33 @@ class ProductFlowV6EvidenceTests(unittest.TestCase):
             tampered = self._write(data, directory, "tampered.json")
             with self.assertRaisesRegex(validate_product_flow_v6_evidence.ProductFlowV6EvidenceError, "visual advisory summary"):
                 validate_product_flow_v6_evidence._validate_visual(self.root, tampered, self.generation)
+
+    def test_advisory_summary_accepts_explicit_zero_evidence_fields(self) -> None:
+        data = json.loads(self.visual.read_text(encoding="utf-8"))
+        result = data["results"][0]
+        advisory = {
+            "target": "示例欄位",
+            "voidHeight": 640,
+            "threshold": 300,
+            "confidence": "dense-independent-column",
+        }
+        result["layoutFlow"]["unfilledColumnAdvisories"] = [advisory]
+        key = f"{result['caseId']}:{result['alias']}"
+        data["summary"].update(
+            {
+                "advisoryCount": 1,
+                "targetsWithAdvisories": 1,
+                "advisoriesByTarget": [{**advisory, "page": result["page"], "state": result["state"], "viewport": result["viewport"], "screenshot": result["screenshot"]}],
+                "verdict": "advisories_present",
+            }
+        )
+        data["summary"]["advisoriesByTarget"] = {key: data["summary"]["advisoriesByTarget"]}
+        data["summary"].update(
+            {"evidenceGapCount": 0, "targetsWithEvidenceGaps": 0, "evidenceGapsByTarget": {}}
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(data, directory, "visual.json")
+            validate_product_flow_v6_evidence._validate_visual(self.root, path, self.generation)
 
     def test_stale_screenshot_hash_is_rejected(self) -> None:
         data = json.loads(self.visual.read_text(encoding="utf-8"))

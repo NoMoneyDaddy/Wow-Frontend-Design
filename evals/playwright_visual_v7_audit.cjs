@@ -22,6 +22,7 @@ const GENERIC_FONT_FAMILIES = new Set([
 ]);
 const FONT_ANGLE_EPSILON = 0.001;
 const FONT_PROBE_UNIQUE_LIMIT = 2048;
+const EVIDENCE_ONLY_ISSUES = new Set(["font_evidence_unavailable"]);
 
 const CASE_PAGES = {
   "wind-maintenance-dispatch-v6": ["index.html"],
@@ -2317,6 +2318,23 @@ function assertFontEvidenceComplete(evidence, identity = "unknown") {
   }
 }
 
+async function captureFontEvidenceForAudit(context, page, identity) {
+  let evidence;
+  try {
+    evidence = await collectFontEvidence(context, page);
+    assertFontEvidenceComplete(evidence, identity);
+    return evidence;
+  } catch (error) {
+    return {
+      ...(evidence || {}),
+      status: "unavailable",
+      error: String(error.message || error).slice(0, 240),
+      roles: Array.isArray(evidence?.roles) ? evidence.roles : [],
+      primaryMismatches: [],
+    };
+  }
+}
+
 function matchesAllowedNetworkOrigin(value, allowedOrigin) {
   try {
     const parsed = new URL(value);
@@ -2602,7 +2620,10 @@ function issueCodes(result) {
   if ((result.layoutFlow?.displacedIntroCopy || []).length) issues.push("intro_copy_displaced_to_right_track");
   if ((result.layoutFlow?.unfilledColumnVoids || []).length) issues.push("layout_column_void");
   if ((result.localeFlow?.untranslatedInterfaceCopy || []).length) issues.push("zh_hant_untranslated_interface_copy");
-  if ((result.fontEvidence?.primaryMismatches || []).length) issues.push("declared_primary_font_not_rendered");
+  if (!result.fontEvidence || result.fontEvidence.status !== "captured") issues.push("font_evidence_unavailable");
+  if (result.fontEvidence?.status === "captured" && (result.fontEvidence.primaryMismatches || []).length) {
+    issues.push("declared_primary_font_not_rendered");
+  }
   if (result.reducedMotionAnimations.length) issues.push("reduced_motion_animation_active");
   if (result.consoleErrors.length) issues.push("console_errors");
   if (result.externalRequests.length) issues.push("external_requests_attempted");
@@ -3285,8 +3306,11 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     localeRules: LOCALE_RULES,
     productTextRootSelector: PRODUCT_TEXT_ROOT_SELECTOR,
   });
-  const fontEvidence = await collectFontEvidence(context, page);
-  assertFontEvidenceComplete(fontEvidence, `${target.caseId}/${pageName}/${viewport.name}/${state}`);
+  const fontEvidence = await captureFontEvidenceForAudit(
+    context,
+    page,
+    `${target.caseId}/${pageName}/${viewport.name}/${state}`,
+  );
 
   const pageSlug = pageName.replace(/\.html$/i, "");
   const screenshot = path.join(options.artifactDir, `${target.caseId}-${target.alias}-${pageSlug}-${state}-${viewport.name}.png`);
@@ -3382,13 +3406,26 @@ async function main() {
   }
 
   const byTarget = {};
+  const evidenceGapsByTarget = {};
   const advisoriesByTarget = {};
   for (const target of options.targets) {
     const key = `${target.caseId}:${target.alias}`;
     const targetResults = report.results.filter((result) => result.caseId === target.caseId && result.alias === target.alias);
     const viewIssues = targetResults.flatMap((result) => result.visualIssues);
     const crossIssues = report.crossPageComparisons.filter((result) => result.caseId === target.caseId && result.alias === target.alias).flatMap((result) => result.visualIssues);
-    byTarget[key] = unique([...viewIssues, ...crossIssues]);
+    const allIssues = unique([...viewIssues, ...crossIssues]);
+    byTarget[key] = allIssues.filter((issue) => !EVIDENCE_ONLY_ISSUES.has(issue));
+    const evidenceGaps = targetResults.flatMap((result) => {
+      if (!result.visualIssues.includes("font_evidence_unavailable")) return [];
+      return [{
+        page: result.page,
+        state: result.state,
+        viewport: result.viewport,
+        screenshot: result.screenshot,
+        error: result.fontEvidence?.error || "font evidence unavailable",
+      }];
+    });
+    if (evidenceGaps.length) evidenceGapsByTarget[key] = evidenceGaps;
     const advisories = targetResults.flatMap((result) => (result.layoutFlow?.unfilledColumnAdvisories || []).map((advisory) => ({
       ...advisory,
       page: result.page,
@@ -3399,6 +3436,7 @@ async function main() {
     if (advisories.length) advisoriesByTarget[key] = advisories;
   }
   const advisoryCount = Object.values(advisoriesByTarget).reduce((count, advisories) => count + advisories.length, 0);
+  const evidenceGapCount = Object.values(evidenceGapsByTarget).reduce((count, gaps) => count + gaps.length, 0);
   const observedIssueCount = Object.values(byTarget).reduce((count, issues) => count + issues.length, 0);
   report.summary = {
     checkedPages: report.results.length,
@@ -3408,7 +3446,16 @@ async function main() {
     advisoryCount,
     targetsWithAdvisories: Object.keys(advisoriesByTarget).length,
     advisoriesByTarget,
-    verdict: observedIssueCount ? "observed_issues" : advisoryCount ? "advisories_present" : "no_observed_issues",
+    evidenceGapCount,
+    targetsWithEvidenceGaps: Object.keys(evidenceGapsByTarget).length,
+    evidenceGapsByTarget,
+    verdict: observedIssueCount
+      ? "observed_issues"
+      : evidenceGapCount
+        ? "evidence_unavailable"
+        : advisoryCount
+          ? "advisories_present"
+          : "no_observed_issues",
   };
   fs.mkdirSync(path.dirname(options.output), { recursive: true });
   fs.writeFileSync(options.output, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
@@ -3420,6 +3467,7 @@ module.exports = {
   PRODUCT_TEXT_ROOT_SELECTOR,
   VIEWPORTS,
   assertFontEvidenceComplete,
+  captureFontEvidenceForAudit,
   classifyPrimaryFontUsage,
   collectFontEvidence,
   compareMultiPageShell,

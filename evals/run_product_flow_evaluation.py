@@ -96,6 +96,7 @@ FONT_EVIDENCE_CLASSIFICATIONS = {
     "rendered",
     "unverified_alias",
 }
+EVIDENCE_ONLY_VISUAL_ISSUES = {"font_evidence_unavailable"}
 GENERIC_FONT_FAMILIES = {
     "-apple-system", "blinkmacsystemfont", "cursive", "emoji", "fangsong", "fantasy",
     "math", "monospace", "sans-serif", "serif", "system-ui", "ui-monospace", "ui-rounded",
@@ -656,10 +657,33 @@ def _png_size(path: Path) -> tuple[int, int]:
 
 def _validate_font_evidence(result: dict[str, Any], key: tuple[object, ...]) -> None:
     evidence = result.get("fontEvidence")
-    if not isinstance(evidence, dict) or evidence.get("status") != "captured":
+    if not isinstance(evidence, dict):
+        raise EvaluationError(f"font evidence is missing or incomplete: {key}")
+    if evidence.get("status") == "unavailable":
+        error = evidence.get("error")
+        roles = evidence.get("roles")
+        mismatches = evidence.get("primaryMismatches")
+        visual_issues = result.get("visualIssues")
+        if (
+            not isinstance(error, str)
+            or not error
+            or len(error) > 240
+            or not isinstance(roles, list)
+            or not isinstance(mismatches, list)
+            or mismatches
+            or not isinstance(visual_issues, list)
+            or "font_evidence_unavailable" not in visual_issues
+            or "declared_primary_font_not_rendered" in visual_issues
+        ):
+            raise EvaluationError(f"font evidence unavailable payload is malformed: {key}")
+        return
+    if evidence.get("status") != "captured":
         raise EvaluationError(f"font evidence is missing or incomplete: {key}")
     roles = evidence.get("roles")
     mismatches = evidence.get("primaryMismatches")
+    visual_issues = result.get("visualIssues")
+    if isinstance(visual_issues, list) and "font_evidence_unavailable" in visual_issues:
+        raise EvaluationError(f"font evidence unavailable issue disagrees with captured evidence: {key}")
     if not isinstance(roles, list) or not roles or not isinstance(mismatches, list):
         raise EvaluationError(f"font evidence roles are missing or malformed: {key}")
     resolved_platform_role = False
@@ -968,6 +992,7 @@ def validate_design_completion(
 def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
     report = _load_json(visual_output, "visual report")
     by_target: dict[str, set[str]] = {}
+    evidence_gaps_from_results: dict[str, list[dict[str, str]]] = {}
     advisories_from_results: dict[str, list[dict[str, Any]]] = {}
     for collection_name in ("results", "crossPageComparisons"):
         collection = report.get(collection_name)
@@ -981,7 +1006,18 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
                 raise EvaluationError(f"visual report {collection_name} issues are malformed")
             if issues:
                 key = f"{result.get('caseId')}:{result.get('alias')}"
-                by_target.setdefault(key, set()).update(issues)
+                blocking_issues = [issue for issue in issues if issue not in EVIDENCE_ONLY_VISUAL_ISSUES]
+                if blocking_issues:
+                    by_target.setdefault(key, set()).update(blocking_issues)
+                if collection_name == "results" and "font_evidence_unavailable" in issues:
+                    evidence = result.get("fontEvidence")
+                    evidence_gaps_from_results.setdefault(key, []).append({
+                        "page": str(result.get("page", "")),
+                        "state": str(result.get("state", "")),
+                        "viewport": str(result.get("viewport", "")),
+                        "screenshot": str(result.get("screenshot", "")),
+                        "error": str(evidence.get("error", "")) if isinstance(evidence, dict) else "",
+                    })
             if collection_name == "results":
                 layout_flow = result.get("layoutFlow")
                 raw_advisories = layout_flow.get("unfilledColumnAdvisories", []) if isinstance(layout_flow, dict) else []
@@ -1036,12 +1072,61 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
         raise EvaluationError("visual report advisory target count disagrees")
     if advisory_fields_present and not advisories_from_results and (advisory_count or targets_with_advisories or advisories_by_target):
         raise EvaluationError("visual report zero-advisory summary is malformed")
+    evidence_gap_count = summary.get("evidenceGapCount", 0)
+    targets_with_evidence_gaps = summary.get("targetsWithEvidenceGaps", 0)
+    evidence_gaps_by_target = summary.get("evidenceGapsByTarget", {})
+    if (
+        type(evidence_gap_count) is not int
+        or evidence_gap_count < 0
+        or type(targets_with_evidence_gaps) is not int
+        or targets_with_evidence_gaps < 0
+        or not isinstance(evidence_gaps_by_target, dict)
+    ):
+        raise EvaluationError("visual report evidence-gap summary is malformed")
+    actual_evidence_gap_count = 0
+    for target, gaps in evidence_gaps_by_target.items():
+        if not isinstance(target, str) or not isinstance(gaps, list):
+            raise EvaluationError("visual report evidence-gap inventory is malformed")
+        for gap in gaps:
+            if not isinstance(gap, dict) or any(
+                not isinstance(gap.get(field), str) or not gap[field]
+                for field in ("page", "state", "viewport", "screenshot", "error")
+            ):
+                raise EvaluationError("visual report evidence-gap evidence is malformed")
+        actual_evidence_gap_count += len(gaps)
+    if actual_evidence_gap_count != evidence_gap_count:
+        raise EvaluationError("visual report evidence-gap count disagrees")
+    if evidence_gaps_from_results != evidence_gaps_by_target:
+        raise EvaluationError("visual report evidence-gap evidence disagrees with results")
+    if len(evidence_gaps_from_results) != targets_with_evidence_gaps:
+        raise EvaluationError("visual report evidence-gap target count disagrees")
     expected_verdict = "observed_issues" if normalized else (
-        "advisories_present" if advisory_count else "no_observed_issues"
+        "evidence_unavailable" if evidence_gap_count else (
+            "advisories_present" if advisory_count else "no_observed_issues"
+        )
     )
     if summary.get("verdict") != expected_verdict:
         raise EvaluationError("visual report verdict disagrees with blocking issues")
     return normalized
+
+
+def visual_evidence_gaps(visual_output: Path) -> dict[str, list[dict[str, str]]]:
+    blocking_visual_findings(visual_output)
+    report = _load_json(visual_output, "visual report")
+    gaps: dict[str, list[dict[str, str]]] = {}
+    for result in report.get("results", []):
+        if not isinstance(result, dict) or "font_evidence_unavailable" not in result.get("visualIssues", []):
+            continue
+        key = f"{result.get('caseId')}:{result.get('alias')}"
+        evidence = result.get("fontEvidence")
+        gaps.setdefault(key, []).append({
+            "page": str(result.get("page", "")),
+            "state": str(result.get("state", "")),
+            "viewport": str(result.get("viewport", "")),
+            "screenshot": str(result.get("screenshot", "")),
+            "error": str(evidence.get("error", "")) if isinstance(evidence, dict) else "",
+        })
+    return gaps
 
 
 def repair_summary(findings: dict[str, list[str]]) -> str:
@@ -1911,6 +1996,15 @@ def main() -> int:
                     screenshot_dir,
                     target_root,
                 )
+            evidence_gaps = visual_evidence_gaps(visual_output)
+            if evidence_gaps:
+                gap_count = sum(len(gaps) for gaps in evidence_gaps.values())
+                print(
+                    f"product-flow execution complete with {gap_count} unavailable evidence check(s): "
+                    f"{len(targets)} targets and {count} screenshots retained; no clean acceptance claim",
+                    file=sys.stderr,
+                )
+                return 0
             advisory_count = visual_advisory_count(visual_output)
             if advisory_count:
                 print(
@@ -1958,6 +2052,15 @@ def main() -> int:
                                 screenshot_dir,
                                 target_root,
                             )
+                        evidence_gaps = visual_evidence_gaps(visual_output)
+                        if evidence_gaps:
+                            gap_count = sum(len(gaps) for gaps in evidence_gaps.values())
+                            print(
+                                f"product-flow execution complete with {gap_count} unavailable evidence check(s): "
+                                f"{len(targets)} targets and {count} screenshots captured; no clean acceptance claim",
+                                file=sys.stderr,
+                            )
+                            return 0
                         advisory_count = visual_advisory_count(visual_output)
                         if advisory_count:
                             print(

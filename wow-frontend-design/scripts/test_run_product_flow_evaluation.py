@@ -328,6 +328,18 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             self.assertEqual(6, evaluation.validate_visual_completion(report, screenshots, targets, generation))
 
             valid_payload = json.loads(report.read_text(encoding="utf-8"))
+            unavailable_payload = json.loads(json.dumps(valid_payload))
+            unavailable_result = unavailable_payload["results"][0]
+            unavailable_result["fontEvidence"] = {
+                "status": "unavailable",
+                "error": "active rendered-text animation prevented stable evidence",
+                "roles": [],
+                "primaryMismatches": [],
+            }
+            unavailable_result["visualIssues"] = ["font_evidence_unavailable"]
+            report.write_text(json.dumps(unavailable_payload), encoding="utf-8")
+            self.assertEqual(6, evaluation.validate_visual_completion(report, screenshots, targets, generation))
+            report.write_text(json.dumps(valid_payload), encoding="utf-8")
             generic_native = json.loads(json.dumps(valid_payload))
             generic_role = generic_native["results"][0]["fontEvidence"]["roles"][0]
             generic_role["declaredPrimary"] = "sans-serif"
@@ -346,6 +358,9 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             unavailable = json.loads(json.dumps(valid_payload))
             unavailable["results"][0]["fontEvidence"]["status"] = "unavailable"
             invalid_payloads.append(unavailable)
+            captured_gap = json.loads(json.dumps(valid_payload))
+            captured_gap["results"][0]["visualIssues"] = ["font_evidence_unavailable"]
+            invalid_payloads.append(captured_gap)
             empty_roles = json.loads(json.dumps(valid_payload))
             empty_roles["results"][0]["fontEvidence"]["roles"] = []
             invalid_payloads.append(empty_roles)
@@ -821,6 +836,58 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             self.assertEqual(
                 "wind-maintenance-dispatch-v6:codex-gpt-5.4=critical_text_collision",
                 evaluation.repair_summary(evaluation.blocking_visual_findings(report)),
+            )
+
+    def test_visual_evidence_gaps_are_unverified_not_product_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "visual.json"
+            gap = {
+                "page": "index.html",
+                "state": "interaction",
+                "viewport": "desktop",
+                "screenshot": "/tmp/font-gap.png",
+                "error": "active rendered-text animation prevented stable evidence",
+            }
+            report.write_text(
+                json.dumps(
+                    {
+                        "results": [
+                            {
+                                "caseId": "wind-maintenance-dispatch-v6",
+                                "alias": "codex-gpt-5.4",
+                                "page": "index.html",
+                                "state": "interaction",
+                                "viewport": "desktop",
+                                "screenshot": gap["screenshot"],
+                                "visualIssues": ["font_evidence_unavailable"],
+                                "fontEvidence": {
+                                    "status": "unavailable",
+                                    "error": gap["error"],
+                                    "roles": [],
+                                    "primaryMismatches": [],
+                                },
+                            }
+                        ],
+                        "crossPageComparisons": [],
+                        "summary": {
+                            "verdict": "evidence_unavailable",
+                            "advisoryCount": 0,
+                            "targetsWithAdvisories": 0,
+                            "advisoriesByTarget": {},
+                            "evidenceGapCount": 1,
+                            "targetsWithEvidenceGaps": 1,
+                            "evidenceGapsByTarget": {
+                                "wind-maintenance-dispatch-v6:codex-gpt-5.4": [gap]
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual({}, evaluation.blocking_visual_findings(report))
+            self.assertEqual(
+                {"wind-maintenance-dispatch-v6:codex-gpt-5.4": [gap]},
+                evaluation.visual_evidence_gaps(report),
             )
 
     def test_visual_advisories_are_disclosed_without_becoming_blockers(self) -> None:

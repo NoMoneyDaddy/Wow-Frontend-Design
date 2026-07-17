@@ -470,6 +470,29 @@ const {{ collectFontEvidence, waitForRenderedStateToSettle }} = require({json.du
         self.assertTrue(result["shadowControlStaticClosed"]["shadowRole"])
         self.assertTrue(result["shadowControlStaticOpen"]["shadowRole"])
 
+    def test_audit_keeps_unstable_font_evidence_as_structured_issue(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ captureFontEvidenceForAudit, waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.setContent('<h1 style="font-family:Arial,sans-serif">繁中 ABC 動態排版</h1>');
+  await page.locator('h1').evaluate((node) => node.animate(
+    [{{ fontSize: '16px' }}, {{ fontSize: '32px' }}],
+    {{ duration: 10000, iterations: Infinity }},
+  ));
+  await waitForRenderedStateToSettle(page);
+  const evidence = await captureFontEvidenceForAudit(context, page, 'fixture/desktop/interaction');
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("unavailable", result["status"])
+        self.assertIn("active rendered-text animation", result["error"])
+
     def test_actual_font_mismatch_requires_a_failed_declared_face(self) -> None:
         source = f"""
 const {{ assertFontEvidenceComplete, classifyPrimaryFontUsage, firstDeclaredFontFamily, primaryFontMismatch }} = require({json.dumps(str(AUDITOR))});
@@ -1382,6 +1405,8 @@ process.stdout.write(JSON.stringify({{
   smallText: issueCodes({{ ...base, textScale: {{ undersizedReadableText: [{{ fontSize: 11 }}] }} }}),
   locale: issueCodes({{ ...base, localeFlow: {{ untranslatedInterfaceCopy: [{{ text: 'Current configuration' }}] }} }}),
   fontMismatch: issueCodes({{ ...base, fontEvidence: {{ status: 'captured', primaryMismatches: [{{ role: 'specimen' }}] }} }}),
+  fontUnavailable: issueCodes({{ ...base, fontEvidence: {{ status: 'unavailable', error: 'active rendered-text animation prevented stable evidence' }} }}),
+  fontUnavailableWithMismatch: issueCodes({{ ...base, fontEvidence: {{ status: 'unavailable', primaryMismatches: [{{ role: 'specimen' }}] }} }}),
 }}));
 """
         result = self.run_node(source)
@@ -1392,6 +1417,9 @@ process.stdout.write(JSON.stringify({{
         self.assertIn("readable_text_below_12px", result["smallText"])
         self.assertIn("zh_hant_untranslated_interface_copy", result["locale"])
         self.assertIn("declared_primary_font_not_rendered", result["fontMismatch"])
+        self.assertIn("font_evidence_unavailable", result["fontUnavailable"])
+        self.assertIn("font_evidence_unavailable", result["fontUnavailableWithMismatch"])
+        self.assertNotIn("declared_primary_font_not_rendered", result["fontUnavailableWithMismatch"])
 
     def test_column_void_gate_requires_sparse_content_and_preserves_advisories(self) -> None:
         source = AUDITOR.read_text(encoding="utf-8")

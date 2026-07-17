@@ -443,7 +443,32 @@ def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
         locale_flow = result.get("localeFlow")
         if not isinstance(locale_flow, dict) or locale_flow.get("untranslatedInterfaceCopy") != []:
             raise ProductFlowV6EvidenceError(f"locale flow repair finding remains for {key}")
-        if result.get("visualIssues") != [] or any(result.get(field) != [] for field in ("consoleErrors", "externalRequests", "badResponses")):
+        visual_issues = result.get("visualIssues")
+        if "fontEvidence" in result:
+            font_evidence = result.get("fontEvidence")
+            if not isinstance(font_evidence, dict):
+                raise ProductFlowV6EvidenceError(f"font evidence is malformed for {key}")
+            status = font_evidence.get("status")
+            if status == "unavailable":
+                if (
+                    visual_issues != ["font_evidence_unavailable"]
+                    or not isinstance(font_evidence.get("error"), str)
+                    or not font_evidence.get("error")
+                    or len(font_evidence["error"]) > 240
+                    or not isinstance(font_evidence.get("roles"), list)
+                    or font_evidence.get("primaryMismatches") != []
+                ):
+                    raise ProductFlowV6EvidenceError(f"font evidence unavailable status is not bound to its issue for {key}")
+            elif status == "captured":
+                if isinstance(visual_issues, list) and "font_evidence_unavailable" in visual_issues:
+                    raise ProductFlowV6EvidenceError(f"captured font evidence is marked unavailable for {key}")
+            else:
+                raise ProductFlowV6EvidenceError(f"font evidence status is invalid for {key}")
+        if (
+            not isinstance(visual_issues, list)
+            or visual_issues not in ([], ["font_evidence_unavailable"])
+            or any(result.get(field) != [] for field in ("consoleErrors", "externalRequests", "badResponses"))
+        ):
             raise ProductFlowV6EvidenceError(f"runtime or visual finding remains for {key}")
     actual_pngs = {_artifact(root, str(path.relative_to(root)), "published screenshot") for path in (root / SCREENSHOT_ROOT).glob("*.png")}
     if seen != expected or screenshot_paths != actual_pngs:
@@ -479,13 +504,44 @@ def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
                     }
                 )
     advisory_count = sum(advisory_by_target.values())
+    evidence_gap_by_target: dict[str, list[dict[str, object]]] = {}
+    for result in results:
+        visual_issues = result.get("visualIssues")
+        font_evidence = result.get("fontEvidence")
+        if not isinstance(visual_issues, list) or "font_evidence_unavailable" not in visual_issues:
+            continue
+        if (
+            not isinstance(font_evidence, dict)
+            or font_evidence.get("status") != "unavailable"
+            or not isinstance(font_evidence.get("error"), str)
+            or not font_evidence.get("error")
+            or len(font_evidence["error"]) > 240
+            or font_evidence.get("primaryMismatches") != []
+        ):
+            raise ProductFlowV6EvidenceError("visual evidence-gap payload is malformed")
+        key = f"{result.get('caseId')}:{result.get('alias')}"
+        evidence_gap_by_target.setdefault(key, []).append(
+            {
+                "page": result.get("page"),
+                "state": result.get("state"),
+                "viewport": result.get("viewport"),
+                "screenshot": result.get("screenshot"),
+                "error": font_evidence["error"],
+            }
+        )
+    evidence_gap_count = sum(len(items) for items in evidence_gap_by_target.values())
+    explicit_evidence_summary = {
+        "evidenceGapCount": evidence_gap_count,
+        "targetsWithEvidenceGaps": len(evidence_gap_by_target),
+        "evidenceGapsByTarget": evidence_gap_by_target,
+    }
     common_summary = {
         "checkedPages": 64,
         "minimumExpectedScreenshots": 60,
         "targetsWithObservedIssues": 0,
         "issuesByTarget": expected_issues,
     }
-    if not advisory_count:
+    if not advisory_count and not evidence_gap_count:
         legacy_clean_summary = {**common_summary, "verdict": "no_observed_issues"}
         explicit_clean_summary = {
             **common_summary,
@@ -494,8 +550,26 @@ def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
             "advisoriesByTarget": {},
             "verdict": "no_observed_issues",
         }
-        if summary not in (legacy_clean_summary, explicit_clean_summary):
+        explicit_clean_with_evidence = {**explicit_clean_summary, **explicit_evidence_summary}
+        legacy_clean_with_evidence = {**legacy_clean_summary, **explicit_evidence_summary}
+        if summary not in (
+            legacy_clean_summary,
+            explicit_clean_summary,
+            legacy_clean_with_evidence,
+            explicit_clean_with_evidence,
+        ):
             raise ProductFlowV6EvidenceError("visual summary changed or overstates acceptance")
+    elif evidence_gap_count:
+        expected_advisory_summary = {
+            **common_summary,
+            "advisoryCount": advisory_count,
+            "targetsWithAdvisories": len(advisory_payload_by_target),
+            "advisoriesByTarget": advisory_payload_by_target,
+            **explicit_evidence_summary,
+            "verdict": "evidence_unavailable",
+        }
+        if summary != expected_advisory_summary:
+            raise ProductFlowV6EvidenceError("visual evidence-gap summary is incomplete or overstates acceptance")
     else:
         expected_advisory_summary = {
             **common_summary,
@@ -504,7 +578,8 @@ def _validate_visual(root: Path, path: Path, generation_path: Path) -> None:
             "advisoriesByTarget": advisory_payload_by_target,
             "verdict": "advisories_present",
         }
-        if summary != expected_advisory_summary:
+        explicit_advisory_with_evidence = {**expected_advisory_summary, **explicit_evidence_summary}
+        if summary not in (expected_advisory_summary, explicit_advisory_with_evidence):
             raise ProductFlowV6EvidenceError("visual advisory summary is incomplete or overstates acceptance")
 
 
