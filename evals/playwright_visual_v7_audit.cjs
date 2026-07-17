@@ -3302,6 +3302,238 @@ function issueCodes(result) {
   return unique(issues);
 }
 
+async function collectRenderedBodyLineBreaks(page, { rootSelector = PRODUCT_TEXT_ROOT_SELECTOR } = {}) {
+  return page.evaluate(({ rootSelector: selector }) => {
+    const lengthToPixels = (value, extent) => {
+      const token = String(value || "").trim().toLowerCase();
+      if (token.endsWith("%")) return (Number.parseFloat(token) / 100) * extent;
+      if (token.endsWith("px") || /^[-+]?\d*\.?\d+$/u.test(token)) return Number.parseFloat(token);
+      return Number.NaN;
+    };
+    const clipPathRemovesPaint = (style, box) => {
+      const clipPath = String(style.clipPath || "none").trim().toLowerCase();
+      const inset = clipPath.match(/^inset\((.*?)(?:\s+round\s+.*)?\)$/u);
+      if (inset) {
+        const values = inset[1].trim().split(/[\t\n\f\r ]+/u);
+        const [top, right = top, bottom = top, left = right] = values.length === 3
+          ? [values[0], values[1], values[2], values[1]]
+          : values.length === 4
+            ? values
+            : [values[0], values[1] || values[0], values[2] || values[0], values[3] || values[1] || values[0]];
+        const vertical = lengthToPixels(top, box.height) + lengthToPixels(bottom, box.height);
+        const horizontal = lengthToPixels(left, box.width) + lengthToPixels(right, box.width);
+        if ((Number.isFinite(vertical) && vertical >= box.height)
+          || (Number.isFinite(horizontal) && horizontal >= box.width)) return true;
+      }
+      const polygon = clipPath.match(/^polygon\((.*)\)$/u);
+      if (polygon) {
+        const points = polygon[1].split(",").map((point) => point.trim().split(/[\t\n\f\r ]+/u))
+          .map(([x, y]) => [lengthToPixels(x, box.width), lengthToPixels(y, box.height)]);
+        if (points.length >= 3 && points.every((point) => point.every(Number.isFinite))) {
+          const [origin] = points;
+          const direction = points.find((point) => point[0] !== origin[0] || point[1] !== origin[1]);
+          if (!direction) return true;
+          const dx = direction[0] - origin[0];
+          const dy = direction[1] - origin[1];
+          if (points.every((point) => Math.abs(dx * (point[1] - origin[1]) - dy * (point[0] - origin[0])) <= Number.EPSILON)) return true;
+        }
+      }
+      const circle = clipPath.match(/^circle\(([^\t\n\f\r )]+)/u);
+      if (circle && Number.parseFloat(circle[1]) === 0) return true;
+      const ellipse = clipPath.match(/^ellipse\(([^\t\n\f\r )]+)[\t\n\f\r ]+([^\t\n\f\r )]+)/u);
+      return Boolean(ellipse && [ellipse[1], ellipse[2]].some((radius) => Number.parseFloat(radius) === 0));
+    };
+    const filterRemovesPaint = (value) => [...String(value || "").matchAll(/opacity\(([^)]+)\)/giu)]
+      .some((match) => Number.parseFloat(match[1]) === 0);
+    const transformRemovesPaint = (transform, scale) => {
+      if (String(scale || "none").trim().split(/[\t\n\f\r ]+/u).some((value) => Number.parseFloat(value) === 0)) return true;
+      if (!transform || transform === "none" || typeof DOMMatrix !== "function") return false;
+      try {
+        return Array.from(new DOMMatrix(transform).inverse().toFloat64Array()).some((value) => !Number.isFinite(value));
+      } catch {
+        return false;
+      }
+    };
+    const legacyClipRemovesPaint = (style) => {
+      if (!["absolute", "fixed"].includes(style.position)) return false;
+      const rectangle = String(style.clip || "auto").trim().toLowerCase().match(/^rect\((.*)\)$/u);
+      if (!rectangle) return false;
+      const values = rectangle[1].trim().split(/\s*,\s*|[\t\n\f\r ]+/u).filter(Boolean);
+      if (values.length !== 4) return false;
+      const [top, right, bottom, left] = values.map((value) => lengthToPixels(value, 0));
+      return [top, right, bottom, left].every(Number.isFinite) && (right <= left || bottom <= top);
+    };
+    const painted = (element) => {
+      for (let current = element; current; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) <= 0.01) return false;
+        if (style.contentVisibility === "hidden") return false;
+        if (clipPathRemovesPaint(style, current.getBoundingClientRect())
+          || legacyClipRemovesPaint(style)
+          || filterRemovesPaint(style.filter)
+          || transformRemovesPaint(style.transform, style.scale)
+          || maskRemovesPaint(style)) return false;
+        if (typeof current.checkVisibility === "function" && !current.checkVisibility({
+          opacityProperty: true,
+          visibilityProperty: true,
+          contentVisibilityAuto: true,
+        })) return false;
+      }
+      return true;
+    };
+    const rectHasUnclippedArea = (rect, element) => {
+      let left = rect.left;
+      let right = rect.right;
+      let top = rect.top;
+      let bottom = rect.bottom;
+      for (let current = element; current; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        const bounds = current.getBoundingClientRect();
+        const paddingBounds = {
+          left: bounds.left + Number.parseFloat(style.borderLeftWidth || "0"),
+          right: bounds.right - Number.parseFloat(style.borderRightWidth || "0"),
+          top: bounds.top + Number.parseFloat(style.borderTopWidth || "0"),
+          bottom: bounds.bottom - Number.parseFloat(style.borderBottomWidth || "0"),
+        };
+        if (["hidden", "clip", "auto", "scroll"].includes(style.overflowX)) {
+          left = Math.max(left, paddingBounds.left);
+          right = Math.min(right, paddingBounds.right);
+        }
+        if (["hidden", "clip", "auto", "scroll"].includes(style.overflowY)) {
+          top = Math.max(top, paddingBounds.top);
+          bottom = Math.min(bottom, paddingBounds.bottom);
+        }
+        if (right - left <= 0.1 || bottom - top <= 0.5) return false;
+      }
+      return true;
+    };
+    const visible = (node) => {
+      const style = getComputedStyle(node);
+      const rect = node.getBoundingClientRect();
+      return painted(node) && rect.width > 0.5 && rect.height > 0.5;
+    };
+    const colorHasPaint = (value) => {
+      const normalized = String(value || "").trim().toLowerCase();
+      if (!normalized || normalized === "transparent") return false;
+      const alpha = normalized.match(/\/\s*([+-]?(?:\d+\.?\d*|\.\d+)%?)\s*\)$/u)
+        || (normalized.startsWith("rgba(") ? normalized.match(/,\s*([+-]?(?:\d+\.?\d*|\.\d+))\s*\)$/u) : null);
+      if (!alpha) return true;
+      const valueNumber = Number.parseFloat(alpha[1]);
+      return Number.isFinite(valueNumber) && valueNumber > 0.01;
+    };
+    const computedColorTokens = (value) => [...String(value || "").matchAll(
+      /(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\)|\btransparent\b/giu,
+    )].map((match) => match[0]);
+    const paintValueHasVisibleColor = (value) => {
+      const normalized = String(value || "").trim().toLowerCase();
+      if (!normalized || normalized === "none") return false;
+      const colors = computedColorTokens(normalized);
+      return colors.length ? colors.some(colorHasPaint) : true;
+    };
+    const maskRemovesPaint = (style) => {
+      const images = [...new Set([style.maskImage, style.webkitMaskImage]
+        .map((value) => String(value || "none").trim()).filter((value) => value !== "none"))];
+      if (!images.length) return false;
+      const modes = String(style.maskMode || "match-source").split(",").map((value) => value.trim().toLowerCase());
+      let anyVisibleLayer = false;
+      for (let index = 0; index < images.length; index += 1) {
+        const colors = computedColorTokens(images[index]);
+        if (!colors.length) return false;
+        const mode = modes[index] || modes.at(-1) || "match-source";
+        if (mode === "luminance") {
+          const visibleLuminance = colors.some((color) => {
+            if (!colorHasPaint(color)) return false;
+            const components = color.match(/[+-]?(?:\d+\.?\d*|\.\d+)%?/gu) || [];
+            return components.length < 3 || components.slice(0, 3).some((component) => Number.parseFloat(component) > 0);
+          });
+          anyVisibleLayer ||= visibleLuminance;
+        } else {
+          anyVisibleLayer ||= colors.some(colorHasPaint);
+        }
+      }
+      return !anyVisibleLayer;
+    };
+    const glyphHasPaint = (element) => {
+      const style = getComputedStyle(element);
+      const fill = style.webkitTextFillColor || style.color;
+      const fillPaint = colorHasPaint(fill);
+      const shadowPaint = paintValueHasVisibleColor(style.textShadow);
+      const strokePaint = Number.parseFloat(style.webkitTextStrokeWidth || "0") > 0
+        && colorHasPaint(style.webkitTextStrokeColor);
+      const clippedBackgroundPaint = [style.backgroundClip, style.webkitBackgroundClip].includes("text")
+        && (style.backgroundImage !== "none" || colorHasPaint(style.backgroundColor));
+      return fillPaint || shadowPaint || strokePaint || clippedBackgroundPaint;
+    };
+    const activeModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+    const isolatedBehindModal = (node) => Boolean(
+      activeModal && !activeModal.contains(node) && node.closest('[inert], [aria-hidden="true"]'),
+    );
+    const textFragmentRect = (textNode, fromEnd) => {
+      if (!painted(textNode.parentElement) || !glyphHasPaint(textNode.parentElement)) return null;
+      const segments = [];
+      let offset = 0;
+      for (const character of textNode.data) {
+        const end = offset + character.length;
+        if (/\S/u.test(character)) segments.push([offset, end]);
+        offset = end;
+      }
+      if (fromEnd) segments.reverse();
+      for (const [start, end] of segments) {
+        const range = document.createRange();
+        range.setStart(textNode, start);
+        range.setEnd(textNode, end);
+        const rect = [...range.getClientRects()].find((item) => item.width > 0.1 && item.height > 0.5);
+        if (rect && rectHasUnclippedArea(rect, textNode.parentElement)) return rect;
+      }
+      return null;
+    };
+    const renderedBreak = (node, br) => {
+      if (br.closest("blockquote, [data-display-copy], [data-intentional-break='true']")) return false;
+      if (!painted(br) || ![...br.getClientRects()].some((rect) => rect.width > 0.5 || rect.height > 0.5)) return false;
+      const beforeNodes = [];
+      const afterNodes = [];
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const relation = br.compareDocumentPosition(walker.currentNode);
+        if (relation & Node.DOCUMENT_POSITION_PRECEDING) beforeNodes.push(walker.currentNode);
+        if (relation & Node.DOCUMENT_POSITION_FOLLOWING) afterNodes.push(walker.currentNode);
+      }
+      const beforeRect = beforeNodes.reverse().map((textNode) => textFragmentRect(textNode, true)).find(Boolean);
+      const afterRect = afterNodes.map((textNode) => textFragmentRect(textNode, false)).find(Boolean);
+      if (!beforeRect || !afterRect) return false;
+      const writingMode = getComputedStyle(br).writingMode;
+      const vertical = writingMode.startsWith("vertical") || writingMode.startsWith("sideways");
+      const tolerance = Math.max(1, Math.min(
+        vertical ? beforeRect.width : beforeRect.height,
+        vertical ? afterRect.width : afterRect.height,
+      ) * 0.25);
+      if (writingMode.endsWith("-rl")) return beforeRect.left - afterRect.left > tolerance;
+      if (writingMode.endsWith("-lr")) return afterRect.left - beforeRect.left > tolerance;
+      return afterRect.top - beforeRect.top > tolerance;
+    };
+    const nodes = [...new Set(
+      [...document.querySelectorAll(selector)]
+        .filter((root) => visible(root) && !isolatedBehindModal(root))
+        .flatMap((root) => [...root.querySelectorAll("p, li")]),
+    )]
+      .filter((node) => visible(node) && !isolatedBehindModal(node))
+      .filter((node) => node.tagName !== "LI" || !node.querySelector("p, div, section, article, ul, ol"))
+      .filter((node) => node.textContent.trim().length >= 40);
+    return nodes
+      .map((node) => {
+        const breaks = [...node.querySelectorAll("br")].filter((br) => renderedBreak(node, br));
+        return {
+          tag: node.tagName.toLowerCase(),
+          text: node.textContent.trim().replace(/\s+/g, " ").slice(0, 80),
+          breakCount: breaks.length,
+          writingMode: breaks.length ? getComputedStyle(breaks[0]).writingMode : null,
+        };
+      })
+      .filter((item) => item.breakCount > 0)
+      .slice(0, 20);
+  }, { rootSelector });
+}
+
 async function auditPage(browser, options, target, pageName, viewport, state = "base") {
   const contextOptions = {
     viewport: { width: viewport.width, height: viewport.height },
@@ -3339,8 +3571,9 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     : { attempted: false, failures: [] };
   await page.evaluate(() => document.fonts.ready);
   if (state === "interaction") await waitForRenderedStateToSettle(page);
+  const renderedForcedLineBreaks = await collectRenderedBodyLineBreaks(page);
 
-  const measured = await page.evaluate(({ caseId, viewportName, requiredPages, localeRules, productTextRootSelector }) => {
+  const measured = await page.evaluate(({ caseId, viewportName, requiredPages, localeRules, productTextRootSelector, renderedForcedLineBreaks }) => {
     const visible = (node) => {
       const style = getComputedStyle(node);
       const rect = node.getBoundingClientRect();
@@ -3575,14 +3808,6 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     const bodyFlowNodes = productTextNodes("p, li")
       .filter((node) => node.tagName !== "LI" || !node.querySelector("p, div, section, article, ul, ol"))
       .filter((node) => node.textContent.trim().length >= 40);
-    const forcedLineBreaks = bodyFlowNodes
-      .filter((node) => node.querySelector("br") && !node.closest("blockquote, [data-display-copy], [data-intentional-break='true']"))
-      .map((node) => ({
-        tag: node.tagName.toLowerCase(),
-        text: node.textContent.trim().replace(/\s+/g, " ").slice(0, 80),
-        breakCount: node.querySelectorAll("br").length,
-      }))
-      .slice(0, 20);
     const nonWrappingProse = bodyFlowNodes
       .map((node) => {
         const style = getComputedStyle(node);
@@ -3625,7 +3850,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       .filter((item) => item.cjkDominant && item.containerWidth >= 560 && item.trackRatio < 0.6
         && item.unusedInline > 220 && !item.hasTaskPeer)
       .slice(0, 20);
-    const bodyFlow = { forcedLineBreaks, nonWrappingProse, underfilledProseBlocks };
+    const bodyFlow = { forcedLineBreaks: renderedForcedLineBreaks, nonWrappingProse, underfilledProseBlocks };
 
     const compressedCjkHeadings = [...document.querySelectorAll("h1")]
       .filter(visible)
@@ -3976,6 +4201,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     requiredPages: CASE_PAGES[target.caseId],
     localeRules: LOCALE_RULES,
     productTextRootSelector: PRODUCT_TEXT_ROOT_SELECTOR,
+    renderedForcedLineBreaks,
   });
   const fontEvidence = await captureFontEvidenceForAudit(
     context,
@@ -4359,6 +4585,7 @@ async function main() {
 
 module.exports = {
   CASE_PAGES,
+  collectRenderedBodyLineBreaks,
   buildInteractionCoverage,
   manifestCaptureVerified,
   captureAuditedScreenshot,

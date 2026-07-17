@@ -1971,6 +1971,90 @@ process.stdout.write(JSON.stringify({{
         self.assertIn("cjk_heading_orphan_line", result["orphan"])
         self.assertIn("visual_order_reverses_dom_flow", result["reorder"])
 
+    def test_forced_break_requires_rendered_line_separation(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ collectRenderedBodyLineBreaks }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage({{ viewport: {{ width: 800, height: 600 }} }});
+  await page.setContent(`
+    <main>
+      <p id="forced" style="clip:rect(0 0 0 0)">這是一段足夠長的正文內容用來檢查排版證據與換行行為是否正確<br>這個可見換行確實把後段文字移到下一行</p>
+      <p id="hidden">這是一段足夠長的正文內容用來檢查隱藏元素是否造成誤報<br style="display:none">這段文字仍在同一個 rendered line</p>
+      <p id="intentional" data-intentional-break="true">這是一段足夠長的展示文字且作者明確標記換行為設計意圖<br>這個換行不應升級為修復碼</p>
+      <p id="hidden-copy">這是一段足夠長的正文內容用來檢查不可見文字是否造成誤報<br><span style="visibility:hidden">這個後段沒有 painted text run</span></p>
+      <p id="transparent-copy">這是一段足夠長的正文內容用來檢查透明 glyph 是否造成誤報<br><span style="color:transparent;text-shadow:none">這個後段沒有 glyph paint</span></p>
+      <p id="transparent-fill">這是一段足夠長的正文內容用來檢查透明 text fill 是否造成誤報<br><span style="-webkit-text-fill-color:transparent;text-shadow:none">這個後段沒有 text fill</span></p>
+      <p id="transparent-shadow">這是一段足夠長的正文內容用來檢查透明文字陰影是否造成誤報<br><span style="color:transparent;text-shadow:0 0 2px rgba(0,0,0,0)">這個後段只有透明 shadow</span></p>
+      <div style="height:0;overflow:hidden"><p id="clipped-parent">這是一段足夠長的正文內容用來檢查祖先裁切是否造成誤報<br>整段都在零高度裁切區域</p></div>
+      <div style="height:0;overflow:auto"><p id="auto-clipped-parent">這是一段足夠長的正文內容用來檢查自動捲動裁切是否造成誤報<br>整段都在零高度 scrollport</p></div>
+      <div style="height:0;overflow:hidden;border:80px solid transparent"><p id="border-clipped-parent">這是一段足夠長的正文內容用來檢查 border box 是否冒充 scrollport<br>整段都在零高度 padding box 外</p></div>
+      <p id="content-hidden" style="content-visibility:hidden">這是一段足夠長的正文內容用來檢查內容可見性是否造成誤報<br>整段內容略過 rendering</p>
+      <p id="clip-path-hidden" style="clip-path:inset(50%)">這是一段足夠長的正文內容用來檢查完整裁切路徑是否造成誤報<br>整段內容沒有 visible clip area</p>
+      <p id="circle-hidden" style="clip-path:circle(0)">這是一段足夠長的正文內容用來檢查零半徑圓形裁切是否造成誤報<br>整段內容沒有 visible circle</p>
+      <p id="ellipse-hidden" style="clip-path:ellipse(10px 0)">這是一段足夠長的正文內容用來檢查零半徑橢圓裁切是否造成誤報<br>整段內容沒有 visible ellipse</p>
+      <p id="polygon-hidden" style="clip-path:polygon(0 0,0 0,0 0)">這是一段足夠長的正文內容用來檢查零面積多邊形裁切是否造成誤報<br>整段內容沒有 visible polygon</p>
+      <p id="filter-hidden">這是一段足夠長的正文內容用來檢查透明濾鏡是否造成誤報<br><span style="filter:opacity(0)">這個後段沒有 filter paint</span></p>
+      <p id="transform-hidden">這是一段足夠長的正文內容用來檢查零縮放是否造成誤報<br><span style="display:inline-block;transform:scale(0)">這個後段沒有 transformed paint</span></p>
+      <p id="legacy-clip-hidden">這是一段足夠長的正文內容用來檢查舊式完整裁切是否造成誤報<br><span style="position:absolute;clip:rect(0 0 0 0)">這個後段沒有 legacy clip area</span></p>
+      <p id="mask-hidden">這是一段足夠長的正文內容用來檢查透明遮罩是否造成誤報<br><span style="mask-image:linear-gradient(transparent,transparent)">這個後段沒有 mask paint</span></p>
+      <div style="opacity:0"><p id="hidden-parent">這是一段足夠長的正文內容用來檢查祖先透明度是否造成誤報<br>整段都沒有 painted output</p></div>
+    </main>
+  `);
+  const findings = await collectRenderedBodyLineBreaks(page);
+  await browser.close();
+  process.stdout.write(JSON.stringify(findings));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual(1, len(result))
+        self.assertIn("可見換行", result[0]["text"])
+        self.assertEqual(1, result[0]["breakCount"])
+
+    def test_forced_break_uses_the_vertical_writing_axis(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ collectRenderedBodyLineBreaks }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage({{ viewport: {{ width: 800, height: 600 }} }});
+  await page.setContent(`<main>
+    <p style="writing-mode:vertical-rl;height:300px">這是一段足夠長的直排正文內容用來檢查由右向左的換行軸與實際繪製方向是否正確<br>第二段直排文字也需要足夠長度</p>
+    <p style="writing-mode:vertical-lr;height:300px">這是一段足夠長的直排正文內容用來檢查由左向右的換行軸與實際繪製方向是否正確<br>第二段直排文字也需要足夠長度</p>
+    <p>這個外層段落維持橫排但內層文字切換排版方向以驗證 break 自身的軸線<span style="writing-mode:vertical-rl;height:300px">內層直排文字需要足夠長度<br>第二段內層直排文字也需要足夠長度</span></p>
+    <p style="writing-mode:sideways-rl;height:300px">這是一段足夠長的側排正文內容用來檢查由右向左的換行軸與實際繪製方向是否正確<br>第二段側排文字也需要足夠長度</p>
+    <p style="writing-mode:sideways-lr;height:300px">這是一段足夠長的側排正文內容用來檢查由左向右的換行軸與實際繪製方向是否正確<br>第二段側排文字也需要足夠長度</p>
+  </main>`);
+  const findings = await collectRenderedBodyLineBreaks(page);
+  await browser.close();
+  process.stdout.write(JSON.stringify(findings));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual(
+            ["vertical-rl", "vertical-lr", "vertical-rl", "sideways-rl", "sideways-lr"],
+            [item["writingMode"] for item in result],
+        )
+
+    def test_forced_break_ignores_content_isolated_behind_active_modal(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ collectRenderedBodyLineBreaks }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <main inert><p>這是一段足夠長的背景正文內容用來確認模態視窗後方內容不會成為視覺證據<br>這段背景文字已被隔離</p></main>
+    <div role="dialog" aria-modal="true"><p>目前可操作的模態內容沒有強制換行並且保持正常流動</p></div>
+  `);
+  const findings = await collectRenderedBodyLineBreaks(page);
+  await browser.close();
+  process.stdout.write(JSON.stringify(findings));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        self.assertEqual([], self.run_node(source))
+
     def test_track_utilization_intro_alignment_and_locale_become_repair_codes(self) -> None:
         source = f"""
 const {{ issueCodes }} = require({json.dumps(str(AUDITOR))});
