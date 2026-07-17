@@ -20,7 +20,7 @@ class SourceLockTests(unittest.TestCase):
         count = validate_external_sources.validate(
             root / "wow-frontend-design" / "references" / "external-sources.lock.json"
         )
-        self.assertEqual(count, 54)
+        self.assertEqual(count, 65)
 
     def test_short_revision_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

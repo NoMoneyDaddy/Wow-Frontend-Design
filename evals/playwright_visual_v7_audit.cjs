@@ -2484,6 +2484,7 @@ async function waitForRenderedStateToSettle(page) {
 
 async function runCaseInteraction(page, caseId, viewport, pageName) {
   const evidence = { attempted: true, page: pageName, failures: [] };
+  page.setDefaultTimeout(2500);
   try {
     if (caseId === "wind-maintenance-dispatch-v6") {
       evidence.initialRecords = await visibleCount(page, '[data-eval="dispatch-row"]');
@@ -2640,13 +2641,129 @@ async function runCaseInteraction(page, caseId, viewport, pageName) {
       await secondRow.locator('[data-eval="compare-b-action"]').click();
       await page.locator('[data-eval="decision-action"]').click();
       await page.waitForTimeout(100);
-      evidence.modalVisible = await page.locator('[data-eval="decision-modal"]').isVisible();
+      const modal = page.locator('[data-eval="decision-modal"]');
+      const decisionTrigger = page.locator('[data-eval="decision-action"]');
+      const retry = page.locator('[data-eval="retry-action"]');
+      evidence.modalVisible = await modal.isVisible();
+      evidence.modalAccessible = await modal.evaluate((node) => {
+        const labelledBy = node.getAttribute("aria-labelledby");
+        const labelledText = labelledBy
+          ? labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent || "").join(" ").trim()
+          : "";
+        return (node.matches("dialog") || node.getAttribute("role") === "dialog")
+          && Boolean(node.getAttribute("aria-label")?.trim() || labelledText);
+      });
       evidence.backgroundInert = await page.locator('[data-eval="grant-board"]').evaluate((node) => {
         const inertAncestor = node.closest("[inert]");
-        return Boolean(inertAncestor) || node.closest('[aria-hidden="true"]') !== null;
+        return Boolean(node.inert || inertAncestor?.inert);
+      });
+      evidence.allBackgroundFocusablesInert = await page.evaluate(() => {
+        const modal = document.querySelector('[data-eval="decision-modal"]');
+        const selector = "a[href], area[href], button, input, select, textarea, summary, audio[controls], video[controls], iframe, object, embed, [contenteditable]:not([contenteditable='false']), [tabindex]:not([tabindex='-1'])";
+        return [...document.querySelectorAll(selector)].filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return !modal?.contains(element) && element.tabIndex >= 0 && !element.matches(":disabled")
+            && !element.closest("[hidden]") && style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+        }).every((element) => Boolean(element.inert || element.closest("[inert]")?.inert));
+      });
+      evidence.scrollLocked = await page.evaluate(() => {
+        const body = getComputedStyle(document.body).overflow;
+        const root = getComputedStyle(document.documentElement).overflow;
+        return body === "hidden" || root === "hidden";
+      });
+      evidence.focusEntered = await page.evaluate(() => {
+        const modal = document.querySelector('[data-eval="decision-modal"]');
+        return Boolean(modal?.contains(document.activeElement));
+      });
+      const dialogFocusables = modal.locator("a[href], area[href], button, input, select, textarea, summary, audio[controls], video[controls], iframe, object, embed, [contenteditable]:not([contenteditable='false']), [tabindex]:not([tabindex='-1'])");
+      const focusableCount = await dialogFocusables.count();
+      const focusWithinAfterTab = [];
+      for (let index = 0; index < Math.max(2, focusableCount + 1); index += 1) {
+        await page.keyboard.press("Tab");
+        focusWithinAfterTab.push(await page.evaluate(() => {
+          const modal = document.querySelector('[data-eval="decision-modal"]');
+          return Boolean(modal?.contains(document.activeElement));
+        }));
+      }
+      evidence.focusContained = focusWithinAfterTab.length > 0 && focusWithinAfterTab.every(Boolean);
+      const focusWithinAfterReverseTab = [];
+      for (let index = 0; index < Math.max(2, focusableCount + 1); index += 1) {
+        await page.keyboard.press("Shift+Tab");
+        focusWithinAfterReverseTab.push(await page.evaluate(() => {
+          const modal = document.querySelector('[data-eval="decision-modal"]');
+          return Boolean(modal?.contains(document.activeElement));
+        }));
+      }
+      evidence.focusContainedReverse = focusWithinAfterReverseTab.length > 0 && focusWithinAfterReverseTab.every(Boolean);
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(50);
+      evidence.escapeClosed = !(await modal.isVisible());
+      evidence.focusReturned = await page.evaluate(() => document.activeElement?.matches('[data-eval="decision-action"]') || false);
+      evidence.scrollRestored = await page.evaluate(() => {
+        const body = getComputedStyle(document.body).overflow;
+        const root = getComputedStyle(document.documentElement).overflow;
+        return body !== "hidden" && root !== "hidden";
       });
       if (evidence.initialRecords !== plan.expectedVisibleRecords || !evidence.modalVisible) evidence.failures.push("grant_decision_flow_failed");
-      if (!evidence.backgroundInert) evidence.failures.push("grant_modal_background_not_inert");
+      if (!evidence.backgroundInert || !evidence.allBackgroundFocusablesInert) evidence.failures.push("grant_modal_background_not_inert");
+      if (!evidence.modalAccessible) evidence.failures.push("grant_modal_accessible_name_missing");
+      if (!evidence.scrollLocked || !evidence.scrollRestored) evidence.failures.push("grant_modal_scroll_lock_failed");
+      if (!evidence.focusEntered || !evidence.focusContained || !evidence.focusContainedReverse) evidence.failures.push("grant_modal_focus_containment_failed");
+      if (!evidence.escapeClosed || !evidence.focusReturned) evidence.failures.push("grant_modal_escape_or_focus_return_failed");
+
+      await decisionTrigger.click();
+      await page.waitForTimeout(50);
+      const confirm = modal.locator('button').last();
+      if (!(await confirm.count())) throw new Error("grant decision modal has no submit control");
+      await confirm.click();
+      await page.waitForTimeout(100);
+      evidence.retryVisible = await retry.isVisible();
+      const errorRegions = modal.locator('[role="alert"], [aria-live="assertive"], [aria-live="polite"]');
+      evidence.errorStateVisible = await errorRegions.evaluateAll((nodes) => nodes.some((node) => {
+        const rect = node.getBoundingClientRect();
+        for (let current = node; current && current.nodeType === 1; current = current.parentElement) {
+          const style = getComputedStyle(current);
+          if (style.display === "none" || style.visibility === "hidden" || Number.parseFloat(style.opacity) === 0) return false;
+        }
+        return rect.width > 0 && rect.height > 0 && Boolean(node.textContent?.trim());
+      }));
+      evidence.errorMessage = evidence.errorStateVisible;
+      evidence.focusAfterError = await page.evaluate(() => document.activeElement?.matches('[data-eval="retry-action"]') || false);
+      if (!evidence.retryVisible || !evidence.errorStateVisible || !evidence.errorMessage || !evidence.focusAfterError) evidence.failures.push("grant_decision_retry_state_failed");
+
+      if (evidence.retryVisible) {
+        await retry.click();
+        await page.waitForTimeout(50);
+        evidence.retryModalVisible = await modal.isVisible();
+        evidence.retryFocusEntered = await page.evaluate(() => {
+          const modal = document.querySelector('[data-eval="decision-modal"]');
+          return Boolean(modal?.contains(document.activeElement));
+        });
+        const retryConfirm = modal.locator('button').last();
+        if (!(await retryConfirm.count())) throw new Error("grant retry modal has no submit control");
+        await retryConfirm.click();
+        await page.waitForTimeout(100);
+        const visibleErrorAfterRetry = await errorRegions.evaluateAll((nodes) => nodes.some((node) => {
+          const rect = node.getBoundingClientRect();
+          for (let current = node; current && current.nodeType === 1; current = current.parentElement) {
+            const style = getComputedStyle(current);
+            if (style.display === "none" || style.visibility === "hidden" || Number.parseFloat(style.opacity) === 0) return false;
+          }
+          return rect.width > 0 && rect.height > 0 && Boolean(node.textContent?.trim());
+        }));
+        evidence.retrySucceeded = !(await modal.isVisible()) && !(await retry.isVisible()) && !visibleErrorAfterRetry;
+        evidence.focusReturnedAfterRetry = await page.evaluate(() => document.activeElement?.matches('[data-eval="retry-action"]') || document.activeElement?.matches('[data-eval="decision-action"]') || false);
+        if (!evidence.retryModalVisible || !evidence.retryFocusEntered || !evidence.retrySucceeded || !evidence.focusReturnedAfterRetry) {
+          evidence.failures.push("grant_retry_completion_failed");
+        }
+      } else {
+        evidence.retryModalVisible = false;
+        evidence.retryFocusEntered = false;
+        evidence.retrySucceeded = false;
+        evidence.focusReturnedAfterRetry = false;
+        evidence.failures.push("grant_retry_completion_failed");
+      }
     }
     const finalPageName = new URL(page.url()).pathname.split('/').pop() || "index.html";
     if (finalPageName !== pageName) evidence.failures.push("interaction_left_declared_page");
@@ -2654,6 +2771,303 @@ async function runCaseInteraction(page, caseId, viewport, pageName) {
     evidence.failures.push(`interaction_exception:${String(error.message || error).slice(0, 160)}`);
   }
   return evidence;
+}
+
+async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
+  const count = await page.evaluate(() => {
+    const selector = "a[href], area[href], button, input, select, textarea, summary, audio[controls], video[controls], iframe, object, embed, [contenteditable]:not([contenteditable='false']), [tabindex]:not([tabindex='-1'])";
+    return [...document.querySelectorAll(selector)].filter((element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const radioGroup = element instanceof HTMLInputElement && element.type === "radio" && element.name
+        ? [...document.querySelectorAll("input[type='radio']")].filter((radio) => radio.name === element.name && radio.form === element.form)
+        : [];
+      const radioIsSequential = (radio) => !radio.disabled && radio.tabIndex >= 0
+        && !radio.closest("[hidden], [inert]") && radio.getClientRects().length > 0;
+      const checkedRadio = radioGroup.find((radio) => radio.checked && radioIsSequential(radio))
+        || radioGroup.find(radioIsSequential);
+      return element.tabIndex >= 0
+        && !element.matches(":disabled")
+        && !(checkedRadio && checkedRadio !== element)
+        && !element.closest("[hidden], [inert]")
+        && style.display !== "none"
+        && style.visibility !== "hidden"
+        && rect.width > 0
+        && rect.height > 0;
+    }).length;
+  });
+  const evidence = [`focusable-count:${count}`];
+  const observations = [];
+  const replaySteps = Math.min(count + 2, 256);
+  const replayTruncated = count + 2 > replaySteps;
+  for (let step = 0; step < replaySteps; step += 1) {
+    await page.keyboard.press("Tab");
+    const observation = await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement) return null;
+      const rect = active.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      const readStyle = () => {
+        const style = getComputedStyle(active);
+        return [
+          style.outlineStyle,
+          style.outlineWidth,
+          style.outlineOffset,
+          style.outlineColor,
+          style.boxShadow,
+          style.borderTopStyle,
+          style.borderRightStyle,
+          style.borderBottomStyle,
+          style.borderLeftStyle,
+          style.borderTopWidth,
+          style.borderRightWidth,
+          style.borderBottomWidth,
+          style.borderLeftWidth,
+          style.borderTopColor,
+          style.borderRightColor,
+          style.borderBottomColor,
+          style.borderLeftColor,
+          style.textDecorationLine,
+          style.textDecorationStyle,
+          style.textDecorationThickness,
+          style.textUnderlineOffset,
+          style.textDecorationColor,
+        ].join("|");
+      };
+      const before = (() => {
+        active.blur();
+        return readStyle();
+      })();
+      active.focus();
+      const after = readStyle();
+      let paintSuppressed = false;
+      let accessibilityHidden = Boolean(active.closest("[aria-hidden='true']"));
+      let backgroundColor = "transparent";
+      for (let node = active.parentElement; node && node.nodeType === 1; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (backgroundColor === "transparent" && style.backgroundColor !== "transparent" && !/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(style.backgroundColor)) {
+          backgroundColor = style.backgroundColor;
+        }
+      }
+      for (let node = active; node && node.nodeType === 1; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        const opacity = Number.parseFloat(style.opacity);
+        const matrixValues = style.transform.match(/^matrix\(([^)]+)\)$/i)?.[1].split(",").map(Number);
+        const transformCollapsed = matrixValues?.length === 6
+          && (Math.hypot(matrixValues[0], matrixValues[1]) < 0.1 || Math.hypot(matrixValues[2], matrixValues[3]) < 0.1);
+        const insetValues = [...style.clipPath.matchAll(/(-?\d+(?:\.\d+)?)%/g)].map((match) => Number.parseFloat(match[1]));
+        const clipCollapsesPaint = (/^inset\(/i.test(style.clipPath) && insetValues.length > 0 && insetValues.every((value) => value >= 50))
+          || /(?:circle|ellipse)\(\s*0(?:px|%|\s|\))/i.test(style.clipPath)
+          || /polygon\(\s*0\s+0\s*,\s*0\s+0/i.test(style.clipPath);
+        if (opacity === 0 || style.visibility === "hidden" || style.display === "none"
+          || /opacity\(\s*0(?:[.%]|\s|\))/i.test(style.filter)
+          || clipCollapsesPaint
+          || /transparent|rgba?\([^)]*(?:,|\s|\/)0(?:%|\s|\)|$)/i.test(style.maskImage || style.webkitMaskImage || "")
+          || transformCollapsed) {
+          paintSuppressed = true;
+          break;
+        }
+      }
+      const label = (active.getAttribute("aria-label") || active.textContent || active.getAttribute("name") || "")
+        .replace(/\s+/g, " ").trim().slice(0, 80);
+      window.__wowFocusProbeIds ||= { map: new WeakMap(), next: 0 };
+      if (!window.__wowFocusProbeIds.map.has(active)) {
+        window.__wowFocusProbeIds.map.set(active, window.__wowFocusProbeIds.next);
+        window.__wowFocusProbeIds.next += 1;
+      }
+      return {
+        focusKey: window.__wowFocusProbeIds.map.get(active),
+        tag: active.tagName.toLowerCase(),
+        label,
+        focusVisible: active.matches(":focus-visible"),
+        styleChanged: before !== after,
+        before,
+        after,
+        paintSuppressed,
+        accessibilityHidden,
+        backgroundColor,
+      };
+    });
+    if (!observation) continue;
+    evidence.push(`focus-target:${observation.tag}:${observation.label || "unlabeled"}`);
+    evidence.push(`focus-visible:${observation.focusVisible}`);
+    evidence.push(`focus-style-changed:${observation.styleChanged}`);
+    observations.push(observation);
+  }
+  if (observations.length) {
+    const parsePx = (value) => Number.parseFloat(value) || 0;
+    const hasVisiblePaint = (value) => {
+      if (!value || value === "none" || value === "transparent") return false;
+      const functions = [...value.matchAll(/(?:rgba?|hsla?)\(([^)]*)\)/gi)];
+      if (functions.length) {
+        return functions.some(([, body]) => {
+          const parts = body.split(/[,\s/]+/).filter(Boolean);
+          if (parts.length < 4) return true;
+          const alpha = parts[3].endsWith("%")
+            ? Number.parseFloat(parts[3]) / 100
+            : Number.parseFloat(parts[3]);
+          return !Number.isFinite(alpha) || alpha > 0;
+        });
+      }
+      return !/(?:transparent|\/\s*0(?:%|\b))/i.test(value);
+    };
+    const parseRgb = (value) => {
+      const match = value?.match(/rgba?\(([^)]*)\)/i);
+      if (!match) return null;
+      const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
+      if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) return null;
+      const alpha = parts.length > 3 ? parts[3] : 1;
+      return alpha > 0 ? { rgb: parts.slice(0, 3), alpha } : null;
+    };
+    const hasContrast = (value, background) => {
+      const foreground = parseRgb(value);
+      const backdrop = parseRgb(background);
+      if (!backdrop) return true;
+      if (!foreground) return false;
+      const composited = foreground.rgb.map((channel, index) => channel * foreground.alpha + backdrop.rgb[index] * (1 - foreground.alpha));
+      const luminance = (rgb) => rgb.reduce((sum, channel, index) => {
+        const normalized = channel / 255;
+        const linear = normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+        return sum + linear * [0.2126, 0.7152, 0.0722][index];
+      }, 0);
+      const ratio = (Math.max(luminance(composited), luminance(backdrop.rgb)) + 0.05)
+        / (Math.min(luminance(composited), luminance(backdrop.rgb)) + 0.05);
+      return ratio >= 3;
+    };
+    const hasPaint = (value, background) => hasVisiblePaint(value) && hasContrast(value, background);
+    const hasIndicator = (observation) => {
+      const before = observation.before.split("|");
+      const after = observation.after.split("|");
+      const outlineGeometryChanged = after[0] !== "none"
+        && parsePx(after[1]) > 0
+        && hasPaint(after[3], observation.backgroundColor)
+        && (before[0] !== after[0] || before[1] !== after[1] || before[2] !== after[2]);
+      const shadowChanged = before[4] !== after[4]
+        && after[4] !== "none"
+        && hasPaint(after[4], observation.backgroundColor)
+        && [...after[4].matchAll(/(-?\d+(?:\.\d+)?)px/g)].some(([, value]) => Math.abs(Number.parseFloat(value)) > 0);
+      const borderGeometryChanged = [0, 1, 2, 3].some((side) => {
+        const styleChanged = after[5 + side] !== before[5 + side] && after[5 + side] !== "none";
+        const widthChanged = after[9 + side] !== before[9 + side];
+        return (styleChanged || widthChanged)
+          && parsePx(after[9 + side]) > 0
+          && hasPaint(after[13 + side], observation.backgroundColor);
+      });
+      const underlineChanged = after[17] !== before[17]
+        && after[17].split(" ").includes("underline")
+        && after[18] !== "none"
+        && after[19] !== "0px"
+        && after[19] !== "0"
+        && hasPaint(after[21], observation.backgroundColor);
+      return !observation.paintSuppressed && !observation.accessibilityHidden
+        && (outlineGeometryChanged || shadowChanged || borderGeometryChanged || underlineChanged);
+    };
+    const uniqueObservations = [...new Map(observations.map((observation) => [observation.focusKey, observation])).values()];
+    const missing = uniqueObservations.filter((observation) => !hasIndicator(observation));
+    const uniqueTargetCount = uniqueObservations.length;
+    const uncoveredCount = Math.max(0, count - uniqueTargetCount);
+    evidence.push(`focus-observations:${observations.length}`);
+    evidence.push(`focus-unique-targets:${uniqueTargetCount}`);
+    evidence.push(`focus-missing-indicators:${missing.length}`);
+    if (uncoveredCount) evidence.push(`focus-uncovered-controls:${uncoveredCount}`);
+    if (replayTruncated) evidence.push("focus-replay-truncated:256-step-safety-bound");
+    return {
+      id: `probe-${viewportName}-${pass}`,
+      route: pageName,
+      viewport: viewportName,
+      state: "keyboard-focus",
+      method: "Playwright Tab replay with computed non-color focus-indicator geometry",
+      outcome: missing.length || uncoveredCount || replayTruncated ? "candidate" : "pass",
+      evidence,
+    };
+  }
+  evidence.push(count ? "no-visible-focusable-control-reached" : "no-focusable-control");
+  return {
+    id: `probe-${viewportName}-${pass}`,
+    route: pageName,
+    viewport: viewportName,
+    state: "keyboard-focus",
+    method: "Playwright Tab replay with computed focus-style comparison",
+    outcome: "blocked",
+    evidence,
+  };
+}
+
+async function runNovelDiscovery(browser, target) {
+  const pageName = CASE_PAGES[target.caseId][0];
+  const profiles = VIEWPORTS.filter(({ name }) => ["desktop", "mobile"].includes(name));
+  const probes = [];
+  const externalRequests = [];
+  const origin = new URL(target.url).origin;
+  for (const viewport of profiles) {
+    const contextOptions = {
+      viewport: { width: viewport.width, height: viewport.height },
+      screen: { width: viewport.screenWidth, height: viewport.screenHeight },
+      deviceScaleFactor: viewport.deviceScaleFactor,
+      isMobile: viewport.isMobile,
+      hasTouch: viewport.hasTouch,
+      locale: "zh-TW",
+      reducedMotion: "reduce",
+      serviceWorkers: "block",
+    };
+    if (viewport.userAgent) contextOptions.userAgent = viewport.userAgent;
+    for (let pass = 1; pass <= 2; pass += 1) {
+      let context = null;
+      try {
+        context = await browser.newContext(contextOptions);
+        await installExactOriginRoutes(context, origin, externalRequests);
+        const page = await context.newPage();
+        await page.goto(new URL(pageName, target.url).href, { waitUntil: "domcontentloaded" });
+        await page.waitForTimeout(100);
+        probes.push(await runKeyboardFocusProbe(page, pageName, viewport.name, pass));
+      } catch (error) {
+        probes.push({
+          id: `probe-${viewport.name}-${pass}`,
+          route: pageName,
+          viewport: viewport.name,
+          state: "keyboard-focus",
+          method: "Playwright Tab replay with computed focus-style comparison",
+          outcome: "blocked",
+          evidence: [`probe-error:${String(error.message || error).slice(0, 160)}`],
+        });
+      } finally {
+        if (context) await context.close();
+      }
+    }
+  }
+  const findings = [];
+  for (const viewport of profiles) {
+    const viewportProbes = probes.filter((probe) => probe.viewport === viewport.name);
+    const candidates = viewportProbes.filter((probe) => probe.outcome === "candidate");
+    const blocked = viewportProbes.filter((probe) => probe.outcome === "blocked");
+    if (!candidates.length && !blocked.length) continue;
+    const isConfirmed = candidates.length >= 2;
+    const symptom = candidates.length ? "indicator-missing" : "probe-unavailable";
+    const evidence = (candidates.length ? candidates : blocked).flatMap((probe) => probe.evidence);
+    findings.push({
+      id: `novel:keyboard-focus:${viewport.name}:${symptom}`,
+      status: isConfirmed ? "confirmed" : "advisory",
+      severity: isConfirmed ? "P1" : "P2",
+      surface: "keyboard-focus",
+      state: "keyboard-focus",
+      route: pageName,
+      viewport: viewport.name,
+      reproduction: "Open the declared route and press Tab until the first visible interactive control.",
+      expected: "The focused control has a perceivable, non-color-only focus indication.",
+      actual: candidates.length ? "The focus target produced no measurable focus-style change." : "The probe could not reach a visible focus target.",
+      owner: candidates.length ? "frontend" : "evaluator",
+      confirmation: {
+        replays: candidates.length || blocked.length,
+        evidence,
+      },
+    });
+  }
+  return {
+    schema_version: 1,
+    status: findings.length ? "findings" : "clean_after_probes",
+    probes,
+    findings,
+  };
 }
 
 function issueCodes(result) {
@@ -3460,6 +3874,7 @@ async function main() {
     targets: options.targets,
     results: [],
     crossPageComparisons: [],
+    discoveryByTarget: {},
   };
   try {
     for (const target of options.targets) {
@@ -3476,6 +3891,7 @@ async function main() {
       if (CASE_PAGES[target.caseId].length > 1) {
         report.crossPageComparisons.push(...compareMultiPageShell(report.results, target));
       }
+      report.discoveryByTarget[`${target.caseId}:${target.alias}`] = await runNovelDiscovery(browser, target);
     }
   } finally {
     await browser.close();
@@ -3484,13 +3900,18 @@ async function main() {
   const byTarget = {};
   const evidenceGapsByTarget = {};
   const advisoriesByTarget = {};
+  const discoveryAdvisoriesByTarget = {};
   for (const target of options.targets) {
     const key = `${target.caseId}:${target.alias}`;
     const targetResults = report.results.filter((result) => result.caseId === target.caseId && result.alias === target.alias);
     const viewIssues = targetResults.flatMap((result) => result.visualIssues);
     const crossIssues = report.crossPageComparisons.filter((result) => result.caseId === target.caseId && result.alias === target.alias).flatMap((result) => result.visualIssues);
     const allIssues = unique([...viewIssues, ...crossIssues]);
-    byTarget[key] = allIssues.filter((issue) => !EVIDENCE_ONLY_ISSUES.has(issue));
+    const discoveryFindings = report.discoveryByTarget[key]?.findings || [];
+    allIssues.push(...discoveryFindings.filter((finding) => finding.status === "confirmed").map((finding) => finding.id));
+    byTarget[key] = unique(allIssues).filter((issue) => !EVIDENCE_ONLY_ISSUES.has(issue));
+    const discoveryAdvisories = discoveryFindings.filter((finding) => finding.status === "advisory");
+    if (discoveryAdvisories.length) discoveryAdvisoriesByTarget[key] = discoveryAdvisories;
     const evidenceGaps = targetResults.flatMap((result) => {
       if (!result.visualIssues.includes("font_evidence_unavailable")) return [];
       return [{
@@ -3512,6 +3933,7 @@ async function main() {
     if (advisories.length) advisoriesByTarget[key] = advisories;
   }
   const advisoryCount = Object.values(advisoriesByTarget).reduce((count, advisories) => count + advisories.length, 0);
+  const discoveryAdvisoryCount = Object.values(discoveryAdvisoriesByTarget).reduce((count, findings) => count + findings.length, 0);
   const evidenceGapCount = Object.values(evidenceGapsByTarget).reduce((count, gaps) => count + gaps.length, 0);
   const observedIssueCount = Object.values(byTarget).reduce((count, issues) => count + issues.length, 0);
   report.summary = {
@@ -3522,6 +3944,8 @@ async function main() {
     advisoryCount,
     targetsWithAdvisories: Object.keys(advisoriesByTarget).length,
     advisoriesByTarget,
+    discoveryAdvisoryCount,
+    discoveryAdvisoriesByTarget,
     evidenceGapCount,
     targetsWithEvidenceGaps: Object.keys(evidenceGapsByTarget).length,
     evidenceGapsByTarget,
@@ -3529,7 +3953,7 @@ async function main() {
       ? "observed_issues"
       : evidenceGapCount
         ? "evidence_unavailable"
-        : advisoryCount
+        : advisoryCount || discoveryAdvisoryCount
           ? "advisories_present"
           : "no_observed_issues",
   };
@@ -3541,6 +3965,8 @@ module.exports = {
   CASE_PAGES,
   INTERACTION_PAGES,
   runCaseInteraction,
+  runKeyboardFocusProbe,
+  runNovelDiscovery,
   interactionPageNames,
   expectedScreenshotCount,
   FONT_ROLE_SELECTORS,

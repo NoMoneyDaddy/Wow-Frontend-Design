@@ -36,6 +36,11 @@ CAPABILITIES = {
     "measurement",
     "independent_review",
 }
+VIEWPORT_PATTERN = re.compile(r"^(?P<width>[1-9]\d*)x(?P<height>[1-9]\d*)$")
+SCALE_PATTERN = re.compile(
+    r"(?:^|\s)(?:dpr|scale)\s*=\s*(?P<scale>[0-9]+(?:\.[0-9]+)?)(?:\s|$)",
+    re.IGNORECASE,
+)
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -340,6 +345,14 @@ def evidence_failure(
             isinstance(event.get(key), int) and event[key] > 0 for key in ("width", "height")
         ):
             return f"OBSERVED screenshot lacks validated dimensions: {label}"
+        expected_dimensions = expected_screenshot_dimensions(event)
+        if expected_dimensions is None:
+            return f"OBSERVED screenshot has an invalid viewport/scale context: {label}"
+        if (event.get("width"), event.get("height")) != expected_dimensions:
+            return (
+                f"OBSERVED screenshot dimensions disagree with viewport/scale: {label} "
+                f"(expected {expected_dimensions[0]}x{expected_dimensions[1]})"
+            )
         if artifact_root is None:
             return f"OBSERVED artifact cannot be revalidated without an evaluator evidence root: {label}"
         mismatch = evidence_ledger.verify_artifact_event(event, artifact_root)
@@ -352,6 +365,29 @@ def evidence_failure(
 
 def nonempty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def expected_screenshot_dimensions(event: dict[str, Any]) -> tuple[int, int] | None:
+    context = event.get("context")
+    viewport = context.get("viewport") if isinstance(context, dict) else None
+    if not isinstance(viewport, str):
+        return None
+    match = VIEWPORT_PATTERN.fullmatch(viewport)
+    if match is None:
+        return None
+    note = context.get("note", "") if isinstance(context, dict) else ""
+    if not isinstance(note, str):
+        return None
+    scale_match = SCALE_PATTERN.search(note)
+    if scale_match is None:
+        return None
+    scale = float(scale_match.group("scale"))
+    if scale <= 0:
+        return None
+    return (
+        round(int(match.group("width")) * scale),
+        round(int(match.group("height")) * scale),
+    )
 
 
 def has_unqualified_pass_wording(value: str) -> bool:

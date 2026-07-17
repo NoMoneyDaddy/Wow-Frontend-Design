@@ -22,6 +22,7 @@ class PlaywrightVisualV7AuditTests(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
+            timeout=30,
         )
         if completed.returncode != 0:
             self.fail(completed.stderr)
@@ -164,6 +165,48 @@ process.stdout.write(JSON.stringify({{
         self.assertTrue(result["mobile"]["usesCaseNavigation"])
         self.assertEqual(1, result["mobile"]["expectedVisibleRecords"])
 
+    def test_grant_interaction_rejects_modal_without_recovery_contract(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <main data-eval="grant-board">
+      <div data-eval="proposal-row" data-record-id="a">
+        <button data-eval="shortlist-action">加入 A</button>
+        <button data-eval="compare-a-action">比較 A</button>
+        <button data-eval="compare-b-action">比較 B</button>
+      </div>
+      <div data-eval="proposal-row" data-record-id="b">
+        <button data-eval="shortlist-action">加入 B</button>
+        <button data-eval="compare-a-action">比較 A</button>
+        <button data-eval="compare-b-action">比較 B</button>
+      </div>
+      <div data-eval="compare-panel"></div>
+      <button data-eval="decision-action">開啟決策</button>
+    </main>
+    <div data-eval="decision-modal" hidden>
+      <button type="button">送出</button>
+    </div>
+    <button data-eval="retry-action" hidden>重試</button>
+    <script>
+      document.querySelector('[data-eval="decision-action"]').addEventListener('click', () =>
+        document.querySelector('[data-eval="decision-modal"]').hidden = false
+      );
+    </script>
+  `);
+  const evidence = await runCaseInteraction(page, 'grant-review-board-v6', {{ name: 'desktop' }}, 'index.html');
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertIn("grant_modal_accessible_name_missing", result["failures"])
+        self.assertIn("grant_modal_focus_containment_failed", result["failures"])
+        self.assertIn("grant_decision_retry_state_failed", result["failures"])
+
     def test_interaction_settle_waits_for_two_rendered_frames(self) -> None:
         source = f"""
 const {{ chromium }} = require('playwright');
@@ -265,6 +308,195 @@ const {{ waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
         result = json.loads(completed.stdout)
         self.assertLess(result["elapsedMs"], 250)
         self.assertNotEqual("none", result["transform"])
+
+    def test_novel_focus_probe_reports_missing_indicator(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent('<style>button:focus {{ outline: none; box-shadow: none; }}</style><button>送出</button>');
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-style-changed:false", result["evidence"])
+
+    def test_novel_focus_probe_checks_all_controls_and_ignores_color_only_delta(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <style>
+      button:focus-visible {{ outline: 3px solid currentColor; outline-offset: 2px; }}
+      button:nth-of-type(2):focus-visible {{ outline: none; color: rgb(0, 0, 1); }}
+    </style>
+    <button>有 focus 框</button><button>只有顏色差</button>
+  `);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-observations:3", result["evidence"])
+        self.assertIn("focus-missing-indicators:1", result["evidence"])
+
+    def test_novel_focus_probe_rejects_transparent_focus_paint(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent('<style>button:focus-visible {{ outline: 3px solid transparent; outline-offset: 2px; }}</style><button>不可見 focus</button>');
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-missing-indicators:1", result["evidence"])
+
+    def test_novel_focus_probe_rejects_tab_cycle_that_skips_a_control(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <style>button:focus-visible {{ outline: 3px solid currentColor; outline-offset: 2px; }}</style>
+    <button id="reachable">可達</button><button id="skipped">被跳過</button>
+    <script>document.addEventListener('keydown', (event) => {{ if (event.key === 'Tab') {{ event.preventDefault(); document.querySelector('#reachable').focus(); }} }});</script>
+  `);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-uncovered-controls:1", result["evidence"])
+
+    def test_novel_focus_probe_includes_native_media_controls(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <style>button:focus-visible, audio:focus-visible {{ outline: 3px solid currentColor; outline-offset: 2px; }} audio.bad:focus-visible {{ outline: none; }}</style>
+    <button>按鈕</button><audio controls></audio><audio class="bad" controls></audio>
+  `);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focusable-count:3", result["evidence"])
+        self.assertIn("focus-uncovered-controls:1", result["evidence"])
+
+    def test_novel_focus_probe_rejects_focus_paint_without_contrast(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`<style>body {{ background: white; }} button:focus-visible {{ outline: 4px solid white; outline-offset: 2px; }}</style><button>白底白框</button>`);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-missing-indicators:1", result["evidence"])
+
+    def test_novel_focus_probe_rejects_low_contrast_focus_paint(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`<style>body {{ background: rgb(118,118,118); }} button:focus-visible {{ outline: 4px solid rgb(100,100,100); }}</style><button>低對比</button>`);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-missing-indicators:1", result["evidence"])
+
+    def test_novel_focus_probe_excludes_nonsequential_controls_from_coverage(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <style>button:focus-visible {{ outline: 3px solid currentColor; outline-offset: 2px; }}</style>
+    <button id="reachable">可達</button><button id="disabled" disabled>停用</button>
+    <button id="hidden" hidden>隱藏</button><button id="negative" tabindex="-2">負索引</button>
+  `);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("pass", result["outcome"])
+        self.assertIn("focusable-count:1", result["evidence"])
+        self.assertNotIn("focus-uncovered-controls", " ".join(result["evidence"]))
+
+    def test_novel_focus_probe_rejects_suppressed_paint_and_zero_geometry_shadow(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <style>
+      button:focus-visible {{ outline: none; box-shadow: 0 0 0 0 rgb(0 0 0); }}
+      #suppressed {{ opacity: 0; outline: 3px solid black; }}
+      #clipped {{ clip-path: inset(100%); outline: 3px solid black; }}
+    </style>
+    <button id="suppressed">透明 focus</button><button id="zero-shadow">零幾何</button><button id="clipped">裁切 focus</button>
+  `);
+  const evidence = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("candidate", result["outcome"])
+        self.assertIn("focus-missing-indicators:3", result["evidence"])
+
+    def test_novel_discovery_uses_fresh_context_for_each_replay(self) -> None:
+        source = AUDITOR.read_text(encoding="utf-8")
+        start = source.index("async function runNovelDiscovery")
+        end = source.index("async function", start + len("async function"))
+        function = source[start:end]
+        pass_loop = function.index("for (let pass = 1; pass <= 2; pass += 1)")
+        self.assertGreater(function.index("browser.newContext(contextOptions)", pass_loop), pass_loop)
+        self.assertIn("finally {\n        if (context) await context.close();", function[pass_loop:])
 
     def test_font_evidence_rejects_hidden_active_typography_animations(self) -> None:
         source = f"""

@@ -56,6 +56,11 @@ HANDOFF_KEYS = {
 RENDERED_KEYS = {"status", "paths", "reason"}
 ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 MAX_INPUT_BYTES = 1_000_000
+NOVEL_DISCOVERY_MAX_PROBES = 256
+NOVEL_DISCOVERY_MAX_FINDINGS = 128
+NOVEL_DISCOVERY_ID_PATTERN = re.compile(
+    r"^novel:[a-z0-9][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*$"
+)
 
 
 class QualityResultError(ValueError):
@@ -222,6 +227,94 @@ def validate(path: Path) -> int:
     return validate_data(data)
 
 
+def validate_novel_discovery_data(data: Any) -> str:
+    """Validate and return a structured discovery report status."""
+
+    if not isinstance(data, dict) or set(data) != {"schema_version", "status", "probes", "findings"}:
+        raise QualityResultError(
+            "novel-discovery report must contain schema_version, status, probes, and findings"
+        )
+    if data["schema_version"] != 1:
+        raise QualityResultError("novel-discovery report schema_version must equal 1")
+    status = data["status"]
+    if status not in {"clean_after_probes", "findings"}:
+        raise QualityResultError("novel-discovery report status is invalid")
+
+    probes = data["probes"]
+    if not isinstance(probes, list) or not probes or len(probes) > NOVEL_DISCOVERY_MAX_PROBES:
+        raise QualityResultError("novel-discovery report requires 1-256 probes")
+    probe_ids: set[str] = set()
+    probe_keys = {"id", "route", "viewport", "state", "method", "outcome", "evidence"}
+    for index, probe in enumerate(probes):
+        label = f"novel-discovery probes[{index}]"
+        if not isinstance(probe, dict) or set(probe) != probe_keys:
+            raise QualityResultError(f"{label} has an invalid shape")
+        for field in ("id", "route", "viewport", "state", "method"):
+            _text(probe[field], f"{label}.{field}")
+        if probe["id"] in probe_ids:
+            raise QualityResultError(f"{label}.id must be unique")
+        probe_ids.add(probe["id"])
+        if probe["outcome"] not in {"pass", "candidate", "blocked"}:
+            raise QualityResultError(f"{label}.outcome is invalid")
+        if not _string_list(probe["evidence"], f"{label}.evidence"):
+            raise QualityResultError(f"{label}.evidence must contain at least one evaluator observation")
+
+    findings = data["findings"]
+    if not isinstance(findings, list) or len(findings) > NOVEL_DISCOVERY_MAX_FINDINGS:
+        raise QualityResultError("novel-discovery report findings must contain at most 128 items")
+    finding_keys = {
+        "id", "status", "severity", "surface", "state", "route", "viewport",
+        "reproduction", "expected", "actual", "owner", "confirmation",
+    }
+    finding_ids: set[str] = set()
+    for index, finding in enumerate(findings):
+        label = f"novel-discovery findings[{index}]"
+        if not isinstance(finding, dict) or set(finding) != finding_keys:
+            raise QualityResultError(f"{label} has an invalid shape")
+        if not isinstance(finding["id"], str) or NOVEL_DISCOVERY_ID_PATTERN.fullmatch(finding["id"]) is None:
+            raise QualityResultError(f"{label}.id must use novel:surface:state:symptom format")
+        if finding["id"] in finding_ids:
+            raise QualityResultError(f"{label}.id must be unique")
+        finding_ids.add(finding["id"])
+        if finding["status"] not in {"confirmed", "advisory"}:
+            raise QualityResultError(f"{label}.status is invalid")
+        if finding["severity"] not in {"P0", "P1", "P2", "P3"}:
+            raise QualityResultError(f"{label}.severity is invalid")
+        for field in ("surface", "state", "route", "viewport", "reproduction", "expected", "actual", "owner"):
+            _text(finding[field], f"{label}.{field}")
+        confirmation = finding["confirmation"]
+        if not isinstance(confirmation, dict) or set(confirmation) != {"replays", "evidence"}:
+            raise QualityResultError(f"{label}.confirmation has an invalid shape")
+        if (
+            not isinstance(confirmation["replays"], int)
+            or isinstance(confirmation["replays"], bool)
+            or confirmation["replays"] < (2 if finding["status"] == "confirmed" else 1)
+        ):
+            raise QualityResultError(f"{label}.confirmation.replays is insufficient")
+        if not _string_list(confirmation["evidence"], f"{label}.confirmation.evidence"):
+            raise QualityResultError(f"{label}.confirmation.evidence must contain at least one replay")
+
+    if status == "clean_after_probes" and findings:
+        raise QualityResultError("clean_after_probes report cannot contain findings")
+    if status == "findings" and not findings:
+        raise QualityResultError("findings report must contain at least one finding")
+    if status == "clean_after_probes" and any(probe["outcome"] != "pass" for probe in probes):
+        raise QualityResultError("clean_after_probes report requires every probe to pass")
+    return status
+
+
+def _validate_novel_discovery_report(path: Path) -> None:
+    """Require structured exploration evidence instead of an empty report claim."""
+
+    try:
+        if path.stat().st_size > MAX_INPUT_BYTES:
+            raise QualityResultError("novel-discovery report exceeds size limit")
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise QualityResultError(f"novel-discovery report is not valid JSON: {error}") from error
+    validate_novel_discovery_data(data)
+
+
 def _resolve_policy_reference(
     reference: str,
     claim_type: str,
@@ -252,6 +345,8 @@ def _resolve_policy_reference(
                 f"rendered evidence must reference the approved artifact path: {reference}"
             )
     if rule.get("kind") == "command":
+        if claim_type == "gate:novel-discovery":
+            raise QualityResultError("novel-discovery must use an evaluator-bound report artifact")
         failure = score_weak_model_output.evidence_failure(
             label,
             claim_type,
@@ -291,6 +386,22 @@ def _resolve_policy_reference(
     if mismatch:
         detail = mismatch or "artifact is absent"
         raise QualityResultError(f"evidence artifact is invalid: {label} ({detail})")
+    if event.get("artifact_kind") == "screenshot" and claim_type == "rendered_visual":
+        failure = score_weak_model_output.evidence_failure(
+            label,
+            claim_type,
+            "OBSERVED",
+            event,
+            rule,
+            policy["run_id"],
+            artifact_root,
+        )
+        if failure:
+            raise QualityResultError(failure)
+    if claim_type == "gate:novel-discovery":
+        if rule.get("artifact_kind") != "report" or event.get("artifact_kind") != "report":
+            raise QualityResultError("novel-discovery must use a report artifact")
+        _validate_novel_discovery_report(artifact_root / event["path"])
 
 
 def validate_with_ledger(
@@ -352,6 +463,28 @@ def validate_with_ledger(
         gate = gates[gate_id]
         if not gate["required"] or not gate["applicable"] or gate["status"] != "PASS":
             raise QualityResultError(f"required hard gate did not pass: {gate_id}")
+    novel_gate = gates.get("novel-discovery")
+    if novel_gate is not None and novel_gate["status"] == "PASS":
+        for reference in novel_gate["evidence"]:
+            rule = policy["evidence"].get(reference)
+            if rule is None:
+                rule = next(
+                    (
+                        candidate
+                        for candidate in policy["evidence"].values()
+                        if candidate.get("kind") == "artifact" and candidate.get("path") == reference
+                    ),
+                    None,
+                )
+            if not isinstance(rule, dict) or rule.get("kind") != "artifact":
+                raise QualityResultError("novel-discovery must use an evaluator-bound report artifact")
+            report_path = artifact_root / rule["path"]
+            try:
+                report_data = json.loads(report_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as error:
+                raise QualityResultError(f"novel-discovery report cannot be read: {error}") from error
+            if validate_novel_discovery_data(report_data) != "clean_after_probes":
+                raise QualityResultError("novel-discovery findings must be repaired before PASS/VERIFIED")
 
     references: list[tuple[str, str]] = []
     for gate in data["hard_gates"]:

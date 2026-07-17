@@ -6,10 +6,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 
@@ -21,6 +23,15 @@ RUN_ID = "docs-run-001"
 PNG_1X1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
+
+
+def fake_png(width: int, height: int) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    pixels = b"".join(b"\x00" + (b"\x00" * width) for _ in range(height))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b"")
 
 
 def command_sha256(command: list[str]) -> str:
@@ -148,7 +159,7 @@ class EvidenceWorkflowSmokeTests(unittest.TestCase):
             result = workspace / "result.json"
             screenshot = artifacts / "mobile-default.png"
             (workspace / "app.js").write_text("const ready = true;\n", encoding="utf-8")
-            screenshot.write_bytes(PNG_1X1)
+            screenshot.write_bytes(fake_png(390, 844))
 
             command = [
                 sys.executable,
@@ -189,6 +200,7 @@ class EvidenceWorkflowSmokeTests(unittest.TestCase):
                                     "viewport": "390x844",
                                     "locale": "zh-Hant",
                                     "state": "default",
+                                    "note": "dpr=1",
                                 },
                             },
                         },
@@ -246,6 +258,8 @@ class EvidenceWorkflowSmokeTests(unittest.TestCase):
                     "/dashboard",
                     "--viewport",
                     "390x844",
+                    "--context",
+                    "dpr=1",
                     "--locale",
                     "zh-Hant",
                     "--state",

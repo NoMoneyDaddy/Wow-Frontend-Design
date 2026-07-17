@@ -29,6 +29,7 @@ SKILL_SCRIPTS = ROOT / "wow-frontend-design" / "scripts"
 if str(SKILL_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SKILL_SCRIPTS))
 from evidence_ledger import LedgerError, png_metadata  # noqa: E402
+from validate_quality_result import QualityResultError, validate_novel_discovery_data  # noqa: E402
 
 MATRIX_RUNNER = ROOT / "evals" / "run_product_flow_matrix.py"
 DESIGN_LINTER = ROOT / "evals" / "lint_design_md_matrix.py"
@@ -644,6 +645,80 @@ def expected_visual_keys(targets: list[dict[str, Any]]) -> set[tuple[str, str, s
     return expected
 
 
+def _validate_visual_discovery_inventory(
+    report: dict[str, Any],
+    expected_targets: set[tuple[str, str]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    raw = report.get("discoveryByTarget")
+    if not isinstance(raw, dict):
+        raise EvaluationError("visual report discovery evidence is missing")
+    if expected_targets is None:
+        reported_targets = report.get("targets")
+        expected_targets = {
+            (target.get("caseId"), target.get("alias"))
+            for target in reported_targets
+            if isinstance(target, dict)
+        } if isinstance(reported_targets, list) else set()
+    expected_keys = {f"{case_id}:{alias}" for case_id, alias in expected_targets}
+    if set(raw) != expected_keys:
+        raise EvaluationError("visual report discovery target inventory disagrees")
+    validated: dict[str, dict[str, Any]] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str):
+            raise EvaluationError("visual report discovery target key is malformed")
+        try:
+            validate_novel_discovery_data(value)
+        except (QualityResultError, TypeError) as error:
+            raise EvaluationError(f"visual report discovery evidence is malformed: {key}: {error}") from error
+        if expected_targets is not None:
+            case_id, _, _alias = key.partition(":")
+            expected_route = CASE_PAGES.get(case_id, [None])[0]
+            probes = value["probes"]
+            if len(probes) != 4:
+                raise EvaluationError(f"visual report discovery probe plan is incomplete: {key}")
+            if {probe["viewport"] for probe in probes} != {"desktop", "mobile"}:
+                raise EvaluationError(f"visual report discovery viewport plan is incomplete: {key}")
+            if any(probe["route"] != expected_route for probe in probes):
+                raise EvaluationError(f"visual report discovery route plan disagrees: {key}")
+            for viewport in ("desktop", "mobile"):
+                selected = [probe for probe in probes if probe["viewport"] == viewport]
+                if len(selected) != 2 or any(probe["state"] != "keyboard-focus" for probe in selected):
+                    raise EvaluationError(f"visual report discovery replay plan is incomplete: {key}:{viewport}")
+                for pass_number, probe in enumerate(sorted(selected, key=lambda item: item["id"]), start=1):
+                    if probe["id"] != f"probe-{viewport}-{pass_number}":
+                        raise EvaluationError(f"visual report discovery probe id disagrees: {key}:{viewport}")
+                    if probe["method"] not in {
+                        "Playwright Tab replay with computed non-color focus-indicator geometry",
+                        "Playwright Tab replay with computed focus-style comparison",
+                    }:
+                        raise EvaluationError(f"visual report discovery method is not evaluator-bound: {key}:{viewport}")
+                    if probe["outcome"] != "blocked" and not any(evidence.startswith("focusable-count:") for evidence in probe["evidence"]):
+                        raise EvaluationError(f"visual report discovery focus inventory is missing: {key}:{viewport}")
+                    def marker_value(marker: str) -> int | None:
+                        matches = [evidence for evidence in probe["evidence"] if evidence.startswith(f"{marker}:")]
+                        if len(matches) != 1 or not re.fullmatch(rf"{re.escape(marker)}:[0-9]+", matches[0]):
+                            return None
+                        return int(matches[0].split(":", 1)[1])
+
+                    focusable_count = marker_value("focusable-count")
+                    if probe["outcome"] != "blocked" and focusable_count is None:
+                        raise EvaluationError(f"visual report discovery focus inventory is malformed: {key}:{viewport}")
+                    if probe["outcome"] != "blocked" and any(
+                        marker_value(marker) is None
+                        for marker in ("focus-observations", "focus-unique-targets", "focus-missing-indicators")
+                    ):
+                        raise EvaluationError(f"visual report discovery focus measurements are missing: {key}:{viewport}")
+                    if probe["outcome"] == "pass":
+                        observations = marker_value("focus-observations")
+                        unique_targets = marker_value("focus-unique-targets")
+                        missing = marker_value("focus-missing-indicators")
+                        uncovered = marker_value("focus-uncovered-controls") or 0
+                        if observations is None or unique_targets is None or missing is None or unique_targets != focusable_count or missing != 0 or uncovered != 0:
+                            raise EvaluationError(f"visual report discovery pass measurements disagree: {key}:{viewport}")
+        validated[key] = value
+    return validated
+
+
 def _validate_input_bindings(
     report: dict[str, Any],
     generation_output: Path,
@@ -873,6 +948,7 @@ def validate_visual_completion(
     } if isinstance(reported_targets, list) else set()
     if not isinstance(reported_targets, list) or len(reported_targets) != len(expected_targets) or actual_targets != expected_targets:
         raise EvaluationError("visual report target inventory disagrees")
+    _validate_visual_discovery_inventory(report, expected_targets)
     expected = expected_visual_keys(targets)
     results = report.get("results")
     if not isinstance(results, list) or len(results) != len(expected):
@@ -1035,11 +1111,22 @@ def validate_design_completion(
     return clean, findings
 
 
-def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
+def blocking_visual_findings(
+    visual_output: Path,
+    *,
+    require_discovery: bool = False,
+) -> dict[str, list[str]]:
     report = _load_json(visual_output, "visual report")
     by_target: dict[str, set[str]] = {}
     evidence_gaps_from_results: dict[str, list[dict[str, str]]] = {}
     advisories_from_results: dict[str, list[dict[str, Any]]] = {}
+    discovery_by_target: dict[str, dict[str, Any]] = {}
+    if require_discovery or "discoveryByTarget" in report:
+        discovery_by_target = _validate_visual_discovery_inventory(report)
+        for key, discovery in discovery_by_target.items():
+            for finding in discovery["findings"]:
+                if finding["status"] == "confirmed":
+                    by_target.setdefault(key, set()).add(finding["id"])
     for collection_name in ("results", "crossPageComparisons"):
         collection = report.get(collection_name)
         if not isinstance(collection, list):
@@ -1120,6 +1207,33 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
         raise EvaluationError("visual report advisory target count disagrees")
     if advisory_fields_present and not advisories_from_results and (advisory_count or targets_with_advisories or advisories_by_target):
         raise EvaluationError("visual report zero-advisory summary is malformed")
+    discovery_advisory_count = summary.get("discoveryAdvisoryCount", 0)
+    discovery_advisories_by_target = summary.get("discoveryAdvisoriesByTarget", {})
+    if (
+        type(discovery_advisory_count) is not int
+        or discovery_advisory_count < 0
+        or not isinstance(discovery_advisories_by_target, dict)
+    ):
+        raise EvaluationError("visual report discovery-advisory summary is malformed")
+    actual_discovery_advisory_count = 0
+    for target, findings in discovery_advisories_by_target.items():
+        if not isinstance(target, str) or not isinstance(findings, list):
+            raise EvaluationError("visual report discovery-advisory inventory is malformed")
+        for finding in findings:
+            if not isinstance(finding, dict) or finding.get("status") != "advisory":
+                raise EvaluationError("visual report discovery-advisory entry is malformed")
+            if not isinstance(finding.get("id"), str) or not finding["id"]:
+                raise EvaluationError("visual report discovery-advisory id is malformed")
+        actual_discovery_advisory_count += len(findings)
+    if actual_discovery_advisory_count != discovery_advisory_count:
+        raise EvaluationError("visual report discovery-advisory count disagrees")
+    expected_discovery_advisories = {
+        key: [finding for finding in discovery["findings"] if finding["status"] == "advisory"]
+        for key, discovery in discovery_by_target.items()
+        if any(finding["status"] == "advisory" for finding in discovery["findings"])
+    }
+    if discovery_advisories_by_target != expected_discovery_advisories:
+        raise EvaluationError("visual report discovery-advisory evidence disagrees with discovery inventory")
     evidence_gap_count = summary.get("evidenceGapCount", 0)
     targets_with_evidence_gaps = summary.get("targetsWithEvidenceGaps", 0)
     evidence_gaps_by_target = summary.get("evidenceGapsByTarget", {})
@@ -1150,7 +1264,7 @@ def blocking_visual_findings(visual_output: Path) -> dict[str, list[str]]:
         raise EvaluationError("visual report evidence-gap target count disagrees")
     expected_verdict = "observed_issues" if normalized else (
         "evidence_unavailable" if evidence_gap_count else (
-            "advisories_present" if advisory_count else "no_observed_issues"
+            "advisories_present" if advisory_count or discovery_advisory_count else "no_observed_issues"
         )
     )
     if summary.get("verdict") != expected_verdict:
@@ -1185,7 +1299,11 @@ def visual_advisory_count(visual_output: Path) -> int:
     blocking_visual_findings(visual_output)
     report = _load_json(visual_output, "visual report")
     summary = report.get("summary")
-    count = summary.get("advisoryCount", 0) if isinstance(summary, dict) else None
+    count = (
+        summary.get("advisoryCount", 0) + summary.get("discoveryAdvisoryCount", 0)
+        if isinstance(summary, dict)
+        else None
+    )
     if type(count) is not int or count < 0:
         raise EvaluationError("visual report advisory count is malformed")
     return count
@@ -2028,7 +2146,7 @@ def main() -> int:
         should_capture = _prepare_capture_paths(visual_output, screenshot_dir, args.resume)
         if not should_capture:
             count = validate_visual_completion(visual_output, screenshot_dir, targets, generation_output)
-            blockers = blocking_visual_findings(visual_output)
+            blockers = blocking_visual_findings(visual_output, require_discovery=True)
             if blockers:
                 print(
                     f"product-flow benchmark complete: {len(targets)} targets and {count} screenshots retained; "
@@ -2084,7 +2202,7 @@ def main() -> int:
                     except EvaluationError as error:
                         completed = subprocess.CompletedProcess(completed.args, 1, completed.stdout, str(error))
                     else:
-                        blockers = blocking_visual_findings(visual_output)
+                        blockers = blocking_visual_findings(visual_output, require_discovery=True)
                         if blockers:
                             print(
                                 f"product-flow benchmark complete: {len(targets)} targets and {count} screenshots captured; "

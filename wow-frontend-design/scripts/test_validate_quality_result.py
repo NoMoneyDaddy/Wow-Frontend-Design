@@ -8,9 +8,11 @@ import copy
 import contextlib
 import io
 import json
+import struct
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -22,6 +24,31 @@ import evidence_ledger
 PNG_1X1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
+
+
+def fake_png(width: int, height: int) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    pixels = b"".join(b"\x00" + (b"\x00" * width) for _ in range(height))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b"")
+NOVEL_DISCOVERY_REPORT = {
+    "schema_version": 1,
+    "status": "clean_after_probes",
+    "probes": [
+        {
+            "id": "probe-default-mobile",
+            "route": "/",
+            "viewport": "390x844",
+            "state": "default",
+            "method": "Playwright DOM and screenshot replay",
+            "outcome": "pass",
+            "evidence": ["mobile.png", "interaction-log"],
+        }
+    ],
+    "findings": [],
+}
 
 
 class QualityResultTests(unittest.TestCase):
@@ -92,9 +119,11 @@ class QualityResultTests(unittest.TestCase):
 
                     artifact = root / rule["path"]
                     artifact.parent.mkdir(parents=True, exist_ok=True)
-                    artifact.write_bytes(
-                        PNG_1X1 if rule["artifact_kind"] == "screenshot" else b"{}\n"
-                    )
+                    if rule["artifact_kind"] == "screenshot":
+                        width, height = (int(value) for value in rule["context"]["viewport"].split("x", 1))
+                        artifact.write_bytes(fake_png(width, height))
+                    else:
+                        artifact.write_bytes(json.dumps(NOVEL_DISCOVERY_REPORT).encode("utf-8"))
                     artifact_args = [
                         "artifact",
                         "--ledger",
@@ -147,9 +176,10 @@ class QualityResultTests(unittest.TestCase):
         )
         result = copy.deepcopy(self.example)
         result["release"] = "VERIFIED"
-        labels = ["primary-task", "rendered-mobile-layout", "novel-discovery"]
-        self.assertEqual(len(result["hard_gates"]), len(labels))
-        for gate, label in zip(result["hard_gates"], labels):
+        gate_labels = ["primary-task", "rendered-mobile-layout", "novel-discovery"]
+        command_labels = gate_labels[:2]
+        self.assertEqual(len(result["hard_gates"]), len(gate_labels))
+        for gate, label in zip(result["hard_gates"], gate_labels):
             gate["evidence"] = [label]
         result["coverage"] = {
             "required_applicable": 3,
@@ -168,7 +198,7 @@ class QualityResultTests(unittest.TestCase):
         result_path.write_text(json.dumps(result), encoding="utf-8")
         commands = {
             label: [sys.executable, "-c", f"raise SystemExit(0)  # {label}"]
-            for label in labels
+            for label in command_labels
         }
         for label, command in commands.items():
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
@@ -189,7 +219,7 @@ class QualityResultTests(unittest.TestCase):
                     0,
                 )
         screenshot = root / "mobile.png"
-        screenshot.write_bytes(PNG_1X1)
+        screenshot.write_bytes(fake_png(390, 844))
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(
                 evidence_ledger.main(
@@ -207,6 +237,8 @@ class QualityResultTests(unittest.TestCase):
                         "/",
                         "--viewport",
                         "390x844",
+                        "--context",
+                        "dpr=1",
                         "--locale",
                         "zh-Hant",
                         "--state",
@@ -223,7 +255,32 @@ class QualityResultTests(unittest.TestCase):
                 "command_sha256": evidence_ledger.canonical_command_sha256(commands[label]),
                 "cwd": "workspace",
             }
-            for gate, label in zip(result["hard_gates"], labels)
+            for gate, label in zip(result["hard_gates"][:2], command_labels)
+        }
+        novel_report = root / "novel-findings.json"
+        novel_report.write_text(json.dumps(NOVEL_DISCOVERY_REPORT), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(
+                evidence_ledger.main(
+                    [
+                        "artifact",
+                        "--ledger",
+                        str(ledger),
+                        "--label",
+                        "novel-discovery",
+                        "--kind",
+                        "report",
+                        "--path",
+                        str(novel_report),
+                    ]
+                ),
+                0,
+            )
+        evidence["novel-discovery"] = {
+            "kind": "artifact",
+            "claim_types": ["gate:novel-discovery"],
+            "artifact_kind": "report",
+            "path": "novel-findings.json",
         }
         evidence["rendered-mobile"] = {
             "kind": "artifact",
@@ -235,6 +292,7 @@ class QualityResultTests(unittest.TestCase):
                 "viewport": "390x844",
                 "locale": "zh-Hant",
                 "state": "default",
+                "note": "dpr=1",
             },
         }
         policy = {
@@ -271,6 +329,84 @@ class QualityResultTests(unittest.TestCase):
                 ),
                 3,
             )
+
+    def test_strict_validation_rejects_one_by_one_screenshot_for_viewport_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy, workspace = self._strict_fixture(Path(directory))
+            screenshot = Path(directory) / "mobile.png"
+            screenshot.write_bytes(PNG_1X1)
+            ledger_data = evidence_ledger.load_ledger(ledger)
+            event = next(item for item in ledger_data["events"] if item["label"] == "rendered-mobile")
+            event["bytes"] = len(PNG_1X1)
+            event["sha256"] = evidence_ledger.sha256_bytes(PNG_1X1)
+            event["width"] = 1
+            event["height"] = 1
+            evidence_ledger.save_ledger(ledger, ledger_data)
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "dimensions disagree with viewport/scale"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_novel_discovery_report_rejects_empty_and_unconfirmed_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "novel.json"
+            path.write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "must contain schema_version"):
+                validate_quality_result._validate_novel_discovery_report(path)
+            invalid = copy.deepcopy(NOVEL_DISCOVERY_REPORT)
+            invalid["status"] = "findings"
+            invalid["findings"] = [{
+                "id": "novel:form:submit:stale-success",
+                "status": "confirmed",
+                "severity": "P1",
+                "surface": "form",
+                "state": "submit",
+                "route": "/",
+                "viewport": "390x844",
+                "reproduction": "submit twice",
+                "expected": "one result",
+                "actual": "two results",
+                "owner": "frontend",
+                "confirmation": {"replays": 1, "evidence": ["replay-1"]},
+            }]
+            path.write_text(json.dumps(invalid), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "replays is insufficient"):
+                validate_quality_result._validate_novel_discovery_report(path)
+            blocked = copy.deepcopy(NOVEL_DISCOVERY_REPORT)
+            blocked["probes"][0]["outcome"] = "blocked"
+            path.write_text(json.dumps(blocked), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "every probe to pass"):
+                validate_quality_result._validate_novel_discovery_report(path)
+            empty_evidence = copy.deepcopy(NOVEL_DISCOVERY_REPORT)
+            empty_evidence["probes"][0]["evidence"] = []
+            path.write_text(json.dumps(empty_evidence), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "at least one evaluator observation"):
+                validate_quality_result._validate_novel_discovery_report(path)
+
+    def test_novel_discovery_cannot_use_a_command_as_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy_path, workspace = self._strict_fixture(Path(directory))
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["evidence"]["novel-discovery"] = {
+                "kind": "command",
+                "claim_types": ["gate:novel-discovery"],
+                "command": [sys.executable, "-c", "raise SystemExit(0)"],
+                "command_sha256": evidence_ledger.canonical_command_sha256([sys.executable, "-c", "raise SystemExit(0)"]),
+                "cwd": "workspace",
+            }
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "must use an evaluator-bound report"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                )
 
     def test_verified_release_requires_novel_discovery_without_caller_flag(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -349,6 +349,51 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                             }
                         ],
                         "results": results,
+                        "discoveryByTarget": {
+                            "wind-maintenance-dispatch-v6:claude-haiku": {
+                                "schema_version": 1,
+                                "status": "clean_after_probes",
+                                "probes": [
+                                    {
+                                        "id": "probe-desktop-1",
+                                        "route": "index.html",
+                                        "viewport": "desktop",
+                                        "state": "keyboard-focus",
+                                        "method": "Playwright Tab replay with computed non-color focus-indicator geometry",
+                                        "outcome": "pass",
+                                        "evidence": ["focusable-count:2", "focus-observations:2", "focus-unique-targets:2", "focus-missing-indicators:0"],
+                                    },
+                                    {
+                                        "id": "probe-desktop-2",
+                                        "route": "index.html",
+                                        "viewport": "desktop",
+                                        "state": "keyboard-focus",
+                                        "method": "Playwright Tab replay with computed non-color focus-indicator geometry",
+                                        "outcome": "pass",
+                                        "evidence": ["focusable-count:2", "focus-observations:2", "focus-unique-targets:2", "focus-missing-indicators:0"],
+                                    },
+                                    {
+                                        "id": "probe-mobile-1",
+                                        "route": "index.html",
+                                        "viewport": "mobile",
+                                        "state": "keyboard-focus",
+                                        "method": "Playwright Tab replay with computed non-color focus-indicator geometry",
+                                        "outcome": "pass",
+                                        "evidence": ["focusable-count:2", "focus-observations:2", "focus-unique-targets:2", "focus-missing-indicators:0"],
+                                    },
+                                    {
+                                        "id": "probe-mobile-2",
+                                        "route": "index.html",
+                                        "viewport": "mobile",
+                                        "state": "keyboard-focus",
+                                        "method": "Playwright Tab replay with computed non-color focus-indicator geometry",
+                                        "outcome": "pass",
+                                        "evidence": ["focusable-count:2", "focus-observations:2", "focus-unique-targets:2", "focus-missing-indicators:0"],
+                                    }
+                                ],
+                                "findings": [],
+                            }
+                        },
                         "summary": {"checkedPages": 6},
                     }
                 ),
@@ -869,6 +914,83 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 "wind-maintenance-dispatch-v6:codex-gpt-5.4=critical_text_collision",
                 evaluation.repair_summary(evaluation.blocking_visual_findings(report)),
             )
+
+    def test_acceptance_requires_evaluator_owned_discovery_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "visual.json"
+            report.write_text(
+                json.dumps({
+                    "results": [],
+                    "crossPageComparisons": [],
+                    "summary": {"verdict": "no_observed_issues"},
+                }),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(evaluation.EvaluationError, "discovery evidence is missing"):
+                evaluation.blocking_visual_findings(report, require_discovery=True)
+
+    def test_discovery_advisory_is_disclosed_without_entering_product_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "visual.json"
+            key = "wind-maintenance-dispatch-v6:codex-gpt-5.4"
+            probes = [
+                {
+                    "id": f"probe-{viewport}-{pass_number}",
+                    "route": "index.html",
+                    "viewport": viewport,
+                    "state": "keyboard-focus",
+                    "method": "Playwright Tab replay with computed non-color focus-indicator geometry",
+                    "outcome": "pass",
+                    "evidence": ["focusable-count:2", "focus-observations:2", "focus-unique-targets:2", "focus-missing-indicators:0"],
+                }
+                for viewport in ("desktop", "mobile")
+                for pass_number in (1, 2)
+            ]
+            finding = {
+                "id": "novel:keyboard-focus:desktop:probe-unavailable",
+                "status": "advisory",
+                "severity": "P2",
+                "surface": "keyboard-focus",
+                "state": "keyboard-focus",
+                "route": "index.html",
+                "viewport": "desktop",
+                "reproduction": "fixture",
+                "expected": "focus indicator",
+                "actual": "probe unavailable",
+                "owner": "evaluator",
+                "confirmation": {"replays": 1, "evidence": ["blocked"]},
+            }
+            report.write_text(json.dumps({
+                "targets": [{"caseId": "wind-maintenance-dispatch-v6", "alias": "codex-gpt-5.4"}],
+                "results": [],
+                "crossPageComparisons": [],
+                "discoveryByTarget": {key: {"schema_version": 1, "status": "findings", "probes": probes, "findings": [finding]}},
+                "summary": {
+                    "verdict": "advisories_present",
+                    "advisoryCount": 0,
+                    "targetsWithAdvisories": 0,
+                    "advisoriesByTarget": {},
+                    "discoveryAdvisoryCount": 1,
+                    "discoveryAdvisoriesByTarget": {key: [finding]},
+                },
+            }), encoding="utf-8")
+            self.assertEqual({}, evaluation.blocking_visual_findings(report, require_discovery=True))
+            self.assertEqual(1, evaluation.visual_advisory_count(report))
+            tampered = json.loads(report.read_text(encoding="utf-8"))
+            tampered["summary"]["discoveryAdvisoryCount"] = 0
+            tampered["summary"]["discoveryAdvisoriesByTarget"] = {}
+            report.write_text(json.dumps(tampered), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationError, "discovery-advisory evidence disagrees"):
+                evaluation.blocking_visual_findings(report, require_discovery=True)
+            forged = json.loads(report.read_text(encoding="utf-8"))
+            forged["summary"]["discoveryAdvisoryCount"] = 1
+            forged["summary"]["discoveryAdvisoriesByTarget"] = {key: [finding]}
+            forged_probe = forged["discoveryByTarget"][key]["probes"][0]
+            forged_probe["method"] = "Playwright Tab replay forged"
+            forged_probe["evidence"] = ["focusable-count:2"]
+            report.write_text(json.dumps(forged), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationError, "method is not evaluator-bound"):
+                evaluation.blocking_visual_findings(report, require_discovery=True)
 
     def test_visual_evidence_gaps_are_unverified_not_product_blockers(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

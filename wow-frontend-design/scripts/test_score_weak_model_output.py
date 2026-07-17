@@ -8,9 +8,11 @@ import contextlib
 import io
 import inspect
 import json
+import struct
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -26,6 +28,20 @@ PNG_1X1 = base64.b64decode(
 JPEG_COMPONENT_MISMATCH = bytes.fromhex(
     "ffd8 ffc0000b080001000101011100 ffda0008010200003f00 01 ffd9"
 )
+
+
+def fake_png(width: int, height: int) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    pixels = b"".join(b"\x00" + (b"\x00" * width) for _ in range(height))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(pixels))
+        + chunk(b"IEND", b"")
+    )
 
 
 def base_result(mode: str = "BUILD") -> dict:
@@ -194,7 +210,7 @@ def screenshot_event(
         "media_type": media_type,
         "width": width,
         "height": height,
-        "context": {"route": "/", "viewport": "390x844", "state": "default"},
+        "context": {"route": "/", "viewport": "390x844", "state": "default", "note": "dpr=1"},
     }
 
 
@@ -631,12 +647,21 @@ class WeakModelScorerTests(unittest.TestCase):
             "claim_types": ["rendered_visual"],
             "artifact_kind": "screenshot",
             "path": "mobile.png",
-            "context": {"route": "/", "viewport": "390x844", "state": "default"},
+            "context": {"route": "/", "viewport": "390x844", "state": "default", "note": "dpr=1"},
         }
         event = screenshot_event("mobile.png", PNG_1X1)
         with evaluator_context([event], artifact_policy) as (paths, root):
             screenshot = root / "mobile.png"
             screenshot.write_bytes(PNG_1X1)
+            failures = score_weak_model_output.score(result, "build", [], **paths)
+            self.assertTrue(any("dimensions disagree with viewport/scale" in failure for failure in failures))
+
+            valid = fake_png(390, 844)
+            event = screenshot_event("mobile.png", valid, width=390, height=844)
+            ledger = score_weak_model_output.evidence_ledger.load_ledger(paths["ledger_path"])
+            ledger["events"] = [event]
+            score_weak_model_output.evidence_ledger.save_ledger(paths["ledger_path"], ledger)
+            screenshot.write_bytes(valid)
             self.assertEqual(score_weak_model_output.score(result, "build", [], **paths), [])
 
             screenshot.write_bytes(b"changed-after-ledger")
@@ -660,9 +685,15 @@ class WeakModelScorerTests(unittest.TestCase):
             "claim_types": ["rendered_visual"],
             "artifact_kind": "screenshot",
             "path": "hostile.jpg",
-            "context": {"route": "/", "viewport": "390x844", "state": "default"},
+            "context": {"route": "/", "viewport": "390x844", "state": "default", "note": "dpr=1"},
         }
-        event = screenshot_event("hostile.jpg", JPEG_COMPONENT_MISMATCH, media_type="image/jpeg")
+        event = screenshot_event(
+            "hostile.jpg",
+            JPEG_COMPONENT_MISMATCH,
+            media_type="image/jpeg",
+            width=390,
+            height=844,
+        )
         with evaluator_context([event], artifact_policy) as (paths, root):
             (root / "hostile.jpg").write_bytes(JPEG_COMPONENT_MISMATCH)
             failures = score_weak_model_output.score(result, "build", [], **paths)
