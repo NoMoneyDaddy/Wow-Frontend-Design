@@ -217,6 +217,63 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 key,
             )
 
+    def test_type_foundry_round_trip_evidence_is_recomputed_fail_closed(self) -> None:
+        state_a = {"writingMode": "horizontal-tb", "ariaPressed": "false"}
+        state_b = {"writingMode": "vertical-rl", "ariaPressed": "true"}
+        sampled_b = {"actual": state_b, "samples": [state_b, state_b, state_b], "matches": True}
+        interaction = {
+            "attempted": True,
+            "page": "index.html",
+            "manifestId": "type-foundry-writing-mode-toggle",
+            "manifestCoverage": "declared-pilot-row",
+            "failures": [],
+            "hooks": {"controlCount": 1, "stateCount": 1, "controlVisible": True, "controlEnabled": True},
+            "A": state_a,
+            "B": state_b,
+            "restoredA": state_a,
+            "returnPath": "activate the same control again",
+            "finalB": state_b,
+            "roundTripVerified": True,
+            "screenshotState": {"expected": "B", "before": sampled_b, "after": sampled_b, "verified": True},
+        }
+        key = ("type-foundry-specimen-v6", "codex-gpt-5.4", "index.html", "interaction", "desktop")
+        result = {
+            "url": "http://fixture.test/target/index.html",
+            "page": "index.html",
+            "interaction": interaction,
+            "visualIssues": [],
+        }
+        target = {"url": "http://fixture.test/target/"}
+        evaluation._validate_visual_route_provenance(result, target, key)
+        evaluation._validate_visual_interaction_evidence(result, key)
+
+        malformed = json.loads(json.dumps(interaction))
+        malformed.pop("restoredA")
+        with self.assertRaisesRegex(evaluation.EvaluationError, "round-trip evidence schema"):
+            evaluation._validate_visual_interaction_evidence({**result, "interaction": malformed}, key)
+
+        forged = json.loads(json.dumps(interaction))
+        forged["screenshotState"]["after"]["samples"][-1] = state_a
+        with self.assertRaisesRegex(evaluation.EvaluationError, "after samples disagree"):
+            evaluation._validate_visual_interaction_evidence({**result, "interaction": forged}, key)
+
+        failed = {
+            "attempted": True,
+            "page": "index.html",
+            "manifestId": "type-foundry-writing-mode-toggle",
+            "manifestCoverage": "declared-pilot-row",
+            "failures": ["type_writing_mode_manifest_hook_invalid"],
+        }
+        evaluation._validate_visual_interaction_evidence(
+            {**result, "interaction": failed, "visualIssues": ["type_writing_mode_manifest_hook_invalid"]},
+            key,
+        )
+        with self.assertRaisesRegex(evaluation.EvaluationError, "hidden from visual issues"):
+            evaluation._validate_visual_interaction_evidence(
+                {**result, "interaction": failed, "visualIssues": []},
+                key,
+            )
+
     def test_visual_tool_resolution_reuses_pinned_package_and_provided_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

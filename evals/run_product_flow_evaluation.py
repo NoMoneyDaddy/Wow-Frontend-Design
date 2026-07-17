@@ -54,6 +54,9 @@ INTERACTION_PAGES = {
     "oral-history-archive-v6": (),
     "grant-review-board-v6": ("index.html",),
 }
+TYPE_FOUNDRY_STATE_A = {"writingMode": "horizontal-tb", "ariaPressed": "false"}
+TYPE_FOUNDRY_STATE_B = {"writingMode": "vertical-rl", "ariaPressed": "true"}
+TYPE_FOUNDRY_RETURN_PATH = "activate the same control again"
 MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
 TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 VIEWPORTS = {
@@ -934,6 +937,102 @@ def _validate_font_evidence(result: dict[str, Any], key: tuple[object, ...]) -> 
         raise EvaluationError(f"font evidence mismatch and visual issue disagree: {key}")
 
 
+def _validate_visual_interaction_evidence(result: dict[str, Any], key: tuple[object, ...]) -> None:
+    if (key[0], key[2], key[3], key[4]) not in {
+        ("type-foundry-specimen-v6", "index.html", "interaction", "desktop"),
+        ("type-foundry-specimen-v6", "index.html", "interaction", "mobile"),
+    }:
+        return
+    interaction = result.get("interaction")
+    if not isinstance(interaction, dict):
+        raise EvaluationError(f"type-foundry round-trip evidence is missing: {key}")
+    failures = interaction.get("failures")
+    visual_issues = result.get("visualIssues")
+    common_valid = (
+        interaction.get("attempted") is True
+        and interaction.get("page") == key[2]
+        and interaction.get("manifestId") == "type-foundry-writing-mode-toggle"
+        and interaction.get("manifestCoverage") == "declared-pilot-row"
+        and isinstance(failures, list)
+        and all(isinstance(failure, str) and failure for failure in failures)
+        and len(failures) == len(set(failures))
+        and isinstance(visual_issues, list)
+        and all(isinstance(issue, str) and issue for issue in visual_issues)
+    )
+    if not common_valid:
+        raise EvaluationError(f"type-foundry round-trip evidence status disagrees: {key}")
+    if failures:
+        allowed = {
+            "type_writing_mode_manifest_hook_invalid",
+            "type_writing_mode_initial_state_failed",
+            "type_writing_mode_toggle_failed",
+            "type_writing_mode_toggle_failed_did_not_settle",
+            "type_writing_mode_round_trip_failed",
+            "type_writing_mode_round_trip_failed_did_not_settle",
+            "type_writing_mode_round_trip_snapshot_mismatch",
+            "type_writing_mode_replay_failed",
+            "type_writing_mode_replay_failed_did_not_settle",
+            "type_writing_mode_replay_snapshot_mismatch",
+            "type_writing_mode_screenshot_state_failed",
+            "interaction_left_declared_page",
+        }
+        if any(failure not in allowed and not failure.startswith("interaction_exception:") for failure in failures):
+            raise EvaluationError(f"type-foundry round-trip failure code is unknown: {key}")
+        if any(failure not in visual_issues for failure in failures):
+            raise EvaluationError(f"type-foundry round-trip failure is hidden from visual issues: {key}")
+        return
+    if any(issue.startswith(("type_writing_mode_", "interaction_")) for issue in visual_issues):
+        raise EvaluationError(f"type-foundry clean evidence retains an interaction failure issue: {key}")
+    expected_keys = {
+        "attempted", "page", "manifestId", "manifestCoverage", "failures", "hooks",
+        "A", "B", "restoredA", "returnPath", "finalB", "roundTripVerified", "screenshotState",
+    }
+    if set(interaction) != expected_keys:
+        raise EvaluationError(f"type-foundry round-trip evidence schema disagrees: {key}")
+    if (
+        interaction.get("roundTripVerified") is not True
+        or interaction.get("returnPath") != TYPE_FOUNDRY_RETURN_PATH
+    ):
+        raise EvaluationError(f"type-foundry round-trip evidence status disagrees: {key}")
+    hooks = interaction.get("hooks")
+    if (
+        not isinstance(hooks, dict)
+        or set(hooks) != {"controlCount", "stateCount", "controlVisible", "controlEnabled"}
+        or type(hooks.get("controlCount")) is not int
+        or type(hooks.get("stateCount")) is not int
+        or hooks.get("controlCount") != 1
+        or hooks.get("stateCount") != 1
+        or hooks.get("controlVisible") is not True
+        or hooks.get("controlEnabled") is not True
+    ):
+        raise EvaluationError(f"type-foundry round-trip hook evidence disagrees: {key}")
+    if (
+        interaction.get("A") != TYPE_FOUNDRY_STATE_A
+        or interaction.get("restoredA") != TYPE_FOUNDRY_STATE_A
+        or interaction.get("B") != TYPE_FOUNDRY_STATE_B
+        or interaction.get("finalB") != TYPE_FOUNDRY_STATE_B
+    ):
+        raise EvaluationError(f"type-foundry round-trip snapshots disagree: {key}")
+    screenshot_state = interaction.get("screenshotState")
+    if (
+        not isinstance(screenshot_state, dict)
+        or set(screenshot_state) != {"expected", "before", "after", "verified"}
+        or screenshot_state.get("expected") != "B"
+        or screenshot_state.get("verified") is not True
+    ):
+        raise EvaluationError(f"type-foundry screenshot-state evidence disagrees: {key}")
+    for boundary in ("before", "after"):
+        sample = screenshot_state.get(boundary)
+        if (
+            not isinstance(sample, dict)
+            or set(sample) != {"actual", "samples", "matches"}
+            or sample.get("matches") is not True
+            or sample.get("actual") != TYPE_FOUNDRY_STATE_B
+            or sample.get("samples") != [TYPE_FOUNDRY_STATE_B] * 3
+        ):
+            raise EvaluationError(f"type-foundry screenshot-state {boundary} samples disagree: {key}")
+
+
 def _validate_visual_route_provenance(
     result: dict[str, Any],
     target_record: dict[str, Any] | None,
@@ -1008,6 +1107,7 @@ def validate_visual_completion(
             None,
         )
         _validate_visual_route_provenance(result, target_record, key)
+        _validate_visual_interaction_evidence(result, key)
         _validate_font_evidence(result, key)
         screenshot_value = result.get("screenshot")
         if not isinstance(screenshot_value, str) or not screenshot_value:
