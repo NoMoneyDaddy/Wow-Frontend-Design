@@ -36,16 +36,24 @@ export async function measureTypographyCandidate(input) {
   if (input.whiteSpace === "pre-wrap") options.whiteSpace = "pre-wrap";
   if (input.wordBreak === "keep-all") options.wordBreak = "keep-all";
   if (Number.isFinite(Number(input.letterSpacing))) options.letterSpacing = Number(input.letterSpacing);
-  const prepared = capability.module.prepare(text, font, options);
-  const stats = capability.module.measureLineStats(prepared, maxWidth);
-  const layout = capability.module.layout(prepared, maxWidth, lineHeight);
-  return {
-    status: "measured",
-    lineCount: layout.lineCount,
-    height: layout.height,
-    maxLineWidth: stats.maxLineWidth,
-    measuredLineCount: stats.lineCount,
-    maxWidth,
-    lineHeight,
-  };
+  try {
+    const prepared = capability.module.prepareWithSegments(text, font, options);
+    const stats = capability.module.measureLineStats(prepared, maxWidth);
+    const layout = capability.module.layout(prepared, maxWidth, lineHeight);
+    return {
+      status: "measured",
+      lineCount: layout.lineCount,
+      height: layout.height,
+      maxLineWidth: stats.maxLineWidth,
+      measuredLineCount: stats.lineCount,
+      maxWidth,
+      lineHeight,
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      package: PACKAGE_NAME,
+      reason: String(error?.message || error).slice(0, 240),
+    };
+  }
 }

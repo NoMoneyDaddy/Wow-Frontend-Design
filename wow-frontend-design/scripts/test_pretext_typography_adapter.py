@@ -35,6 +35,26 @@ class PretextTypographyAdapterTests(unittest.TestCase):
         if result["status"] == "unavailable":
             self.assertEqual("@chenglou/pretext", result["package"])
 
+    def test_canvas_capability_failure_is_fail_soft(self) -> None:
+        result = self.run_node(
+            f"import {{ measureTypographyCandidate }} from {json.dumps(ADAPTER.as_uri())};"
+            "console.log(JSON.stringify(await measureTypographyCandidate({text:'繁中段落',font:'16px Arial',maxWidth:240,lineHeight:24})));"
+        )
+        if result["status"] == "unavailable":
+            self.assertEqual("@chenglou/pretext", result["package"])
+            self.assertIn("canvas", result["reason"].lower())
+
+    def test_measurement_with_canvas_capability(self) -> None:
+        result = self.run_node(
+            "globalThis.OffscreenCanvas=class{getContext(){return {font:'',measureText(value){return {width:[...value].length*8}}}}};"
+            f"const {{ measureTypographyCandidate }}=await import({json.dumps(ADAPTER.as_uri())});"
+            "console.log(JSON.stringify(await measureTypographyCandidate({text:'alpha beta gamma',font:'16px Arial',maxWidth:64,lineHeight:24})));"
+        )
+        self.assertEqual("measured", result["status"])
+        self.assertGreaterEqual(result["lineCount"], 2)
+        self.assertEqual(result["lineCount"], result["measuredLineCount"])
+        self.assertEqual(result["lineCount"] * 24, result["height"])
+
     def test_invalid_candidate_fails_before_capability_lookup(self) -> None:
         result = self.run_node(
             f"import {{ measureTypographyCandidate }} from {json.dumps(ADAPTER.as_uri())};"

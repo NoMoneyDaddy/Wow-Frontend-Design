@@ -58,7 +58,7 @@ v6 report 把 screenshot、route、state、viewport、DPR、browser、source、a
 
 ```bash
 npm run validate:evidence-v7 -- \
-  --manifest evals/v7-current-pilot-manifest.json \
+  --manifest evals/v7-pilot-manifest-20260717.json \
   --ledger "$RUN_ROOT/ledger.json" \
   --result-dir "$RUN_ROOT/results" \
   --screenshot-dir "$RUN_ROOT/screenshots" \
