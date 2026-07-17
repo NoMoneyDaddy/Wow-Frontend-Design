@@ -19,6 +19,7 @@ from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v6-generation-results.json"
+PROCESS_CLEANUP_TIMEOUT_SECONDS = 1.0
 BRIEFS = {
     "wind-maintenance-dispatch-v6": ROOT / "evals" / "briefs" / "wind-maintenance-dispatch-v6.md",
     "type-foundry-specimen-v6": ROOT / "evals" / "briefs" / "type-foundry-specimen-v6.md",
@@ -225,13 +226,58 @@ def command_for(provider: str, model: str, case_id: str) -> list[str]:
     return [str(runner), model, "--case", case_id]
 
 
+def _process_group_members(process_group_id: int) -> list[int]:
+    try:
+        listing = subprocess.run(
+            ["ps", "-axo", "pid=,pgid="],
+            capture_output=True,
+            text=True,
+            timeout=0.2,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    members: list[int] = []
+    for line in listing.stdout.splitlines():
+        fields = line.split()
+        if len(fields) != 2:
+            continue
+        try:
+            pid, pgid = (int(value) for value in fields)
+        except ValueError:
+            continue
+        if pgid == process_group_id and pid != process_group_id:
+            members.append(pid)
+    return members
+
+
+def _signal_processes(process_ids: list[int], signal_number: int) -> None:
+    for process_id in process_ids:
+        try:
+            os.kill(process_id, signal_number)
+        except (PermissionError, ProcessLookupError):
+            continue
+
+
 def terminate_process_group(process: subprocess.Popen[str]) -> None:
+    cleanup_deadline = time.monotonic() + PROCESS_CLEANUP_TIMEOUT_SECONDS
+    group_signal_denied = False
+    group_members: list[int] = []
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
         return
+    except PermissionError:
+        group_signal_denied = True
+        group_members = _process_group_members(process.pid)
+        _signal_processes(group_members, signal.SIGTERM)
+        try:
+            process.terminate()
+        except (PermissionError, ProcessLookupError):
+            return
+    remaining = max(0.0, cleanup_deadline - time.monotonic())
     try:
-        process.communicate(timeout=5)
+        process.communicate(timeout=remaining)
         return
     except subprocess.TimeoutExpired:
         pass
@@ -239,7 +285,31 @@ def terminate_process_group(process: subprocess.Popen[str]) -> None:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         return
-    process.communicate()
+    except PermissionError:
+        if group_signal_denied:
+            group_members = _process_group_members(process.pid) or group_members
+            _signal_processes(group_members, signal.SIGKILL)
+        try:
+            process.kill()
+        except (PermissionError, ProcessLookupError):
+            return
+    remaining = max(0.0, cleanup_deadline - time.monotonic())
+    if remaining:
+        try:
+            process.communicate(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            pass
+    if process.poll() is None:
+        for stream in (process.stdout, process.stderr):
+            if stream is not None:
+                try:
+                    stream.close()
+                except OSError:
+                    pass
+        try:
+            process.wait(timeout=0.1)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 class ProgressTimeoutExpired(subprocess.TimeoutExpired):

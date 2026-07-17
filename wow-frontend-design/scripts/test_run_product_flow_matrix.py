@@ -7,10 +7,12 @@ import hashlib
 import importlib.util
 import json
 import os
+import signal
 import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -291,6 +293,48 @@ class ProductFlowMatrixTests(unittest.TestCase):
                 time.sleep(0.05)
             else:
                 self.fail(f"child process {child_pid} survived process-group timeout")
+
+    def test_timeout_cleanup_falls_back_when_group_signal_is_denied(self) -> None:
+        with patch.object(matrix.os, "killpg", side_effect=PermissionError):
+            with self.assertRaises(matrix.ProgressTimeoutExpired) as captured:
+                matrix.run_isolated(["bash", "-c", "sleep 60"], 0.2)
+        self.assertEqual("inactivity", captured.exception.kind)
+
+    def test_timeout_cleanup_is_bounded_when_descendant_holds_pipe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            pid_file = Path(directory) / "child.pid"
+            command = [
+                "bash",
+                "-c",
+                f"sleep 2 & echo $! > '{pid_file}'; trap '' TERM; wait",
+            ]
+            started = time.monotonic()
+            child_pid = None
+            try:
+                with patch.object(matrix.os, "killpg", side_effect=PermissionError):
+                    with self.assertRaises(matrix.ProgressTimeoutExpired):
+                        matrix.run_isolated(command, 0.2)
+                child_pid = int(pid_file.read_text(encoding="utf-8"))
+                for _ in range(20):
+                    try:
+                        os.kill(child_pid, 0)
+                    except ProcessLookupError:
+                        break
+                    time.sleep(0.05)
+                else:
+                    self.fail(f"descendant process {child_pid} survived denied group cleanup")
+            finally:
+                if child_pid is None and pid_file.exists():
+                    try:
+                        child_pid = int(pid_file.read_text(encoding="utf-8"))
+                    except ValueError:
+                        child_pid = None
+                if child_pid is not None:
+                    try:
+                        os.kill(child_pid, signal.SIGKILL)
+                    except (ProcessLookupError, ValueError):
+                        pass
+            self.assertLess(time.monotonic() - started, 1.8)
 
     def test_advancing_output_extends_the_inactivity_deadline(self) -> None:
         completed = matrix.run_isolated(
