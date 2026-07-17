@@ -66,7 +66,7 @@ If a major decision cannot be traced to product meaning, audience need, user pre
 
 ## 3. Generate directions
 
-For an empty build or broad redesign without an approved direction, generate only enough alternatives to resolve a named choice—normally two, sometimes three—and make them differ in more than palette. For focused repair or polish, derive one direction from the existing system instead of expanding scope. An audit reports the existing direction and risks; it does not invent alternatives unless comparison was explicitly requested. When alternatives are in scope, change at least four of these axes:
+For an empty build or broad redesign without an approved direction, generate only enough alternatives to resolve a named choice—normally two, sometimes three—and make them differ in more than palette. For focused repair or polish, derive one direction from the existing system instead of expanding scope. An audit reports the existing direction and risks; it does not invent alternatives unless comparison was explicitly requested. When alternatives are in scope, first freeze the known brand, language, core-content, workflow, accessibility, safety, and technical invariants. Give each alternative a different product hypothesis for the named choice, then change the smallest coherent axis set that makes the hypothesis observable. At least one changed axis must materially alter hierarchy, content representation, or task behavior; add dependent axes only when evidence makes them necessary. Record changed axis → product basis → expected task/layout consequence → validation method. Palette-only restyling, effect-only novelty, unrelated axis churn, and a preselected style-label bundle do not count. Possible axes include:
 
 - composition: axial, editorial, modular, radial, spatial, dense, sparse;
 - typography: expressive serif, grotesk, humanist, mono, variable, CJK-led;
@@ -76,7 +76,7 @@ For an empty build or broad redesign without an approved direction, generate onl
 - motion: inertial, stepped, elastic, mechanical, cinematic, scroll-linked, state-driven;
 - interaction: browse, compare, construct, reveal, tune, trace, collect, navigate.
 
-Score each 1–5:
+Reject a direction that violates a frozen invariant or fails an essential task, accessibility, safety, or feasibility boundary; a distinctiveness score cannot offset a blocker. Score each remaining direction 1–5:
 
 | Criterion | Question |
 | --- | --- |
