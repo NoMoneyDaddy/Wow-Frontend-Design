@@ -91,6 +91,38 @@ Define:
 
 Color-wheel harmonies—complementary, analogous, monochromatic, split-complementary, triadic, and tetradic—are palette-generation strategies, not semantic systems. Figma's [color-combination guide](https://www.figma.com/resource-library/color-combinations/) is useful for exploring hue relationships, value, saturation, temperature, and intended mood, but its named palettes and psychology descriptions do not prove brand fit, accessibility, or behavior. Map any candidate back to semantic roles, express controlled ramps in the project's source color space when useful, keep sRGB fallbacks, and test rendered contrast/state distinction before adoption.
 
+## Author a product-specific color structure, not a trend preset
+
+Technical correctness prevents color failures; it does not author an identity. `Contemporary` is not a palette: do not translate it into neon gradients, purple-on-black, warm cream, glassy rainbow light, high chroma, dark mode, OKLCH, or any other default look. Current color spaces and functions expand implementation choices, not aesthetic proof.
+
+For an empty build or broad redesign, derive the palette thesis from visible product evidence before selecting values. Useful evidence may include approved brand assets, product vocabulary, workflow tempo and risk, physical material and lighting, content or photography, place, data structure, and category conventions that the product deliberately keeps or rejects. A mood adjective, competitor screenshot, product category, or universal psychology claim is not enough. For a focused repair, preserve established roles unless the evidence identifies a defect.
+
+Record the relationship rather than a fixed number of hues:
+
+```text
+PRODUCT EVIDENCE: visible source → observation → confidence/unknown
+COLOR STRUCTURE: field/surface/support/signal relationship → area, adjacency, and repetition
+ROLE MAPPING: identity/action/status/data → task or state job → non-color companion
+SPECIFICITY: why this relationship fits here → unrelated product where it would mis-signal
+IMPLEMENTATION: source space → sRGB/wide-gamut fallback → supported appearances
+REVIEW: rendered observation → evidence limit → keep/revise
+```
+
+`field`, `surface`, `support`, and `signal` are composition lenses, not required layers. A chromatic canvas, tinted neutral, discontinuous accent, temperature boundary, content-sampled ink, or wide-gamut highlight can be appropriate when the evidence earns it; none is a default recipe. Budget chroma spatially: decide which regions may carry it, how often it repeats, what it sits beside, and where quiet contrast must remain. Keep identity, action, status, and data distinguishable; do not spend semantic safety colors as decoration or force all identity into the primary CTA.
+
+When a major direction is genuinely unresolved, compare only enough candidates to decide it—usually two structures that preserve the same access and semantic requirements but differ in field/signal relationship, adjacency, or distribution, not merely hue. Select from rendered evidence of product specificity, task salience, content/media compatibility, and independent light/dark behavior. Do not require exploration for a repair with an established system, and do not prefer a candidate merely because its numeric colors differ more from other sites.
+
+Modern CSS can express a chosen structure when the locked support matrix and fallback path permit it. [CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/) defines `oklch()` and predefined color spaces including `display-p3`. The [CSS Color Module Level 5 Working Draft](https://www.w3.org/TR/css-color-5/) extends that foundation with `color-mix()`, relative color syntax, `light-dark()`, and `contrast-color()`. Verify each used feature in the actual target runtime; draft status and source syntax are not implementation evidence, and `contrast-color()` cannot prove general legibility or the project's WCAG claim. Do not require wide gamut: a disciplined sRGB palette may be the more faithful result.
+
+Use these gates without pretending to automate taste:
+
+- **Product-swap:** apply this only to identity-bearing authorship, not access or status roles that may correctly share conventions. If the same identity-bearing relationship remains equally defensible for an unrelated product, revise the thesis; preserve a shared convention or deliberate restraint when product/task evidence supports it.
+- **Structure:** blur and inspect in grayscale; hierarchy must survive without chroma, while the color view adds a specific job rather than rescuing weak composition.
+- **Collision:** inspect brand, action, status, selection, and data together; decoration must not look actionable and unrelated states must not merge.
+- **Distribution:** compare matched full-page frames, not isolated swatches; reject accidental uniform sprinkling, saturation everywhere, or a lone accent repeated without hierarchy.
+- **Fallback:** compare matched sRGB/wide-gamut and light/dark renders where supported; clipping, gamut mapping, gradients, media, and alpha must not change meaning or destroy the intended relationship.
+- **Claim ceiling:** automated checks may prove declared roles, contrast, fallback, and state separation. `Coherent`, `contemporary`, `beautiful`, and `product-specific` remain independently reviewed rendered observations, never conclusions from hue count, color distance, or a passing contrast tool.
+
 ## Appearance is a composition, not an inversion
 
 When light/dark support is in scope, implement at least the system preference. Offer a `system | light | dark` control only when product context or user need justifies an app-specific setting. A complete three-state implementation has:
@@ -145,6 +177,7 @@ Require this compact record before implementation:
 
 ```text
 COLOR ROLES: semantic role → meaning
+PALETTE THESIS: product evidence → color structure → specificity/rejection case
 LIGHTNESS LADDER: canvas/surface/text/border hierarchy
 CHROMA BUDGET: where vivid color may appear
 STATE DISTINCTION: color + non-color cue
@@ -153,7 +186,7 @@ PSYCH CLAIM: SUPPORTED | HYPOTHESIS | REJECTED | UNKNOWN
 TEST: rendered pair/state/viewport/appearance and evidence tool
 ```
 
-If the model cannot supply a meaning and a test, reduce the palette to neutrals plus one action color. Never let the model's own ratio estimate, color name, confidence, or screenshot description count as evidence.
+If the model cannot supply a meaning and a test, neutrals plus one action color is a safe provisional baseline, not a finished identity for an empty build or broad redesign. Missing psychological evidence lowers only the psychological claim; it does not require generic color structure when product evidence exists. Deliberate restraint remains valid when product/task evidence supports it. Never let the model's own ratio estimate, color name, confidence, or screenshot description count as evidence.
 
 ## Release blockers
 
@@ -163,3 +196,4 @@ If the model cannot supply a meaning and a test, reduce the palette to neutrals 
 - Dynamic media can pass beneath text without a bounded contrast treatment.
 - A psychological or conversion claim is presented as fact without applicable evidence.
 - A theme is declared supported from source keywords without rendered, stateful checks.
+- A claimed product-specific palette has no visible evidence trace, depends only on a style/category label, or merges identity, action, and status roles without an evidenced exception.
