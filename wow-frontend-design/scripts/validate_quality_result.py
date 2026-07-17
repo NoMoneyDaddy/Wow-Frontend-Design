@@ -303,7 +303,7 @@ def validate_novel_discovery_data(data: Any) -> str:
     return status
 
 
-def _validate_novel_discovery_report(path: Path) -> None:
+def _validate_novel_discovery_report(path: Path) -> dict[str, Any]:
     """Require structured exploration evidence instead of an empty report claim."""
 
     try:
@@ -313,6 +313,7 @@ def _validate_novel_discovery_report(path: Path) -> None:
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise QualityResultError(f"novel-discovery report is not valid JSON: {error}") from error
     validate_novel_discovery_data(data)
+    return data
 
 
 def _resolve_policy_reference(
@@ -321,7 +322,7 @@ def _resolve_policy_reference(
     events: dict[str, dict[str, Any]],
     policy: dict[str, Any],
     artifact_root: Path,
-) -> None:
+) -> dict[str, Any] | None:
     rules = policy["evidence"]
     candidates = {reference} if reference in rules else set()
     candidates.update(
@@ -358,7 +359,7 @@ def _resolve_policy_reference(
         )
         if failure:
             raise QualityResultError(failure)
-        return
+        return None
 
     if event is None:
         raise QualityResultError(f"evidence label has no latest event: {label}")
@@ -401,7 +402,46 @@ def _resolve_policy_reference(
     if claim_type == "gate:novel-discovery":
         if rule.get("artifact_kind") != "report" or event.get("artifact_kind") != "report":
             raise QualityResultError("novel-discovery must use a report artifact")
-        _validate_novel_discovery_report(artifact_root / event["path"])
+        return _validate_novel_discovery_report(artifact_root / event["path"])
+    return None
+
+
+def _validate_probe_evidence_bindings(
+    report_data: dict[str, Any],
+    report_label: str,
+    report_path: str,
+    events: dict[str, dict[str, Any]],
+    policy: dict[str, Any],
+    artifact_root: Path,
+) -> None:
+    """Bind discovery observations to evaluator artifacts for the exact probe context."""
+
+    resolved_report = (artifact_root / report_path).resolve()
+    for probe in report_data["probes"]:
+        expected_context = {field: probe[field] for field in ("route", "viewport", "state")}
+        for reference in probe["evidence"]:
+            rule = policy["evidence"].get(reference)
+            if (
+                reference == report_label
+                or not isinstance(rule, dict)
+                or rule.get("kind") != "artifact"
+                or "novel-observation" not in rule.get("claim_types", [])
+            ):
+                raise QualityResultError(f"unbound probe evidence: {reference}")
+            if (artifact_root / rule["path"]).resolve() == resolved_report:
+                raise QualityResultError(f"probe evidence cannot reference its own report: {reference}")
+            context = rule.get("context")
+            if not isinstance(context, dict) or any(
+                context.get(field) != value for field, value in expected_context.items()
+            ):
+                raise QualityResultError(f"probe evidence context does not match report: {reference}")
+            _resolve_policy_reference(
+                reference,
+                "novel-observation",
+                events,
+                policy,
+                artifact_root,
+            )
 
 
 def validate_with_ledger(
@@ -466,25 +506,36 @@ def validate_with_ledger(
     novel_gate = gates.get("novel-discovery")
     if novel_gate is not None and novel_gate["status"] == "PASS":
         for reference in novel_gate["evidence"]:
-            rule = policy["evidence"].get(reference)
-            if rule is None:
-                rule = next(
-                    (
-                        candidate
-                        for candidate in policy["evidence"].values()
-                        if candidate.get("kind") == "artifact" and candidate.get("path") == reference
-                    ),
-                    None,
-                )
+            matching_rules = [
+                (label, candidate)
+                for label, candidate in policy["evidence"].items()
+                if label == reference
+                or (candidate.get("kind") == "artifact" and candidate.get("path") == reference)
+            ]
+            if len(matching_rules) != 1:
+                raise QualityResultError("novel-discovery must use an evaluator-bound report artifact")
+            report_label, rule = matching_rules[0]
             if not isinstance(rule, dict) or rule.get("kind") != "artifact":
                 raise QualityResultError("novel-discovery must use an evaluator-bound report artifact")
-            report_path = artifact_root / rule["path"]
-            try:
-                report_data = json.loads(report_path.read_text(encoding="utf-8"))
-            except (OSError, UnicodeError, json.JSONDecodeError) as error:
-                raise QualityResultError(f"novel-discovery report cannot be read: {error}") from error
+            report_data = _resolve_policy_reference(
+                reference,
+                "gate:novel-discovery",
+                events,
+                policy,
+                artifact_root,
+            )
+            if not isinstance(report_data, dict):
+                raise QualityResultError("novel-discovery report cannot be read")
             if validate_novel_discovery_data(report_data) != "clean_after_probes":
                 raise QualityResultError("novel-discovery findings must be repaired before PASS/VERIFIED")
+            _validate_probe_evidence_bindings(
+                report_data,
+                report_label,
+                rule["path"],
+                events,
+                policy,
+                artifact_root,
+            )
 
     references: list[tuple[str, str]] = []
     for gate in data["hard_gates"]:

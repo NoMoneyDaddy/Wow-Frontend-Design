@@ -44,7 +44,7 @@ NOVEL_DISCOVERY_REPORT = {
             "state": "default",
             "method": "Playwright DOM and screenshot replay",
             "outcome": "pass",
-            "evidence": ["mobile.png", "interaction-log"],
+            "evidence": ["mobile-default"],
         }
     ],
     "findings": [],
@@ -258,7 +258,9 @@ class QualityResultTests(unittest.TestCase):
             for gate, label in zip(result["hard_gates"][:2], command_labels)
         }
         novel_report = root / "novel-findings.json"
-        novel_report.write_text(json.dumps(NOVEL_DISCOVERY_REPORT), encoding="utf-8")
+        novel_report_data = copy.deepcopy(NOVEL_DISCOVERY_REPORT)
+        novel_report_data["probes"][0]["evidence"] = ["rendered-mobile"]
+        novel_report.write_text(json.dumps(novel_report_data), encoding="utf-8")
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(
                 evidence_ledger.main(
@@ -284,7 +286,7 @@ class QualityResultTests(unittest.TestCase):
         }
         evidence["rendered-mobile"] = {
             "kind": "artifact",
-            "claim_types": ["rendered_visual"],
+            "claim_types": ["rendered_visual", "novel-observation"],
             "artifact_kind": "screenshot",
             "path": "mobile.png",
             "context": {
@@ -329,6 +331,177 @@ class QualityResultTests(unittest.TestCase):
                 ),
                 3,
             )
+
+    def test_novel_discovery_probe_evidence_must_be_evaluator_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, ledger, policy, workspace = self._strict_fixture(root)
+            report = root / "novel-findings.json"
+            report_data = json.loads(report.read_text(encoding="utf-8"))
+            report_data["probes"][0]["evidence"] = ["arbitrary-token"]
+            report.write_text(json.dumps(report_data), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    evidence_ledger.main(
+                        [
+                            "artifact",
+                            "--ledger",
+                            str(ledger),
+                            "--label",
+                            "novel-discovery",
+                            "--kind",
+                            "report",
+                            "--path",
+                            str(report),
+                        ]
+                    ),
+                    0,
+                )
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "unbound probe evidence"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_novel_discovery_probe_evidence_must_match_probe_context(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, ledger, policy, workspace = self._strict_fixture(root)
+            report = root / "novel-findings.json"
+            report_data = json.loads(report.read_text(encoding="utf-8"))
+            report_data["probes"][0]["viewport"] = "391x844"
+            report.write_text(json.dumps(report_data), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    evidence_ledger.main(
+                        [
+                            "artifact",
+                            "--ledger",
+                            str(ledger),
+                            "--label",
+                            "novel-discovery",
+                            "--kind",
+                            "report",
+                            "--path",
+                            str(report),
+                        ]
+                    ),
+                    0,
+                )
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "context does not match"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_novel_discovery_report_alias_cannot_prove_its_own_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, ledger, policy_path, workspace = self._strict_fixture(root)
+            report = root / "novel-findings.json"
+            report_data = json.loads(report.read_text(encoding="utf-8"))
+            report_data["probes"][0]["evidence"] = ["report-alias"]
+            report.write_text(json.dumps(report_data), encoding="utf-8")
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["evidence"]["report-alias"] = {
+                "kind": "artifact",
+                "claim_types": ["novel-observation"],
+                "artifact_kind": "report",
+                "path": "novel-findings.json",
+                "context": {
+                    "route": "/",
+                    "viewport": "390x844",
+                    "state": "default",
+                },
+            }
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                for label in ("novel-discovery", "report-alias"):
+                    self.assertEqual(
+                        evidence_ledger.main(
+                            [
+                                "artifact",
+                                "--ledger",
+                                str(ledger),
+                                "--label",
+                                label,
+                                "--kind",
+                                "report",
+                                "--path",
+                                str(report),
+                                "--route",
+                                "/",
+                                "--viewport",
+                                "390x844",
+                                "--state",
+                                "default",
+                            ]
+                        ),
+                        0,
+                    )
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "own report"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                )
+
+    def test_novel_discovery_report_hash_is_checked_before_probe_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, ledger, policy, workspace = self._strict_fixture(root)
+            report = root / "novel-findings.json"
+            report_data = json.loads(report.read_text(encoding="utf-8"))
+            report_data["probes"][0]["evidence"] = ["arbitrary-token"]
+            report.write_text(json.dumps(report_data), encoding="utf-8")
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "artifact is invalid"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
+
+    def test_novel_discovery_report_size_limit_precedes_json_parsing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, ledger, policy, workspace = self._strict_fixture(root)
+            report = root / "novel-findings.json"
+            report.write_bytes(b" " * (validate_quality_result.MAX_INPUT_BYTES + 1))
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    evidence_ledger.main(
+                        [
+                            "artifact",
+                            "--ledger",
+                            str(ledger),
+                            "--label",
+                            "novel-discovery",
+                            "--kind",
+                            "report",
+                            "--path",
+                            str(report),
+                        ]
+                    ),
+                    0,
+                )
+            with self.assertRaisesRegex(validate_quality_result.QualityResultError, "exceeds size limit"):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy,
+                )
 
     def test_strict_validation_rejects_one_by_one_screenshot_for_viewport_claim(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

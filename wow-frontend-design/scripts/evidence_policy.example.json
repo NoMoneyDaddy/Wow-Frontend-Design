@@ -42,7 +42,7 @@
     },
     "mobile-default": {
       "kind": "artifact",
-      "claim_types": ["rendered_visual", "gate:rendered-mobile-layout", "craft:visual-typography", "craft:mobile-experience", "craft:localization"],
+      "claim_types": ["rendered_visual", "gate:rendered-mobile-layout", "craft:visual-typography", "craft:mobile-experience", "craft:localization", "novel-observation"],
       "artifact_kind": "screenshot",
       "path": "artifacts/mobile-default.png",
       "context": {
