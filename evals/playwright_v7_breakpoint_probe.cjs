@@ -35,6 +35,15 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 
+function exactKeys(value, keys) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join("|") === [...keys].sort().join("|");
+}
+
+function isSha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
 function modeHash(value) {
   return sha256Bytes(canonical(value));
 }
@@ -242,7 +251,9 @@ function validateSpecValue(value, expectedCase, expectedState) {
 function validateTarget(routeArgument, manifestArgument) {
   const route = stableFile(routeArgument, "route", 8 * 1024 * 1024);
   const manifest = loadJson(manifestArgument, "target manifest");
-  if (path.dirname(route.absolute) !== path.dirname(manifest.absolute) || path.basename(route.absolute) !== "index.html") {
+  if (path.dirname(route.absolute) !== path.dirname(manifest.absolute)
+      || path.basename(route.absolute) !== "index.html"
+      || path.basename(manifest.absolute) !== "run-manifest.json") {
     fail("route and target manifest must bind one target root");
   }
   const value = manifest.value;
@@ -391,6 +402,102 @@ function unavailableReport(base, reasonCode, coverage = {}) {
   };
 }
 
+function validateBreakpointReport(report, contract) {
+  if (!exactKeys(report, OUTPUT_KEYS) || report.schema_version !== 1
+      || !["complete", "unavailable"].includes(report.status)
+      || report.authority !== contract.authority || report.claim_boundary !== contract.claim_boundary) {
+    fail("breakpoint output root schema changed");
+  }
+  if (!exactKeys(report.identity, ["variant", "case_id", "state"])
+      || !["accepted", "candidate"].includes(report.identity.variant)
+      || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(report.identity.case_id)
+      || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(report.identity.state)) {
+    fail("breakpoint output identity is invalid");
+  }
+  if (!exactKeys(report.subject, ["route", "route_sha256", "manifest", "manifest_sha256", "spec", "spec_sha256"])
+      || report.subject.route !== "index.html" || report.subject.manifest !== "run-manifest.json"
+      || report.subject.spec !== "hidden-spec" || !isSha256(report.subject.route_sha256)
+      || !isSha256(report.subject.manifest_sha256) || !isSha256(report.subject.spec_sha256)) {
+    fail("breakpoint output subject is invalid");
+  }
+  const probeKeys = ["id", "script_sha256", "contract_sha256", "playwright", "dependencies", "engine"];
+  if (Object.hasOwn(report.probe || {}, "engine_version")) probeKeys.push("engine_version");
+  if (!exactKeys(report.probe, probeKeys) || report.probe.id !== contract.probe_id
+      || !isSha256(report.probe.script_sha256) || !isSha256(report.probe.contract_sha256)
+      || report.probe.playwright !== contract.dependencies.playwright_manifest.version
+      || report.probe.engine !== "chromium"
+      || !exactKeys(report.probe.dependencies, ["playwright_entrypoint_sha256", "playwright_manifest_sha256"])
+      || report.probe.dependencies.playwright_entrypoint_sha256 !== contract.dependencies.playwright_entrypoint.sha256
+      || report.probe.dependencies.playwright_manifest_sha256 !== contract.dependencies.playwright_manifest.sha256
+      || (Object.hasOwn(report.probe, "engine_version")
+        && (typeof report.probe.engine_version !== "string" || report.probe.engine_version.length > 100))) {
+    fail("breakpoint output probe is invalid");
+  }
+  if (!exactKeys(report.contract, ["widths", "height", "device_scale_factor", "max_samples", "max_depth", "max_transitions", "screenshots", "traces", "videos"])
+      || canonical(report.contract.widths) !== canonical(contract.widths)
+      || report.contract.height !== contract.height
+      || report.contract.device_scale_factor !== contract.device_scale_factor
+      || report.contract.max_samples !== contract.max_samples || report.contract.max_depth !== contract.max_depth
+      || report.contract.max_transitions !== contract.max_transitions
+      || report.contract.screenshots !== false || report.contract.traces !== false
+      || report.contract.videos !== false) {
+    fail("breakpoint output contract is invalid");
+  }
+  if (!exactKeys(report.coverage, ["status", "reason_code", "sample_count", "sampled_widths", "budget_exhausted"])
+      || !Number.isInteger(report.coverage.sample_count) || report.coverage.sample_count < 0
+      || report.coverage.sample_count > contract.max_samples || !Array.isArray(report.coverage.sampled_widths)
+      || report.coverage.sampled_widths.length > contract.max_samples
+      || typeof report.coverage.budget_exhausted !== "boolean") {
+    fail("breakpoint output coverage is invalid");
+  }
+  const minimumWidth = Math.min(...contract.widths);
+  const maximumWidth = Math.max(...contract.widths);
+  const sampled = report.coverage.sampled_widths;
+  if (sampled.some((width) => !Number.isInteger(width) || width < minimumWidth || width > maximumWidth)
+      || sampled.some((width, index) => index > 0 && width <= sampled[index - 1])
+      || report.coverage.sample_count < sampled.length) {
+    fail("breakpoint output sampled widths are invalid");
+  }
+  const unavailable = report.status === "unavailable";
+  if (unavailable !== (report.coverage.status === "unavailable")
+      || (unavailable ? !REASON_CODES.has(report.coverage.reason_code)
+        : report.coverage.status !== "complete" || report.coverage.reason_code !== null
+          || report.coverage.budget_exhausted)) {
+    fail("breakpoint output reason is invalid");
+  }
+  if (!unavailable && contract.widths.some((width) => !sampled.includes(width))) {
+    fail("breakpoint output baseline coverage is incomplete");
+  }
+  if (!Array.isArray(report.transitions) || report.transitions.length > contract.max_transitions
+      || report.transitions.some((item) => !exactKeys(item, ["lower_width", "upper_width", "from", "to"])
+        || !Number.isInteger(item.lower_width) || item.upper_width !== item.lower_width + 1
+        || item.lower_width < minimumWidth || item.upper_width > maximumWidth
+        || !isSha256(item.from) || !isSha256(item.to) || item.from === item.to)) {
+    fail("breakpoint output transitions are invalid");
+  }
+  if (!Array.isArray(report.findings) || report.findings.length > contract.max_samples * 2
+      || report.findings.some((item) => !exactKeys(item, ["code", "width", "replays"])
+        || !["breakpoint_horizontal_overflow", "breakpoint_required_assertion_failed"].includes(item.code)
+        || !sampled.includes(item.width) || item.replays !== 2)) {
+    fail("breakpoint output findings are invalid");
+  }
+  if (!Array.isArray(report.advisories) || report.advisories.length > contract.max_transitions + contract.max_samples
+      || report.advisories.some((item) => {
+        if (item?.code === "responsive_mode_transition") {
+          return !exactKeys(item, ["code", "lower_width", "upper_width"])
+            || item.upper_width !== item.lower_width + 1 || item.lower_width < minimumWidth
+            || item.upper_width > maximumWidth;
+        }
+        return item?.code !== "same_width_replay_changed" || !exactKeys(item, ["code", "width"])
+          || !sampled.includes(item.width);
+      })) {
+    fail("breakpoint output advisories are invalid");
+  }
+  if (unavailable && (report.transitions.length || report.findings.length || report.advisories.length)) {
+    fail("unavailable breakpoint output must not make claims");
+  }
+}
+
 async function locateTransitions(widths, sample, contract) {
   const cache = new Map();
   const transitions = [];
@@ -468,9 +575,9 @@ async function main() {
     subject: {
       route: path.basename(target.route),
       route_sha256: target.routeSha256,
-      manifest: path.basename(target.manifest),
+      manifest: "run-manifest.json",
       manifest_sha256: target.manifestSha256,
-      spec: path.basename(specRecord.absolute),
+      spec: "hidden-spec",
       spec_sha256: specRecord.sha256,
     },
     probe: {
@@ -516,7 +623,7 @@ async function main() {
     }
   };
   const writeReport = (report, exitCode = 0) => {
-    if (Object.keys(report).some((key) => !OUTPUT_KEYS.has(key))) fail("output schema changed");
+    validateBreakpointReport(report, contract);
     const serialized = `${JSON.stringify(report, null, 2)}\n`;
     if (Buffer.byteLength(serialized) > MAX_JSON_BYTES) fail("output exceeds its byte budget");
     fs.writeFileSync(output, serialized, { flag: "wx", mode: 0o600 });
@@ -684,6 +791,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  applySteps,
+  assertionsPassed,
+  browserModeSnapshot,
   canonical,
   hiddenAnchors,
   loadContract,
@@ -693,5 +803,6 @@ module.exports = {
   reasonCode,
   stableFile,
   validateSpecValue,
+  validateBreakpointReport,
   validateTarget,
 };

@@ -59,7 +59,7 @@ const contract = { ...probe.loadContract().value, max_samples: 48, max_depth: 11
             design = target / "DESIGN.md"
             route = target / "index.html"
             manifest = target / "run-manifest.json"
-            spec = Path(directory) / "hidden-spec.json"
+            spec = Path(directory) / "客戶名稱-不可外洩文案.json"
             output = Path(directory) / "breakpoints.json"
             design.write_text("# Design\n", encoding="utf-8")
             route.write_text(
@@ -128,8 +128,28 @@ const contract = { ...probe.loadContract().value, max_samples: 48, max_depth: 11
             serialized = output.read_text(encoding="utf-8")
             self.assertNotIn(".secret-selector", serialized)
             self.assertNotIn("不可外洩產品文字", serialized)
+            self.assertNotIn(spec.name, serialized)
+            self.assertEqual("hidden-spec", report["subject"]["spec"])
             self.assertNotIn("screenshot", " ".join(str(path) for path in Path(directory).iterdir()).lower())
             self.assertFalse(any(path.suffix == ".png" for path in Path(directory).rglob("*")))
+            schema_check = subprocess.run(
+                [
+                    "node", "-e",
+                    """const fs=require('node:fs');const p=require(process.argv[1]);
+const report=JSON.parse(fs.readFileSync(process.argv[2]));const contract=p.loadContract().value;
+p.validateBreakpointReport(report,contract);const rejects=(mutate)=>{const copy=structuredClone(report);mutate(copy);
+try{p.validateBreakpointReport(copy,contract);return false}catch{return true}};
+if(!rejects(r=>{r.subject.debug='forbidden'})
+||!rejects(r=>{r.coverage.sampled_widths=r.coverage.sampled_widths.filter(w=>w!==320)})
+||!rejects(r=>{r.transitions[0].to=r.transitions[0].from}))process.exitCode=2;""",
+                    str(PROBE), str(output),
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            self.assertEqual(0, schema_check.returncode, schema_check.stderr)
 
     def test_manifest_drift_fails_before_browser_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

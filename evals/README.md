@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-breakpoint-probe-v7.json \
+  --manifest evals/v7-pilot-manifest-20260718-motion-probe-v8.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -103,6 +103,8 @@ npm run eval:v7-repair-cycle -- \
 P2 在每個 repair target 的生成前、affected Playwright matrix 後執行一個 hash-pinned `source_layout_audit.py` supporting probe。它只投影 `global_emergency_breaking`、`prose_wrap_disabled`、`fixed_text_clipping` 三種高可信 source-risk code，去除原始 evidence、confirmation、selector、HTML 與產品文字，依 `probe × code × path` 去重並限制最多三筆。Sidecar 以 target SHA-256、probe contract、script 與 dependency 綁定；未知 schema/code、truncated coverage、tool drift、timeout 或 unavailable 都留下明確 receipt，不得被解讀成 clean。這些 advisory 只有與已驗證 browser finding 共用根因時才可協助定位，不改變 failure key、best-artifact rank、promotion 或 release gate；Playwright 仍是 rendered behavior 的權威。Pretext 暫不接入自修正閉環，因目前缺少穩定 CLI／versioned result schema 與 bounded computed-style provenance。
 
 P3a `eval:v7-breakpoints` 是獨立、零截圖的 Chromium supporting-discovery sidecar。它不接受模型自報的 breakpoint；先量固定 11 個 coarse widths，只有相鄰 categorical layout signature 不同時才二分到 1 CSS px，單一 route/state 最多 48 samples、8 transitions、depth 11。Signature 只保留 hidden spec ID、display/position/writing-mode/flex 類別、可見數、child row/column topology、viewport clipping、overflow 與 assertion 結果，不輸出 selector、產品文字或連續 rect。相同寬度的兩次 animation-frame sample 必須穩定；route/spec/manifest/contract/script 漂移、字型、互動、runtime、外部 request 或 budget 問題都明示 unavailable。只有兩個 fresh context 都重現的 horizontal overflow／required assertion failure 才列 finding；mode transition 本身只是 advisory。它不產生 screenshot/trace/video，也不被 repair packet、failure key、rank 或 promotion 讀取。第一版只宣稱 bounded Chromium width observation；cross-engine、touch、height、zoom、motion、physical-device 與視覺品質仍未驗證。
+
+P3b `eval:v7-motion` 是另一個獨立 sidecar，只在 390／1024px 的 `no-preference` fresh context 透過標準 `document.getAnimations()` 觀測到 CSS Animation、CSS Transition 或 Web Animation 時，才建立對應 `reduce` context；不注入全域極短 duration CSS。它以 kind × duration bucket × finite/infinite 的 bounded categories 比較 computed behavior，並重跑 hidden assertions、overflow 與 categorical layout signature。只有 normal 通過但 reduce 連續兩組 fresh-context pair 失敗，才列 `reduced_motion_task_regression`／`reduced_motion_horizontal_overflow`；動畫數量或 normal/reduce 類別相同本身只可成 advisory。無 motion 是 `not_applicable`，超過 64 animations／12 samples、preference emulation、provenance、font、runtime 或外部 request 問題都是 explicit unavailable。它同樣不產生 screenshot/trace/video，也不進 repair authority。這遵循 [Media Queries Level 5 `prefers-reduced-motion`](https://www.w3.org/TR/mediaqueries-5/#prefers-reduced-motion) 的 preference 語意，並使用 [MDN `Document.getAnimations()`](https://developer.mozilla.org/en-US/docs/Web/API/Document/getAnimations) 所述會涵蓋 CSS Animations、CSS Transitions 與 Web Animations 的介面；sidecar 不等同 WCAG、視覺品質或 physical-device 證據。
 
 ## 目前案例
 
