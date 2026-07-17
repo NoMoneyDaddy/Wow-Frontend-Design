@@ -59,6 +59,10 @@ class SourceLockTests(unittest.TestCase):
             with self.assertRaises(validate_external_sources.SourceLockError):
                 validate_external_sources.load(deep)
 
+            bracket_text = root / "bracket-text.json"
+            bracket_text.write_text(json.dumps({"value": "[" * 1_100}), encoding="utf-8")
+            self.assertEqual("[" * 1_100, validate_external_sources.load(bracket_text)["value"])
+
 
 if __name__ == "__main__":
     unittest.main()

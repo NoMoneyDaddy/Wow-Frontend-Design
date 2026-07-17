@@ -23,10 +23,33 @@ LICENSES = {
 }
 SOURCE_KEYS = {"repository", "revision", "license", "paths"}
 MAX_LOCK_BYTES = 1_000_000
+MAX_JSON_DEPTH = 128
 
 
 class SourceLockError(ValueError):
     """Raised when the source lock cannot be trusted."""
+
+
+def _validate_json_depth(raw: bytes) -> None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for byte in raw:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif byte == 0x5C:
+                escaped = True
+            elif byte == 0x22:
+                in_string = False
+        elif byte == 0x22:
+            in_string = True
+        elif byte in {0x5B, 0x7B}:
+            depth += 1
+            if depth > MAX_JSON_DEPTH:
+                raise SourceLockError(f"lock exceeds {MAX_JSON_DEPTH} levels of JSON nesting")
+        elif byte in {0x5D, 0x7D} and depth:
+            depth -= 1
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -45,6 +68,7 @@ def load(path: Path) -> dict[str, Any]:
             raw = stream.read(MAX_LOCK_BYTES + 1)
             if len(raw) > MAX_LOCK_BYTES:
                 raise SourceLockError(f"lock exceeds {MAX_LOCK_BYTES} bytes")
+        _validate_json_depth(raw)
         value = json.loads(raw.decode("utf-8"))
     except (OSError, RecursionError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise SourceLockError(f"cannot read valid JSON lock: {error}") from error
