@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 
 import run_product_flow_matrix as matrix
 
@@ -41,6 +41,16 @@ CASE_PAGES = {
     "royalty-statement-v6": ("index.html",),
     "packaging-configurator-v6": ("index.html", "materials.html", "summary.html"),
     "oral-history-archive-v6": ("index.html", "archive.html", "story.html"),
+    "grant-review-board-v6": ("index.html",),
+}
+INTERACTION_PAGES = {
+    "wind-maintenance-dispatch-v6": ("index.html",),
+    "type-foundry-specimen-v6": ("index.html",),
+    "repair-cafe-intake-v6": ("index.html",),
+    "night-market-allergen-v6": ("index.html",),
+    "royalty-statement-v6": ("index.html",),
+    "packaging-configurator-v6": ("index.html", "materials.html", "summary.html"),
+    "oral-history-archive-v6": (),
     "grant-review-board-v6": ("index.html",),
 }
 MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
@@ -616,6 +626,24 @@ def bind_visual_report(visual_output: Path, generation_output: Path, targets: li
     _atomic_write_json(visual_output, report)
 
 
+def expected_visual_keys(targets: list[dict[str, Any]]) -> set[tuple[str, str, str, str, str]]:
+    expected = {
+        (target["case_id"], target["alias"], page, "base", viewport)
+        for target in targets
+        for page in CASE_PAGES[target["case_id"]]
+        for viewport in VIEWPORTS
+    }
+    expected.update(
+        {
+            (target["case_id"], target["alias"], page, "interaction", viewport)
+            for target in targets
+            for page in INTERACTION_PAGES[target["case_id"]]
+            for viewport in ("desktop", "mobile")
+        }
+    )
+    return expected
+
+
 def _validate_input_bindings(
     report: dict[str, Any],
     generation_output: Path,
@@ -798,6 +826,30 @@ def _validate_font_evidence(result: dict[str, Any], key: tuple[object, ...]) -> 
         raise EvaluationError(f"font evidence mismatch and visual issue disagree: {key}")
 
 
+def _validate_visual_route_provenance(
+    result: dict[str, Any],
+    target_record: dict[str, Any] | None,
+    key: tuple[object, ...],
+) -> None:
+    reported_url = result.get("url")
+    target_url = target_record.get("url") if isinstance(target_record, dict) else None
+    if not isinstance(reported_url, str) or not isinstance(target_url, str):
+        raise EvaluationError(f"visual result route provenance is missing: {key}")
+    reported_parts = urlsplit(reported_url)
+    expected_page = str(key[2])
+    expected_parts = urlsplit(urljoin(target_url, expected_page))
+    if (
+        reported_parts.scheme != expected_parts.scheme
+        or reported_parts.netloc != expected_parts.netloc
+        or PurePosixPath(reported_parts.path) != PurePosixPath(expected_parts.path)
+    ):
+        raise EvaluationError(f"visual result route provenance disagrees: {key}")
+    if key[3] == "interaction":
+        interaction = result.get("interaction")
+        if not isinstance(interaction, dict) or interaction.get("page") != expected_page:
+            raise EvaluationError(f"visual interaction page provenance disagrees: {key}")
+
+
 def validate_visual_completion(
     visual_output: Path,
     screenshot_dir: Path,
@@ -821,19 +873,7 @@ def validate_visual_completion(
     } if isinstance(reported_targets, list) else set()
     if not isinstance(reported_targets, list) or len(reported_targets) != len(expected_targets) or actual_targets != expected_targets:
         raise EvaluationError("visual report target inventory disagrees")
-    expected = {
-        (target["case_id"], target["alias"], page, "base", viewport)
-        for target in targets
-        for page in CASE_PAGES[target["case_id"]]
-        for viewport in VIEWPORTS
-    }
-    expected.update(
-        {
-            (target["case_id"], target["alias"], CASE_PAGES[target["case_id"]][0], "interaction", viewport)
-            for target in targets
-            for viewport in ("desktop", "mobile")
-        }
-    )
+    expected = expected_visual_keys(targets)
     results = report.get("results")
     if not isinstance(results, list) or len(results) != len(expected):
         raise EvaluationError(f"visual result count must be {len(expected)}")
@@ -853,6 +893,12 @@ def validate_visual_completion(
         if key in seen or key not in expected:
             raise EvaluationError(f"visual result identity is invalid: {key}")
         seen.add(key)  # type: ignore[arg-type]
+        target_record = next(
+            (item for item in reported_targets if isinstance(item, dict)
+             and item.get("caseId") == key[0] and item.get("alias") == key[1]),
+            None,
+        )
+        _validate_visual_route_provenance(result, target_record, key)
         _validate_font_evidence(result, key)
         screenshot_value = result.get("screenshot")
         if not isinstance(screenshot_value, str) or not screenshot_value:

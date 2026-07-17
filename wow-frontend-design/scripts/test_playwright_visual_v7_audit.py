@@ -27,16 +27,19 @@ class PlaywrightVisualV7AuditTests(unittest.TestCase):
             self.fail(completed.stderr)
         return json.loads(completed.stdout)
 
-    def test_inventory_produces_sixty_four_screenshots(self) -> None:
+    def test_inventory_replays_every_route_interaction(self) -> None:
         source = f"""
-const {{ CASE_PAGES, VIEWPORTS }} = require({json.dumps(str(AUDITOR))});
+const {{ CASE_PAGES, INTERACTION_PAGES, VIEWPORTS, expectedScreenshotCount, interactionPageNames }} = require({json.dumps(str(AUDITOR))});
 const base = Object.values(CASE_PAGES).reduce((sum, pages) => sum + pages.length * VIEWPORTS.length, 0);
-const interaction = Object.keys(CASE_PAGES).length * 2;
+const interaction = Object.values(INTERACTION_PAGES).reduce((sum, pages) => sum + pages.length * 2, 0);
 process.stdout.write(JSON.stringify({{
   cases: Object.keys(CASE_PAGES).length,
   routes: Object.values(CASE_PAGES).flat().length,
   profiles: VIEWPORTS.map((viewport) => viewport.name),
   total: base + interaction,
+  expected: expectedScreenshotCount(Object.keys(CASE_PAGES).map((caseId) => ({{ caseId }}))),
+  packagingInteractionPages: interactionPageNames('packaging-configurator-v6'),
+  oralHistoryInteractionPages: interactionPageNames('oral-history-archive-v6'),
 }}));
 """
         result = self.run_node(source)
@@ -46,7 +49,75 @@ process.stdout.write(JSON.stringify({{
             ["desktop", "tablet", "mobile", "compact-mobile"],
             result["profiles"],
         )
-        self.assertEqual(64, result["total"])
+        self.assertEqual(66, result["total"])
+        self.assertEqual(66, result["expected"])
+        self.assertEqual(["index.html", "materials.html", "summary.html"], result["packagingInteractionPages"])
+        self.assertEqual([], result["oralHistoryInteractionPages"])
+
+    def test_packaging_material_recovery_handler_is_required(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent(`
+    <label data-eval="material-option"><input type="radio" name="material" value="double" checked></label>
+    <label data-eval="material-option"><input type="radio" name="material" value="light"></label>
+    <div id="status-pill" class="status status--ok"></div>
+    <div data-eval="conflict-message"></div>
+    <button data-action="load-stress" type="button">stress</button>
+    <button data-action="apply-recovery" type="button" hidden>recover</button>
+    <script>
+      const status = document.querySelector('#status-pill');
+      const recovery = document.querySelector('[data-action="apply-recovery"]');
+      document.querySelector('[data-action="load-stress"]').addEventListener('click', () => {{
+        status.className = 'status status--warn';
+        recovery.hidden = false;
+      }});
+      // Recovery listener intentionally omitted: the evaluator must fail this fixture.
+    </script>
+  `);
+  const evidence = await runCaseInteraction(page, 'packaging-configurator-v6', {{ name: 'desktop' }}, 'materials.html');
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertIn("packaging_material_recovery_failed", result["failures"])
+
+    def test_packaging_summary_replays_reset_then_resubmits(self) -> None:
+        source = AUDITOR.read_text(encoding="utf-8")
+        start = source.index('} else if (caseId === "packaging-configurator-v6" && pageName === "summary.html")')
+        end = source.index('} else if (caseId === "oral-history-archive-v6")', start)
+        summary_flow = source[start:end]
+        submit = 'await page.locator(\'#submit-action\').click();'
+        self.assertGreaterEqual(summary_flow.count(submit), 2)
+        first_submit = summary_flow.index(submit)
+        reset = summary_flow.index('reset.click()', first_submit)
+        restore = summary_flow.index('await page.goto(summaryUrl', reset)
+        second_submit = summary_flow.index(submit, restore)
+        self.assertLess(first_submit, reset)
+        self.assertLess(reset, restore)
+        self.assertLess(restore, second_submit)
+        self.assertIn("evidence.postResetSubmitted", summary_flow)
+        self.assertIn("packaging_summary_post_reset_state_failed", summary_flow)
+
+    def test_noninteractive_page_is_not_reported_as_behavioral_pass(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runCaseInteraction }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const page = await browser.newPage();
+  await page.setContent('<div data-eval="archive-shell">靜態內容</div>');
+  const evidence = await runCaseInteraction(page, 'oral-history-archive-v6', {{ name: 'desktop' }}, 'archive.html');
+  await browser.close();
+  process.stdout.write(JSON.stringify(evidence));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertIn("interaction_not_applicable", result["failures"])
 
     def test_mobile_profiles_use_real_mobile_emulation_signals(self) -> None:
         source = f"""

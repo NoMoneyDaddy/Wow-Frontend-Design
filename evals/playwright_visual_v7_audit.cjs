@@ -34,6 +34,16 @@ const CASE_PAGES = {
   "oral-history-archive-v6": ["index.html", "archive.html", "story.html"],
   "grant-review-board-v6": ["index.html"],
 };
+const INTERACTION_PAGES = {
+  "wind-maintenance-dispatch-v6": ["index.html"],
+  "type-foundry-specimen-v6": ["index.html"],
+  "repair-cafe-intake-v6": ["index.html"],
+  "night-market-allergen-v6": ["index.html"],
+  "royalty-statement-v6": ["index.html"],
+  "packaging-configurator-v6": ["index.html", "materials.html", "summary.html"],
+  "oral-history-archive-v6": [],
+  "grant-review-board-v6": ["index.html"],
+};
 const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 const TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const LOCALE_RULES = {
@@ -2472,8 +2482,8 @@ async function waitForRenderedStateToSettle(page) {
   }
 }
 
-async function runCaseInteraction(page, caseId, viewport) {
-  const evidence = { attempted: true, failures: [] };
+async function runCaseInteraction(page, caseId, viewport, pageName) {
+  const evidence = { attempted: true, page: pageName, failures: [] };
   try {
     if (caseId === "wind-maintenance-dispatch-v6") {
       evidence.initialRecords = await visibleCount(page, '[data-eval="dispatch-row"]');
@@ -2540,7 +2550,7 @@ async function runCaseInteraction(page, caseId, viewport) {
         evidence.failures.push("royalty_period_switch_failed");
       }
       if (!evidence.tooltipVisible) evidence.failures.push("royalty_tooltip_failed");
-    } else if (caseId === "packaging-configurator-v6") {
+    } else if (caseId === "packaging-configurator-v6" && pageName === "index.html") {
       const inputs = page.locator('[data-eval="size-option"] input[type="radio"]:enabled');
       const inputCount = await inputs.count();
       if (!inputCount) throw new Error("no enabled size radio inside data-eval=size-option");
@@ -2557,9 +2567,61 @@ async function runCaseInteraction(page, caseId, viewport) {
       evidence.sizeSelected = await input.isChecked();
       evidence.summaryVisible = await page.locator('[data-eval="config-summary"]').isVisible();
       if (!evidence.sizeSelected || !evidence.summaryVisible) evidence.failures.push("packaging_summary_failed");
+    } else if (caseId === "packaging-configurator-v6" && pageName === "materials.html") {
+      const inputs = page.locator('[data-eval="material-option"] input[type="radio"]:enabled');
+      const inputCount = await inputs.count();
+      if (inputCount < 2) throw new Error("materials interaction requires at least two enabled material options");
+      let input = inputs.first();
+      for (let index = 0; index < inputCount; index += 1) {
+        if (!(await inputs.nth(index).isChecked())) {
+          input = inputs.nth(index);
+          break;
+        }
+      }
+      const label = input.locator("xpath=ancestor::label[1]");
+      if ((await label.count()) && await label.isVisible()) await label.click();
+      else await input.check();
+      await page.waitForTimeout(100);
+      evidence.materialSelected = await input.isChecked();
+      await page.locator('[data-action="load-stress"]').click();
+      await page.waitForTimeout(100);
+      evidence.conflictState = await page.locator('#status-pill').getAttribute('class');
+      evidence.recoveryVisible = await page.locator('[data-action="apply-recovery"]').isVisible();
+      if (!evidence.materialSelected || !evidence.recoveryVisible || !String(evidence.conflictState || '').includes('status--warn')) {
+        evidence.failures.push("packaging_material_conflict_not_reproduced");
+      }
+      await page.locator('[data-action="apply-recovery"]').click();
+      await page.waitForTimeout(100);
+      evidence.recovered = !(await page.locator('[data-action="apply-recovery"]').isVisible())
+        && String(await page.locator('#status-pill').getAttribute('class') || '').includes('status--ok');
+      if (!evidence.recovered) evidence.failures.push("packaging_material_recovery_failed");
+    } else if (caseId === "packaging-configurator-v6" && pageName === "summary.html") {
+      await page.locator('#submit-action').click();
+      await page.waitForTimeout(100);
+      evidence.submitted = (await page.locator('#submission-state').innerText()).includes('已在本機標記送樣');
+      const reset = page.locator('[data-eval="reset-action"]');
+      await Promise.all([
+        page.waitForURL((url) => url.pathname.endsWith('/index.html'), { timeout: 3000 }),
+        reset.click(),
+      ]);
+      await page.waitForTimeout(100);
+      evidence.resetNavigated = new URL(page.url()).pathname.endsWith('/index.html');
+      evidence.resetToDefault = await page.locator('[data-eval="size-option"] input[value="m"]').isChecked()
+        && await page.locator('[data-eval="config-summary"]').isVisible();
+      if (!evidence.submitted || !evidence.resetNavigated || !evidence.resetToDefault) {
+        evidence.failures.push("packaging_summary_reset_failed");
+      }
+      const summaryUrl = new URL(pageName, page.url()).href;
+      await page.goto(summaryUrl, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(100);
+      evidence.routeRestored = new URL(page.url()).pathname.endsWith('/summary.html');
+      if (!evidence.routeRestored) evidence.failures.push("packaging_summary_route_not_restored");
+      await page.locator('#submit-action').click();
+      await page.waitForTimeout(100);
+      evidence.postResetSubmitted = (await page.locator('#submission-state').innerText()).includes('已在本機標記送樣');
+      if (!evidence.postResetSubmitted) evidence.failures.push("packaging_summary_post_reset_state_failed");
     } else if (caseId === "oral-history-archive-v6") {
-      evidence.shellVisible = await page.locator('[data-eval="archive-shell"]').isVisible();
-      if (!evidence.shellVisible) evidence.failures.push("oral_history_shell_missing");
+      evidence.failures.push("interaction_not_applicable");
     } else if (caseId === "grant-review-board-v6") {
       const plan = grantInteractionPlan(viewport.name);
       evidence.initialRecords = await visibleCount(page, '[data-eval="proposal-row"]');
@@ -2586,6 +2648,8 @@ async function runCaseInteraction(page, caseId, viewport) {
       if (evidence.initialRecords !== plan.expectedVisibleRecords || !evidence.modalVisible) evidence.failures.push("grant_decision_flow_failed");
       if (!evidence.backgroundInert) evidence.failures.push("grant_modal_background_not_inert");
     }
+    const finalPageName = new URL(page.url()).pathname.split('/').pop() || "index.html";
+    if (finalPageName !== pageName) evidence.failures.push("interaction_left_declared_page");
   } catch (error) {
     evidence.failures.push(`interaction_exception:${String(error.message || error).slice(0, 160)}`);
   }
@@ -2664,7 +2728,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
   await page.waitForTimeout(250);
   await page.evaluate(() => document.fonts.ready);
   const interaction = state === "interaction"
-    ? await runCaseInteraction(page, target.caseId, viewport)
+    ? await runCaseInteraction(page, target.caseId, viewport, pageName)
     : { attempted: false, failures: [] };
   await page.evaluate(() => document.fonts.ready);
   if (state === "interaction") await waitForRenderedStateToSettle(page);
@@ -3323,7 +3387,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
     alias: target.alias,
     page: pageName,
     state,
-    url: targetUrl,
+    url: page.url(),
     viewport: viewport.name,
     size: `${viewport.width}x${viewport.height}`,
     screenshot,
@@ -3368,6 +3432,16 @@ function compareMultiPageShell(results, target) {
   return comparisons;
 }
 
+function interactionPageNames(caseId) {
+  return [...(INTERACTION_PAGES[caseId] || [])];
+}
+
+function expectedScreenshotCount(targets) {
+  return targets.reduce((count, target) => count
+    + (CASE_PAGES[target.caseId]?.length || 0) * VIEWPORTS.length
+    + (INTERACTION_PAGES[target.caseId]?.length || 0) * 2, 0);
+}
+
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   const launchOptions = { headless: true };
@@ -3394,8 +3468,10 @@ async function main() {
           report.results.push(await auditPage(browser, options, target, pageName, viewport, "base"));
         }
       }
-      for (const viewport of VIEWPORTS.filter(({ name }) => ["desktop", "mobile"].includes(name))) {
-        report.results.push(await auditPage(browser, options, target, CASE_PAGES[target.caseId][0], viewport, "interaction"));
+      for (const pageName of interactionPageNames(target.caseId)) {
+        for (const viewport of VIEWPORTS.filter(({ name }) => ["desktop", "mobile"].includes(name))) {
+          report.results.push(await auditPage(browser, options, target, pageName, viewport, "interaction"));
+        }
       }
       if (CASE_PAGES[target.caseId].length > 1) {
         report.crossPageComparisons.push(...compareMultiPageShell(report.results, target));
@@ -3440,7 +3516,7 @@ async function main() {
   const observedIssueCount = Object.values(byTarget).reduce((count, issues) => count + issues.length, 0);
   report.summary = {
     checkedPages: report.results.length,
-    minimumExpectedScreenshots: 60,
+    minimumExpectedScreenshots: Math.max(60, expectedScreenshotCount(options.targets)),
     targetsWithObservedIssues: Object.values(byTarget).filter((issues) => issues.length).length,
     issuesByTarget: byTarget,
     advisoryCount,
@@ -3463,6 +3539,10 @@ async function main() {
 
 module.exports = {
   CASE_PAGES,
+  INTERACTION_PAGES,
+  runCaseInteraction,
+  interactionPageNames,
+  expectedScreenshotCount,
   FONT_ROLE_SELECTORS,
   PRODUCT_TEXT_ROOT_SELECTOR,
   VIEWPORTS,

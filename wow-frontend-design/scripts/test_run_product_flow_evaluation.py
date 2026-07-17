@@ -65,6 +65,34 @@ def write_completed_manifest(target: Path, provider: str, model: str, case_id: s
 
 
 class ProductFlowEvaluationTests(unittest.TestCase):
+    def test_visual_inventory_replays_every_declared_page(self) -> None:
+        keys = evaluation.expected_visual_keys(
+            [{"case_id": "packaging-configurator-v6", "alias": "codex-gpt-5.4", "directory": Path(".")}]
+        )
+        interactions = {key[2] for key in keys if key[3] == "interaction"}
+        self.assertEqual(18, len(keys))
+        self.assertEqual({"index.html", "materials.html", "summary.html"}, interactions)
+        oral_keys = evaluation.expected_visual_keys(
+            [{"case_id": "oral-history-archive-v6", "alias": "codex-gpt-5.4", "directory": Path(".")}]
+        )
+        self.assertEqual(12, len(oral_keys))
+        self.assertFalse(any(key[3] == "interaction" for key in oral_keys))
+
+    def test_visual_route_provenance_is_required(self) -> None:
+        key = ("wind-maintenance-dispatch-v6", "codex-gpt-5.4", "index.html", "base", "desktop")
+        with self.assertRaisesRegex(evaluation.EvaluationError, "route provenance"):
+            evaluation._validate_visual_route_provenance(
+                {"page": "index.html"},
+                {"url": "http://fixture.test/"},
+                key,
+            )
+        with self.assertRaisesRegex(evaluation.EvaluationError, "route provenance disagrees"):
+            evaluation._validate_visual_route_provenance(
+                {"url": "http://fixture.test/target-1/index.html"},
+                {"url": "http://fixture.test/target-0/"},
+                key,
+            )
+
     def test_visual_tool_resolution_reuses_pinned_package_and_provided_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -243,6 +271,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                         "caseId": "wind-maintenance-dispatch-v6",
                         "alias": "claude-haiku",
                         "page": "index.html",
+                        "url": "http://fixture.test/index.html",
                         "state": state,
                         "viewport": viewport,
                         "size": f"{width}x{height}",
@@ -297,6 +326,8 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                         },
                     }
                 )
+                if state == "interaction":
+                    results[-1]["interaction"] = {"page": "index.html", "status": "completed"}
             report = root / "visual.json"
             generation = root / "generation.json"
             generation.write_text('{"status":"completed"}\n', encoding="utf-8")
@@ -314,6 +345,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                             {
                                 "caseId": "wind-maintenance-dispatch-v6",
                                 "alias": "claude-haiku",
+                                "url": "http://fixture.test/",
                             }
                         ],
                         "results": results,
