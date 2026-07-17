@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -41,6 +42,25 @@ def fake_png(width: int, height: int) -> bytes:
     header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
     pixels = b"".join(b"\x00" + (b"\x00" * width) for _ in range(height))
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b"")
+
+
+def javascript_interaction_coverage(report: dict) -> dict:
+    source = f"""
+const fs = require('node:fs');
+const {{ buildInteractionCoverage }} = require({json.dumps(str(EVALS / 'playwright_visual_v7_audit.cjs'))});
+const report = JSON.parse(fs.readFileSync(0, 'utf8'));
+process.stdout.write(JSON.stringify(buildInteractionCoverage(report.targets, report.results)));
+"""
+    completed = subprocess.run(
+        ["node", "-e", source],
+        input=json.dumps(report),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(completed.stderr or completed.stdout)
+    return json.loads(completed.stdout)
 
 
 def write_completed_manifest(target: Path, provider: str, model: str, case_id: str) -> dict[str, object]:
@@ -218,8 +238,9 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             )
 
     def test_type_foundry_round_trip_evidence_is_recomputed_fail_closed(self) -> None:
-        state_a = {"writingMode": "horizontal-tb", "ariaPressed": "false"}
-        state_b = {"writingMode": "vertical-rl", "ariaPressed": "true"}
+        # Reverse the manifest's key order: JSON object order must not change semantic verification.
+        state_a = {"ariaPressed": "false", "writingMode": "horizontal-tb"}
+        state_b = {"ariaPressed": "true", "writingMode": "vertical-rl"}
         sampled_b = {"actual": state_b, "samples": [state_b, state_b, state_b], "matches": True}
         interaction = {
             "attempted": True,
@@ -273,6 +294,104 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 {**result, "interaction": failed, "visualIssues": []},
                 key,
             )
+
+    def test_interaction_coverage_is_recomputed_before_retention(self) -> None:
+        state_a = {"ariaPressed": "false", "writingMode": "horizontal-tb"}
+        state_b = {"ariaPressed": "true", "writingMode": "vertical-rl"}
+        sampled_b = {"actual": state_b, "samples": [state_b, state_b, state_b], "matches": True}
+        interaction = {
+            "attempted": True,
+            "page": "index.html",
+            "manifestId": "type-foundry-writing-mode-toggle",
+            "manifestCoverage": "declared-pilot-row",
+            "failures": [],
+            "hooks": {"controlCount": 1, "stateCount": 1, "controlVisible": True, "controlEnabled": True},
+            "A": state_a,
+            "B": state_b,
+            "restoredA": state_a,
+            "returnPath": "activate the same control again",
+            "finalB": state_b,
+            "roundTripVerified": True,
+            "screenshotState": {"expected": "B", "before": sampled_b, "after": sampled_b, "verified": True},
+        }
+        report = {
+            "targets": [
+                {"caseId": "type-foundry-specimen-v6", "alias": "pilot"},
+                {"caseId": "wind-maintenance-dispatch-v6", "alias": "pilot"},
+            ],
+            "results": [
+                *[
+                    {
+                        "caseId": "type-foundry-specimen-v6",
+                        "alias": "pilot",
+                        "page": "index.html",
+                        "state": "interaction",
+                        "viewport": viewport,
+                        "screenshot": f"type-{viewport}.png",
+                        "visualIssues": [],
+                        "interaction": interaction,
+                    }
+                    for viewport in ("desktop", "mobile")
+                ],
+                *[
+                    {
+                        "caseId": "wind-maintenance-dispatch-v6",
+                        "alias": "pilot",
+                        "page": "index.html",
+                        "state": "interaction",
+                        "viewport": viewport,
+                        "screenshot": f"wind-{viewport}.png",
+                        "visualIssues": ["wind_filter_count_failed"] if viewport == "desktop" else [],
+                        "interaction": {"failures": []},
+                    }
+                    for viewport in ("desktop", "mobile")
+                ],
+                {
+                    "caseId": "wind-maintenance-dispatch-v6",
+                    "alias": "pilot",
+                    "page": "index.html",
+                    "state": "interaction",
+                    "viewport": "desktop",
+                    "screenshot": "wind-desktop-duplicate.png",
+                    "visualIssues": [],
+                    "interaction": {"failures": []},
+                },
+            ],
+            "summary": {},
+        }
+        javascript_coverage = javascript_interaction_coverage(report)
+        by_target, summary = evaluation._expected_visual_interaction_coverage(report)
+        self.assertEqual(javascript_coverage["byTarget"], by_target)
+        self.assertEqual(javascript_coverage["summary"], summary)
+        report["interactionCoverageByTarget"] = javascript_coverage["byTarget"]
+        report["summary"]["interactionCoverage"] = javascript_coverage["summary"]
+        evaluation._validate_visual_interaction_coverage(report, required=True)
+        self.assertEqual("cohort_complete", by_target["type-foundry-specimen-v6:pilot"]["status"])
+        self.assertEqual(1, summary["legacyFailedCaptures"])
+        self.assertEqual(3, summary["legacyExecutedCaptures"])
+        self.assertEqual(
+            ["desktop"],
+            by_target["wind-maintenance-dispatch-v6:pilot"]["rows"][0]["duplicateViewports"],
+        )
+
+        forged = json.loads(json.dumps(report))
+        forged["summary"]["interactionCoverage"]["legacyFailedCaptures"] = 0
+        with self.assertRaisesRegex(evaluation.EvaluationError, "coverage summary disagrees"):
+            evaluation._validate_visual_interaction_coverage(forged, required=True)
+
+        forged = json.loads(json.dumps(report))
+        forged["interactionCoverageByTarget"]["wind-maintenance-dispatch-v6:pilot"]["rows"][0]["failedViewports"] = []
+        with self.assertRaisesRegex(evaluation.EvaluationError, "coverage by target disagrees"):
+            evaluation._validate_visual_interaction_coverage(forged, required=True)
+
+    def test_current_visual_completion_requires_both_interaction_coverage_dimensions(self) -> None:
+        report = {"targets": [], "results": [], "summary": {}}
+        evaluation._validate_visual_interaction_coverage(report, required=False)
+        with self.assertRaisesRegex(evaluation.EvaluationError, "coverage evidence is incomplete"):
+            evaluation._validate_visual_interaction_coverage(report, required=True)
+        report["interactionCoverageByTarget"] = {}
+        with self.assertRaisesRegex(evaluation.EvaluationError, "coverage evidence is incomplete"):
+            evaluation._validate_visual_interaction_coverage(report, required=True)
 
     def test_visual_tool_resolution_reuses_pinned_package_and_provided_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -582,6 +701,11 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             )
             (root / "DESIGN.md").write_text("# Design\n", encoding="utf-8")
             (root / "index.html").write_text("<main></main>\n", encoding="utf-8")
+            report_payload = json.loads(report.read_text(encoding="utf-8"))
+            javascript_coverage = javascript_interaction_coverage(report_payload)
+            report_payload["interactionCoverageByTarget"] = javascript_coverage["byTarget"]
+            report_payload["summary"]["interactionCoverage"] = javascript_coverage["summary"]
+            report.write_text(json.dumps(report_payload), encoding="utf-8")
             evaluation.bind_visual_report(report, generation, targets)
             self.assertEqual(6, evaluation.validate_visual_completion(report, screenshots, targets, generation))
 

@@ -2509,6 +2509,18 @@ function interactionManifestById(manifestId) {
   return Object.values(INTERACTION_MANIFEST).find((manifest) => manifest.id === manifestId) || null;
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sameJsonValue(actual, expected) {
+  return canonicalJson(actual) === canonicalJson(expected);
+}
+
 async function sampleManifestState(page, manifest, expectedState) {
   const samples = await page.evaluate(async ({ controlSelector, stateSelector }) => {
     const snapshot = () => {
@@ -2526,11 +2538,10 @@ async function sampleManifestState(page, manifest, expectedState) {
     }
     return values;
   }, { controlSelector: manifest.controlSelector, stateSelector: manifest.stateSelector });
-  const expected = JSON.stringify(expectedState);
   return {
     actual: samples.at(-1),
     samples,
-    matches: samples.every((sample) => JSON.stringify(sample) === expected),
+    matches: samples.every((sample) => sameJsonValue(sample, expectedState)),
   };
 }
 
@@ -2600,7 +2611,7 @@ async function runCaseInteraction(page, caseId, viewport, pageName) {
           writingMode: await specimen.evaluate((node) => getComputedStyle(node).writingMode),
           ariaPressed: await toggle.getAttribute("aria-pressed"),
         });
-        const sameState = (actual, expected) => JSON.stringify(actual) === JSON.stringify(expected);
+        const sameState = (actual, expected) => sameJsonValue(actual, expected);
         const activateAndCapture = async (step, expected, failureCode) => {
           await toggle.click();
           let settled = true;
@@ -4059,18 +4070,18 @@ function manifestCaptureVerified(capture, manifest) {
     && Number.isInteger(hooks.stateCount) && hooks.stateCount === 1
     && hooks.controlVisible === true
     && hooks.controlEnabled === true
-    && JSON.stringify(interaction.A) === JSON.stringify(expectedA)
-    && JSON.stringify(interaction.restoredA) === JSON.stringify(expectedA)
-    && JSON.stringify(interaction.B) === JSON.stringify(expectedB)
-    && JSON.stringify(interaction.finalB) === JSON.stringify(expectedB)
+    && sameJsonValue(interaction.A, expectedA)
+    && sameJsonValue(interaction.restoredA, expectedA)
+    && sameJsonValue(interaction.B, expectedB)
+    && sameJsonValue(interaction.finalB, expectedB)
     && interaction.returnPath === manifest.returnAction;
   const screenshotState = interaction.screenshotState;
   const sampleMatches = (sample) => sample
     && JSON.stringify(Object.keys(sample).sort()) === JSON.stringify(["actual", "samples", "matches"].sort())
     && Array.isArray(sample.samples)
     && sample.samples.length === 3
-    && sample.samples.every((state) => JSON.stringify(state) === JSON.stringify(expectedB))
-    && JSON.stringify(sample.actual) === JSON.stringify(sample.samples.at(-1))
+    && sample.samples.every((state) => sameJsonValue(state, expectedB))
+    && sameJsonValue(sample.actual, sample.samples.at(-1))
     && sample.matches === true;
   const screenshotVerified = screenshotState
     && JSON.stringify(Object.keys(screenshotState).sort()) === JSON.stringify(["expected", "before", "after", "verified"].sort())

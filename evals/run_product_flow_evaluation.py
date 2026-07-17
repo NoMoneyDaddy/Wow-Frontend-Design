@@ -57,6 +57,7 @@ INTERACTION_PAGES = {
 TYPE_FOUNDRY_STATE_A = {"writingMode": "horizontal-tb", "ariaPressed": "false"}
 TYPE_FOUNDRY_STATE_B = {"writingMode": "vertical-rl", "ariaPressed": "true"}
 TYPE_FOUNDRY_RETURN_PATH = "activate the same control again"
+INTERACTION_REQUIRED_VIEWPORTS = ("desktop", "mobile")
 MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
 TABLET_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 VIEWPORTS = {
@@ -1033,6 +1034,238 @@ def _validate_visual_interaction_evidence(result: dict[str, Any], key: tuple[obj
             raise EvaluationError(f"type-foundry screenshot-state {boundary} samples disagree: {key}")
 
 
+def _capture_interaction_failures(result: dict[str, Any]) -> list[str]:
+    interaction = result.get("interaction")
+    declared = interaction.get("failures", []) if isinstance(interaction, dict) else []
+    observed = result.get("visualIssues", [])
+    if (
+        not isinstance(declared, list)
+        or any(not isinstance(item, str) or not item for item in declared)
+        or not isinstance(observed, list)
+        or any(not isinstance(item, str) or not item for item in observed)
+    ):
+        raise EvaluationError("visual interaction failure inventory is malformed")
+    return list(dict.fromkeys([*declared, *observed]))
+
+
+def _declared_interaction_capture_verified(result: dict[str, Any], key: tuple[object, ...]) -> bool:
+    _validate_visual_interaction_evidence(result, key)
+    interaction = result.get("interaction")
+    return isinstance(interaction, dict) and interaction.get("failures") == []
+
+
+def _expected_visual_interaction_coverage(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    targets = report.get("targets")
+    results = report.get("results")
+    if not isinstance(targets, list) or not isinstance(results, list):
+        raise EvaluationError("visual interaction coverage inputs are malformed")
+    by_target: dict[str, Any] = {}
+    for target in targets:
+        if (
+            not isinstance(target, dict)
+            or not isinstance(target.get("caseId"), str)
+            or target["caseId"] not in INTERACTION_PAGES
+            or not isinstance(target.get("alias"), str)
+            or not target["alias"]
+        ):
+            raise EvaluationError("visual interaction coverage target is malformed")
+        case_id = target["caseId"]
+        alias = target["alias"]
+        rows: list[dict[str, Any]] = []
+        for page in INTERACTION_PAGES[case_id]:
+            row_key = f"{case_id}:{page}"
+            manifest_id = "type-foundry-writing-mode-toggle" if row_key == "type-foundry-specimen-v6:index.html" else None
+            captures = [
+                result for result in results
+                if isinstance(result, dict)
+                and result.get("caseId") == case_id
+                and result.get("alias") == alias
+                and result.get("page") == page
+                and result.get("state") == "interaction"
+                and result.get("viewport") in INTERACTION_REQUIRED_VIEWPORTS
+            ]
+            captures_by_viewport = {
+                viewport: [capture for capture in captures if capture.get("viewport") == viewport]
+                for viewport in INTERACTION_REQUIRED_VIEWPORTS
+            }
+            observed_viewports = [
+                viewport for viewport in INTERACTION_REQUIRED_VIEWPORTS
+                if captures_by_viewport[viewport]
+            ]
+            duplicate_viewports = [
+                viewport for viewport in INTERACTION_REQUIRED_VIEWPORTS
+                if len(captures_by_viewport[viewport]) > 1
+            ]
+            screenshots_by_viewport = {
+                viewport: [capture.get("screenshot") or None for capture in captures_by_viewport[viewport]]
+                for viewport in observed_viewports
+            }
+            failures_by_viewport: dict[str, list[str]] = {}
+            failed_viewports: list[str] = []
+            if manifest_id is None:
+                for viewport in INTERACTION_REQUIRED_VIEWPORTS:
+                    failures = list(dict.fromkeys(
+                        failure
+                        for capture in captures_by_viewport[viewport]
+                        for failure in _capture_interaction_failures(capture)
+                    ))
+                    if failures:
+                        failed_viewports.append(viewport)
+                        failures_by_viewport[viewport] = failures
+                rows.append({
+                    "rowKey": row_key,
+                    "page": page,
+                    "manifestId": None,
+                    "declaration": "legacy",
+                    "requiredViewports": list(INTERACTION_REQUIRED_VIEWPORTS),
+                    "observedViewports": observed_viewports,
+                    "verifiedViewports": [],
+                    "failedViewports": failed_viewports,
+                    "missingViewports": [
+                        viewport for viewport in INTERACTION_REQUIRED_VIEWPORTS
+                        if viewport not in observed_viewports
+                    ],
+                    "duplicateViewports": duplicate_viewports,
+                    "failuresByViewport": failures_by_viewport,
+                    "screenshotsByViewport": screenshots_by_viewport,
+                    "observedCaptureCount": len(captures),
+                    "failedCaptureCount": sum(
+                        bool(_capture_interaction_failures(capture)) for capture in captures
+                    ),
+                    "status": "undeclared",
+                })
+                continue
+            verified_viewports: list[str] = []
+            capture_verification: dict[int, bool] = {}
+            for viewport in INTERACTION_REQUIRED_VIEWPORTS:
+                viewport_captures = captures_by_viewport[viewport]
+                for capture in viewport_captures:
+                    key = (case_id, alias, page, "interaction", viewport)
+                    capture_verification[id(capture)] = _declared_interaction_capture_verified(capture, key)
+                failures = list(dict.fromkeys(
+                    failure
+                    for capture in viewport_captures
+                    for failure in _capture_interaction_failures(capture)
+                ))
+                verified = len(viewport_captures) == 1 and capture_verification[id(viewport_captures[0])]
+                if verified:
+                    verified_viewports.append(viewport)
+                elif len(viewport_captures) == 1 or failures:
+                    failed_viewports.append(viewport)
+                    failures_by_viewport[viewport] = failures or ["interaction_evidence_not_verified"]
+            missing_viewports = [
+                viewport for viewport in INTERACTION_REQUIRED_VIEWPORTS
+                if not captures_by_viewport[viewport]
+            ]
+            failed = bool(failed_viewports)
+            incomplete = bool(missing_viewports or duplicate_viewports)
+            rows.append({
+                "rowKey": row_key,
+                "page": page,
+                "manifestId": manifest_id,
+                "declaration": "declared",
+                "requiredViewports": list(INTERACTION_REQUIRED_VIEWPORTS),
+                "observedViewports": observed_viewports,
+                "verifiedViewports": verified_viewports,
+                "failedViewports": failed_viewports,
+                "missingViewports": missing_viewports,
+                "duplicateViewports": duplicate_viewports,
+                "failuresByViewport": failures_by_viewport,
+                "screenshotsByViewport": screenshots_by_viewport,
+                "observedCaptureCount": len(captures),
+                "failedCaptureCount": sum(not verified for verified in capture_verification.values()),
+                "status": (
+                    "failed_incomplete" if failed and incomplete else
+                    "failed" if failed else
+                    "incomplete" if incomplete else
+                    "verified"
+                ),
+            })
+        declared_rows = [row for row in rows if row["declaration"] == "declared"]
+        legacy_rows = [row for row in rows if row["declaration"] == "legacy"]
+        counts = {
+            "applicable": len(rows),
+            "declared": len(declared_rows),
+            "verified": sum(row["status"] == "verified" for row in declared_rows),
+            "undeclared": len(legacy_rows),
+            "failedDeclared": sum(bool(row["failedViewports"]) for row in declared_rows),
+            "incompleteDeclared": sum(bool(row["missingViewports"] or row["duplicateViewports"]) for row in declared_rows),
+            "declaredExpectedCaptures": len(declared_rows) * len(INTERACTION_REQUIRED_VIEWPORTS),
+            "declaredObservedCaptures": sum(row["observedCaptureCount"] for row in declared_rows),
+            "declaredVerifiedCaptures": sum(len(row["verifiedViewports"]) for row in declared_rows),
+            "declaredFailedCaptures": sum(row["failedCaptureCount"] for row in declared_rows),
+            "declaredMissingCaptures": sum(len(row["missingViewports"]) for row in declared_rows),
+            "legacyExpectedCaptures": len(legacy_rows) * len(INTERACTION_REQUIRED_VIEWPORTS),
+            "legacyExecutedCaptures": sum(row["observedCaptureCount"] for row in legacy_rows),
+            "legacyFailedRows": sum(bool(row["failedViewports"]) for row in legacy_rows),
+            "legacyFailedCaptures": sum(row["failedCaptureCount"] for row in legacy_rows),
+        }
+        if counts["applicable"] == 0:
+            status = "not_applicable"
+        elif counts["declared"] == 0:
+            status = "undeclared"
+        elif counts["verified"] == counts["applicable"]:
+            status = "cohort_complete"
+        elif (
+            counts["verified"] == counts["declared"]
+            and counts["failedDeclared"] == 0
+            and counts["incompleteDeclared"] == 0
+        ):
+            status = "pilot_complete"
+        else:
+            status = "partial"
+        by_target[f"{case_id}:{alias}"] = {
+            "status": status,
+            **counts,
+            "declarationCoverage": f"{counts['declared']}/{counts['applicable']}",
+            "declaredRowVerification": f"{counts['verified']}/{counts['declared']}",
+            "declaredCaptureVerification": f"{counts['declaredVerifiedCaptures']}/{counts['declaredExpectedCaptures']}",
+            "rows": rows,
+        }
+    count_fields = (
+        "applicable", "declared", "verified", "undeclared", "failedDeclared", "incompleteDeclared",
+        "declaredExpectedCaptures", "declaredObservedCaptures", "declaredVerifiedCaptures",
+        "declaredFailedCaptures", "declaredMissingCaptures", "legacyExpectedCaptures", "legacyExecutedCaptures",
+        "legacyFailedRows", "legacyFailedCaptures",
+    )
+    summary = {"unit": "target-row", "requiredViewports": list(INTERACTION_REQUIRED_VIEWPORTS)}
+    for field in count_fields:
+        summary[field] = sum(target[field] for target in by_target.values())
+    summary["declarationCoverage"] = f"{summary['declared']}/{summary['applicable']}"
+    summary["declaredRowVerification"] = f"{summary['verified']}/{summary['declared']}"
+    summary["declaredCaptureVerification"] = f"{summary['declaredVerifiedCaptures']}/{summary['declaredExpectedCaptures']}"
+    if summary["applicable"] == 0:
+        summary["status"] = "not_applicable"
+    elif summary["declared"] == 0:
+        summary["status"] = "undeclared"
+    elif summary["verified"] == summary["applicable"]:
+        summary["status"] = "cohort_complete"
+    elif (
+        summary["verified"] == summary["declared"]
+        and summary["failedDeclared"] == 0
+        and summary["incompleteDeclared"] == 0
+    ):
+        summary["status"] = "pilot_complete"
+    else:
+        summary["status"] = "partial"
+    return by_target, summary
+
+
+def _validate_visual_interaction_coverage(report: dict[str, Any], *, required: bool) -> None:
+    coverage_present = "interactionCoverageByTarget" in report
+    summary = report.get("summary")
+    summary_present = isinstance(summary, dict) and "interactionCoverage" in summary
+    if not coverage_present and not summary_present and not required:
+        return
+    if not coverage_present or not summary_present:
+        raise EvaluationError("visual interaction coverage evidence is incomplete")
+    expected_by_target, expected_summary = _expected_visual_interaction_coverage(report)
+    if report.get("interactionCoverageByTarget") != expected_by_target:
+        raise EvaluationError("visual interaction coverage by target disagrees with results")
+    if summary.get("interactionCoverage") != expected_summary:
+        raise EvaluationError("visual interaction coverage summary disagrees with results")
+
+
 def _validate_visual_route_provenance(
     result: dict[str, Any],
     target_record: dict[str, Any] | None,
@@ -1135,6 +1368,7 @@ def validate_visual_completion(
         screenshot_paths.add(screenshot)
     if seen != expected or len(screenshot_paths) != len(expected):
         raise EvaluationError("visual screenshot inventory is incomplete")
+    _validate_visual_interaction_coverage(report, required=True)
     actual_pngs = {path.resolve() for path in screenshot_dir.glob("*.png") if path.is_file() and not path.is_symlink()}
     if actual_pngs != screenshot_paths:
         raise EvaluationError("screenshot directory contains missing or extra PNG files")
@@ -1250,6 +1484,7 @@ def blocking_visual_findings(
     require_discovery: bool = False,
 ) -> dict[str, list[str]]:
     report = _load_json(visual_output, "visual report")
+    _validate_visual_interaction_coverage(report, required=False)
     by_target: dict[str, set[str]] = {}
     evidence_gaps_from_results: dict[str, list[dict[str, str]]] = {}
     advisories_from_results: dict[str, list[dict[str, Any]]] = {}

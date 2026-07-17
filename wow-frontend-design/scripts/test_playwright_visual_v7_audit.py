@@ -60,8 +60,8 @@ process.stdout.write(JSON.stringify({{
 const {{ CASE_PAGES, INTERACTION_MANIFEST, INTERACTION_PAGES, buildInteractionCoverage }} = require({json.dumps(str(AUDITOR))});
 const targets = Object.keys(CASE_PAGES).map((caseId) => ({{ caseId, alias: 'pilot' }}));
 const results = [];
-const stateA = {{ writingMode: 'horizontal-tb', ariaPressed: 'false' }};
-const stateB = {{ writingMode: 'vertical-rl', ariaPressed: 'true' }};
+const stateA = {{ ariaPressed: 'false', writingMode: 'horizontal-tb' }};
+const stateB = {{ ariaPressed: 'true', writingMode: 'vertical-rl' }};
 const sampledB = {{ actual: stateB, samples: [stateB, stateB, stateB], matches: true }};
 for (const [caseId, pages] of Object.entries(INTERACTION_PAGES)) {{
   for (const page of pages) {{
