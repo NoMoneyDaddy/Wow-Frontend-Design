@@ -23,6 +23,7 @@ Before choosing a wide-screen grid, map each major region to its task stage, sou
 
 - Keep unrelated task stages in sequential full-width regions. Do not stack a short display note and a later form beside a long article when this leaves either column continuing alone through a large empty rectangle.
 - Use two columns only when both regions belong to the same reading or task moment and benefit from simultaneous visibility. If one column ends while the other continues through another substantial component, move the later component below the shared row or recompose the parent grid.
+- Preserve task completeness while repairing composition. Never remove, hide, or demote required comparison evidence, current selection/status, validation feedback, primary actions, or the resulting summary merely to eliminate a void or shorten the page. Recompose those elements into the task stage that owns them, then verify the complete default-to-result flow.
 - Treat vertical writing as display content with its own measured block. It must not become a tall narrow spacer that determines the height of an otherwise unrelated article or form. Preserve the same semantic text as a horizontal region at the mobile breakpoint.
 - For a long horizontal Traditional Chinese product title with no simultaneous task peer, let the title and intro span their owning surface. If the title reaches four lines or ends with a stranded one- or two-Han tail, widen or recompose before reducing type size or editing copy.
 - Do not apply a Latin `ch` cap directly to CJK product copy. Give extended prose a coherent reading surface, but do not leave that surface floating at the start of a substantially wider empty owner.
@@ -154,11 +155,16 @@ Use semantic text with CSS writing modes:
 .vertical-copy {
   writing-mode: vertical-rl;
   text-orientation: mixed;
+  inline-size: fit-content;
+  max-inline-size: min(var(--verified-column-length, 28em), 70dvh);
+  align-self: start;
 }
 ```
 
 - Do not rotate a horizontal container with `transform`. Rotation breaks line construction, punctuation behavior, selection geometry, sizing, and often reading order.
 - `vertical-rl` lays lines from right to left. Use logical properties (`inline-size`, `block-size`, `margin-inline`, `padding-block`) and test scroll direction, source order, selection, copy, keyboard focus, and assistive output.
+- In vertical writing, the inline axis is physical height and the block axis is physical width. Bound the rendered column length with a content-sized `inline-size` and an evidence-derived `max-inline-size` so short copy does not stretch while long copy can form additional columns along the block axis. A `max-width` cap only constrains the vertical box's block axis; it cannot prevent one unbounded, page-height column. The `28em` fallback and `70dvh` cap above are candidates to compare, not universal limits; replace the custom property with the rendered selection.
+- Do not use grid stretch, `min-height: 100%`, viewport-height padding, or an unrelated peer's height to size a vertical note. Let the verified inline size own its height, keep the item at block/inline start, and move the note below the article when its complete text still makes the shared row substantially taller than the reading region. Never clip, mask, or scroll away required text to make the row look balanced.
 - Keep ordinary Han characters upright; verify punctuation glyphs and positions. Test mixed Latin, numerals, dates, abbreviations, and units. Use upright or short horizontal-in-vertical runs only when the content convention calls for them.
 - CLReq reports vertical publication lines commonly around `10–40` characters and often no more than `55`; use this only as a starting envelope. Avoid fixed inline sizes that clip a line after fallback-font or mobile changes.
 - Use vertical writing where it adds editorial meaning. Dense controls, forms, tables, and task instructions need a readable horizontal composition.
@@ -276,6 +282,8 @@ Record the tested font version, viewport, locale, content fixture, candidate val
 - [W3C WCAG 2.2 Understanding 1.4.12: Text Spacing](https://www.w3.org/WAI/WCAG22/Understanding/text-spacing)
 - [W3C Requirements for Chinese Text Layout](https://www.w3.org/TR/clreq/)
 - [W3C CSS Writing Modes Level 3](https://www.w3.org/TR/css-writing-modes-3/)
+- [W3C CSS Logical Properties and Values Level 1](https://www.w3.org/TR/css-logical-1/)
+- [MDN `inline-size`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/inline-size)
 - [W3C CSS Text Module Level 4](https://www.w3.org/TR/css-text-4/)
 - [W3C CSS Text Module Level 3](https://www.w3.org/TR/css-text-3/)
 - [W3C CSS Box Sizing Level 3](https://www.w3.org/TR/css-sizing-3/)
