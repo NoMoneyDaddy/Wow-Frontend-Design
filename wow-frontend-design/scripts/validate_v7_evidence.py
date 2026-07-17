@@ -135,7 +135,11 @@ def _validate_timestamp(value: Any, label: str) -> str:
     return value
 
 
-def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
+def _validate_focus_evidence(
+    runtime: dict[str, Any],
+    label: str,
+    result_schema: int,
+) -> tuple[bool, bool, set[str]]:
     """Validate optional spec-v2 focus evidence and return blocking finding/unavailable flags."""
 
     has_coverage = "focusCoverage" in runtime
@@ -143,7 +147,7 @@ def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool,
     if has_coverage != has_controls:
         raise V7EvidenceError(f"focus evidence is incomplete for {label}")
     if not has_coverage:
-        return False, False
+        return False, False, set()
     coverage = runtime["focusCoverage"]
     controls = runtime["focusedControls"]
     coverage_keys = {
@@ -168,6 +172,8 @@ def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool,
     completed_records = 0
     confirmed = 0
     unavailable = 0
+    confirmed_click_candidate_steps: set[str] = set()
+    step_ids: set[str] = set()
     for record in controls:
         if not isinstance(record, dict):
             raise V7EvidenceError(f"focused control record is malformed for {label}")
@@ -177,12 +183,19 @@ def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool,
             if status == "unavailable"
             else {"id", "role", "status", "fullyObscured", "replays", "occluderCount", "targetArea", "coveredArea"}
         )
+        if result_schema == 3:
+            expected_keys = expected_keys | {"stepId"}
         if set(record) != expected_keys:
             raise V7EvidenceError(f"focused control record schema changed for {label}")
         control_id = record.get("id")
         if not isinstance(control_id, str) or RECORD_ID.fullmatch(control_id) is None or control_id in ids:
             raise V7EvidenceError(f"focused control id is invalid or duplicated for {label}")
         ids.add(control_id)
+        if result_schema == 3:
+            step_id = record.get("stepId")
+            if not isinstance(step_id, str) or RECORD_ID.fullmatch(step_id) is None or step_id in step_ids:
+                raise V7EvidenceError(f"focused control step id is invalid or duplicated for {label}")
+            step_ids.add(step_id)
         if record.get("role") not in {"form-control", "primary-action"}:
             raise V7EvidenceError(f"focused control role is invalid for {label}")
         if status not in {"clear", "confirmed", "unavailable"} or type(record.get("fullyObscured")) is not bool:
@@ -223,6 +236,8 @@ def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool,
             raise V7EvidenceError(f"clear focused control is fully covered for {label}")
         completed_records += 1
         confirmed += int(status == "confirmed")
+        if status == "confirmed" and result_schema == 3 and record["role"] == "primary-action":
+            confirmed_click_candidate_steps.add(record["stepId"])
     if completed != completed_records:
         raise V7EvidenceError(f"focus completed target count changed for {label}")
     status = coverage["status"]
@@ -236,7 +251,7 @@ def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool,
             raise V7EvidenceError(f"unavailable focus coverage is inconsistent for {label}")
     elif status != "complete" or reason is not None or completed != declared or replays != declared * 2:
         raise V7EvidenceError(f"complete focus coverage is inconsistent for {label}")
-    return confirmed > 0, unavailable > 0
+    return confirmed > 0, unavailable > 0, confirmed_click_candidate_steps
 
 
 def _validate_result(
@@ -277,8 +292,10 @@ def _validate_result(
     if set(evidence) != {"schemaVersion", "identity", "input", "browser", "runtime", "typography", "verdict", "screenshot"}:
         raise V7EvidenceError(f"result root schema changed for {artifact_stem(key)}")
     result_schema = evidence.get("schemaVersion")
-    if result_schema not in {1, 2} or identity != expected_identity:
+    if type(result_schema) is not int or result_schema not in {1, 2, 3} or identity != expected_identity:
         raise V7EvidenceError(f"result identity changed for {artifact_stem(key)}")
+    if result_schema == 3 and key[2] != "interaction":
+        raise V7EvidenceError(f"result schema 3 is reserved for blocked interaction evidence: {artifact_stem(key)}")
     if evidence.get("verdict") not in {"clean", "findings"}:
         raise V7EvidenceError(f"result verdict is invalid for {artifact_stem(key)}")
     screenshot = evidence.get("screenshot")
@@ -336,29 +353,62 @@ def _validate_result(
     array_fields = ("interactions", "assertions", "consoleErrors", "pageErrors", "externalRequests", "issues")
     if any(not isinstance(runtime.get(field), list) for field in array_fields):
         raise V7EvidenceError(f"runtime arrays are malformed for {artifact_stem(key)}")
+    focus_blocking, focus_unavailable, confirmed_click_candidate_steps = _validate_focus_evidence(
+        runtime, artifact_stem(key), result_schema,
+    )
     if key[2] == "interaction" and (not runtime["interactions"] or not runtime["assertions"]):
         raise V7EvidenceError(f"interaction evidence must record at least one step and one assertion for {artifact_stem(key)}")
     if key[2] == "interaction":
         interaction_ids: list[str] = []
-        for item in runtime["interactions"]:
-            if (
-                not isinstance(item, dict)
-                or set(item) != {"id", "action", "completed"}
-                or not isinstance(item.get("id"), str)
-                or RECORD_ID.fullmatch(item["id"]) is None
-                or item.get("action") not in {"click", "fill", "select", "press"}
-                or item.get("completed") is not True
-            ):
+        blocked_index: int | None = None
+        for index, item in enumerate(runtime["interactions"]):
+            base_valid = (
+                isinstance(item, dict)
+                and isinstance(item.get("id"), str)
+                and RECORD_ID.fullmatch(item["id"]) is not None
+                and item.get("action") in {"click", "fill", "select", "press"}
+                and type(item.get("completed")) is bool
+            )
+            if not base_valid:
                 raise V7EvidenceError(f"interaction step evidence is malformed for {artifact_stem(key)}")
+            if result_schema != 3:
+                if set(item) != {"id", "action", "completed"} or item["completed"] is not True:
+                    raise V7EvidenceError(f"interaction step evidence is malformed for {artifact_stem(key)}")
+            elif item["completed"] is True:
+                if set(item) != {"id", "action", "completed"} or blocked_index is not None:
+                    raise V7EvidenceError(f"completed interaction appears after a blocked step for {artifact_stem(key)}")
+                if item["action"] == "click" and item["id"] in confirmed_click_candidate_steps:
+                    raise V7EvidenceError(f"confirmed obscured click was marked completed for {artifact_stem(key)}")
+            else:
+                if set(item) != {"id", "action", "completed", "reason"}:
+                    raise V7EvidenceError(f"incomplete interaction evidence is malformed for {artifact_stem(key)}")
+                reason = item.get("reason")
+                if blocked_index is None:
+                    if reason != "focused_control_obscured" or item["action"] != "click":
+                        raise V7EvidenceError(f"blocked interaction reason is invalid for {artifact_stem(key)}")
+                    blocked_index = index
+                elif reason != "prior_step_not_completed":
+                    raise V7EvidenceError(f"dependent interaction reason is invalid for {artifact_stem(key)}")
             interaction_ids.append(item["id"])
         assertion_ids: list[str] = []
         for item in runtime["assertions"]:
-            if (
-                not isinstance(item, dict)
-                or set(item) != {"id", "type", "count", "passed"}
-                or not isinstance(item.get("id"), str)
-                or RECORD_ID.fullmatch(item["id"]) is None
-                or item.get("type") not in {"visible", "hidden", "text"}
+            common_valid = (
+                isinstance(item, dict)
+                and isinstance(item.get("id"), str)
+                and RECORD_ID.fullmatch(item["id"]) is not None
+                and item.get("type") in {"visible", "hidden", "text"}
+            )
+            if not common_valid:
+                raise V7EvidenceError(f"interaction assertion evidence is malformed for {artifact_stem(key)}")
+            if result_schema == 3:
+                if (
+                    set(item) != {"id", "type", "evaluated", "reason"}
+                    or item.get("evaluated") is not False
+                    or item.get("reason") != "interaction_state_unavailable"
+                ):
+                    raise V7EvidenceError(f"unevaluated assertion evidence is malformed for {artifact_stem(key)}")
+            elif (
+                set(item) != {"id", "type", "count", "passed"}
                 or isinstance(item.get("count"), bool)
                 or not isinstance(item.get("count"), int)
                 or item["count"] < 0
@@ -368,6 +418,14 @@ def _validate_result(
             assertion_ids.append(item["id"])
         if len(interaction_ids) != len(set(interaction_ids)) or len(assertion_ids) != len(set(assertion_ids)):
             raise V7EvidenceError(f"interaction evidence ids must be unique for {artifact_stem(key)}")
+        if result_schema == 3:
+            if (
+                blocked_index is None
+                or runtime["interactions"][blocked_index]["id"] not in confirmed_click_candidate_steps
+                or not focus_blocking
+                or focus_unavailable
+            ):
+                raise V7EvidenceError(f"blocked interaction is not bound to complete focus evidence for {artifact_stem(key)}")
     if type(runtime.get("fontsReady")) is not bool or type(runtime.get("horizontalOverflow")) is not bool or type(runtime.get("eventOverflow")) is not bool:
         raise V7EvidenceError(f"runtime flags are malformed for {artifact_stem(key)}")
     page_bounds = runtime.get("pageBounds")
@@ -385,7 +443,6 @@ def _validate_result(
         raise V7EvidenceError(f"runtime event counts are invalid for {artifact_stem(key)}")
     if runtime["eventOverflow"] != any(value > 50 for value in counts.values()):
         raise V7EvidenceError(f"runtime event overflow changed for {artifact_stem(key)}")
-    focus_blocking, focus_unavailable = _validate_focus_evidence(runtime, artifact_stem(key))
     expected_runtime_issues = [
         *(["page_horizontal_overflow"] if runtime["horizontalOverflow"] else []),
         *(["page_capture_area_exceeded"] if screenshot.get("fullPage") is not True else []),
@@ -395,7 +452,9 @@ def _validate_result(
     ]
     if runtime.get("issues") != expected_runtime_issues:
         raise V7EvidenceError(f"runtime issue derivation changed for {artifact_stem(key)}")
-    assertions_pass = all(isinstance(item, dict) and item.get("passed") is True for item in runtime["assertions"])
+    assertions_pass = result_schema != 3 and all(
+        isinstance(item, dict) and item.get("passed") is True for item in runtime["assertions"]
+    )
     recomputed_clean = (
         runtime.get("fontsReady") is True
         and screenshot.get("fullPage") is True

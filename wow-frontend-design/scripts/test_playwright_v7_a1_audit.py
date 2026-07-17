@@ -69,6 +69,7 @@ process.stdout.write(JSON.stringify(PROFILES));
             self.assertEqual(2, completed.returncode, completed.stderr)
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual("findings", result["verdict"])
+            self.assertEqual(1, result["schemaVersion"])
             self.assertEqual("accepted", result["identity"]["variant"])
             self.assertIn("page_horizontal_overflow", result["runtime"]["issues"])
             self.assertTrue(all("url" not in item for item in result["runtime"]["externalRequests"]))
@@ -316,17 +317,27 @@ const {{ inspectFocusedControl }} = require({json.dumps(str(FOCUS_AUDITOR))});
             root = Path(directory)
             page = root / "focus.html"
             page.write_text("""<!doctype html><html><head><style>
-body{margin:0}#submit{position:absolute;left:40px;top:40px;width:160px;height:48px;z-index:1}
+body{margin:0}#secret-submit-selector{position:absolute;left:40px;top:40px;width:160px;height:48px;z-index:1}
+#prefix-field{position:absolute;left:40px;top:220px}#suffix-action{position:absolute;left:40px;top:280px}
 #cover{position:fixed;left:0;top:0;width:100%;height:180px;background:rgb(20,30,40);z-index:10}
-</style></head><body><main id=owner><h1 id=heading>Focus fixture</h1><button id=submit>Submit</button></main><div id=cover></div></body></html>""", encoding="utf-8")
+</style></head><body><main id=owner><h1 id=heading>Focus fixture</h1>
+<button id=secret-submit-selector>DO-NOT-LEAK-PRODUCT-COPY</button><input id=prefix-field>
+<button id=suffix-action>Suffix</button></main><div id=cover></div></body></html>""", encoding="utf-8")
             spec = {
                 "schemaVersion": 2,
                 "caseId": "focus-case",
                 "state": "interaction",
-                "steps": [{"id": "submit", "action": "press", "selector": "#submit", "value": "Enter"}],
-                "assertions": [{"id": "submit-visible", "type": "visible", "selector": "#submit"}],
+                "steps": [
+                    {"id": "prepare-field", "action": "fill", "selector": "#prefix-field", "value": "prepared"},
+                    {"id": "blocked-submit", "action": "click", "selector": "#secret-submit-selector"},
+                    {"id": "suffix-action", "action": "click", "selector": "#suffix-action"},
+                ],
+                "assertions": [
+                    {"id": "submit-visible", "type": "visible", "selector": "#secret-submit-selector"},
+                    {"id": "secret-copy", "type": "text", "selector": "#secret-submit-selector", "value": "DO-NOT-LEAK-PRODUCT-COPY"},
+                ],
                 "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
-                "focusTargets": [{"id": "primary-submit", "stepId": "submit", "role": "primary-action"}],
+                "focusTargets": [{"id": "primary-submit", "stepId": "blocked-submit", "role": "primary-action"}],
             }
             spec_path = root / "spec.json"
             spec_path.write_text(json.dumps(spec), encoding="utf-8")
@@ -340,11 +351,56 @@ body{margin:0}#submit{position:absolute;left:40px;top:40px;width:160px;height:48
             ], cwd=ROOT, text=True, capture_output=True)
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(2, completed.returncode, json.dumps(result["runtime"], indent=2))
-            self.assertEqual(2, result["schemaVersion"])
+            self.assertEqual(3, result["schemaVersion"])
             self.assertIn("focused_control_obscured", result["runtime"]["issues"])
             self.assertEqual("complete", result["runtime"]["focusCoverage"]["status"])
             self.assertEqual(2, result["runtime"]["focusCoverage"]["freshReplays"])
             self.assertEqual("confirmed", result["runtime"]["focusedControls"][0]["status"])
+            self.assertEqual("blocked-submit", result["runtime"]["focusedControls"][0]["stepId"])
+            self.assertEqual([
+                {"id": "prepare-field", "action": "fill", "completed": True},
+                {"id": "blocked-submit", "action": "click", "completed": False, "reason": "focused_control_obscured"},
+                {"id": "suffix-action", "action": "click", "completed": False, "reason": "prior_step_not_completed"},
+            ], result["runtime"]["interactions"])
+            self.assertEqual([
+                {"id": "submit-visible", "type": "visible", "evaluated": False, "reason": "interaction_state_unavailable"},
+                {"id": "secret-copy", "type": "text", "evaluated": False, "reason": "interaction_state_unavailable"},
+            ], result["runtime"]["assertions"])
+            serialized = json.dumps(result)
+            self.assertNotIn("#secret-submit-selector", serialized)
+            self.assertNotIn("DO-NOT-LEAK-PRODUCT-COPY", serialized)
+            self.assertNotIn("#secret-submit-selector", completed.stderr)
+            self.assertNotIn("DO-NOT-LEAK-PRODUCT-COPY", completed.stderr)
+            self.assertEqual([screenshot], list(root.glob("*.png")))
+
+    def test_v2_non_click_obscuration_keeps_exact_result_schema_2(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "press.html"
+            page.write_text("""<!doctype html><style>
+#submit{position:absolute;left:40px;top:40px;width:160px;height:48px}#cover{position:fixed;inset:0 0 auto 0;height:180px;background:rgb(20,30,40);z-index:10}
+</style><main id=owner><h1 id=heading>Fixture</h1><button id=submit>Submit</button></main><div id=cover></div>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 2, "caseId": "press-case", "state": "interaction",
+                "steps": [{"id": "submit", "action": "press", "selector": "#submit", "value": "Enter"}],
+                "assertions": [{"id": "submit-visible", "type": "visible", "selector": "#submit"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "focusTargets": [{"id": "primary-submit", "stepId": "submit", "role": "primary-action"}],
+            }
+            spec_path = root / "spec.json"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            screenshot = root / "press.png"
+            output = root / "result.json"
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "press-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot), "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, result["schemaVersion"])
+            self.assertEqual({"id": "submit", "action": "press", "completed": True}, result["runtime"]["interactions"][0])
+            self.assertNotIn("stepId", result["runtime"]["focusedControls"][0])
             self.assertEqual([screenshot], list(root.glob("*.png")))
 
 

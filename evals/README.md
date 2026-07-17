@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-focus-obscuration-v14.json \
+  --manifest evals/v7-pilot-manifest-20260718-blocked-interaction-v15.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -106,7 +106,7 @@ P7 paired decision compiler 把 promotion ratchet 固定為唯讀、無 promotio
 
 ```bash
 npm run eval:v7-paired-decision -- \
-  --manifest evals/v7-pilot-manifest-20260718-focus-obscuration-v14.json \
+  --manifest evals/v7-pilot-manifest-20260718-blocked-interaction-v15.json \
   --output "$DECISION_ROOT/v7-paired-decision.json" \
   --repository-root .
 ```
@@ -118,6 +118,8 @@ P3a `eval:v7-breakpoints` 是獨立、零截圖的 Chromium supporting-discovery
 P3b `eval:v7-motion` 是另一個獨立 sidecar，只在 390／1024px 的 `no-preference` fresh context 透過標準 `document.getAnimations()` 觀測到 CSS Animation、CSS Transition 或 Web Animation 時，才建立對應 `reduce` context；不注入全域極短 duration CSS。它以 kind × duration bucket × finite/infinite 的 bounded categories 比較 computed behavior，並重跑 hidden assertions、overflow 與 categorical layout signature。只有 normal 通過但 reduce 連續兩組 fresh-context pair 失敗，才列 `reduced_motion_task_regression`／`reduced_motion_horizontal_overflow`；動畫數量或 normal/reduce 類別相同本身只可成 advisory。無 motion 是 `not_applicable`，超過 64 animations／12 samples、preference emulation、provenance、font、runtime 或外部 request 問題都是 explicit unavailable。它同樣不產生 screenshot/trace/video，也不進 repair authority。這遵循 [Media Queries Level 5 `prefers-reduced-motion`](https://www.w3.org/TR/mediaqueries-5/#prefers-reduced-motion) 的 preference 語意，並使用 [MDN `Document.getAnimations()`](https://developer.mozilla.org/en-US/docs/Web/API/Document/getAnimations) 所述會涵蓋 CSS Animations、CSS Transitions 與 Web Animations 的介面；sidecar 不等同 WCAG、視覺品質或 physical-device 證據。
 
 P9 focus-obscuration repair gate 使用 hidden spec v2 明示最多八個 task control；v1 spec 與 result schema 保持原契約。每個 v2 control 先重播其 preceding steps，再於兩個 fresh Playwright context 各自執行 `scrollIntoViewIfNeeded()`、`focus()` 與兩個 animation frame，只有兩次都以 bounded partition 證明同一 simple opaque author-created fixed/sticky rectangle coverage 時，才產生 `focused_control_obscured` repair finding。partial／behind 為 clear；透明、blend、transform／clip／mask／filter、複雜 ancestor paint、外部 request、字型、DOM／partition budget或兩次幾何不穩定一律 unavailable。Unavailable 會明示阻斷 clean，repair packet 也會拒絕把 evaluator evidence gap 投影成產品修正。它不增加 screenshot、trace 或 video；repair packet 只帶 evaluator target ID 與 bounded geometry，不帶 selector。這個 gate 以 [Playwright locator focus API](https://playwright.dev/docs/api/class-locator#locator-focus) 與 [W3C WCAG 2.4.11 Focus Not Obscured (Minimum)](https://www.w3.org/TR/WCAG22/#focus-not-obscured-minimum) 建立反例，但只宣稱 named browser/profile/state 的 programmatic focus；不宣稱 keyboard、virtual keyboard、assistive technology 或 WCAG conformance。
+
+P10 修補 P9 在 required `click` 被完整遮住時先撞上 Playwright actionability timeout、因而遺失 repair evidence 的消費端缺口。Auditor 先取得 P9 的兩次 fresh-context full-obscuration 證據；只有 coverage complete、confirmed control 與 hidden click step 三者精確綁定時，才輸出 outcome-specific result schema v3。它不執行也不 force blocked click：前置 step 誠實記 completed，blocked step 與相依後續 step 各以固定 reason 記 incomplete，assertions 全標示未評估；focused evidence 只新增 evaluator step ID，不帶 selector、value、產品文字或 raw Playwright error。沒有這個精確反例時仍輸出原 v1/v2 exact contract。v3 仍只保留原本一張 screenshot，repair packet 只投影既有 focus finding；這遵循 [Playwright actionability](https://playwright.dev/docs/actionability) 對 click 必須 Receives Events 的官方邊界，不把一般 timeout 或 selector defect猜成產品修正。
 
 ## 目前案例
 

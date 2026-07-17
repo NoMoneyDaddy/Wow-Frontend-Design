@@ -204,9 +204,19 @@ function pngDimensions(file) {
   return { width: body.readUInt32BE(16), height: body.readUInt32BE(20), bytes: body.length, sha256: sha256(file) };
 }
 
-async function applySteps(page, steps) {
+async function applySteps(page, steps, blockedStepId = null) {
   const attempts = [];
+  let priorStepNotCompleted = false;
   for (const step of steps) {
+    if (priorStepNotCompleted) {
+      attempts.push({ id: step.id, action: step.action, completed: false, reason: "prior_step_not_completed" });
+      continue;
+    }
+    if (step.id === blockedStepId) {
+      attempts.push({ id: step.id, action: step.action, completed: false, reason: "focused_control_obscured" });
+      priorStepNotCompleted = true;
+      continue;
+    }
     const locator = page.locator(step.selector);
     if (await locator.count() !== 1) fail(`interaction selector must resolve exactly once: ${step.selector}`);
     if (step.action === "click") await locator.click();
@@ -230,6 +240,15 @@ async function runAssertions(page, assertions) {
     results.push({ id: assertion.id, type: assertion.type, count, passed });
   }
   return results;
+}
+
+function unavailableAssertions(assertions) {
+  return assertions.map((assertion) => ({
+    id: assertion.id,
+    type: assertion.type,
+    evaluated: false,
+    reason: "interaction_state_unavailable",
+  }));
 }
 
 async function main() {
@@ -299,11 +318,30 @@ async function main() {
     page.evaluate(() => document.fonts.ready.then(() => true)),
     new Promise((resolve) => { fontTimer = setTimeout(() => resolve(false), 10_000); }),
   ]).finally(() => clearTimeout(fontTimer));
-  const interactions = await applySteps(page, spec.data.steps);
-  await page.waitForTimeout(150);
-  const assertions = await runAssertions(page, spec.data.assertions);
-  const typography = await page.evaluate(auditV7A1Typography, spec.data.targets);
   const focusEvidence = await auditFocusedControls(browser, url, contextOptions, spec.data);
+  const focusById = new Map(focusEvidence.focusedControls.map((control) => [control.id, control]));
+  const confirmedClickStepIds = spec.data.schemaVersion === 2 && focusEvidence.focusCoverage.status === "complete"
+    ? new Set(spec.data.focusTargets.filter((target) => {
+        const step = spec.data.steps.find((item) => item.id === target.stepId);
+        const control = focusById.get(target.id);
+        return step?.action === "click" && control?.status === "confirmed" && control.fullyObscured === true;
+      }).map((target) => target.stepId))
+    : new Set();
+  const blockedStepId = spec.data.steps.find((step) => confirmedClickStepIds.has(step.id))?.id || null;
+  const resultSchemaVersion = blockedStepId === null ? spec.data.schemaVersion : 3;
+  const resultFocusEvidence = resultSchemaVersion === 3 ? {
+    focusCoverage: focusEvidence.focusCoverage,
+    focusedControls: focusEvidence.focusedControls.map((control) => ({
+      ...control,
+      stepId: spec.data.focusTargets.find((target) => target.id === control.id).stepId,
+    })),
+  } : focusEvidence;
+  const interactions = await applySteps(page, spec.data.steps, blockedStepId);
+  await page.waitForTimeout(150);
+  const assertions = blockedStepId === null
+    ? await runAssertions(page, spec.data.assertions)
+    : unavailableAssertions(spec.data.assertions);
+  const typography = await page.evaluate(auditV7A1Typography, spec.data.targets);
   const pageBounds = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
   const horizontalOverflow = pageBounds.width > profile.width + 2;
   const devicePixelArea = pageBounds.width * pageBounds.height * profile.deviceScaleFactor ** 2;
@@ -318,7 +356,7 @@ async function main() {
     && focusEvidence.focusCoverage.status === "unavailable";
   await page.screenshot({ path: screenshot, fullPage, animations: "disabled" });
   const evidence = {
-    schemaVersion: spec.data.schemaVersion,
+    schemaVersion: resultSchemaVersion,
     identity: { variant: args.variant, caseId: args["case-id"], state: args.state, profile: args.profile, engine: args.engine },
     input: { scheme: url.protocol.slice(0, -1), route: url.pathname.split("/").pop() || "/", specSha256: sha256(spec.absolute) },
     browser: {
@@ -338,8 +376,8 @@ async function main() {
       horizontalOverflow,
       eventOverflow,
       ...(spec.data.schemaVersion === 2 ? {
-        focusCoverage: focusEvidence.focusCoverage,
-        focusedControls: focusEvidence.focusedControls,
+        focusCoverage: resultFocusEvidence.focusCoverage,
+        focusedControls: resultFocusEvidence.focusedControls,
       } : {}),
       eventCounts: { consoleErrors: consoleErrorCount, pageErrors: pageErrorCount, externalRequests: externalRequestCount },
       issues: [

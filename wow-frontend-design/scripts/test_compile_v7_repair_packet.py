@@ -193,6 +193,33 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
             compiler.extract_findings(result)
 
+    def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["focused_control_obscured"],
+            "assertions": [{
+                "id": "dialog-visible",
+                "type": "visible",
+                "evaluated": False,
+                "reason": "interaction_state_unavailable",
+            }],
+            "focusedControls": [{
+                "id": "primary-submit",
+                "stepId": "open-dialog",
+                "role": "primary-action",
+                "status": "confirmed",
+                "fullyObscured": True,
+                "replays": 2,
+                "occluderCount": 1,
+                "targetArea": 2400,
+                "coveredArea": 2400,
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("focused_control_obscured", findings[0]["code"])
+        self.assertEqual("primary-submit", findings[0]["locator"])
+
     def test_unknown_issue_fails_closed_instead_of_becoming_prompt_text(self) -> None:
         with self.assertRaisesRegex(compiler.RepairPacketError, "unknown typography issue code"):
             compiler.extract_findings(_result(typography=[{

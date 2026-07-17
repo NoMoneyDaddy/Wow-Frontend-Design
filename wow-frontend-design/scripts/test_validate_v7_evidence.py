@@ -183,6 +183,14 @@ class V7EvidenceTests(unittest.TestCase):
                 "clean",
                 evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"),
             )
+            boolean_schema = copy.deepcopy(payload)
+            boolean_schema["schemaVersion"] = True
+            result.write_text(json.dumps(boolean_schema), encoding="utf-8")
+            boolean_schema_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "result identity changed"):
+                evidence._validate_result(
+                    key, result, screenshot, boolean_schema_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
             unavailable_focus = copy.deepcopy(payload)
             unavailable_focus["schemaVersion"] = 2
             unavailable_focus["runtime"].update({
@@ -330,6 +338,124 @@ class V7EvidenceTests(unittest.TestCase):
                     "1.61.1",
                 ),
             )
+            blocked_interaction = copy.deepcopy(payload)
+            blocked_interaction["schemaVersion"] = 3
+            blocked_interaction["runtime"].update({
+                "interactions": [
+                    {"id": "prepare-form", "action": "fill", "completed": True},
+                    {
+                        "id": "open-dialog",
+                        "action": "click",
+                        "completed": False,
+                        "reason": "focused_control_obscured",
+                    },
+                    {
+                        "id": "confirm-dialog",
+                        "action": "press",
+                        "completed": False,
+                        "reason": "prior_step_not_completed",
+                    },
+                ],
+                "assertions": [{
+                    "id": "dialog-visible",
+                    "type": "visible",
+                    "evaluated": False,
+                    "reason": "interaction_state_unavailable",
+                }],
+                "focusCoverage": {
+                    "status": "complete",
+                    "reason": None,
+                    "declaredTargets": 1,
+                    "completedTargets": 1,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "stepId": "open-dialog",
+                    "role": "primary-action",
+                    "status": "confirmed",
+                    "fullyObscured": True,
+                    "replays": 2,
+                    "occluderCount": 1,
+                    "targetArea": 2400,
+                    "coveredArea": 2400,
+                }],
+                "issues": ["focused_control_obscured"],
+            })
+            blocked_interaction["verdict"] = "findings"
+            result.write_text(json.dumps(blocked_interaction), encoding="utf-8")
+            blocked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    blocked_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                ),
+            )
+            wrong_step = copy.deepcopy(blocked_interaction)
+            wrong_step["runtime"]["focusedControls"][0]["stepId"] = "different-step"
+            result.write_text(json.dumps(wrong_step), encoding="utf-8")
+            wrong_step_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "not bound"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, wrong_step_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            wrong_role = copy.deepcopy(blocked_interaction)
+            wrong_role["runtime"]["focusedControls"][0]["role"] = "form-control"
+            result.write_text(json.dumps(wrong_role), encoding="utf-8")
+            wrong_role_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "not bound"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, wrong_role_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            skipped_earlier_block = copy.deepcopy(blocked_interaction)
+            skipped_earlier_block["runtime"]["interactions"][0] = {
+                "id": "first-confirmed-click", "action": "click", "completed": True,
+            }
+            skipped_earlier_block["runtime"]["focusCoverage"].update({
+                "declaredTargets": 2, "completedTargets": 2, "freshReplays": 4,
+            })
+            skipped_earlier_block["runtime"]["focusedControls"].insert(0, {
+                "id": "first-primary-action",
+                "stepId": "first-confirmed-click",
+                "role": "primary-action",
+                "status": "confirmed",
+                "fullyObscured": True,
+                "replays": 2,
+                "occluderCount": 1,
+                "targetArea": 2400,
+                "coveredArea": 2400,
+            })
+            result.write_text(json.dumps(skipped_earlier_block), encoding="utf-8")
+            skipped_earlier_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "confirmed obscured click"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, skipped_earlier_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            completed_after_block = copy.deepcopy(blocked_interaction)
+            completed_after_block["runtime"]["interactions"][2] = {
+                "id": "confirm-dialog", "action": "press", "completed": True,
+            }
+            result.write_text(json.dumps(completed_after_block), encoding="utf-8")
+            completed_after_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "after a blocked step"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, completed_after_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            evaluated_assertion = copy.deepcopy(blocked_interaction)
+            evaluated_assertion["runtime"]["assertions"][0]["evaluated"] = True
+            result.write_text(json.dumps(evaluated_assertion), encoding="utf-8")
+            evaluated_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "unevaluated assertion"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, evaluated_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
             payload["runtime"]["assertions"][0]["passed"] = False
             payload["verdict"] = "findings"
             result.write_text(json.dumps(payload), encoding="utf-8")
