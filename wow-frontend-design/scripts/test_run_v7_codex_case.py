@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -132,12 +133,134 @@ class V7CodexRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
             shutil.copy2(ROOT / "wow-frontend-design" / "assets" / "DESIGN.template.md", stage / "DESIGN.md")
-            clean, diagnostic, tool = runner._design_lint(stage, 30)
+            clean, diagnostic, tool, lint = runner._design_lint(stage, 30)
             self.assertTrue(clean)
             self.assertEqual("", diagnostic)
             self.assertEqual("@google/design.md", tool["package"])
             self.assertEqual(64, len(tool["cli_sha256"]))
+            self.assertEqual([], lint["findings"])
         self.assertNotIn("npx", runner._design_lint.__code__.co_names)
+
+    def test_failure_receipt_preserves_bounded_attempt_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            manifest = root / "manifest.json"
+            manifest.write_text("{}\n", encoding="utf-8")
+            attempts = [
+                {
+                    "number": 1,
+                    "status": "retryable_design_findings",
+                }
+            ]
+            diagnostics = [{
+                "number": 1,
+                "diagnostic": "x" * 600,
+                "design_md_gate": {
+                    "input": {"path": "DESIGN.md", "bytes": 7, "sha256": "d" * 64},
+                    "summary": {"errors": 1, "warnings": 0},
+                    "findings": [{"severity": "error", "message": "missing token"}],
+                },
+            }]
+            tool = {
+                "package": "@google/design.md",
+                "version": "0.3.0",
+                "lock_integrity": "sha512-test",
+                "cli_path": "node_modules/@google/design.md/dist/index.js",
+                "cli_sha256": "c" * 64,
+                "package_json_sha256": "p" * 64,
+            }
+            receipt = runner._write_failure_receipt(
+                log_dir,
+                "candidate-nature",
+                "nature-case",
+                "candidate",
+                manifest,
+                root,
+                attempts,
+                diagnostics,
+                "x" * 600,
+                tool,
+                "b" * 64,
+                {"variant": "candidate", "materialized_tree_sha256": "m" * 64},
+                "codex-cli 0.142.0",
+            )
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual("failed", payload["status"])
+            self.assertNotIn("diagnostic", attempts[0])
+            self.assertEqual(500, len(payload["attempts"][0]["diagnostic"]))
+            self.assertEqual("d" * 64, payload["attempts"][0]["design_md_gate"]["input"]["sha256"])
+            self.assertEqual(500, len(payload["final_diagnostic"]))
+            self.assertEqual("zero-errors-zero-warnings", payload["design_md_gate"]["required_result"])
+            for key in ("lock_integrity", "cli_path", "cli_sha256", "package_json_sha256"):
+                self.assertIn(key, payload["design_md_gate"])
+            self.assertEqual("b" * 64, payload["brief_sha256"])
+            self.assertEqual("candidate", payload["package"]["variant"])
+            self.assertEqual("gpt-5.4-mini", payload["model"]["requested"])
+            self.assertEqual("codex-cli 0.142.0", payload["cli"]["version"])
+            self.assertEqual(hashlib.sha256(manifest.read_bytes()).hexdigest(), payload["cohort_manifest"]["sha256"])
+
+    def test_design_lint_preserves_bounded_actionable_findings_and_input_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            design = stage / "DESIGN.md"
+            design.write_text("# Broken\n", encoding="utf-8")
+            clean, diagnostic, tool, lint = runner._design_lint(stage, 30)
+            self.assertFalse(clean)
+            self.assertIn("warnings=1", diagnostic)
+            self.assertIn("warning:", diagnostic)
+            self.assertEqual(
+                {"path": "DESIGN.md", "bytes": design.stat().st_size, "sha256": hashlib.sha256(design.read_bytes()).hexdigest()},
+                lint["input"],
+            )
+            self.assertGreaterEqual(len(lint["findings"]), 1)
+            self.assertLessEqual(len(lint["findings"]), 20)
+            for finding in lint["findings"]:
+                self.assertEqual({"severity", "message"}, set(finding))
+                self.assertIn(finding["severity"], {"error", "warning"})
+                self.assertLessEqual(len(finding["message"]), 300)
+            self.assertEqual(
+                {"package", "version", "lock_integrity", "cli_path", "cli_sha256", "package_json_sha256"},
+                set(tool),
+            )
+
+    def test_design_lint_does_not_let_info_findings_hide_a_late_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "DESIGN.md").write_text("# Broken\n", encoding="utf-8")
+            payload = {
+                "findings": [
+                    {"severity": "info", "message": f"context {index}"}
+                    for index in range(20)
+                ] + [{"severity": "warning", "message": "actionable tail " + "x" * 400}],
+                "summary": {"errors": 0, "warnings": 1, "infos": 20},
+            }
+            completed = subprocess.CompletedProcess(
+                args=["node"], returncode=1, stdout=json.dumps(payload), stderr=""
+            )
+            with mock.patch.object(runner.subprocess, "run", return_value=completed):
+                clean, diagnostic, _tool, lint = runner._design_lint(stage, 30)
+            self.assertFalse(clean)
+            self.assertIn("actionable tail", diagnostic)
+            self.assertEqual("warning", lint["findings"][0]["severity"])
+            self.assertTrue(lint["findings"][0]["message"].startswith("actionable tail"))
+            self.assertEqual(300, len(lint["findings"][0]["message"]))
+
+    def test_failure_receipt_is_exclusive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            manifest = root / "manifest.json"
+            manifest.write_text("{}\n", encoding="utf-8")
+            arguments = (
+                log_dir, "target", "case", "accepted", manifest, root, [], [], "failed", None,
+                "b" * 64, {"variant": "accepted"}, "codex-cli test",
+            )
+            runner._write_failure_receipt(*arguments)
+            with self.assertRaisesRegex(runner.V7CodexRunnerError, "already exists"):
+                runner._write_failure_receipt(*arguments)
 
 
 if __name__ == "__main__":

@@ -363,7 +363,7 @@ def _validate_outputs(stage: Path) -> None:
             raise V7CodexRunnerError(f"index.html is missing required structure: {marker}")
 
 
-def _design_lint(stage: Path, timeout: int) -> tuple[bool, str, dict[str, str]]:
+def _design_lint(stage: Path, timeout: int) -> tuple[bool, str, dict[str, str], dict[str, Any]]:
     lock = _load(ROOT / "package-lock.json", "package-lock.json")
     locked = lock.get("packages", {}).get("node_modules/@google/design.md", {})
     package_root = ROOT / "node_modules" / "@google" / "design.md"
@@ -398,12 +398,28 @@ def _design_lint(stage: Path, timeout: int) -> tuple[bool, str, dict[str, str]]:
     try:
         payload = json.loads(completed.stdout)
         summary = payload["summary"]
+        raw_findings = payload["findings"]
         errors, warnings = summary["errors"], summary["warnings"]
     except (json.JSONDecodeError, KeyError, TypeError) as error:
         raise V7CodexRunnerError("pinned DESIGN.md linter returned malformed JSON") from error
     if type(errors) is not int or type(warnings) is not int or errors < 0 or warnings < 0:
         raise V7CodexRunnerError("pinned DESIGN.md linter returned malformed counts")
+    if not isinstance(raw_findings, list):
+        raise V7CodexRunnerError("pinned DESIGN.md linter returned malformed findings")
+    actionable = []
+    for finding in raw_findings:
+        if not isinstance(finding, dict):
+            raise V7CodexRunnerError("pinned DESIGN.md linter returned malformed findings")
+        severity = finding.get("severity")
+        message = finding.get("message")
+        if severity not in {"error", "warning", "info"} or not isinstance(message, str):
+            raise V7CodexRunnerError("pinned DESIGN.md linter returned malformed findings")
+        if severity in {"error", "warning"} and len(actionable) < 20:
+            actionable.append({"severity": severity, "message": " ".join(message.split())[:300]})
+    detail = "; ".join(f"{item['severity']}: {item['message']}" for item in actionable[:6])
     diagnostic = f"DESIGN.md findings: errors={errors}, warnings={warnings}"
+    if detail:
+        diagnostic = f"{diagnostic}; {detail}"[:500]
     if completed.returncode not in {0, 1}:
         detail = " ".join((completed.stderr or diagnostic).split())[:500]
         raise V7CodexRunnerError(f"DESIGN.md linter infrastructure failure: {detail}")
@@ -415,7 +431,76 @@ def _design_lint(stage: Path, timeout: int) -> tuple[bool, str, dict[str, str]]:
         "cli_sha256": _digest(cli),
         "package_json_sha256": _digest(package_json),
     }
-    return errors == 0 and warnings == 0, "" if errors == 0 and warnings == 0 else diagnostic, tool_record
+    design_path = stage / "DESIGN.md"
+    lint_record = {
+        "input": {"path": "DESIGN.md", "bytes": design_path.stat().st_size, "sha256": _digest(design_path)},
+        "summary": {"errors": errors, "warnings": warnings},
+        "findings": actionable,
+    }
+    return errors == 0 and warnings == 0, "" if errors == 0 and warnings == 0 else diagnostic, tool_record, lint_record
+
+
+def _failure_attempt_projection(
+    attempt_history: list[dict[str, Any]], attempt_diagnostics: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    diagnostics = {item["number"]: item for item in attempt_diagnostics}
+    projected = []
+    for attempt in attempt_history:
+        item = dict(attempt)
+        diagnostic = diagnostics.get(attempt.get("number"))
+        if diagnostic is not None:
+            item["diagnostic"] = str(diagnostic["diagnostic"])[:500]
+            if diagnostic.get("design_md_gate") is not None:
+                item["design_md_gate"] = diagnostic["design_md_gate"]
+        projected.append(item)
+    return projected
+
+
+def _write_failure_receipt(
+    log_dir: Path,
+    target_name: str,
+    case_id: str,
+    variant: str,
+    manifest_path: Path,
+    repository_root: Path,
+    attempt_history: list[dict[str, Any]],
+    attempt_diagnostics: list[dict[str, Any]],
+    final_diagnostic: str,
+    design_tool_record: dict[str, str] | None,
+    brief_sha256: str,
+    package_record: dict[str, Any],
+    codex_version: str,
+) -> Path:
+    receipt = log_dir / f"{target_name}--failure.json"
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "status": "failed",
+        "case_id": case_id,
+        "variant": variant,
+        "model": {"provider": "codex", "requested": "gpt-5.4-mini", "silent_fallback": False},
+        "cli": {"version": codex_version},
+        "cohort_manifest": {
+            "path": manifest_path.relative_to(repository_root).as_posix(),
+            "sha256": _digest(manifest_path),
+        },
+        "brief_sha256": brief_sha256,
+        "package": package_record,
+        "attempts": _failure_attempt_projection(attempt_history, attempt_diagnostics),
+        "final_diagnostic": final_diagnostic[:500] or "generation failed without a diagnostic",
+        "design_md_gate": None,
+    }
+    if design_tool_record is not None:
+        payload["design_md_gate"] = {
+            "required_result": "zero-errors-zero-warnings",
+            **design_tool_record,
+        }
+    try:
+        with receipt.open("x", encoding="utf-8") as stream:
+            json.dump(payload, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+    except FileExistsError as error:
+        raise V7CodexRunnerError(f"failure receipt already exists: {receipt.name}") from error
+    return receipt
 
 
 def _fresh_directory(path: Path, label: str) -> Path:
@@ -512,6 +597,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     isolation: Path | None = None
     active_stage: Path | None = None
     attempt_history = []
+    attempt_diagnostics = []
     retry_diagnostic = ""
     completed_stage = None
     design_tool_record: dict[str, str] | None = None
@@ -569,8 +655,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 raise V7CodexRunnerError(f"Codex trace violated the controlled policy: {error}") from error
             if exit_code != 0 or reason != "completed":
                 attempt_record["status"] = "retryable_generation_failure"
-                attempt_history.append(attempt_record)
                 retry_diagnostic = f"前次生成未完成（{reason}，exit={exit_code}）；請重新建立完整的兩個輸出檔。"[:500]
+                attempt_history.append(attempt_record)
+                attempt_diagnostics.append({"number": attempt, "diagnostic": retry_diagnostic, "design_md_gate": None})
                 shutil.rmtree(stage, ignore_errors=True)
                 active_stage = None
                 continue
@@ -578,18 +665,22 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 _validate_outputs(stage)
             except V7CodexRunnerError as error:
                 attempt_record["status"] = "retryable_output_failure"
-                attempt_history.append(attempt_record)
                 retry_diagnostic = str(error)[:500]
+                attempt_history.append(attempt_record)
+                attempt_diagnostics.append({"number": attempt, "diagnostic": retry_diagnostic, "design_md_gate": None})
                 shutil.rmtree(stage, ignore_errors=True)
                 active_stage = None
                 continue
-            lint_clean, diagnostic, design_tool_record = _design_lint(
+            lint_clean, diagnostic, design_tool_record, lint_record = _design_lint(
                 stage, manifest["timeouts"]["lint"]["hard_seconds"]
             )
             if not lint_clean:
                 attempt_record["status"] = "retryable_design_findings"
-                attempt_history.append(attempt_record)
                 retry_diagnostic = diagnostic[:500]
+                attempt_history.append(attempt_record)
+                attempt_diagnostics.append(
+                    {"number": attempt, "diagnostic": retry_diagnostic, "design_md_gate": lint_record}
+                )
                 shutil.rmtree(stage, ignore_errors=True)
                 active_stage = None
                 continue
@@ -599,7 +690,25 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             active_stage = None
             break
         if completed_stage is None:
-            raise V7CodexRunnerError("generation exhausted all retry attempts")
+            receipt = _write_failure_receipt(
+                log_dir,
+                target.name,
+                args.case_id,
+                args.variant,
+                manifest_path,
+                root,
+                attempt_history,
+                attempt_diagnostics,
+                retry_diagnostic,
+                design_tool_record,
+                _digest(brief),
+                package_record,
+                codex_version,
+            )
+            raise V7CodexRunnerError(
+                f"generation exhausted all retry attempts; see {receipt.name}: "
+                f"{retry_diagnostic or 'no diagnostic'}"
+            )
         if design_tool_record is None:
             raise V7CodexRunnerError("DESIGN.md gate provenance is missing")
         for name in EXPECTED_OUTPUTS:
