@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -85,12 +88,36 @@ class V7RepairPolicyTests(unittest.TestCase):
                 target_isolated=True,
             )
 
-    def test_repository_support_contract_is_bound_to_capture_and_auditor_bytes(self) -> None:
-        digest = policy.validate_support_contract(
-            ROOT / "evals" / "v7-repair-support-contract.json",
-            ROOT,
-        )
+    def test_repository_support_contract_binds_auditor_direct_dependencies(self) -> None:
+        contract = ROOT / "evals" / "v7-repair-support-contract.json"
+        digest = policy.validate_support_contract(contract, ROOT)
         self.assertEqual(64, len(digest))
+        value = json.loads(contract.read_text(encoding="utf-8"))
+        self.assertEqual(list(policy.SUPPORT_DEPENDENCY_PATHS), [
+            record["path"] for record in value["dependencies"]
+        ])
+
+        with tempfile.TemporaryDirectory() as directory:
+            isolated = Path(directory)
+            for relative in (
+                "evals/v7-repair-support-contract.json",
+                "evals/run_v7_visual_matrix.py",
+                "evals/playwright_v7_a1_audit.cjs",
+                *policy.SUPPORT_DEPENDENCY_PATHS,
+            ):
+                destination = isolated / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT / relative, destination)
+            policy.validate_support_contract(
+                isolated / "evals" / "v7-repair-support-contract.json",
+                isolated,
+            )
+            (isolated / policy.SUPPORT_DEPENDENCY_PATHS[0]).write_text("// drift\n", encoding="utf-8")
+            with self.assertRaisesRegex(policy.V7RepairPolicyError, "dependency.*stale"):
+                policy.validate_support_contract(
+                    isolated / "evals" / "v7-repair-support-contract.json",
+                    isolated,
+                )
 
     def test_rank_rejects_new_core_regression_even_when_composition_count_falls(self) -> None:
         baseline = _target()

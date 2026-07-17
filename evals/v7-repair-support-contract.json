@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "scope": "target-root",
   "target_inventory": [
     "DESIGN.md",
@@ -15,6 +15,16 @@
     "path": "evals/playwright_v7_a1_audit.cjs",
     "sha256": "0f409f393c4cee4128462b45f1c19a2ce6935fd324bcab1dc76d4095560b12c7"
   },
+  "dependencies": [
+    {
+      "path": "evals/v7_a1_typography_metrics.cjs",
+      "sha256": "306ed61717678f9eca7e8c08ba9fa7fdba102533ae364a88b30a82b66a4661aa"
+    },
+    {
+      "path": "evals/v7_focus_obscuration.cjs",
+      "sha256": "a329cf8848f0ccbdcdbc780367b9e1a625ea054aa28e3c777a4c7fd9559b21ee"
+    }
+  ],
   "isolation": {
     "capture": "opaque-copy-single-entry",
     "external_requests": "blocked-and-reported",

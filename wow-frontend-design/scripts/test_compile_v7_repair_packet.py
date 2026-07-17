@@ -106,6 +106,62 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "columnVoid.source is invalid"):
             compiler.extract_findings(result)
 
+    def test_required_text_clip_projects_only_bounded_geometry_and_enums(self) -> None:
+        result = _result(typography=[{
+            "code": "a1_required_text_clipped",
+            "targetId": "required-summary",
+            "measurement": {
+                "lastLineText": "不得進入 prompt 的產品文字",
+                "textCompleteness": {
+                    "status": "clipped",
+                    "reason": "direct_text_outside_client_box",
+                    "mechanism": "line_clamp",
+                    "tolerance": 6,
+                    "inlineDelta": 0,
+                    "blockDelta": 48.12567,
+                    "graphemeCount": 42,
+                    "outsideRectCount": 12,
+                },
+            },
+        }])
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "a1_required_text_clipped",
+            "classification": "composition",
+            "locator": "required-summary",
+            "evidence": {
+                "blockDelta": 48.1257,
+                "clipAxis": "block",
+                "clipMechanism": "line_clamp",
+                "inlineDelta": 0,
+                "outsideRectCount": 12,
+                "tolerance": 6,
+            },
+        }], findings)
+        self.assertNotIn("產品文字", json.dumps(findings, ensure_ascii=False))
+        feedback = compiler._feedback([{
+            "state": "base", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("preserve the full copy", feedback)
+        self.assertIn("remove direct clipping or recompose", feedback)
+
+        forged = _result(typography=[{
+            "code": "a1_required_text_clipped",
+            "targetId": "required-summary",
+            "measurement": {"textCompleteness": {
+                "status": "clipped",
+                "reason": "direct_text_outside_client_box",
+                "mechanism": "line_clamp",
+                "tolerance": 6,
+                "inlineDelta": 0,
+                "blockDelta": 6,
+                "graphemeCount": 42,
+                "outsideRectCount": 12,
+            }},
+        }])
+        with self.assertRaisesRegex(compiler.RepairPacketError, "does not exceed tolerance"):
+            compiler.extract_findings(forged)
+
     def test_runtime_projection_records_counts_and_failed_assertion_without_messages(self) -> None:
         result = _result()
         result["runtime"].update({

@@ -37,6 +37,23 @@ class V7A1TypographyMetricsTests(unittest.TestCase):
         {"id": "void-column", "selector": "#void-column-heading", "ownerSelector": "#void-column-owner", "role": "heading", "mode": "editorial"},
         {"id": "balanced-column", "selector": "#balanced-column-heading", "ownerSelector": "#balanced-column-owner", "role": "heading", "mode": "editorial"},
         {"id": "nested-column", "selector": "#nested-column-copy", "ownerSelector": "#nested-column-owner", "role": "prose", "mode": "editorial"},
+        {"id": "clip-ellipsis", "selector": "#clip-ellipsis", "ownerSelector": "#owner-clip-ellipsis", "role": "heading", "mode": "product"},
+        {"id": "clip-nowrap", "selector": "#clip-nowrap", "ownerSelector": "#owner-clip-nowrap", "role": "heading", "mode": "product"},
+        {"id": "clip-clamp", "selector": "#clip-clamp", "ownerSelector": "#owner-clip-clamp", "role": "prose", "mode": "product"},
+        {"id": "clip-block-hidden", "selector": "#clip-block-hidden", "ownerSelector": "#owner-clip-block-hidden", "role": "prose", "mode": "product"},
+        {"id": "clip-block-clip", "selector": "#clip-block-clip", "ownerSelector": "#owner-clip-block-clip", "role": "prose", "mode": "product"},
+        {"id": "clip-block-normal", "selector": "#clip-block-normal", "ownerSelector": "#owner-clip-block-normal", "role": "prose", "mode": "product"},
+        {"id": "clip-fit", "selector": "#clip-fit", "ownerSelector": "#owner-clip-fit", "role": "heading", "mode": "product"},
+        {"id": "clip-tolerance", "selector": "#clip-tolerance", "ownerSelector": "#owner-clip-tolerance", "role": "heading", "mode": "product"},
+        {"id": "clip-axis-priority", "selector": "#clip-axis-priority", "ownerSelector": "#owner-clip-axis-priority", "role": "prose", "mode": "product"},
+        {"id": "clip-mixed-axis", "selector": "#clip-mixed-axis", "ownerSelector": "#owner-clip-mixed-axis", "role": "prose", "mode": "product"},
+        {"id": "scroll-accessible", "selector": "#scroll-accessible", "ownerSelector": "#owner-scroll-accessible", "role": "prose", "mode": "product"},
+        {"id": "scroll-advisory", "selector": "#scroll-advisory", "ownerSelector": "#owner-scroll-advisory", "role": "prose", "mode": "product"},
+        {"id": "clip-editorial", "selector": "#clip-editorial", "ownerSelector": "#owner-clip-editorial", "role": "prose", "mode": "editorial"},
+        {"id": "clip-display", "selector": "#clip-display", "ownerSelector": "#owner-clip-display", "role": "heading", "mode": "display"},
+        {"id": "clip-transform", "selector": "#clip-transform", "ownerSelector": "#owner-clip-transform", "role": "heading", "mode": "product"},
+        {"id": "clip-pseudo", "selector": "#clip-pseudo", "ownerSelector": "#owner-clip-pseudo", "role": "heading", "mode": "product"},
+        {"id": "clip-path", "selector": "#clip-path", "ownerSelector": "#owner-clip-path", "role": "heading", "mode": "product"},
     ]
 
     @classmethod
@@ -121,6 +138,80 @@ const { auditV7A1Typography, validateSpecs } = require(process.argv[1]);
 
     def test_fonts_are_ready_before_measurement(self) -> None:
         self.assertEqual("loaded", self.result["environment"]["fontsStatus"])
+
+    def test_direct_required_text_clipping_requires_delta_and_range_evidence(self) -> None:
+        expected = {
+            "clip-ellipsis": "inline_ellipsis",
+            "clip-nowrap": "inline_clip",
+            "clip-clamp": "line_clamp",
+            "clip-block-hidden": "block_clip",
+            "clip-block-clip": "block_clip",
+            "clip-axis-priority": "block_clip",
+            "clip-mixed-axis": "block_clip",
+        }
+        for target_id, mechanism in expected.items():
+            with self.subTest(target_id=target_id):
+                completeness = self.targets[target_id]["textCompleteness"]
+                self.assertIn((target_id, "a1_required_text_clipped"), self.codes)
+                self.assertEqual("clipped", completeness["status"])
+                self.assertEqual(mechanism, completeness["mechanism"])
+                self.assertGreater(completeness["outsideRectCount"], 0)
+        self.assertEqual(2, self.targets["clip-ellipsis"]["textCompleteness"]["tolerance"])
+        self.assertEqual(2, self.targets["clip-clamp"]["textCompleteness"]["tolerance"])
+        self.assertLessEqual(
+            self.targets["clip-axis-priority"]["textCompleteness"]["inlineDelta"],
+            self.targets["clip-axis-priority"]["textCompleteness"]["tolerance"],
+        )
+        mixed = self.targets["clip-mixed-axis"]["textCompleteness"]
+        self.assertLessEqual(mixed["inlineDelta"], mixed["tolerance"])
+        self.assertGreater(mixed["blockDelta"], mixed["tolerance"])
+        normal_block = self.targets["clip-block-normal"]["textCompleteness"]
+        self.assertEqual("unavailable", normal_block["status"])
+        self.assertEqual("line_height_unavailable", normal_block["reason"])
+        self.assertNotIn(("clip-block-normal", "a1_required_text_clipped"), self.codes)
+
+    def test_fitting_and_sub_tolerance_content_remain_clean(self) -> None:
+        for target_id in ("clip-fit", "clip-tolerance"):
+            with self.subTest(target_id=target_id):
+                self.assertNotIn((target_id, "a1_required_text_clipped"), self.codes)
+                self.assertEqual("complete", self.targets[target_id]["textCompleteness"]["status"])
+        tolerance = self.targets["clip-tolerance"]["textCompleteness"]
+        self.assertGreater(tolerance["inlineDelta"], 0)
+        self.assertLessEqual(tolerance["inlineDelta"], tolerance["tolerance"])
+
+    def test_scroll_regions_are_never_promoted_to_hard_clipping(self) -> None:
+        accessible = self.targets["scroll-accessible"]["textCompleteness"]
+        advisory = self.targets["scroll-advisory"]["textCompleteness"]
+        self.assertEqual("accessible_scroll", accessible["status"])
+        self.assertEqual("named_focusable_scroll_region", accessible["reason"])
+        self.assertEqual("advisory", advisory["status"])
+        self.assertEqual("scroll_region_not_accessibly_exposed", advisory["reason"])
+        self.assertNotIn(("scroll-accessible", "a1_required_text_clipped"), self.codes)
+        self.assertNotIn(("scroll-advisory", "a1_required_text_clipped"), self.codes)
+
+    def test_non_product_and_complex_geometry_fail_closed(self) -> None:
+        self.assertEqual("not_applicable", self.targets["clip-editorial"]["textCompleteness"]["status"])
+        self.assertEqual("not_applicable", self.targets["clip-display"]["textCompleteness"]["status"])
+        expected = {
+            "clip-transform": "transformed_target",
+            "clip-pseudo": "pseudo_content_present",
+            "clip-path": "complex_clip_or_filter",
+        }
+        for target_id, reason in expected.items():
+            with self.subTest(target_id=target_id):
+                completeness = self.targets[target_id]["textCompleteness"]
+                self.assertEqual("unavailable", completeness["status"])
+                self.assertEqual(reason, completeness["reason"])
+                self.assertNotIn((target_id, "a1_required_text_clipped"), self.codes)
+
+    def test_text_completeness_does_not_emit_product_text_or_selectors(self) -> None:
+        serialized = json.dumps(
+            {target_id: target["textCompleteness"] for target_id, target in self.targets.items()},
+            ensure_ascii=False,
+        )
+        self.assertNotIn("必要標題資訊", serialized)
+        self.assertNotIn("#clip-ellipsis", serialized)
+        self.assertNotIn("selector", serialized.lower())
 
     def test_invalid_manifest_specs_fail_closed(self) -> None:
         source = f"""

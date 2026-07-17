@@ -32,6 +32,7 @@ TYPOGRAPHY_CODES = {
     "a1_layout_column_void",
     "a1_prose_han_orphan",
     "a1_prose_track_void",
+    "a1_required_text_clipped",
     "a1_target_contract_unresolved",
 }
 RUNTIME_CODES = {
@@ -109,7 +110,7 @@ def _bounded_number(value: Any, label: str) -> int | float:
     return value if isinstance(value, int) else round(value, 4)
 
 
-def _measurement(issue: dict[str, Any]) -> dict[str, int | float | str]:
+def _measurement(issue: dict[str, Any], code: str) -> dict[str, int | float | str]:
     source = issue.get("measurement")
     if source is None:
         source = issue
@@ -135,6 +136,48 @@ def _measurement(issue: dict[str, Any]) -> dict[str, int | float | str]:
                 if value not in allowed:
                     raise RepairPacketError(f"columnVoid.{name} is invalid")
                 selected[name] = value
+    if code == "a1_required_text_clipped":
+        completeness = source.get("textCompleteness")
+        required_keys = {
+            "status", "reason", "mechanism", "tolerance", "inlineDelta",
+            "blockDelta", "graphemeCount", "outsideRectCount",
+        }
+        if not isinstance(completeness, dict) or set(completeness) != required_keys:
+            raise RepairPacketError("text completeness measurement is malformed")
+        mechanism = completeness.get("mechanism")
+        if (
+            completeness.get("status") != "clipped"
+            or completeness.get("reason") != "direct_text_outside_client_box"
+            or mechanism not in {"inline_ellipsis", "inline_clip", "line_clamp", "block_clip"}
+        ):
+            raise RepairPacketError("text completeness finding is inconsistent")
+        tolerance = _bounded_number(completeness.get("tolerance"), "textCompleteness.tolerance")
+        inline_delta = _bounded_number(completeness.get("inlineDelta"), "textCompleteness.inlineDelta")
+        block_delta = _bounded_number(completeness.get("blockDelta"), "textCompleteness.blockDelta")
+        grapheme_count = _bounded_number(completeness.get("graphemeCount"), "textCompleteness.graphemeCount")
+        outside_count = _bounded_number(completeness.get("outsideRectCount"), "textCompleteness.outsideRectCount")
+        if (
+            tolerance <= 0
+            or inline_delta < 0
+            or block_delta < 0
+            or type(grapheme_count) is not int
+            or not 1 <= grapheme_count <= 4096
+            or type(outside_count) is not int
+            or not 1 <= outside_count <= 4096
+        ):
+            raise RepairPacketError("text completeness bounds are invalid")
+        axis = "inline" if mechanism in {"inline_ellipsis", "inline_clip"} else "block"
+        relevant_delta = inline_delta if axis == "inline" else block_delta
+        if relevant_delta <= tolerance:
+            raise RepairPacketError("text completeness delta does not exceed tolerance")
+        selected.update({
+            "clipAxis": axis,
+            "clipMechanism": mechanism,
+            "inlineDelta": inline_delta,
+            "blockDelta": block_delta,
+            "tolerance": tolerance,
+            "outsideRectCount": outside_count,
+        })
     return dict(sorted(selected.items()))
 
 
@@ -164,7 +207,7 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError(
                 "unresolved hidden target is an evaluator contract defect, not an automatic product repair"
             )
-        findings.append(_finding(code, "composition", issue.get("targetId"), _measurement(issue)))
+        findings.append(_finding(code, "composition", issue.get("targetId"), _measurement(issue, code)))
 
     runtime_issues = runtime.get("issues", [])
     if not isinstance(runtime_issues, list):
@@ -233,12 +276,17 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
-    suffix = (
-        " Preserve passed behavior and required content; for focus obscuration, preserve the control and reserve space "
-        "or reposition the affected fixed/sticky layer; change only affected composition; do not edit the evaluator."
-        if focus_repair
-        else " Preserve passed behavior and required content; change only affected composition; do not edit the evaluator."
+    clip_repair = any(
+        finding.get("code") == "a1_required_text_clipped"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
     )
+    suffix = " Preserve passed behavior and required content;"
+    if focus_repair:
+        suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
+    if clip_repair:
+        suffix += " for clipped required text, preserve the full copy and remove direct clipping or recompose its text track;"
+    suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()
     for occurrence in occurrences:

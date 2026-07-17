@@ -100,6 +100,147 @@ function auditV7A1Typography(specs) {
       }));
   };
 
+  const textCompleteness = (node, facts) => {
+    const style = getComputedStyle(node);
+    const base = {
+      status: "complete",
+      reason: null,
+      mechanism: null,
+      tolerance: null,
+      inlineDelta: 0,
+      blockDelta: 0,
+      graphemeCount: 0,
+      outsideRectCount: 0,
+    };
+    const notApplicable = (reason) => ({ ...base, status: "not_applicable", reason });
+    const unavailable = (reason, values = {}) => ({ ...base, ...values, status: "unavailable", reason });
+    if (facts.mode !== "product") return notApplicable(`${facts.mode}_intent`);
+    if (!facts.horizontal) return notApplicable("vertical_writing");
+    if (!facts.leftToRight) return notApplicable("right_to_left");
+    if (facts.interactive) return notApplicable("interactive_control");
+    if (!facts.eligible) return notApplicable("ineligible_target");
+
+    const normalized = (value) => value || "none";
+    const individualTransform = [style.translate, style.rotate, style.scale]
+      .some((value) => value && value !== "none");
+    if (style.transform !== "none" || individualTransform || normalized(style.offsetPath) !== "none") {
+      return unavailable("transformed_target");
+    }
+    if ((style.clip || "auto") !== "auto") return unavailable("complex_clip_or_filter");
+    const zoom = !style.zoom || style.zoom === "normal" ? 1 : Number(style.zoom);
+    if (!Number.isFinite(zoom) || zoom !== 1) return unavailable("non_unit_zoom");
+    if (normalized(style.clipPath) !== "none" || normalized(style.maskImage) !== "none"
+        || normalized(style.filter) !== "none") return unavailable("complex_clip_or_filter");
+    const pseudoContent = ["::before", "::after"].some((pseudo) => {
+      const content = getComputedStyle(node, pseudo).content;
+      return Boolean(content && !["none", "normal", "\"\"", "''"].includes(content));
+    });
+    if (pseudoContent) return unavailable("pseudo_content_present");
+    if (node.clientWidth <= 0 || node.clientHeight <= 0) return unavailable("direct_client_box_unavailable");
+
+    const inlineDelta = Math.max(0, node.scrollWidth - node.clientWidth);
+    const blockDelta = Math.max(0, node.scrollHeight - node.clientHeight);
+    const finiteLineHeight = Number.parseFloat(style.lineHeight);
+    const lineHeightIsFinite = Number.isFinite(finiteLineHeight) && finiteLineHeight > 0;
+    const finiteTolerance = lineHeightIsFinite ? Math.max(2, finiteLineHeight * 0.25) : null;
+    const overflowX = style.overflowX;
+    const overflowY = style.overflowY;
+    const nonScrollX = ["hidden", "clip"].includes(overflowX);
+    const nonScrollY = ["hidden", "clip"].includes(overflowY);
+    const clamp = Number.parseInt(style.webkitLineClamp, 10);
+    const ellipsisOrClampTolerance = finiteTolerance ?? 2;
+    let mechanism = null;
+    if (Number.isFinite(clamp) && clamp > 0 && nonScrollY && blockDelta > ellipsisOrClampTolerance) {
+      mechanism = "line_clamp";
+    } else if (style.textOverflow === "ellipsis" && nonScrollX && inlineDelta > ellipsisOrClampTolerance) {
+      mechanism = "inline_ellipsis";
+    } else if (nonScrollX && inlineDelta > (finiteTolerance ?? 2)) {
+      mechanism = "inline_clip";
+    } else if (nonScrollY && blockDelta > (finiteTolerance ?? 2)) {
+      mechanism = "block_clip";
+    }
+
+    const tolerance = finiteTolerance ?? (["inline_ellipsis", "line_clamp"].includes(mechanism) ? 2 : null);
+    const comparisonTolerance = tolerance ?? 2;
+    const scrollAxis = !mechanism && (
+      (["auto", "scroll"].includes(overflowX) && inlineDelta > comparisonTolerance && "inline")
+      || (["auto", "scroll"].includes(overflowY) && blockDelta > comparisonTolerance && "block")
+      || null
+    );
+    const values = {
+      mechanism: scrollAxis ? "scroll_region" : mechanism,
+      tolerance: tolerance === null ? null : Number(tolerance.toFixed(2)),
+      inlineDelta: Number(Math.min(inlineDelta, 1_000_000).toFixed(2)),
+      blockDelta: Number(Math.min(blockDelta, 1_000_000).toFixed(2)),
+    };
+    if (nonScrollX && inlineDelta > (finiteTolerance ?? 2) && !["clip", "ellipsis"].includes(style.textOverflow)) {
+      return unavailable("unsupported_text_overflow", values);
+    }
+    const relevantDelta = scrollAxis
+      ? scrollAxis === "inline" ? inlineDelta : blockDelta
+      : ["inline_ellipsis", "inline_clip"].includes(mechanism) ? inlineDelta : blockDelta;
+    if ((!scrollAxis && !mechanism) || relevantDelta <= comparisonTolerance) return { ...base, ...values };
+    if (!scrollAxis && tolerance === null) return unavailable("line_height_unavailable", values);
+
+    const clientLeft = node.getBoundingClientRect().left + node.clientLeft;
+    const clientTop = node.getBoundingClientRect().top + node.clientTop;
+    const clipBox = {
+      left: clientLeft,
+      top: clientTop,
+      right: clientLeft + node.clientWidth,
+      bottom: clientTop + node.clientHeight,
+    };
+    const locale = node.lang || document.documentElement.lang || "zh-Hant";
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    const fragments = [];
+    let graphemeCount = 0;
+    while (walker.nextNode()) {
+      const textNode = walker.currentNode;
+      const parent = textNode.parentElement;
+      if (!parent || parent.closest("rt, rp, script, style, [aria-hidden='true'], [inert]")) continue;
+      for (const item of graphemes(textNode.data, locale)) {
+        graphemeCount += 1;
+        if (graphemeCount > 4096) return unavailable("grapheme_budget_exceeded", {
+          ...values,
+          graphemeCount: 4096,
+        });
+        const range = document.createRange();
+        range.setStart(textNode, item.index);
+        range.setEnd(textNode, item.index + item.segment.length);
+        for (const rect of range.getClientRects()) {
+          if (rect.width > 0.1 && rect.height > 0.1) fragments.push(rect);
+        }
+      }
+    }
+    const inlineMechanism = ["inline_ellipsis", "inline_clip"].includes(mechanism);
+    const outside = fragments.filter((rect) => scrollAxis
+      ? scrollAxis === "inline"
+        ? rect.left < clipBox.left - comparisonTolerance || rect.right > clipBox.right + comparisonTolerance
+        : rect.top < clipBox.top - comparisonTolerance || rect.bottom > clipBox.bottom + comparisonTolerance
+      : inlineMechanism
+        ? rect.left < clipBox.left - comparisonTolerance || rect.right > clipBox.right + comparisonTolerance
+        : rect.top < clipBox.top - comparisonTolerance || rect.bottom > clipBox.bottom + comparisonTolerance);
+    const measured = {
+      ...base,
+      ...values,
+      graphemeCount,
+      outsideRectCount: Math.min(outside.length, 4096),
+    };
+    if (!outside.length) return { ...measured, status: "advisory", reason: "direct_text_overflow_not_confirmed" };
+    if (scrollAxis) {
+      const labelledBy = (node.getAttribute("aria-labelledby") || "").trim().split(/\s+/).filter(Boolean);
+      const labelledName = labelledBy.some((id) => Boolean(document.getElementById(id)?.textContent?.trim()));
+      const named = Boolean(node.getAttribute("aria-label")?.trim() || labelledName);
+      const accessible = node.getAttribute("role") === "region" && node.tabIndex >= 0 && named;
+      return {
+        ...measured,
+        status: accessible ? "accessible_scroll" : "advisory",
+        reason: accessible ? "named_focusable_scroll_region" : "scroll_region_not_accessibly_exposed",
+      };
+    }
+    return { ...measured, status: "clipped", reason: "direct_text_outside_client_box" };
+  };
+
   const meaningful = (value) => graphemes(value).filter((item) => /[\p{Letter}\p{Number}]/u.test(item.segment));
   const han = (value) => graphemes(value).filter((item) => /\p{Script=Han}/u.test(item.segment));
   const taskPeer = (spec, node, owner) => {
@@ -212,6 +353,13 @@ function auditV7A1Typography(specs) {
       && inlineEndGap > gapMinimum
       && startAligned
       && !hasTaskPeer;
+    const completeness = textCompleteness(node, {
+      eligible,
+      horizontal,
+      interactive,
+      leftToRight,
+      mode,
+    });
     const measurement = {
       id: spec.id,
       role,
@@ -235,6 +383,7 @@ function auditV7A1Typography(specs) {
       hasTaskPeer,
       columnVoid: columnVoidMeasurement,
       computedFontFamily: style.fontFamily,
+      textCompleteness: completeness,
     };
     targets.push(measurement);
 
@@ -245,6 +394,7 @@ function auditV7A1Typography(specs) {
     }
     if (orphan) findings.push(role === "heading" ? "a1_heading_han_orphan" : "a1_prose_han_orphan");
     if (underfilledTrack) findings.push(role === "heading" ? "a1_heading_track_void" : "a1_prose_track_void");
+    if (completeness.status === "clipped") findings.push("a1_required_text_clipped");
     if (eligible) {
       for (const code of findings) issues.push({ code, targetId: spec.id, measurement });
     } else if (findings.length || !horizontal || interactive || !hardModes.has(mode)) {

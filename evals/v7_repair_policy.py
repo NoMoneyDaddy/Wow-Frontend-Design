@@ -16,7 +16,7 @@ class V7RepairPolicyError(ValueError):
 KNOWN_ISSUE_CLASSES = {"composition", "interaction", "runtime"}
 ROW_FIELDS = ("variant", "case_id", "state", "profile", "engine")
 SUPPORT_CONTRACT = {
-    "schema_version": 1,
+    "schema_version": 2,
     "scope": "target-root",
     "target_inventory": ["DESIGN.md", "index.html", "run-manifest.json"],
     "rendered_entry": "index.html",
@@ -32,6 +32,10 @@ SUPPORT_CONTRACT = {
         "unknown": "cohort-full",
     },
 }
+SUPPORT_DEPENDENCY_PATHS = (
+    "evals/v7_a1_typography_metrics.cjs",
+    "evals/v7_focus_obscuration.cjs",
+)
 
 
 def _canonical_sha256(value: Any) -> str:
@@ -45,7 +49,7 @@ def _file_sha256(path: Path) -> str:
 
 
 def validate_support_contract(path: Path, repository_root: Path) -> str:
-    """Bind target isolation to a frozen declaration and the exact capture/auditor bytes."""
+    """Bind target isolation to frozen capture, auditor, and direct dependency bytes."""
     root = repository_root.resolve(strict=True)
     if not path.is_file() or path.is_symlink() or path.stat().st_size > 64 * 1024:
         raise V7RepairPolicyError("repair support contract is missing, unsafe or oversized")
@@ -58,13 +62,23 @@ def validate_support_contract(path: Path, repository_root: Path) -> str:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise V7RepairPolicyError(f"cannot read repair support contract: {error}") from error
-    if not isinstance(value, dict) or set(value) != set(SUPPORT_CONTRACT) | {"capture_module", "auditor"}:
+    if not isinstance(value, dict) or set(value) != set(SUPPORT_CONTRACT) | {"capture_module", "auditor", "dependencies"}:
         raise V7RepairPolicyError("repair support contract schema changed")
     for key, expected in SUPPORT_CONTRACT.items():
         if value.get(key) != expected:
             raise V7RepairPolicyError(f"repair support contract changed: {key}")
-    for label in ("capture_module", "auditor"):
-        record = value.get(label)
+    dependencies = value.get("dependencies")
+    if (
+        not isinstance(dependencies, list)
+        or [record.get("path") for record in dependencies if isinstance(record, dict)]
+        != list(SUPPORT_DEPENDENCY_PATHS)
+    ):
+        raise V7RepairPolicyError("repair support dependency inventory changed")
+    for label, record in (
+        ("capture_module", value.get("capture_module")),
+        ("auditor", value.get("auditor")),
+        *((f"dependency[{index}]", record) for index, record in enumerate(dependencies)),
+    ):
         if not isinstance(record, dict) or set(record) != {"path", "sha256"}:
             raise V7RepairPolicyError(f"repair support {label} binding is malformed")
         raw = record.get("path")
