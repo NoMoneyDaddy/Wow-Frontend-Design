@@ -32,6 +32,9 @@ codex = _module("v7_cycle_codex", ROOT / "evals" / "run_v7_codex_case.py")
 visual = _module("v7_cycle_visual", ROOT / "evals" / "run_v7_visual_matrix.py")
 compiler = _module("v7_cycle_compiler", ROOT / "evals" / "compile_v7_repair_packet.py")
 policy = _module("v7_cycle_policy", ROOT / "evals" / "v7_repair_policy.py")
+supporting_probes = _module(
+    "v7_cycle_supporting_probes", ROOT / "evals" / "v7_supporting_probe_registry.py"
+)
 evidence = visual.evidence
 
 
@@ -201,6 +204,62 @@ def _require_support_contract(
         raise V7RepairCycleError(f"repair support contract became invalid: {error}") from error
     if current_sha256 != expected_sha256:
         raise V7RepairCycleError("repair support contract drifted during the cycle")
+
+
+def _attach_supporting_probe_receipts(
+    bindings: list[dict[str, Any]],
+    accepted: dict[tuple[str, str], dict[str, Any]],
+    sidecars: dict[tuple[str, str], Path] | None = None,
+    targets: dict[tuple[str, str], Path] | None = None,
+    repository_root: Path | None = None,
+) -> None:
+    for binding in bindings:
+        key = tuple(binding["target"])
+        receipt = accepted.get(key)
+        if receipt is None:
+            receipt = {
+                "coverage_status": "unavailable",
+                "reason_code": "probe_receipt_missing",
+                "advisory_count": 0,
+                "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+            }
+        elif sidecars is not None and targets is not None and repository_root is not None:
+            try:
+                sidecar = sidecars[key]
+                if receipt.get("reason_code") == "probe_contract_unavailable":
+                    generic = _load(sidecar, "unavailable supporting registry", 2 * 1024 * 1024)
+                    if generic != {
+                        "schema_version": 1,
+                        "status": "unavailable",
+                        "reason_code": "probe_contract_unavailable",
+                        "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+                    } or _digest(sidecar) != receipt.get("sha256"):
+                        raise V7RepairCycleError("unavailable supporting registry changed")
+                else:
+                    registry = supporting_probes.validate_registry_file(
+                        sidecar,
+                        receipt.get("sha256"),
+                        targets[key],
+                        repository_root,
+                    )
+                    current = {
+                        "path": sidecar.name,
+                        "sha256": _digest(sidecar),
+                        "coverage_status": registry["coverage"]["status"],
+                        "reason_code": registry["coverage"]["reason_code"],
+                        "advisory_count": len(registry["advisories"]),
+                        "claim_boundary": registry["claim_boundary"],
+                    }
+                    if current != receipt:
+                        raise V7RepairCycleError("supporting registry receipt changed")
+            except (KeyError, OSError, V7RepairCycleError, supporting_probes.V7SupportingProbeError):
+                receipt = {
+                    "coverage_status": "unavailable",
+                    "reason_code": "probe_receipt_invalid",
+                    "advisory_count": 0,
+                    "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+                }
+        binding["supporting_probe"] = copy.deepcopy(receipt)
 
 
 def _brief_map(path: Path, repository_root: Path) -> dict[str, Path]:
@@ -608,6 +667,10 @@ def run(args: Namespace) -> dict[str, Any]:
     packet_files: dict[str, Path] = {_digest(packet_path): packet_path}
     verified_receipts: dict[tuple[str, str], dict[str, Any]] = {}
     accepted_selectors: dict[tuple[str, str], dict[str, Any]] = {}
+    accepted_probe_receipts: dict[tuple[str, str], dict[str, Any]] = {}
+    candidate_probe_receipts: dict[tuple[str, str], dict[str, Any]] = {}
+    accepted_probe_sidecars: dict[tuple[str, str], Path] = {}
+    candidate_probe_sidecars: dict[tuple[str, str], Path] = {}
     verification_bindings: list[dict[str, Any]] = []
     round_counter = 0
 
@@ -615,6 +678,59 @@ def run(args: Namespace) -> dict[str, Any]:
         nonlocal round_counter
         round_counter += 1
         _write_once(work_root / f"receipt-{round_counter:03d}.json", value)
+
+    def run_supporting_probe(
+        target_root: Path,
+        round_dir: Path,
+        phase: str,
+    ) -> tuple[dict[str, str] | None, dict[str, Any], Path]:
+        sidecar = round_dir / f"supporting-probe-{phase}.json"
+        try:
+            registry = supporting_probes.run_source_layout_probe(target_root, repository_root)
+        except (OSError, supporting_probes.V7SupportingProbeError):
+            registry = {
+                "schema_version": 1,
+                "status": "unavailable",
+                "reason_code": "probe_contract_unavailable",
+                "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+            }
+            _write_once(sidecar, registry)
+            return None, {
+                "path": sidecar.name,
+                "sha256": _digest(sidecar),
+                "coverage_status": "unavailable",
+                "reason_code": "probe_contract_unavailable",
+                "advisory_count": 0,
+                "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+            }, sidecar
+        try:
+            supporting_probes.validate_registry(registry, target_root, repository_root)
+        except supporting_probes.V7SupportingProbeError:
+            registry = {
+                "schema_version": 1,
+                "status": "unavailable",
+                "reason_code": "probe_validation_failed",
+                "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+            }
+            _write_once(sidecar, registry)
+            return None, {
+                "path": sidecar.name,
+                "sha256": _digest(sidecar),
+                "coverage_status": "unavailable",
+                "reason_code": "probe_validation_failed",
+                "advisory_count": 0,
+                "claim_boundary": supporting_probes.REGISTRY_BOUNDARY,
+            }, sidecar
+        _write_once(sidecar, registry)
+        receipt = {
+            "path": sidecar.name,
+            "sha256": _digest(sidecar),
+            "coverage_status": registry["coverage"]["status"],
+            "reason_code": registry["coverage"]["reason_code"],
+            "advisory_count": len(registry["advisories"]),
+            "claim_boundary": registry["claim_boundary"],
+        }
+        return {"path": sidecar.name, "sha256": receipt["sha256"]}, receipt, sidecar
 
     def generate(target: dict[str, Any], active_packet: dict[str, Any], generation_number: int) -> dict[str, Any]:
         key = _target_identity(target)
@@ -654,8 +770,11 @@ def run(args: Namespace) -> dict[str, Any]:
             })
             raise V7RepairCycleFuse("failure key reached the three-round fuse before generation")
         repair_round = max(next_counts.values())
+        supporting_binding, supporting_receipt, _before_sidecar = run_supporting_probe(
+            source, round_dir, "before"
+        )
         context = {
-            "schema_version": 1,
+            "schema_version": 2 if supporting_binding is not None else 1,
             "variant": key[0],
             "case_id": key[1],
             "packet_sha256": _digest(packet_file),
@@ -663,6 +782,8 @@ def run(args: Namespace) -> dict[str, Any]:
             "finding_signature": codex._repair_finding_signature(target),
             "feedback": target["feedback"],
         }
+        if supporting_binding is not None:
+            context["supporting_registry"] = supporting_binding
         context_file = _write_once(round_dir / "repair-context.json", context)
         generated = round_dir / "target"
         generated.mkdir()
@@ -692,6 +813,7 @@ def run(args: Namespace) -> dict[str, Any]:
                 "outputs": manifest["outputs"],
                 "packet_sha256": context["packet_sha256"],
                 "context_sha256": _digest(context_file),
+                "supporting_probe": supporting_receipt,
             },
         }
 
@@ -750,6 +872,13 @@ def run(args: Namespace) -> dict[str, Any]:
         if verified_after != verified_before:
             raise V7RepairCycleError("target changed during affected-matrix capture")
         verified_receipts.update(verified_after)
+        _after_binding, after_probe_receipt, after_probe_sidecar = run_supporting_probe(
+            generated, round_dir, "after"
+        )
+        if _source_receipt(generated) != generated_receipt:
+            raise V7RepairCycleError("target changed during the supporting source probe")
+        candidate_probe_receipts[key] = after_probe_receipt
+        candidate_probe_sidecars[key] = after_probe_sidecar
         ledger = {
             "schema_version": 1,
             "status": "completed",
@@ -793,6 +922,7 @@ def run(args: Namespace) -> dict[str, Any]:
                 "selection_decision": selector["decision"],
                 "rows": len(attempts),
                 "finding_runs": finding_runs,
+                "supporting_probe": after_probe_receipt,
             },
         }
 
@@ -807,6 +937,13 @@ def run(args: Namespace) -> dict[str, Any]:
             accepted_selectors,
             full_inventory,
             support_contract_sha256,
+        )
+        _attach_supporting_probe_receipts(
+            bindings,
+            accepted_probe_receipts,
+            accepted_probe_sidecars,
+            staged,
+            repository_root,
         )
         verification_bindings[:] = copy.deepcopy(bindings)
         packet_value = {"schema_version": 1, "status": "clean", "targets": []}
@@ -827,6 +964,13 @@ def run(args: Namespace) -> dict[str, Any]:
         verified_targets: dict[tuple[str, str], dict[str, Any]],
     ) -> dict[str, Any]:
         _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
+        _attach_supporting_probe_receipts(
+            verification_bindings,
+            accepted_probe_receipts,
+            accepted_probe_sidecars,
+            {key: staged[key] for key in accepted_probe_receipts},
+            repository_root,
+        )
         if set(verified_targets) != set(canonical):
             raise V7RepairCycleError("full verification target inventory is incomplete")
         for key, before in source_receipts.items():
@@ -839,6 +983,13 @@ def run(args: Namespace) -> dict[str, Any]:
 
         def verify() -> None:
             _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
+            _attach_supporting_probe_receipts(
+                verification_bindings,
+                accepted_probe_receipts,
+                accepted_probe_sidecars,
+                {key: canonical[key] for key in accepted_probe_receipts},
+                repository_root,
+            )
             for key, before in source_receipts.items():
                 expected = verified_targets[key]
                 if _source_receipt(canonical[key]) != expected:
@@ -899,6 +1050,8 @@ def run(args: Namespace) -> dict[str, Any]:
             "path": str(selector_path),
             "sha256": _digest(selector_path),
         }
+        accepted_probe_receipts[key] = copy.deepcopy(candidate_probe_receipts[key])
+        accepted_probe_sidecars[key] = candidate_probe_sidecars[key]
 
     completed = execute_cycle(
         packet,

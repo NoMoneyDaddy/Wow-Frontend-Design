@@ -90,6 +90,21 @@ class V7CodexRunnerTests(unittest.TestCase):
         self.assertNotIn("candidate", prompt.casefold())
         self.assertNotIn("accepted", prompt.casefold())
 
+    def test_supporting_advisory_is_bounded_and_cannot_claim_rendered_evidence(self) -> None:
+        prompt = runner.build_prompt(
+            "保留公民決策流程。",
+            repair_feedback="REPAIR REQUIRED: layout void at base/desktop.",
+            supporting_advisory=(
+                "SOURCE-RISK ADVISORY (not rendered evidence): "
+                "prose_wrap_disabled@index.html:4. Only address it when it shares the verified "
+                "browser finding's root cause; Playwright remains authoritative."
+            ),
+        )
+        self.assertIn("EVALUATOR-OWNED SUPPORTING ADVISORY", prompt)
+        self.assertIn("not rendered evidence", prompt)
+        self.assertIn("not a release gate", prompt)
+        self.assertIn("Do not broaden", prompt)
+
     def test_repair_source_requires_matching_provenance_and_seeds_only_outputs(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT.parent) as directory:
             outside = Path(directory)
@@ -108,7 +123,7 @@ class V7CodexRunnerTests(unittest.TestCase):
             outputs = []
             for name, body in (
                 ("DESIGN.md", b"# Design\n"),
-                ("index.html", b"<!doctype html><html><main>test</main></html>\n"),
+                ("index.html", b"<style>p { white-space: nowrap; }</style><p>test</p>\n"),
             ):
                 artifact = source / name
                 artifact.write_bytes(body)
@@ -189,7 +204,7 @@ class V7CodexRunnerTests(unittest.TestCase):
                 "finding_signature": runner._repair_finding_signature(target),
                 "feedback": target["feedback"],
             }), encoding="utf-8")
-            source_root, feedback, repair = runner._validate_repair_source(
+            source_root, feedback, advisory, repair = runner._validate_repair_source(
                 source,
                 context,
                 packet,
@@ -203,6 +218,7 @@ class V7CodexRunnerTests(unittest.TestCase):
             )
             self.assertEqual(source, source_root)
             self.assertTrue(feedback.startswith("REPAIR REQUIRED"))
+            self.assertEqual("", advisory)
             self.assertEqual(1, repair["round"])
             self.assertEqual(outputs, repair["source_outputs"])
             stage = outside / "stage"
@@ -212,6 +228,32 @@ class V7CodexRunnerTests(unittest.TestCase):
             )
             self.assertEqual(set(runner.EXPECTED_OUTPUTS), {path.name for path in stage.iterdir()})
             self.assertEqual((source / "index.html").read_bytes(), (stage / "index.html").read_bytes())
+
+            probe = runner.supporting_probes.run_source_layout_probe(source, ROOT)
+            probe_path = outside / "supporting-probe-before.json"
+            probe_path.write_text(json.dumps(probe), encoding="utf-8")
+            context_v2 = json.loads(context.read_text(encoding="utf-8"))
+            context_v2["schema_version"] = 2
+            context_v2["supporting_registry"] = {
+                "path": probe_path.name,
+                "sha256": runner._digest(probe_path),
+            }
+            context.write_text(json.dumps(context_v2), encoding="utf-8")
+            _source_root, _feedback, advisory, repair_v2 = runner._validate_repair_source(
+                source, context, packet, 1, ROOT, manifest_path, "candidate", "case-one", "e" * 64, package
+            )
+            self.assertIn("prose_wrap_disabled@index.html", advisory)
+            self.assertEqual(1, repair_v2["supporting_registry"]["advisory_count"])
+            self.assertEqual(repair["failure_keys"], repair_v2["failure_keys"])
+            probe_path.write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(runner.V7CodexRunnerError, "hash disagrees"):
+                runner._validate_repair_source(
+                    source, context, packet, 1, ROOT, manifest_path,
+                    "candidate", "case-one", "e" * 64, package,
+                )
+            context_v2.pop("supporting_registry")
+            context_v2["schema_version"] = 1
+            context.write_text(json.dumps(context_v2), encoding="utf-8")
 
             def drift_packet(*_args: object) -> dict[str, int]:
                 packet.write_text("{}\n", encoding="utf-8")

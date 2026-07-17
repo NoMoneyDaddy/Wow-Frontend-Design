@@ -370,6 +370,76 @@ class V7RepairCycleTests(unittest.TestCase):
             with self.assertRaisesRegex(cycle.V7RepairCycleError, "became invalid"):
                 cycle._require_support_contract(Path("/tmp/contract.json"), ROOT, "a" * 64)
 
+    def test_unavailable_supporting_probe_is_retained_without_blocking_visual_completion(self) -> None:
+        target = _target()
+        unavailable = {
+            "coverage_status": "unavailable",
+            "reason_code": "probe_execution_unavailable",
+            "advisory_count": 0,
+            "claim_boundary": cycle.supporting_probes.REGISTRY_BOUNDARY,
+        }
+        receipts = []
+        result = cycle.execute_cycle(
+            _packet(target),
+            generate=lambda *_args: {
+                "root": "/tmp/repaired",
+                "receipt": {"supporting_probe": unavailable},
+            },
+            capture_narrow=lambda *_args: {
+                "targets": [],
+                "packet": {"status": "clean"},
+                "receipt": {"supporting_probe": unavailable},
+            },
+            run_full=lambda *_args: {
+                "packet": {"status": "clean"},
+                "receipt": {
+                    "mode": "affected",
+                    "target_bindings": [{"target": ["candidate", "case-one"], "supporting_probe": unavailable}],
+                },
+                "verified_targets": {},
+            },
+            promote=lambda *_args: {"status": "promoted", "supporting_probe": unavailable},
+            write_receipt=receipts.append,
+        )
+        self.assertEqual("completed", result["status"])
+        self.assertEqual("unavailable", receipts[0]["generation"]["supporting_probe"]["coverage_status"])
+        self.assertEqual("unavailable", receipts[0]["narrow"]["supporting_probe"]["coverage_status"])
+
+    def test_missing_probe_receipt_is_explicitly_unavailable(self) -> None:
+        bindings = [{"target": ["candidate", "case-one"]}]
+        cycle._attach_supporting_probe_receipts(bindings, {})
+        self.assertEqual("unavailable", bindings[0]["supporting_probe"]["coverage_status"])
+        self.assertEqual("probe_receipt_missing", bindings[0]["supporting_probe"]["reason_code"])
+
+    def test_changed_after_probe_sidecar_is_unavailable_at_final_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "target"
+            root.mkdir()
+            (root / "index.html").write_text("<p>copy</p>", encoding="utf-8")
+            registry = cycle.supporting_probes.run_source_layout_probe(root, ROOT)
+            sidecar = Path(directory) / "supporting-probe-after.json"
+            sidecar.write_text(json.dumps(registry), encoding="utf-8")
+            key = ("candidate", "case-one")
+            receipt = {
+                "path": sidecar.name,
+                "sha256": cycle._digest(sidecar),
+                "coverage_status": registry["coverage"]["status"],
+                "reason_code": registry["coverage"]["reason_code"],
+                "advisory_count": len(registry["advisories"]),
+                "claim_boundary": registry["claim_boundary"],
+            }
+            bindings = [{"target": list(key)}]
+            cycle._attach_supporting_probe_receipts(
+                bindings, {key: receipt}, {key: sidecar}, {key: root}, ROOT
+            )
+            self.assertEqual("complete", bindings[0]["supporting_probe"]["coverage_status"])
+            sidecar.write_text("{}", encoding="utf-8")
+            cycle._attach_supporting_probe_receipts(
+                bindings, {key: receipt}, {key: sidecar}, {key: root}, ROOT
+            )
+            self.assertEqual("unavailable", bindings[0]["supporting_probe"]["coverage_status"])
+            self.assertEqual("probe_receipt_invalid", bindings[0]["supporting_probe"]["reason_code"])
+
 
 if __name__ == "__main__":
     unittest.main()
