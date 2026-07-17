@@ -1,6 +1,8 @@
-# 測試方案：v6 執行紀錄與 v7 候選計畫
+# 測試方案：v6 執行紀錄、v7 研究結果與後續優化路線
 
-狀態：`COMPLETED`。固定 cohort 已於 2026-07-15 完成。
+狀態：v6 固定 cohort `COMPLETED`（2026-07-15）；v7 roadmap `IN PROGRESS`。
+
+v7 狀態（2026-07-18）：development instrumentation 與 A4 pilot 已執行；A4 因 deterministic findings 增加及 civic desktop material regression，未晉級為全域品質改善。v7 尚未完成 sealed promotion。Playwright evidence 現可編譯為 bounded repair packet，但正式 repair consumer、affected-matrix selector 與 append-only fuse receipt 尚未完成；不得把「已產生診斷」轉述成「已自動修正」。
 
 方法定位：這 8 案同時參與缺陷發現、Skill／evaluator 修正、Darwin candidate 比較與最終回歸，因此是 **development/regression closure**，不是 held-out validation，也不證明 Skill 已泛化。下一次 promotion 必須另用未進 authoring context 的 sealed validation／test tasks，比較 accepted 與 candidate Skill，並對 stochastic case 重複執行。
 
@@ -206,9 +208,9 @@ Finding 自動送回修復；只重跑該 target lint，再跑 8-case contract r
 
 使用者說「開始測試」後，已依序執行 harness preflight、8-case generation、lint、browser、repair、完整回歸與發布。執行中只要仍有進度輸出就延長 soft timeout；未完成的 generation／lint／capture 依分類重試，沒有用 timeout 偽裝完成。
 
-## v7 候選：分階段優化與獨立供應鏈 lane
+## v7 歷史候選計畫：分階段優化與獨立供應鏈 lane
 
-狀態：`PLANNED`，尚未執行，也不屬於 v6 證據。模型仍固定為使用者指定的 `gpt-5.4-mini`，禁止 silent fallback。下一輪只優化 `v7-A1`；其餘候選必須等前一輪接受或拒絕並封存後另開 cohort。
+狀態：以下保留 v7 開跑前的原始 lane 設計，供 provenance 與未完成 sealed promotion 使用；現況以文件頂端 v7 狀態及「2026-07-18 後續持續優化路線」為準。A1–A4 development instrumentation／pilot 已執行，sealed validation／test 尚未完成，也不屬於 v6 證據。模型固定為使用者指定的 `gpt-5.4-mini`，禁止 silent fallback；新候選仍須等前一輪接受或拒絕並封存後另開 cohort。
 
 | Lane | 單一假設 | 候選可改範圍 | 不得混入 |
 | --- | --- | --- | --- |
@@ -301,3 +303,34 @@ Candidate 只有在以下全部成立時才能取代 accepted Skill：
 5. v7-B security gate 通過；untouched sealed test 一次通過。任一失敗就拒絕 candidate、保留 accepted best-so-far，不修改 hidden test 追分。
 
 新 cohort 完成前，只能稱這份內容為研究與測試計畫。README 不新增成果圖或通過宣稱；執行後再更新 `RESULTS.md`、evidence ledger、`CHANGELOG.md` 與展示。Darwin 9 維分數只作結構診斷，不是 promotion authority；實際決策以上述 paired evidence ratchet 為準。
+
+## 2026-07-18 後續持續優化路線
+
+這份路線用來限制範圍與避免「再加一個 scanner」的死循環。每輪只接受一個可歸因候選；先完成最高優先級的 exit criteria，再依實際 repair receipt 的問題分布決定下一輪。工具數量、規則數量、截圖數量與主觀總分都不是進度。
+
+| 順序 | 單一能力缺口 | 候選邊界 | 必須證明的 exit criteria | 本輪不做 |
+| --- | --- | --- | --- | --- |
+| P0 | v7 repair packet 沒有 consumer | evaluator-owned `packet → selective regeneration → narrow retest` runner；只處理 packet 明示的 `variant × case_id`；narrow clean 後一律以已凍結 full matrix 作保守 fallback 並記錄原因 | 未失敗 target byte/hash 不變；同一 failure key 最多三輪；每輪保存 receipt；full-matrix fallback 通過才結束；任一未知 schema fail closed；不得在本輪推論相依關係或挑選「最佳」產物 | 新增 scanner、改 Skill 視覺規則、安裝套件、affected-set selector |
+| P1 | affected matrix 與最佳產物選擇尚未機械化 | 用 issue class、實際 diff、宣告支援矩陣映射取代 P0 的 full-matrix fallback；新增 lexicographic best-artifact contract | 原失敗格必重跑；shared token/layout 變更擴大到完整相依矩陣；未知範圍維持 full matrix；失敗時保留最佳可用 artifact 而非最後一次 artifact | 用 finding 總數抵銷核心任務／runtime regression |
+| P2 | 已有 accessibility／contrast／source／Pretext 工具未形成同一 bounded issue registry | 一次只接一個已存在且 pinned 的 supporting probe；versioned allowlist、claim boundary、dedupe key | 注入 fixture 可走完整 repair cycle；工具不可用時降級而非偽造 pass；axe／lint 不得被稱為 WCAG 或視覺驗證 | 一次接入所有工具、讓 advisory 直接阻斷發布 |
+| P3 | 固定 viewport 可能漏掉 breakpoint 邊界；motion 只有穩定截圖模式 | 無截圖的 bounded breakpoint probe；僅對有 motion 的頁面比較 normal/reduce computed behavior | 只在觀測到 mode change 周圍收斂；不得無上限掃寬度；normal/reduce 結果可重現且不以 global `0.01ms` 規則代替產品行為 | 每個像素寬度截圖、以動畫數量評美感 |
+| P4 | 美感、色彩與排版仍需避免跨產品收斂 | 以 product thesis、產品證據、內容結構與 locale 為條件的 paired cohort；繁中 line fragments 與 task completeness 為硬 gate；每案產生可追溯的品牌／表面／文字／狀態／資料語意 color-role map 與 contrast pairs | deterministic vector 無退步；匿名 craft review 無 material loss；color-role map 服務 task/readability 且不同 brief 不複製同一角色映射；同一 Skill 在錯開產品 brief 不收斂成同 palette／grid／type treatment | 固定美學 preset、字型／色彩黑名單、用 novelty 抵銷 usability |
+| P5 | Stylelint／Biome 等 code-quality adapter 的專案差異 | 只在目標專案已有 pin/config 時讀取；read-only first，fix 只對明確 safe action 且經 diff review | parser/config/version provenance 完整；原專案無工具時不安裝；靜態 finding 不升級為 rendered pass/fail | 把 Stylelint 或 Biome 變成 Skill 必要 runtime dependency |
+| P6 | 長期維護成本與 context/runtime 預算 | selected-reference bytes、首次可用 artifact、wall time、repair count、flake、user relay count | 高優先 gate/evidence 不退步後才比較成本；連續兩輪無 deterministic 改善即停 | 以 token 便宜補償缺證據或品質退步 |
+
+### 每輪固定協定
+
+1. 凍結一個 candidate、公開契約、對照組、典型 prompt、反例 fixture、nearby valid counterexample 與預期 claim boundary。
+2. 先跑最窄 deterministic gate；有改善後，P0 使用已凍結 full matrix，P1 起才使用 affected matrix，未知範圍仍回到 full matrix；再跑 installability、完整 regression 與兩個獨立 judge。P0 full matrix 會重跑驗證格，但只保存原 failure／repair before-after 與新 finding 的截圖，不重複保存無關 clean 畫面。主觀 judge 不可覆蓋硬 gate。
+3. 接受時自動 commit 並記錄 commit、測試輸出、工具版本、來源與下一個新問題；拒絕時保留 rejected diagnosis，回復 accepted best-so-far，不修改 active evaluator 追分。
+4. 同一 failure key 三次失敗即熔斷；連續兩個 Skill candidates 沒有 deterministic 改善，或連續兩輪只有主觀小幅收益，停止該假設並回到 backlog。若新增 checker 沒有真實 counterexample 與 repair path，也停止。
+5. 每三個 accepted commits 或每次 evaluator schema 變更後跑完整 contract suite（在 receipt 記錄本輪實際 test/run/skip 數）、Skill installability、v7 preflight 與一個代表性 Playwright smoke；一般快速修正不重拍無關頁面。
+
+### 研究來源分級與採用結果
+
+- **規範與官方文件（normative／primary）**：[W3C CSS Text Level 3](https://www.w3.org/TR/css-text-3/) 與 [CLReq](https://www.w3.org/TR/clreq/) 定義語言與換行邊界；它們用來造 fixture，不用來宣稱瀏覽器實作已通過。[Playwright best practices](https://playwright.dev/docs/best-practices)、[visual comparisons](https://playwright.dev/docs/test-snapshots) 與 [trace viewer](https://playwright.dev/docs/trace-viewer-intro) 支持 user-facing locator、web-first assertion、同環境 screenshot baseline，以及只在失敗／retry 保存 trace；本計畫因此不對每次成功 run 錄 trace或擴張截圖。
+- **工具官方文件（adapter boundary）**：[Stylelint CLI/options](https://stylelint.io/user-guide/cli/) 支持 read-only diagnostics 與明示 fix；disable reporting 可抓無理由／無效／多餘抑制。[Biome CSS rules](https://biomejs.dev/linter/css/rules/) 區分 safe/unsafe code action。兩者都只在既有 project pin/config 成立時啟用，不能證明 rendered quality。
+- **同類 Skill（方法參考）**：[Microsoft frontend-design-review](https://github.com/microsoft/skills/blob/main/.github/skills/frontend-design-review/SKILL.md) 的 task/craft/trust 分層與 [gstack design-review](https://github.com/garrytan/gstack/blob/main/design-review/SKILL.md) 的 finding-level before/after／revert 紀錄有參考價值；固定點數、字型禁令、效果配方、runtime-specific orchestration 與把主觀 grade 當 promotion gate 不採用。
+- **Reddit 實務觀察（advisory only；擷取 2026-07-18）**：[AI-assisted Playwright workflow 討論](https://www.reddit.com/r/Playwright/comments/1umqvix/whats_missing_from_this_aidriven_e2e_testing/)提出 AI 較適合 evidence gathering／boilerplate，而非唯一 final skeptic；[E2E 投資範圍討論](https://www.reddit.com/r/webdev/comments/1r9ubwa/e2e_testing_for_frontend_developers_whats/)偏向保留 critical user flows、降低脆弱測試量。它們是未經本專案證明的實務假設，只用來設計反例；實際規則仍須由官方文件、固定 fixture 與本 repo evidence 證明。動態內容／字型 rasterization 的視覺噪音邊界直接採 Playwright 官方文件，不由 Reddit 推導。
+
+第一個功能候選固定為 P0 repair-cycle consumer。P0 接受前不啟動 P2–P5；如果 P0 在三次同因嘗試後仍無法用合成 fixture 完成 selective repair 與重測，保留現有 packet compiler，將自修正能力維持 `PARTIALLY VERIFIED`，不以更多規則掩蓋缺口。
