@@ -248,6 +248,53 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                         "size": f"{width}x{height}",
                         "screenshot": str(screenshot),
                         "screenshotSha256": hashlib.sha256(screenshot.read_bytes()).hexdigest(),
+                        "visualIssues": [],
+                        "fontEvidence": {
+                            "status": "captured",
+                            "roles": [
+                                {
+                                    "role": "page-heading",
+                                    "selector": "h1",
+                                    "source": "dom-text",
+                                    "pseudoDescendant": False,
+                                    "textRunIndex": 0,
+                                    "textNodeCount": 1,
+                                    "declaredPrimary": "serif",
+                                    "declaredPrimaryQuoted": False,
+                                    "classification": "not_applicable",
+                                    "fontStretch": "100%",
+                                    "fontStyle": "normal",
+                                    "fontWeight": "400",
+                                    "probeSourceTextEmpty": False,
+                                    "pseudoTextMappingUnavailable": False,
+                                    "renderedTextMappingUnavailable": False,
+                                    "probeTextComplete": True,
+                                    "probeHasLetterOrNumber": True,
+                                    "probeHasRelevantGlyph": True,
+                                    "probeRelevantGlyphOverflow": False,
+                                    "probeCodePoints": [65],
+                                    "fontPaintVisible": True,
+                                    "fontPaintEvidenceReliable": True,
+                                    "fontProbeStable": True,
+                                    "fontInventoryStable": True,
+                                    "platformFontsStable": True,
+                                    "browserGeneratedTextUnavailable": False,
+                                    "declaredFaceCheck": True,
+                                    "declaredFaceCheckReliable": True,
+                                    "declaredFaceSelectionFailed": False,
+                                    "declaredFaceSelectionUnavailable": False,
+                                    "fontFaces": [],
+                                    "actualFonts": [
+                                        {
+                                            "familyName": "Songti TC",
+                                            "postScriptName": "SongtiTC-Regular",
+                                            "glyphCount": 8,
+                                        }
+                                    ],
+                                }
+                            ],
+                            "primaryMismatches": [],
+                        },
                     }
                 )
             report = root / "visual.json"
@@ -279,6 +326,128 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             (root / "index.html").write_text("<main></main>\n", encoding="utf-8")
             evaluation.bind_visual_report(report, generation, targets)
             self.assertEqual(6, evaluation.validate_visual_completion(report, screenshots, targets, generation))
+
+            valid_payload = json.loads(report.read_text(encoding="utf-8"))
+            generic_native = json.loads(json.dumps(valid_payload))
+            generic_role = generic_native["results"][0]["fontEvidence"]["roles"][0]
+            generic_role["declaredPrimary"] = "sans-serif"
+            generic_role["classification"] = "not_applicable"
+            generic_role["browserGeneratedTextUnavailable"] = True
+            generic_role["renderedTextMappingUnavailable"] = True
+            generic_role["pseudoTextMappingUnavailable"] = True
+            generic_role["declaredFaceSelectionUnavailable"] = True
+            report.write_text(json.dumps(generic_native), encoding="utf-8")
+            self.assertEqual(6, evaluation.validate_visual_completion(report, screenshots, targets, generation))
+            report.write_text(json.dumps(valid_payload), encoding="utf-8")
+            invalid_payloads = []
+            missing = json.loads(json.dumps(valid_payload))
+            missing["results"][0].pop("fontEvidence")
+            invalid_payloads.append(missing)
+            unavailable = json.loads(json.dumps(valid_payload))
+            unavailable["results"][0]["fontEvidence"]["status"] = "unavailable"
+            invalid_payloads.append(unavailable)
+            empty_roles = json.loads(json.dumps(valid_payload))
+            empty_roles["results"][0]["fontEvidence"]["roles"] = []
+            invalid_payloads.append(empty_roles)
+            unknown_classification = json.loads(json.dumps(valid_payload))
+            unknown_classification["results"][0]["fontEvidence"]["roles"][0]["classification"] = "unknown"
+            invalid_payloads.append(unknown_classification)
+            unstable_probe = json.loads(json.dumps(valid_payload))
+            unstable_probe["results"][0]["fontEvidence"]["roles"][0]["fontProbeStable"] = False
+            invalid_payloads.append(unstable_probe)
+            unstable_inventory = json.loads(json.dumps(valid_payload))
+            unstable_inventory["results"][0]["fontEvidence"]["roles"][0]["fontInventoryStable"] = False
+            invalid_payloads.append(unstable_inventory)
+            invisible_paint = json.loads(json.dumps(valid_payload))
+            invisible_paint["results"][0]["fontEvidence"]["roles"][0]["fontPaintVisible"] = False
+            invalid_payloads.append(invisible_paint)
+            unreliable_paint = json.loads(json.dumps(valid_payload))
+            unreliable_paint["results"][0]["fontEvidence"]["roles"][0]["fontPaintEvidenceReliable"] = False
+            invalid_payloads.append(unreliable_paint)
+            unstable_platform_fonts = json.loads(json.dumps(valid_payload))
+            unstable_platform_fonts["results"][0]["fontEvidence"]["roles"][0]["platformFontsStable"] = False
+            invalid_payloads.append(unstable_platform_fonts)
+            boolean_glyph_count = json.loads(json.dumps(valid_payload))
+            boolean_glyph_count["results"][0]["fontEvidence"]["roles"][0]["actualFonts"][0]["glyphCount"] = True
+            invalid_payloads.append(boolean_glyph_count)
+            malformed_font_face = json.loads(json.dumps(valid_payload))
+            malformed_font_face["results"][0]["fontEvidence"]["roles"][0]["fontFaces"] = ["not-a-font-face"]
+            invalid_payloads.append(malformed_font_face)
+            missing_text_run_source = json.loads(json.dumps(valid_payload))
+            missing_text_run_source["results"][0]["fontEvidence"]["roles"][0].pop("source")
+            invalid_payloads.append(missing_text_run_source)
+            boolean_text_node_count = json.loads(json.dumps(valid_payload))
+            boolean_text_node_count["results"][0]["fontEvidence"]["roles"][0]["textNodeCount"] = True
+            invalid_payloads.append(boolean_text_node_count)
+            semantic_font_tamper = json.loads(json.dumps(valid_payload))
+            semantic_tamper_role = semantic_font_tamper["results"][0]["fontEvidence"]["roles"][0]
+            semantic_tamper_role["declaredPrimary"] = "BrokenFace"
+            semantic_tamper_role["declaredPrimaryQuoted"] = False
+            semantic_tamper_role["classification"] = "rendered"
+            semantic_tamper_role["declaredFaceSelectionFailed"] = True
+            semantic_tamper_role["fontFaces"] = [{
+                "family": "BrokenFace",
+                "status": "error",
+                "stretch": "normal",
+                "style": "normal",
+                "unicodeRange": "U+0-10FFFF",
+                "weight": "400",
+            }]
+            invalid_payloads.append(semantic_font_tamper)
+            consistent_semantic_tamper = json.loads(json.dumps(valid_payload))
+            consistent_tamper_role = consistent_semantic_tamper["results"][0]["fontEvidence"]["roles"][0]
+            consistent_tamper_role["declaredPrimary"] = "BrokenFace"
+            consistent_tamper_role["declaredPrimaryQuoted"] = False
+            consistent_tamper_role["classification"] = "fallback_rendered"
+            consistent_tamper_role["declaredFaceCheck"] = False
+            consistent_tamper_role["fontFaces"] = [{
+                "family": "BrokenFace",
+                "status": "error",
+                "stretch": "normal",
+                "style": "normal",
+                "unicodeRange": "U+0-10FFFF",
+                "weight": "400",
+            }]
+            invalid_payloads.append(consistent_semantic_tamper)
+            hidden_unavailable_selection = json.loads(json.dumps(valid_payload))
+            hidden_unavailable_selection["results"][0]["fontEvidence"]["roles"][0]["declaredFaceSelectionUnavailable"] = True
+            invalid_payloads.append(hidden_unavailable_selection)
+            missing_control_label = json.loads(json.dumps(valid_payload))
+            missing_control_label_role = missing_control_label["results"][0]["fontEvidence"]["roles"][0]
+            missing_control_label_role["classification"] = "rendered"
+            missing_control_label_role["browserGeneratedTextUnavailable"] = True
+            invalid_payloads.append(missing_control_label)
+            uncertain_native_mapping = json.loads(json.dumps(valid_payload))
+            uncertain_native_role = uncertain_native_mapping["results"][0]["fontEvidence"]["roles"][0]
+            uncertain_native_role["classification"] = "rendered"
+            uncertain_native_role["renderedTextMappingUnavailable"] = True
+            invalid_payloads.append(uncertain_native_mapping)
+            uncertain_pseudo_mapping = json.loads(json.dumps(valid_payload))
+            uncertain_pseudo_role = uncertain_pseudo_mapping["results"][0]["fontEvidence"]["roles"][0]
+            uncertain_pseudo_role["classification"] = "rendered"
+            uncertain_pseudo_role["pseudoTextMappingUnavailable"] = True
+            invalid_payloads.append(uncertain_pseudo_mapping)
+            platform_unavailable = json.loads(json.dumps(valid_payload))
+            platform_unavailable["results"][0]["fontEvidence"]["roles"][0]["classification"] = "platform_fonts_unavailable"
+            invalid_payloads.append(platform_unavailable)
+            stale_mismatch = json.loads(json.dumps(valid_payload))
+            stale_mismatch["results"][0]["fontEvidence"]["primaryMismatches"] = [
+                stale_mismatch["results"][0]["fontEvidence"]["roles"][0]
+            ]
+            invalid_payloads.append(stale_mismatch)
+            missing_issue = json.loads(json.dumps(valid_payload))
+            failed_role = missing_issue["results"][0]["fontEvidence"]["roles"][0]
+            failed_role["classification"] = "failed_font_face"
+            missing_issue["results"][0]["fontEvidence"]["primaryMismatches"] = [failed_role]
+            invalid_payloads.append(missing_issue)
+            stale_issue = json.loads(json.dumps(valid_payload))
+            stale_issue["results"][0]["visualIssues"] = ["declared_primary_font_not_rendered"]
+            invalid_payloads.append(stale_issue)
+            for invalid_payload in invalid_payloads:
+                report.write_text(json.dumps(invalid_payload), encoding="utf-8")
+                with self.assertRaisesRegex(evaluation.EvaluationError, "font evidence"):
+                    evaluation.validate_visual_completion(report, screenshots, targets, generation)
+            report.write_text(json.dumps(valid_payload), encoding="utf-8")
 
             (screenshots / "extra.png").write_bytes(fake_png(1, 1))
             with self.assertRaisesRegex(evaluation.EvaluationError, "extra PNG"):
@@ -721,6 +890,29 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                                     ]
                                 },
                             },
+                            {
+                                "caseId": "type-foundry-specimen-v6",
+                                "page": "index.html",
+                                "viewport": "desktop",
+                                "state": "base",
+                                "visualIssues": ["declared_primary_font_not_rendered"],
+                                "fontEvidence": {
+                                    "primaryMismatches": [
+                                        {
+                                            "role": "specimen",
+                                            "selector": "[data-eval='specimen'] p",
+                                            "text": "繁中標點 ABC 0123 一起校對",
+                                            "declaredPrimary": "BrokenFace",
+                                            "actualFonts": [
+                                                {
+                                                    "familyName": "PingFang TC",
+                                                    "postScriptName": "PingFangTC-Regular",
+                                                }
+                                            ],
+                                        }
+                                    ]
+                                },
+                            },
                         ],
                         "crossPageComparisons": [],
                     },
@@ -735,6 +927,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                     "layout-void-v6:codex-gpt-5.4-mini": ["layout_column_void"],
                     "small-text-v7:codex-gpt-5.4-mini": ["readable_text_below_12px"],
                     "grant-review-board-v6:codex-gpt-5.4-mini": ["paragraph_measure_too_wide"],
+                    "type-foundry-specimen-v6:codex-gpt-5.4-mini": ["declared_primary_font_not_rendered"],
                 },
                 report,
             )
@@ -743,6 +936,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
         layout_void = feedback["layout-void-v6"]
         small_text = feedback["small-text-v7"]
         grant = feedback["grant-review-board-v6"]
+        font = feedback["type-foundry-specimen-v6"]
         self.assertIn("archive.html/desktop/base", oral)
         self.assertIn("trackRatio=0.51", oral)
         self.assertIn("summary.html/desktop/base", packaging)
@@ -759,6 +953,11 @@ class ProductFlowEvaluationTests(unittest.TestCase):
         self.assertIn("limit=48", grant)
         self.assertIn("narrow only this text element's inline measure", grant)
         self.assertIn("do not shorten its copy or change unrelated prose", grant)
+        self.assertIn("role='specimen'", font)
+        self.assertIn("declaredPrimary='BrokenFace'", font)
+        self.assertIn("PingFang TC/PingFangTC-Regular", font)
+        self.assertIn("fix this local @font-face", font)
+        self.assertIn("keep fallbacks and copy unchanged", font)
         self.assertTrue(all(len(value) <= 500 and "\n" not in value for value in feedback.values()))
 
     def test_visual_repair_feedback_normalizes_long_interaction_exception(self) -> None:

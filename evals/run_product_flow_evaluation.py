@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -86,6 +88,236 @@ VIEWPORTS = {
     },
 }
 COMPLETED_STATUSES = {"completed", "existing_completed"}
+FONT_EVIDENCE_CLASSIFICATIONS = {
+    "failed_font_face",
+    "fallback_rendered",
+    "not_applicable",
+    "platform_fonts_unavailable",
+    "rendered",
+    "unverified_alias",
+}
+GENERIC_FONT_FAMILIES = {
+    "-apple-system", "blinkmacsystemfont", "cursive", "emoji", "fangsong", "fantasy",
+    "math", "monospace", "sans-serif", "serif", "system-ui", "ui-monospace", "ui-rounded",
+    "ui-sans-serif", "ui-serif",
+}
+FONT_ANGLE_EPSILON = 0.001
+
+
+def _normalize_font_family(value: object) -> str:
+    return " ".join(str(value or "").strip().split()).lower()
+
+
+def _classify_font_evidence_role(role: dict[str, Any]) -> str:
+    primary = _normalize_font_family(role.get("declaredPrimary"))
+    is_generic = not role["declaredPrimaryQuoted"] and (
+        primary in GENERIC_FONT_FAMILIES or primary.startswith("generic(")
+    )
+    if not primary or is_generic:
+        return "not_applicable"
+    if role["declaredFaceSelectionUnavailable"]:
+        return "evidence_unavailable"
+    if not role["probeHasRelevantGlyph"]:
+        return "not_applicable"
+    actual_families = {
+        _normalize_font_family(value)
+        for font in role["actualFonts"]
+        if font["glyphCount"] > 0
+        for value in (font["familyName"], font["postScriptName"])
+        if _normalize_font_family(value)
+    }
+    matching_faces = [
+        face for face in role["fontFaces"]
+        if _normalize_font_family(face["family"]) == primary
+    ]
+    if role["declaredFaceSelectionFailed"]:
+        return "failed_font_face"
+    if not actual_families:
+        return "platform_fonts_unavailable"
+    if primary in actual_families:
+        return "rendered"
+    if any(face["status"] == "loaded" for face in matching_faces):
+        return "unverified_alias"
+    return "fallback_rendered"
+
+
+def _numeric_descriptor_range(value: object, aliases: dict[str, float] | None = None) -> tuple[float, float] | None:
+    normalized = str(value or "normal").strip().lower()
+    if aliases and normalized in aliases:
+        return aliases[normalized], aliases[normalized]
+    numbers = [float(number) for number in re.findall(r"\d+(?:\.\d+)?", normalized)]
+    if not numbers:
+        return None
+    return (numbers[0], numbers[0]) if len(numbers) == 1 else (numbers[0], numbers[1])
+
+
+def _font_style_descriptor(value: object) -> tuple[str, tuple[float, float]]:
+    normalized = str(value or "normal").strip().lower()
+    if normalized.startswith("italic"):
+        return "italic", (14.0, 14.0)
+    if normalized.startswith("oblique"):
+        angles = []
+        for number, unit in re.findall(r"([+-]?(?:\d+(?:\.\d+)?|\.\d+))(deg|grad|rad|turn)\b", normalized):
+            angle = float(number)
+            angles.append({"deg": angle, "grad": angle * 0.9, "rad": angle * 180 / math.pi, "turn": angle * 360}[unit])
+        return "oblique", (min(angles), max(angles)) if angles else (14.0, 14.0)
+    return "normal", (0.0, 0.0)
+
+
+def _select_boundary_faces(
+    candidates: list[tuple[dict[str, Any], tuple[float, float]]],
+    boundary_index: int,
+    direction: str,
+) -> list[dict[str, Any]]:
+    if not candidates:
+        return []
+    values = [item[1][boundary_index] for item in candidates]
+    boundary = min(values) if direction == "min" else max(values)
+    return [face for face, value_range in candidates if value_range[boundary_index] == boundary]
+
+
+def _select_style_faces(faces: list[dict[str, Any]], requested_value: object) -> list[dict[str, Any]]:
+    requested_category, requested_range = _font_style_descriptor(requested_value)
+    requested_angle = 0.0 if requested_category == "normal" else requested_range[0]
+    candidates = []
+    for face in faces:
+        category, value_range = _font_style_descriptor(face["style"])
+        candidates.append((face, (0.0, 0.0) if category == "normal" else ((14.0, 14.0) if category == "italic" else value_range)))
+    oriented = [(face, (-value_range[1], -value_range[0])) for face, value_range in candidates] if requested_angle < 0 else candidates
+    target = abs(requested_angle)
+    same_direction = [(face, value_range) for face, value_range in oriented if value_range[1] >= -FONT_ANGLE_EPSILON]
+    exact = [face for face, value_range in same_direction if value_range[0] - FONT_ANGLE_EPSILON <= target <= value_range[1] + FONT_ANGLE_EPSILON]
+    if exact:
+        return exact
+    below = [(face, value_range) for face, value_range in same_direction if value_range[1] < target - FONT_ANGLE_EPSILON]
+    above = [(face, value_range) for face, value_range in same_direction if value_range[0] > target + FONT_ANGLE_EPSILON]
+    order = ((above, 0, "min"), (below, 1, "max")) if target >= 14 else ((below, 1, "max"), (above, 0, "min"))
+    for pool, boundary_index, direction in order:
+        selected = _select_boundary_faces(pool, boundary_index, direction)
+        if selected:
+            return selected
+    return _select_boundary_faces([(face, value_range) for face, value_range in oriented if value_range[1] < 0], 1, "max")
+
+
+def _unicode_range_covers(value: object, code_point: int) -> bool:
+    ranges = []
+    for part in str(value or "U+0-10FFFF").split(","):
+        match = re.fullmatch(r"U\+([0-9A-F?]+)(?:-([0-9A-F]+))?", part.strip(), re.IGNORECASE)
+        if not match:
+            continue
+        start = int(match.group(1).replace("?", "0"), 16)
+        end = int((match.group(2) or match.group(1)).replace("?", "F"), 16)
+        ranges.append((start, end))
+    return not ranges or any(start <= code_point <= end for start, end in ranges)
+
+
+def _select_stretch_faces(faces: list[dict[str, Any]], requested_stretch: object) -> list[dict[str, Any]]:
+    aliases = {
+        "ultra-condensed": 50, "extra-condensed": 62.5, "condensed": 75, "semi-condensed": 87.5,
+        "normal": 100, "semi-expanded": 112.5, "expanded": 125, "extra-expanded": 150, "ultra-expanded": 200,
+    }
+    role_stretch_range = _numeric_descriptor_range(requested_stretch, aliases)
+    selected = list(faces)
+    if role_stretch_range is None or not selected:
+        return selected
+    role_stretch = role_stretch_range[0]
+    candidates = [(face, _numeric_descriptor_range(face["stretch"], aliases) or (100.0, 100.0)) for face in selected]
+    exact = [face for face, value_range in candidates if value_range[0] <= role_stretch <= value_range[1]]
+    if exact:
+        return exact
+    if role_stretch <= 100:
+        narrower = [(face, value_range) for face, value_range in candidates if value_range[1] < role_stretch]
+        pool = narrower or [(face, value_range) for face, value_range in candidates if value_range[0] > role_stretch]
+        boundary_index = 1 if narrower else 0
+        direction = "max" if narrower else "min"
+    else:
+        wider = [(face, value_range) for face, value_range in candidates if value_range[0] > role_stretch]
+        pool = wider or [(face, value_range) for face, value_range in candidates if value_range[1] < role_stretch]
+        boundary_index = 0 if wider else 1
+        direction = "min" if wider else "max"
+    return _select_boundary_faces(pool, boundary_index, direction)
+
+
+def _selected_font_faces(role: dict[str, Any], faces: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    family = _normalize_font_family(role["declaredPrimary"])
+    selected = [face for face in faces if _normalize_font_family(face["family"]) == family]
+    selected = _select_stretch_faces(selected, role["fontStretch"])
+    selected = _select_style_faces(selected, role["fontStyle"])
+    role_weight_range = _numeric_descriptor_range(role["fontWeight"], {"normal": 400, "bold": 700})
+    if role_weight_range is None:
+        return selected
+    role_weight = role_weight_range[0]
+    candidates = [(face, _numeric_descriptor_range(face["weight"], {"normal": 400, "bold": 700}) or (400.0, 400.0)) for face in selected]
+    matches = [face for face, value_range in candidates if value_range[0] <= role_weight <= value_range[1]]
+    if matches or not candidates:
+        return matches
+
+    def preference(value_range: tuple[float, float]) -> tuple[int, float]:
+        if role_weight < 400:
+            return (0, role_weight - value_range[1]) if value_range[1] < role_weight else (1, value_range[0] - role_weight)
+        if role_weight > 500:
+            return (0, value_range[0] - role_weight) if value_range[0] > role_weight else (1, role_weight - value_range[1])
+        if role_weight <= value_range[0] <= 500:
+            return 0, value_range[0] - role_weight
+        if value_range[1] < role_weight:
+            return 1, role_weight - value_range[1]
+        return 2, value_range[0] - 500
+
+    ranked = [(face, preference(value_range)) for face, value_range in candidates]
+    best = min(value for _, value in ranked)
+    return [face for face, value in ranked if value == best]
+
+
+def _font_face_selection_state(role: dict[str, Any], faces: list[dict[str, Any]]) -> str:
+    if not role["probeCodePoints"]:
+        return "resolved"
+    selected = _selected_font_faces(role, faces)
+    pending = False
+    ambiguous = False
+    for code_point in role["probeCodePoints"]:
+        covering = [face for face in selected if _unicode_range_covers(face["unicodeRange"], code_point)]
+        if covering and all(face["status"] == "error" for face in covering):
+            return "failed"
+        if any(face["status"] == "error" for face in covering) and any(face["status"] == "loaded" for face in covering):
+            ambiguous = True
+        if covering and not any(face["status"] == "loaded" for face in covering):
+            pending = pending or any(face["status"] in {"loading", "unloaded"} for face in covering)
+    return "unavailable" if pending or ambiguous else "resolved"
+
+
+def _expected_font_face_selection_state(role: dict[str, Any]) -> str:
+    state = "unavailable" if role["probeRelevantGlyphOverflow"] else (
+        _font_face_selection_state(role, role["fontFaces"]) if role["probeHasRelevantGlyph"] else "resolved"
+    )
+    if not role["probeTextComplete"] and role["probeHasRelevantGlyph"]:
+        state = "unavailable"
+    has_relevant_failed_face = any(
+        face["status"] == "error"
+        and _normalize_font_family(face["family"]) == _normalize_font_family(role["declaredPrimary"])
+        and any(_unicode_range_covers(face["unicodeRange"], code_point) for code_point in role["probeCodePoints"])
+        for face in role["fontFaces"]
+    )
+    if (
+        not role["fontProbeStable"]
+        or not role["fontInventoryStable"]
+        or not role["platformFontsStable"]
+        or not role["fontPaintEvidenceReliable"]
+        or role["browserGeneratedTextUnavailable"]
+        or role["renderedTextMappingUnavailable"]
+        or role["pseudoTextMappingUnavailable"]
+    ):
+        return "unavailable"
+    if role["declaredFaceCheckReliable"] and role["declaredFaceCheck"] and state == "failed":
+        return "unavailable"
+    if (
+        role["declaredFaceCheckReliable"]
+        and not role["declaredFaceCheck"]
+        and has_relevant_failed_face
+        and role["probeHasRelevantGlyph"]
+        and state == "resolved"
+    ):
+        return "unavailable"
+    return state
 
 
 def locked_package_record(package_name: str) -> dict[str, str]:
@@ -407,6 +639,126 @@ def _png_size(path: Path) -> tuple[int, int]:
     return width, height
 
 
+def _validate_font_evidence(result: dict[str, Any], key: tuple[object, ...]) -> None:
+    evidence = result.get("fontEvidence")
+    if not isinstance(evidence, dict) or evidence.get("status") != "captured":
+        raise EvaluationError(f"font evidence is missing or incomplete: {key}")
+    roles = evidence.get("roles")
+    mismatches = evidence.get("primaryMismatches")
+    if not isinstance(roles, list) or not roles or not isinstance(mismatches, list):
+        raise EvaluationError(f"font evidence roles are missing or malformed: {key}")
+    resolved_platform_role = False
+    expected_mismatches = []
+    for role in roles:
+        if not isinstance(role, dict):
+            raise EvaluationError(f"font evidence role is malformed: {key}")
+        if any(not isinstance(role.get(field), str) or not role.get(field) for field in (
+            "role", "selector", "declaredPrimary", "classification", "fontStretch", "fontStyle", "fontWeight",
+        )):
+            raise EvaluationError(f"font evidence role identity is malformed: {key}")
+        if (
+            role.get("source") not in {"dom-text", "native-control", "pseudo"}
+            or not isinstance(role.get("pseudoDescendant"), bool)
+            or type(role.get("textRunIndex")) is not int
+            or role["textRunIndex"] < 0
+            or type(role.get("textNodeCount")) is not int
+            or role["textNodeCount"] <= 0
+        ):
+            raise EvaluationError(f"font evidence text-run identity is malformed: {key}")
+        if role.get("classification") not in FONT_EVIDENCE_CLASSIFICATIONS:
+            raise EvaluationError(f"font evidence classification is invalid: {key}")
+        if (
+            not isinstance(role.get("probeSourceTextEmpty"), bool)
+            or not isinstance(role.get("declaredPrimaryQuoted"), bool)
+            or not isinstance(role.get("pseudoTextMappingUnavailable"), bool)
+            or not isinstance(role.get("renderedTextMappingUnavailable"), bool)
+            or not isinstance(role.get("probeTextComplete"), bool)
+            or not isinstance(role.get("probeHasLetterOrNumber"), bool)
+            or not isinstance(role.get("probeHasRelevantGlyph"), bool)
+            or not isinstance(role.get("probeRelevantGlyphOverflow"), bool)
+            or not isinstance(role.get("fontPaintVisible"), bool)
+            or not isinstance(role.get("fontPaintEvidenceReliable"), bool)
+            or not isinstance(role.get("fontProbeStable"), bool)
+            or not isinstance(role.get("fontInventoryStable"), bool)
+            or not isinstance(role.get("platformFontsStable"), bool)
+            or not isinstance(role.get("browserGeneratedTextUnavailable"), bool)
+            or not isinstance(role.get("declaredFaceCheck"), bool)
+            or not isinstance(role.get("declaredFaceCheckReliable"), bool)
+            or not isinstance(role.get("declaredFaceSelectionFailed"), bool)
+            or not isinstance(role.get("declaredFaceSelectionUnavailable"), bool)
+        ):
+            raise EvaluationError(f"font evidence browser checks are malformed: {key}")
+        if (
+            not role["fontPaintVisible"]
+            or not role["fontPaintEvidenceReliable"]
+            or not role["fontProbeStable"]
+            or not role["fontInventoryStable"]
+            or not role["platformFontsStable"]
+        ):
+            raise EvaluationError(f"font evidence stability checks did not pass: {key}")
+        mapping_unavailable = (
+            role["browserGeneratedTextUnavailable"]
+            or role["renderedTextMappingUnavailable"]
+            or role["pseudoTextMappingUnavailable"]
+        )
+        if mapping_unavailable and role.get("classification") != "not_applicable":
+            raise EvaluationError(f"font evidence rendered-text mapping did not resolve: {key}")
+        if role.get("classification") in {"evidence_unavailable", "platform_fonts_unavailable"}:
+            raise EvaluationError(f"font evidence role did not resolve: {key}")
+        actual_fonts = role.get("actualFonts")
+        font_faces = role.get("fontFaces")
+        if not isinstance(actual_fonts, list) or not isinstance(font_faces, list):
+            raise EvaluationError(f"font evidence font inventory is malformed: {key}")
+        probe_code_points = role.get("probeCodePoints")
+        if (
+            not isinstance(probe_code_points, list)
+            or len(probe_code_points) > 2048
+            or any(type(code_point) is not int or not 0 <= code_point <= 0x10FFFF for code_point in probe_code_points)
+            or len(probe_code_points) != len(set(probe_code_points))
+            or bool(probe_code_points) != role["probeHasRelevantGlyph"]
+        ):
+            raise EvaluationError(f"font evidence probe code points are malformed: {key}")
+        for font in actual_fonts:
+            if (
+                not isinstance(font, dict)
+                or not isinstance(font.get("familyName"), str)
+                or not font["familyName"]
+                or not isinstance(font.get("postScriptName"), str)
+                or type(font.get("glyphCount")) is not int
+                or font["glyphCount"] < 0
+            ):
+                raise EvaluationError(f"font evidence platform usage is malformed: {key}")
+            if font["glyphCount"] > 0:
+                resolved_platform_role = True
+        for face in font_faces:
+            if (
+                not isinstance(face, dict)
+                or any(not isinstance(face.get(field), str) or not face[field] for field in ("family", "status", "stretch", "style", "unicodeRange", "weight"))
+                or face["status"] not in {"unloaded", "loading", "loaded", "error"}
+            ):
+                raise EvaluationError(f"font evidence font-face inventory is malformed: {key}")
+        expected_selection_state = _expected_font_face_selection_state(role)
+        if (
+            role["declaredFaceSelectionFailed"] != (expected_selection_state == "failed")
+            or role["declaredFaceSelectionUnavailable"] != (expected_selection_state == "unavailable")
+        ):
+            raise EvaluationError(f"font evidence face-selection state disagrees with classification: {key}")
+        if role["classification"] != _classify_font_evidence_role(role):
+            raise EvaluationError(f"font evidence classification disagrees with its evidence: {key}")
+        if role.get("classification") == "failed_font_face":
+            expected_mismatches.append(role)
+    if not resolved_platform_role:
+        raise EvaluationError(f"font evidence has no resolved platform-font role: {key}")
+    if mismatches != expected_mismatches:
+        raise EvaluationError(f"font evidence mismatch inventory disagrees: {key}")
+    visual_issues = result.get("visualIssues")
+    if not isinstance(visual_issues, list) or any(not isinstance(issue, str) or not issue for issue in visual_issues):
+        raise EvaluationError(f"font evidence visual-issue inventory is malformed: {key}")
+    has_font_issue = "declared_primary_font_not_rendered" in visual_issues
+    if has_font_issue != bool(mismatches):
+        raise EvaluationError(f"font evidence mismatch and visual issue disagree: {key}")
+
+
 def validate_visual_completion(
     visual_output: Path,
     screenshot_dir: Path,
@@ -462,6 +814,7 @@ def validate_visual_completion(
         if key in seen or key not in expected:
             raise EvaluationError(f"visual result identity is invalid: {key}")
         seen.add(key)  # type: ignore[arg-type]
+        _validate_font_evidence(result, key)
         screenshot_value = result.get("screenshot")
         if not isinstance(screenshot_value, str) or not screenshot_value:
             raise EvaluationError(f"visual result has no screenshot: {key}")
@@ -762,6 +1115,26 @@ def _visual_issue_detail(result: dict[str, Any], code: str) -> str:
         copies = result.get("localeFlow", {}).get("untranslatedInterfaceCopy", [])
         if isinstance(copies, list) and copies and isinstance(copies[0], dict):
             return f"{code}@{location} text={_one_line(copies[0].get('text', ''), 72)!r}"
+    if code == "declared_primary_font_not_rendered":
+        mismatches = result.get("fontEvidence", {}).get("primaryMismatches", [])
+        if isinstance(mismatches, list) and mismatches and isinstance(mismatches[0], dict):
+            mismatch = mismatches[0]
+            actual_fonts = mismatch.get("actualFonts", [])
+            actual = []
+            if isinstance(actual_fonts, list):
+                for font in actual_fonts[:3]:
+                    if isinstance(font, dict):
+                        actual.append(
+                            f"{_one_line(font.get('familyName', '?'), 28)}/{_one_line(font.get('postScriptName', '?'), 28)}"
+                        )
+            return (
+                f"{code}@{location} role={_one_line(mismatch.get('role', ''), 24)!r} "
+                f"selector={_one_line(mismatch.get('selector', ''), 40)!r} "
+                f"text={_one_line(mismatch.get('text', ''), 36)!r} "
+                f"declaredPrimary={_one_line(mismatch.get('declaredPrimary', ''), 32)!r} "
+                f"actual={_one_line(','.join(actual), 64)!r} Action: fix this local @font-face source, "
+                "or change only this role's primary token to the verified face; keep fallbacks and copy unchanged."
+            )
     return f"{_visual_issue_label(code)}@{location}"
 
 
