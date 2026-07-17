@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-near-template-v9.json \
+  --manifest evals/v7-pilot-manifest-20260718-lint-inventory-v11.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \

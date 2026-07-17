@@ -15,7 +15,7 @@ import stat
 import sys
 import unicodedata
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 
@@ -181,6 +181,44 @@ TEST_SIGNALS = {
     "vitest": "Vitest",
 }
 
+LINT_SIGNALS = {
+    "@biomejs/biome": "biome",
+    "eslint": "eslint",
+    "stylelint": "stylelint",
+}
+
+LINT_CONFIG_TOOLS = {
+    **{name: "biome" for name in (".biome.json", ".biome.jsonc", "biome.json", "biome.jsonc")},
+    **{
+        name: "eslint"
+        for name in (
+            ".eslintrc", ".eslintrc.cjs", ".eslintrc.js", ".eslintrc.json", ".eslintrc.mjs",
+            ".eslintrc.yaml", ".eslintrc.yml", "eslint.config.cjs", "eslint.config.cts",
+            "eslint.config.js", "eslint.config.mjs", "eslint.config.mts", "eslint.config.ts",
+        )
+    },
+    **{
+        name: "stylelint"
+        for name in (
+            ".stylelintrc", ".stylelintrc.cjs", ".stylelintrc.js", ".stylelintrc.json",
+            ".stylelintrc.mjs", ".stylelintrc.yaml", ".stylelintrc.yml",
+            "stylelint.config.cjs", "stylelint.config.js", "stylelint.config.mjs",
+        )
+    },
+}
+
+LINT_CONFIG_NAMES = set(LINT_CONFIG_TOOLS)
+
+LINT_PACKAGE_CONFIG_KEYS = {
+    "eslint": "eslintConfig",
+    "stylelint": "stylelint",
+}
+
+LINT_CLAIM_BOUNDARY = (
+    "Discovery only; local binary, resolved version, config loading, parser/plugins, "
+    "cwd, scope, command safety and diagnostics remain unverified."
+)
+
 MANIFEST_NAMES = {
     "DESIGN.md",
     "Gemfile",
@@ -214,7 +252,7 @@ MANIFEST_NAMES = {
     "vite.config.js",
     "vite.config.ts",
     "wireframe-plan.json",
-}
+} | LINT_CONFIG_NAMES
 
 LOCKFILE_NAMES = {
     "Gemfile.lock",
@@ -237,6 +275,7 @@ RELEVANT_PACKAGE_SIGNALS = set().union(
     EXPERIENCE_RUNTIME_SIGNALS,
     I18N_SIGNALS,
     TEST_SIGNALS,
+    LINT_SIGNALS,
 )
 
 INSTRUCTION_NAMES = {
@@ -444,6 +483,104 @@ def declared_relevant_versions(package: dict[str, Any]) -> dict[str, str]:
     return dict(sorted(versions.items()))
 
 
+def _declared_package_version(package: dict[str, Any], package_name: str) -> str | None:
+    for key in ("dependencies", "devDependencies", "peerDependencies"):
+        values = package.get(key, {})
+        if isinstance(values, dict) and isinstance(values.get(package_name), str):
+            return values[package_name]
+    return None
+
+
+def _declared_version_kind(value: str) -> str:
+    return "exact" if re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", value) else "range_or_protocol"
+
+
+def lint_capability_inventory(
+    root: Path,
+    files: list[Path],
+    package_files: list[tuple[str, dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Inventory untrusted lint declarations without loading configs or commands."""
+    config_sources: dict[str, list[str]] = {tool: [] for tool in LINT_SIGNALS.values()}
+    for path in files:
+        tool = LINT_CONFIG_TOOLS.get(path.name)
+        if tool:
+            config_sources[tool].append(path.relative_to(root).as_posix())
+
+    declarations: dict[str, list[dict[str, str]]] = {tool: [] for tool in LINT_SIGNALS.values()}
+    scripts_by_manifest: dict[str, list[str]] = {}
+    for manifest_path, package in package_files:
+        parent = Path(manifest_path).parent.as_posix()
+        prefix = "" if parent == "." and len(package_files) == 1 else f"{parent}: "
+        scripts = package.get("scripts", {})
+        lint_names: set[str] = set()
+        if isinstance(scripts, dict):
+            for name in scripts:
+                if isinstance(name, str) and re.search(r"(?:^|:)(?:lint|check)(?::|$)", name, re.IGNORECASE):
+                    lint_names.add(f"{prefix}{name}")
+        scripts_by_manifest[manifest_path] = sorted(lint_names)
+        for package_name, tool in LINT_SIGNALS.items():
+            version = _declared_package_version(package, package_name)
+            if version is not None:
+                declarations[tool].append(
+                    {
+                        "manifest_path": manifest_path,
+                        "package": package_name,
+                        "declared_version": version,
+                        "declared_version_kind": _declared_version_kind(version),
+                    }
+                )
+        for tool, key in LINT_PACKAGE_CONFIG_KEYS.items():
+            if key in package:
+                config_sources[tool].append(f"{manifest_path}#{key}")
+
+    inventory: list[dict[str, Any]] = []
+    for tool in ("biome", "stylelint", "eslint"):
+        sources = sorted(set(config_sources[tool]))
+        used_sources: set[str] = set()
+        for declaration in sorted(
+            declarations[tool], key=lambda item: (item["manifest_path"], item["package"])
+        ):
+            manifest_path = declaration["manifest_path"]
+            package_root = PurePosixPath(manifest_path).parent
+            applicable_sources = []
+            for source in sources:
+                if "#" in source:
+                    applies = source.startswith(f"{manifest_path}#")
+                else:
+                    config_root = PurePosixPath(source).parent
+                    applies = config_root == package_root or config_root in package_root.parents
+                if applies:
+                    applicable_sources.append(source)
+                    used_sources.add(source)
+            lint_names = scripts_by_manifest.get(manifest_path, [])
+            inventory.append(
+                {
+                    "tool": tool,
+                    "declarations": [declaration],
+                    "config_sources": applicable_sources,
+                    "script_names": lint_names,
+                    "status": "runtime_verification_required"
+                    if applicable_sources or lint_names
+                    else "declaration_only",
+                    "claim_boundary": LINT_CLAIM_BOUNDARY,
+                }
+            )
+        unmatched_sources = [source for source in sources if source not in used_sources]
+        if unmatched_sources:
+            inventory.append(
+                {
+                    "tool": tool,
+                    "declarations": [],
+                    "config_sources": unmatched_sources,
+                    "script_names": [],
+                    "status": "not_eligible",
+                    "claim_boundary": LINT_CLAIM_BOUNDARY,
+                }
+            )
+    return inventory
+
+
 def detect_by_packages(names: set[str], signals: dict[str, str]) -> list[str]:
     return sorted({label for package, label in signals.items() if package in names})
 
@@ -568,6 +705,7 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
                 "declared_versions": declared_relevant_versions(package),
             }
         )
+    lint_tools = lint_capability_inventory(root, files, package_files)
     candidate_pool = [
         rel
         for rel in rel_paths
@@ -595,6 +733,10 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
         observations.append("No common frontend test dependency detected; inspect project-specific scripts and CI.")
     if localization and not lang_tags:
         observations.append("Localization signals exist but no static lang attribute was detected; verify runtime document language updates.")
+    if any(tool["status"] in {"declaration_only", "not_eligible"} for tool in lint_tools):
+        observations.append(
+            "Incomplete lint capability evidence was found; keep the adapter disabled until a same-scope declaration and config or lint script are verified."
+        )
 
     return {
         "root": str(root),
@@ -608,6 +750,7 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
         "test_tools": testing,
         "package_scripts": script_names,
         "package_profiles": package_profiles,
+        "lint_tools": lint_tools,
         "manifests": relative(root, manifests),
         "lockfiles": relative(root, lockfiles),
         "language_tags": sorted(lang_tags),
@@ -649,6 +792,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Motion/media runtimes: {joined(report['experience_runtimes'])}",
         f"- Localization: {joined(report['localization_tools'])}",
         f"- Tests: {joined(report['test_tools'])}",
+        f"- Lint inventory: {joined([item['tool'] for item in report['lint_tools']])}",
         f"- Document language tags: {joined(report['language_tags'])}",
         "",
         "## Manifests and scripts",
@@ -672,6 +816,19 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("- No package.json evidence detected.")
+
+    if report["lint_tools"]:
+        lines.extend(["", "## Lint capability inventory", ""])
+        for tool in report["lint_tools"]:
+            lines.append(f"- Tool: {tool['tool']} ({tool['status']})")
+            lines.append(f"  - Config sources: {joined(tool['config_sources'], untrusted=True)}")
+            lines.append(f"  - Script names: {joined(tool['script_names'], untrusted=True)}")
+            declarations = [
+                f"{item['manifest_path']}:{item['package']}@{item['declared_version']} ({item['declared_version_kind']})"
+                for item in tool["declarations"]
+            ]
+            lines.append(f"  - Declarations: {joined(declarations, untrusted=True)}")
+            lines.append(f"  - Boundary: {tool['claim_boundary']}")
 
     lines.extend([
         "",

@@ -7,7 +7,7 @@
   },
   "dependency": {
     "path": "wow-frontend-design/scripts/project_scan.py",
-    "sha256": "d0c77228c144d5f5313d631dfd252607bc0c0d4b78c857e7b4daede9fb54c729"
+    "sha256": "fa813234da45f1e64d7d63f76a530e2ecb115fbd38da2411210945aab03dd8e0"
   },
   "report_schema_version": 1,
   "report_claim_boundary": "Source risks only; rendered layout requires browser and screenshot evidence.",
