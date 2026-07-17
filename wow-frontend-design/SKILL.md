@@ -58,6 +58,7 @@ Choose the delivery lane below before loading references. In `DIRECT`, load `qua
 ### Visual and content route
 
 - Type, rhythm, wrapping, vertical text, ruby/Bopomofo, density, or spacing: [typographic-layout.md](references/typographic-layout.md) and, for font selection/loading/licensing, [typography-webfonts.md](references/typography-webfonts.md).
+- If exact wrap or text-height prediction is useful and `@chenglou/pretext` is already available, use the optional Pretext lane in [typographic-layout.md](references/typographic-layout.md); absence must degrade to the Playwright/DOM path and never justify installing a dependency or claiming rendered proof.
 - Color, borders, depth, texture, theme, effects, or brand fidelity: [color-system-psychology.md](references/color-system-psychology.md), [visual-material-system.md](references/visual-material-system.md), and [brand-system-fidelity.md](references/brand-system-fidelity.md).
 - Photography, advertising, or cinematic/image-first composition: [visual-storytelling.md](references/visual-storytelling.md).
 - Charts, maps, KPI color, or portable tokens: [data-visualization-color.md](references/data-visualization-color.md) and [design-token-portability.md](references/design-token-portability.md).

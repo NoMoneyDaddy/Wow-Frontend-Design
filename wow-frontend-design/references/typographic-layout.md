@@ -239,6 +239,24 @@ Horizontal and vertical composition have different placement rules. In horizonta
 
 ## 7. Verify the rendered typography system
 
+### Optional Pretext measurement lane
+
+[Pretext](https://github.com/chenglou/pretext) is useful when a character-count heuristic cannot explain a wrap, height, or label overflow. If `@chenglou/pretext` is already available in the authorized project, use its browser-font-engine measurement APIs as a fast preflight:
+
+```ts
+const prepared = prepare(text, exactCanvasFont, {
+  whiteSpace: computed.whiteSpace === "pre-wrap" ? "pre-wrap" : "normal",
+  wordBreak: computed.wordBreak === "keep-all" ? "keep-all" : "normal",
+  letterSpacing: parseFloat(computed.letterSpacing) || 0,
+})
+const stats = measureLineStats(prepared, contentWidth)
+const layoutResult = layout(prepared, contentWidth, computedLineHeight)
+```
+
+Use the same loaded font, CSS width, `white-space`, `word-break`, `overflow-wrap`, `letter-spacing`, locale, and content fixture as the rendered page. Record the candidate's line count, max line width, height, and exact input. Use `layoutWithLines()` or `walkLineRanges()` for headings, buttons, chips, and mixed inline content where the final line matters. This can replace the current character-count estimate as a diagnostic signal, not as an acceptance claim.
+
+The lane is optional and fail-soft. The packaged adapter at `scripts/pretext_typography_adapter.mjs` reports `unavailable` when the package is absent; keep the existing Playwright/DOM path in that case. Pretext does not model complete CSS layout, grid/flex tracks, padding, pseudo-elements, line clamp, transforms, fallback timing, or browser accessibility. Confirm every candidate with `document.fonts.ready`, computed styles, Playwright screenshots, and the actual interaction viewport. Do not install it or edit a lockfile merely to make a visual claim.
+
 Capture and inspect:
 
 1. actual smallest supported phone, short phone, desktop, 200% text, and 400%/reflow;

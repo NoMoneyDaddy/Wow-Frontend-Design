@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "retrieved_at": "2026-07-16",
+  "retrieved_at": "2026-07-17",
   "policy": "Research coordinates only. Re-fetch by the full content-addressed Git revision; verify the selected path and applicable license before copying or executing content.",
   "sources": [
     {"repository":"zeke/swiss-design-skill","revision":"d4e8daee5d051d81271b2a561d1a582e7d0e2d40","license":"MIT","paths":["swiss-design/SKILL.md"]},
@@ -67,6 +67,7 @@
     {"repository":"xntj-ai/ppvi","revision":"db6ab84a14b74ffe64dbb354f9f13fc098016309","license":"NOASSERTION","paths":["LICENSE","references/visual-principles.md","references/responsive-layout.md","references/typography-system.md","references/spatial-density.md"]},
     {"repository":"Xialiang98/design-visual-frontend","revision":"aa6250300b61bb0aab9cd98e154c59f30383956b","license":"NOASSERTION","paths":["LICENSE","SKILL.md","references/core-design.md","references/frontend-implementation.md","references/review-gates.md"]},
     {"repository":"jamiemill/layers-skills","revision":"a201dc8c2011940b9d93934abb0f40c3b226c7ca","license":"NOASSERTION","paths":["LICENSE","README.md","skills/layers-conceptual-model/SKILL.md","skills/layers-user-needs/SKILL.md","skills/layers-product-strategy/SKILL.md","skills/layers-surface/SKILL.md","skills/layers-interaction-flow/SKILL.md","skills/layers-observed-behaviour/SKILL.md"]},
-    {"repository":"superdesigndev/superdesign","revision":"49e2b9dd9615c6dae936b326b1ddb85d4f1d6f19","license":"NOASSERTION","paths":["LICENSE","README.md","system-prompt.txt","src"]}
+    {"repository":"superdesigndev/superdesign","revision":"49e2b9dd9615c6dae936b326b1ddb85d4f1d6f19","license":"NOASSERTION","paths":["LICENSE","README.md","system-prompt.txt","src"]},
+    {"repository":"chenglou/pretext","revision":"ac49b09b7d83ede19581fa94a8b892b07d309baf","license":"MIT","paths":["LICENSE","README.md","package.json","src"]}
   ]
 }
