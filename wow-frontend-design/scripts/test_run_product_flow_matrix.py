@@ -379,6 +379,24 @@ class ProductFlowMatrixTests(unittest.TestCase):
         self.assertEqual("repair finding", environment["PRODUCT_FLOW_RETRY_FEEDBACK"])
         self.assertNotIn("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE", environment)
 
+    def test_case_feedback_prefers_provider_model_target_key(self) -> None:
+        environment = {
+            "PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE": json.dumps(
+                {
+                    "repair-cafe-intake-v6:claude-haiku": "claude finding",
+                    "repair-cafe-intake-v6:codex-gpt-5.4-mini": "codex finding",
+                }
+            )
+        }
+        matrix.apply_case_feedback(
+            environment,
+            "repair-cafe-intake-v6",
+            None,
+            provider="codex",
+            model="gpt-5.4-mini",
+        )
+        self.assertEqual("codex finding", environment["PRODUCT_FLOW_RETRY_FEEDBACK"])
+
     def test_case_feedback_rejects_unbounded_selected_value(self) -> None:
         environment = {
             "PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE": json.dumps(

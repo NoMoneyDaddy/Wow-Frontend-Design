@@ -345,6 +345,10 @@ class EvaluationError(ValueError):
 class DesignFindingsError(EvaluationError):
     """Raised when the official DESIGN.md linter completed with findings."""
 
+    def __init__(self, message: str, findings: dict[str, list[str]] | None = None) -> None:
+        super().__init__(message)
+        self.findings = findings or {}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -370,6 +374,13 @@ def parse_args() -> argparse.Namespace:
         default=2,
         help="fresh repair generations after a valid visual report still has blocking findings",
     )
+    parser.add_argument(
+        "--design-repair-max-rounds",
+        type=int,
+        default=2,
+        help="fresh repair generations after the official DESIGN.md linter reports findings",
+    )
+    parser.add_argument("--design-repair-round", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--visual-repair-round", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--chrome-executable", type=Path)
     parser.add_argument("--resume", action="store_true")
@@ -388,6 +399,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--visual-repair-max-rounds must be within 0..3")
     if args.visual_repair_round < 0 or args.visual_repair_round > args.visual_repair_max_rounds:
         parser.error("--visual-repair-round must be within 0..visual-repair-max-rounds")
+    if args.design_repair_max_rounds < 0 or args.design_repair_max_rounds > 3:
+        parser.error("--design-repair-max-rounds must be within 0..3")
+    if args.design_repair_round < 0 or args.design_repair_round > args.design_repair_max_rounds:
+        parser.error("--design-repair-round must be within 0..design-repair-max-rounds")
     if args.provider != "all" and args.model != "all" and args.model not in matrix.PROVIDERS[args.provider]:
         parser.error(f"--model {args.model} does not belong to provider {args.provider}")
     return args
@@ -872,6 +887,7 @@ def validate_design_completion(
         raise EvaluationError(f"DESIGN.md result count must be {len(expected)}")
     seen: set[tuple[str, str, str]] = set()
     clean = findings = 0
+    finding_details: dict[str, list[str]] = {}
     for result in results:
         if not isinstance(result, dict):
             raise EvaluationError("DESIGN.md result is malformed")
@@ -889,16 +905,50 @@ def validate_design_completion(
             raise EvaluationError(f"DESIGN.md input is missing or unsafe for {key}")
         if _recorded_path(result.get("path")) != design or result.get("sha256") != _digest(design):
             raise EvaluationError(f"DESIGN.md input hash disagrees for {key}")
+        summary = result.get("summary")
+        if (
+            not isinstance(summary, dict)
+            or any(type(summary.get(field)) is not int or summary.get(field) < 0 for field in ("errors", "warnings", "infos"))
+        ):
+            raise EvaluationError(f"DESIGN.md summary is malformed for {key}")
+        raw_findings = result.get("findings", [])
+        if not isinstance(raw_findings, list):
+            raise EvaluationError(f"DESIGN.md findings are malformed for {key}")
+        finding_counts = {"error": 0, "warning": 0, "info": 0}
+        for item in raw_findings:
+            if not isinstance(item, dict):
+                raise EvaluationError(f"DESIGN.md findings are malformed for {key}")
+            severity = item.get("severity")
+            message = item.get("message")
+            if not isinstance(severity, str) or severity not in finding_counts or not isinstance(message, str) or not message.strip():
+                raise EvaluationError(f"DESIGN.md findings are malformed for {key}")
+            finding_counts[severity] += 1
+        summary_fields = {"error": "errors", "warning": "warnings", "info": "infos"}
+        if any(finding_counts[field] != summary[summary_fields[field]] for field in finding_counts):
+            raise EvaluationError(f"DESIGN.md findings disagree with summary for {key}")
         status = result.get("status")
+        expected_status = "clean" if summary["errors"] == 0 and summary["warnings"] == 0 else "findings"
+        if status != expected_status:
+            raise EvaluationError(f"DESIGN.md status disagrees with summary for {key}")
         if status == "clean":
             clean += 1
         elif status == "findings":
             findings += 1
+            details: list[str] = []
+            for item in raw_findings:
+                severity = _one_line(item.get("severity", "finding"), 24)
+                message = _one_line(item.get("message", "reported finding"), 300)
+                detail = f"{severity}: {message}"
+                if detail not in details:
+                    details.append(detail)
+            if not details:
+                details.append(
+                    "summary: "
+                    f"errors={summary.get('errors')}; warnings={summary.get('warnings')}; infos={summary.get('infos')}"
+                )
+            finding_details[f"{key[2]}:{key[0]}-{key[1]}"] = details[:6]
         else:
             raise EvaluationError(f"DESIGN.md lint did not complete for {key}")
-        summary = result.get("summary")
-        if not isinstance(summary, dict) or any(not isinstance(summary.get(field), int) for field in ("errors", "warnings", "infos")):
-            raise EvaluationError(f"DESIGN.md summary is malformed for {key}")
     summary = report.get("summary")
     if summary != {
         "checked": len(expected),
@@ -908,7 +958,10 @@ def validate_design_completion(
     }:
         raise EvaluationError("DESIGN.md aggregate summary is incomplete")
     if findings:
-        raise DesignFindingsError(f"DESIGN.md repair required for {findings} target(s)")
+        raise DesignFindingsError(
+            f"DESIGN.md repair required for {findings} target(s)",
+            finding_details,
+        )
     return clean, findings
 
 
@@ -1013,10 +1066,17 @@ def _archive_failed_path(path: Path, attempt: int) -> Path:
     return destination
 
 
-def _archive_visual_repair_state(paths: list[Path], attempt: int) -> dict[Path, Path]:
+def _archive_visual_repair_state(
+    paths: list[Path],
+    attempt: int,
+    *,
+    phase: str = "visual",
+) -> dict[Path, Path]:
     if not paths or len(set(paths)) != len(paths):
         raise EvaluationError("visual repair archive paths are empty or duplicated")
-    plan = {path: path.with_name(f"{path.name}.failed-attempt-{attempt}") for path in paths}
+    if phase not in {"design", "visual"}:
+        raise EvaluationError(f"unsupported repair archive phase: {phase}")
+    plan = {path: path.with_name(f"{path.name}.failed-{phase}-attempt-{attempt}") for path in paths}
     for source, destination in plan.items():
         if not source.exists() or source.is_symlink():
             raise EvaluationError(f"visual repair source is missing or unsafe: {source}")
@@ -1036,13 +1096,20 @@ def _archive_visual_repair_state(paths: list[Path], attempt: int) -> dict[Path, 
                 rollback_errors.append(f"{source}: {rollback_error}")
         if rollback_errors:
             raise EvaluationError(
-                f"visual repair archive failed and rollback was incomplete: {'; '.join(rollback_errors)}"
+                f"repair archive failed and rollback was incomplete: {'; '.join(rollback_errors)}"
             ) from error
-        raise EvaluationError(f"visual repair archive failed and was rolled back: {error}") from error
+        raise EvaluationError(f"repair archive failed and was rolled back: {error}") from error
     return plan
 
 
-def _visual_repair_command(args: argparse.Namespace, next_round: int) -> list[str]:
+def _visual_repair_command(
+    args: argparse.Namespace,
+    next_round: int,
+    design_round: int | None = None,
+) -> list[str]:
+    if design_round is None:
+        design_round = getattr(args, "design_repair_round", 0)
+    absolute_path = lambda value: str(Path(value).expanduser().resolve())
     command = [
         sys.executable,
         str(Path(__file__).resolve()),
@@ -1053,15 +1120,15 @@ def _visual_repair_command(args: argparse.Namespace, next_round: int) -> list[st
         "--theme",
         args.theme,
         "--target-root",
-        str(args.target_root),
+        absolute_path(args.target_root),
         "--generation-output",
-        str(args.generation_output),
+        absolute_path(args.generation_output),
         "--design-output",
-        str(args.design_output),
+        absolute_path(args.design_output),
         "--visual-output",
-        str(args.visual_output),
+        absolute_path(args.visual_output),
         "--screenshot-dir",
-        str(args.screenshot_dir),
+        absolute_path(args.screenshot_dir),
         "--timeout-seconds",
         str(args.timeout_seconds),
         "--max-attempts",
@@ -1078,6 +1145,10 @@ def _visual_repair_command(args: argparse.Namespace, next_round: int) -> list[st
         str(args.lint_timeout_seconds),
         "--tool-install-max-attempts",
         str(args.tool_install_max_attempts),
+        "--design-repair-max-rounds",
+        str(getattr(args, "design_repair_max_rounds", 2)),
+        "--design-repair-round",
+        str(design_round),
         "--visual-repair-max-rounds",
         str(args.visual_repair_max_rounds),
         "--visual-repair-round",
@@ -1085,7 +1156,7 @@ def _visual_repair_command(args: argparse.Namespace, next_round: int) -> list[st
         "--resume",
     ]
     if args.chrome_executable is not None:
-        command.extend(["--chrome-executable", str(args.chrome_executable)])
+        command.extend(["--chrome-executable", absolute_path(args.chrome_executable)])
     return command
 
 
@@ -1093,6 +1164,21 @@ def _one_line(value: object, limit: int = 72) -> str:
     printable = "".join(character if character.isprintable() else " " for character in str(value))
     text = " ".join(printable.split())
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _design_repair_feedback(findings: dict[str, list[str]]) -> dict[str, str]:
+    suffix = " Preserve passed behavior/direction; fix only the reported DESIGN.md findings; do not weaken the evaluator."
+    feedback: dict[str, str] = {}
+    for case_key, details in sorted(findings.items()):
+        message = "REPAIR REQUIRED: DESIGN.md " + _one_line(case_key, 160) + "."
+        for index, detail in enumerate(details[:6]):
+            separator = " Evidence: " if index == 0 else "; "
+            bounded = _one_line(detail, 260)
+            if len(message) + len(separator) + len(bounded) + len(suffix) > 500:
+                break
+            message += separator + bounded
+        feedback[case_key] = message + suffix
+    return feedback
 
 
 def _visual_issue_label(code: str) -> str:
@@ -1202,11 +1288,10 @@ def _visual_issue_detail(result: dict[str, Any], code: str) -> str:
 
 
 def visual_repair_feedback(findings: dict[str, list[str]], visual_output: Path | None = None) -> dict[str, str]:
-    issues_by_case: dict[str, set[str]] = {}
+    issues_by_target: dict[str, set[str]] = {}
     for target, codes in findings.items():
-        case_id = target.split(":", 1)[0]
-        issues_by_case.setdefault(case_id, set()).update(codes)
-    details_by_case: dict[str, list[str]] = {case_id: [] for case_id in issues_by_case}
+        issues_by_target.setdefault(target, set()).update(codes)
+    details_by_target: dict[str, list[str]] = {target: [] for target in issues_by_target}
     if visual_output is not None:
         report = _load_json(visual_output, "visual report")
         for collection_name in ("results", "crossPageComparisons"):
@@ -1217,25 +1302,33 @@ def visual_repair_feedback(findings: dict[str, list[str]], visual_output: Path |
                 if not isinstance(result, dict):
                     continue
                 case_id = result.get("caseId")
+                alias = result.get("alias")
+                target_keys = [
+                    target
+                    for target in issues_by_target
+                    if target.split(":", 1)[0] == case_id
+                    and (not isinstance(alias, str) or target == f"{case_id}:{alias}")
+                ]
                 issues = result.get("visualIssues")
-                if case_id not in issues_by_case or not isinstance(issues, list):
+                if not target_keys or not isinstance(issues, list):
                     continue
-                for code in sorted(issues_by_case[case_id].intersection(issue for issue in issues if isinstance(issue, str))):
-                    detail = _visual_issue_detail(result, code)
-                    if detail not in details_by_case[case_id]:
-                        details_by_case[case_id].append(detail)
+                for target_key in target_keys:
+                    for code in sorted(issues_by_target[target_key].intersection(issue for issue in issues if isinstance(issue, str))):
+                        detail = _visual_issue_detail(result, code)
+                        if detail not in details_by_target[target_key]:
+                            details_by_target[target_key].append(detail)
 
     feedback: dict[str, str] = {}
     suffix = " Preserve passed behavior/direction; do not edit or weaken the evaluator."
-    for case_id, codes in sorted(issues_by_case.items()):
+    for target_key, codes in sorted(issues_by_target.items()):
         labels = sorted({_visual_issue_label(code) for code in codes})
         message = "REPAIR REQUIRED: " + _one_line(",".join(labels), 192) + "."
-        for index, detail in enumerate(details_by_case[case_id]):
+        for index, detail in enumerate(details_by_target[target_key]):
             separator = " Evidence: " if index == 0 else "; "
             if len(message) + len(separator) + len(detail) + len(suffix) > 500:
                 break
             message += separator + detail
-        feedback[case_id] = message + suffix
+        feedback[target_key] = message + suffix
     return feedback
 
 
@@ -1316,6 +1409,57 @@ def _prepare_selective_repair_state(
     return len(preserved)
 
 
+def _run_design_repair(
+    args: argparse.Namespace,
+    findings: dict[str, list[str]],
+    generation_output: Path,
+    design_output: Path,
+    target_root: Path,
+) -> int:
+    if args.design_repair_round >= args.design_repair_max_rounds:
+        print(
+            f"DESIGN.md repair fuse reached after {args.design_repair_round + 1} evaluated generation(s); "
+            f"best artifacts and findings were preserved: {repair_summary(findings)}",
+            file=sys.stderr,
+        )
+        return 1
+    next_round = args.design_repair_round + 1
+    archived = _archive_visual_repair_state(
+        [target_root, generation_output, design_output],
+        next_round,
+        phase="design",
+    )
+    source_root = archived[target_root]
+    preserved_count = _prepare_selective_repair_state(
+        source_root,
+        archived[generation_output],
+        target_root,
+        generation_output,
+        findings,
+    )
+    environment = os.environ.copy()
+    environment["PRODUCT_FLOW_REPAIR_SOURCE_ROOT"] = str(source_root)
+    environment.pop("PRODUCT_FLOW_RETRY_FEEDBACK", None)
+    environment["PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE"] = json.dumps(
+        _design_repair_feedback(findings),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    environment["PRODUCT_FLOW_DESIGN_REPAIR_ROUND"] = str(next_round)
+    command = _visual_repair_command(args, args.visual_repair_round, next_round)
+    print(
+        f"starting DESIGN.md repair round {next_round}/{args.design_repair_max_rounds}; "
+        f"preserved {preserved_count} passing target(s); prior targets and evidence archived at {source_root}",
+        flush=True,
+    )
+    process = subprocess.Popen(command, cwd=ROOT, env=environment, start_new_session=True)
+    try:
+        return process.wait()
+    except BaseException:
+        matrix.terminate_process_group(process)
+        raise
+
+
 def _run_visual_repair(
     args: argparse.Namespace,
     findings: dict[str, list[str]],
@@ -1337,6 +1481,7 @@ def _run_visual_repair(
     archived = _archive_visual_repair_state(
         [target_root, generation_output, design_output, visual_output, screenshot_dir],
         next_round,
+        phase="visual",
     )
     source_root = archived[target_root]
     preserved_count = _prepare_selective_repair_state(
@@ -1698,8 +1843,14 @@ def main() -> int:
                 raise EvaluationError(f"refusing to overwrite DESIGN.md report: {design_output}")
             try:
                 clean, findings = validate_design_completion(design_output, targets, generation_output)
-            except DesignFindingsError:
-                raise
+            except DesignFindingsError as error:
+                return _run_design_repair(
+                    args,
+                    error.findings,
+                    generation_output,
+                    design_output,
+                    target_root,
+                )
             except EvaluationError:
                 _archive_failed_path(design_output, 0)
             else:
@@ -1715,8 +1866,14 @@ def main() -> int:
                 if completed.returncode == 0:
                     try:
                         clean, findings = validate_design_completion(design_output, targets, generation_output)
-                    except DesignFindingsError:
-                        raise
+                    except DesignFindingsError as error:
+                        return _run_design_repair(
+                            args,
+                            error.findings,
+                            generation_output,
+                            design_output,
+                            target_root,
+                        )
                     except EvaluationError as error:
                         completed = subprocess.CompletedProcess(completed.args, 1, completed.stdout, str(error))
                     else:

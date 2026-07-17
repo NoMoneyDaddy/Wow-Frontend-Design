@@ -569,6 +569,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                                 "sha256": hashlib.sha256(design.read_bytes()).hexdigest(),
                                 "status": "findings",
                                 "summary": {"errors": 0, "warnings": 1, "infos": 0},
+                                "findings": [{"severity": "warning", "message": "needs repair"}],
                             }
                         ],
                         "summary": {
@@ -590,6 +591,172 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             ]
             with self.assertRaisesRegex(evaluation.DesignFindingsError, "repair required"):
                 evaluation.validate_design_completion(report, targets, generation)
+
+    def test_design_findings_are_forwarded_as_bounded_repair_feedback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            design = target / "DESIGN.md"
+            design.write_text("# Design\n", encoding="utf-8")
+            generation = target / "generation.json"
+            generation.write_text('{"status":"completed"}\n', encoding="utf-8")
+            report = target / "design.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "generation_ledger": {
+                            "path": str(generation.resolve()),
+                            "sha256": hashlib.sha256(generation.read_bytes()).hexdigest(),
+                        },
+                        "linter": {"package": "@google/design.md", "version": evaluation.DESIGN_MD_VERSION},
+                        "results": [
+                            {
+                                "provider": "claude",
+                                "model": "haiku",
+                                "case_id": "repair-cafe-intake-v6",
+                                "path": str(design.resolve()),
+                                "sha256": hashlib.sha256(design.read_bytes()).hexdigest(),
+                                "status": "findings",
+                                "summary": {"errors": 1, "warnings": 0, "infos": 0},
+                                "findings": [
+                                    {"severity": "error", "message": "A" * 600},
+                                ],
+                            }
+                        ],
+                        "summary": {
+                            "checked": 1,
+                            "clean": 0,
+                            "with_findings": 1,
+                            "infrastructure_failures": 0,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            targets = [{"case_id": "repair-cafe-intake-v6", "alias": "claude-haiku", "directory": target}]
+            with self.assertRaises(evaluation.DesignFindingsError) as raised:
+                evaluation.validate_design_completion(report, targets, generation)
+            findings = raised.exception.findings
+            self.assertIn("repair-cafe-intake-v6:claude-haiku", findings)
+            feedback = evaluation._design_repair_feedback(findings)
+            self.assertIn("repair-cafe-intake-v6:claude-haiku", feedback)
+            self.assertLessEqual(len(feedback["repair-cafe-intake-v6:claude-haiku"]), 500)
+            self.assertIn("error:", feedback["repair-cafe-intake-v6:claude-haiku"])
+
+    def test_design_status_must_match_summary_and_findings_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            design = target / "DESIGN.md"
+            design.write_text("# Design\n", encoding="utf-8")
+            generation = target / "generation.json"
+            generation.write_text('{"status":"completed"}\n', encoding="utf-8")
+            report = target / "design.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "generation_ledger": {
+                            "path": str(generation.resolve()),
+                            "sha256": hashlib.sha256(generation.read_bytes()).hexdigest(),
+                        },
+                        "linter": {"package": "@google/design.md", "version": evaluation.DESIGN_MD_VERSION},
+                        "results": [
+                            {
+                                "provider": "claude",
+                                "model": "haiku",
+                                "case_id": "repair-cafe-intake-v6",
+                                "path": str(design.resolve()),
+                                "sha256": hashlib.sha256(design.read_bytes()).hexdigest(),
+                                "status": "clean",
+                                "summary": {"errors": 1, "warnings": 0, "infos": 0},
+                                "findings": [{"severity": "error", "message": "invalid"}],
+                            }
+                        ],
+                        "summary": {"checked": 1, "clean": 1, "with_findings": 0, "infrastructure_failures": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            targets = [{"case_id": "repair-cafe-intake-v6", "alias": "claude-haiku", "directory": target}]
+            with self.assertRaisesRegex(evaluation.EvaluationError, "status disagrees"):
+                evaluation.validate_design_completion(report, targets, generation)
+
+            payload = json.loads(report.read_text(encoding="utf-8"))
+            payload["results"][0]["status"] = "findings"
+            payload["results"][0]["findings"] = [{"severity": True, "message": "invalid"}]
+            payload["summary"] = {"checked": 1, "clean": 0, "with_findings": 1, "infrastructure_failures": 0}
+            report.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationError, "findings are malformed"):
+                evaluation.validate_design_completion(report, targets, generation)
+
+            payload["results"][0]["findings"] = [{"severity": "error", "message": "MUST_NOT_PASS"}]
+            payload["results"][0]["summary"] = {"errors": 0, "warnings": 0, "infos": 0}
+            payload["results"][0]["status"] = "clean"
+            payload["summary"] = {"checked": 1, "clean": 1, "with_findings": 0, "infrastructure_failures": 0}
+            report.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationError, "findings disagree"):
+                evaluation.validate_design_completion(report, targets, generation)
+
+            payload["results"][0]["findings"] = [{"severity": [], "message": "x"}]
+            report.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationError, "findings are malformed"):
+                evaluation.validate_design_completion(report, targets, generation)
+
+    def test_design_repair_archives_evidence_and_starts_fresh_round(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target_root = root / "targets"
+            target_root.mkdir()
+            (target_root / "target.txt").write_text("original target", encoding="utf-8")
+            generation = root / "generation.json"
+            design = root / "design.json"
+            for path in (generation, design):
+                path.write_text("{}\n", encoding="utf-8")
+            args = SimpleNamespace(
+                provider="codex",
+                model="gpt-5.4-mini",
+                theme="all",
+                target_root=target_root,
+                generation_output=generation,
+                design_output=design,
+                visual_output=root / "visual.json",
+                screenshot_dir=root / "screenshots",
+                timeout_seconds=1800,
+                max_attempts=3,
+                retry_delay_seconds=0,
+                capture_max_attempts=3,
+                capture_timeout_seconds=300,
+                lint_max_attempts=3,
+                lint_timeout_seconds=180,
+                tool_install_max_attempts=3,
+                design_repair_max_rounds=2,
+                design_repair_round=0,
+                visual_repair_max_rounds=2,
+                visual_repair_round=0,
+                chrome_executable=None,
+            )
+            process = mock.Mock()
+            process.wait.return_value = 0
+            findings = {"repair-cafe-intake-v6:codex-gpt-5.4-mini": ["error: missing tokens"]}
+            with (
+                mock.patch.object(evaluation, "_prepare_selective_repair_state", return_value=0) as prepare,
+                mock.patch.object(evaluation.subprocess, "Popen", return_value=process) as popen,
+            ):
+                status = evaluation._run_design_repair(args, findings, generation, design, target_root)
+            self.assertEqual(0, status)
+            for path in (target_root, generation, design):
+                self.assertFalse(path.exists())
+                self.assertTrue(path.with_name(f"{path.name}.failed-design-attempt-1").exists())
+            environment = popen.call_args.kwargs["env"]
+            self.assertEqual("1", environment["PRODUCT_FLOW_DESIGN_REPAIR_ROUND"])
+            self.assertEqual(
+                str(target_root.with_name("targets.failed-design-attempt-1")),
+                environment["PRODUCT_FLOW_REPAIR_SOURCE_ROOT"],
+            )
+            feedback = json.loads(environment["PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE"])
+            self.assertIn("missing tokens", feedback["repair-cafe-intake-v6:codex-gpt-5.4-mini"])
+            command = popen.call_args.args[0]
+            self.assertEqual("1", command[command.index("--design-repair-round") + 1])
+            self.assertIn("--resume", command)
+            prepare.assert_called_once()
 
     def test_design_completion_rejects_stale_design_hash(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -757,17 +924,17 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             self.assertEqual(0, status)
             for path in (target_root, generation, design, visual, screenshot_dir):
                 self.assertFalse(path.exists())
-                self.assertTrue(path.with_name(f"{path.name}.failed-attempt-1").exists())
+                self.assertTrue(path.with_name(f"{path.name}.failed-visual-attempt-1").exists())
             command = popen.call_args.args[0]
             environment = popen.call_args.kwargs["env"]
             self.assertEqual("1", environment["PRODUCT_FLOW_VISUAL_REPAIR_ROUND"])
             self.assertEqual(
-                str(target_root.with_name("targets.failed-attempt-1")),
+                str(target_root.with_name("targets.failed-visual-attempt-1")),
                 environment["PRODUCT_FLOW_REPAIR_SOURCE_ROOT"],
             )
             feedback = json.loads(environment["PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE"])
-            self.assertIn("repair-cafe-intake-v6", feedback)
-            self.assertIn("repair_failed", feedback["repair-cafe-intake-v6"])
+            self.assertIn("repair-cafe-intake-v6:codex-gpt-5.4-mini", feedback)
+            self.assertIn("repair_failed", feedback["repair-cafe-intake-v6:codex-gpt-5.4-mini"])
             self.assertNotIn("PRODUCT_FLOW_RETRY_FEEDBACK", environment)
             self.assertEqual("1", command[command.index("--visual-repair-round") + 1])
             self.assertIn("--resume", command)
@@ -853,6 +1020,27 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             )
         self.assertEqual(1, status)
         archive.assert_not_called()
+
+    def test_design_and_visual_repair_archives_use_distinct_namespaces(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = [root / "targets", root / "generation.json", root / "design.json"]
+            paths[0].mkdir()
+            for path in paths[1:]:
+                path.write_text("{}\n", encoding="utf-8")
+            design_archive = evaluation._archive_visual_repair_state(paths, 1, phase="design")
+            for path in paths:
+                if path.suffix:
+                    path.write_text("new\n", encoding="utf-8")
+                else:
+                    path.mkdir()
+            visual_paths = [*paths, root / "visual.json", root / "screenshots"]
+            visual_paths[-2].write_text("{}\n", encoding="utf-8")
+            visual_paths[-1].mkdir()
+            visual_archive = evaluation._archive_visual_repair_state(visual_paths, 1, phase="visual")
+            self.assertNotEqual(design_archive[paths[0]], visual_archive[paths[0]])
+            self.assertTrue(design_archive[paths[0]].name.endswith("failed-design-attempt-1"))
+            self.assertTrue(visual_archive[paths[0]].name.endswith("failed-visual-attempt-1"))
 
     def test_visual_repair_feedback_includes_bounded_rendered_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -978,12 +1166,12 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 },
                 report,
             )
-        oral = feedback["oral-history-archive-v6"]
-        packaging = feedback["packaging-configurator-v6"]
-        layout_void = feedback["layout-void-v6"]
-        small_text = feedback["small-text-v7"]
-        grant = feedback["grant-review-board-v6"]
-        font = feedback["type-foundry-specimen-v6"]
+        oral = feedback["oral-history-archive-v6:codex-gpt-5.4-mini"]
+        packaging = feedback["packaging-configurator-v6:codex-gpt-5.4-mini"]
+        layout_void = feedback["layout-void-v6:codex-gpt-5.4-mini"]
+        small_text = feedback["small-text-v7:codex-gpt-5.4-mini"]
+        grant = feedback["grant-review-board-v6:codex-gpt-5.4-mini"]
+        font = feedback["type-foundry-specimen-v6:codex-gpt-5.4-mini"]
         self.assertIn("archive.html/desktop/base", oral)
         self.assertIn("trackRatio=0.51", oral)
         self.assertIn("summary.html/desktop/base", packaging)
@@ -1031,7 +1219,7 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             feedback = evaluation.visual_repair_feedback(
                 {"night-market-allergen-v6:codex-gpt-5.4-mini": [issue]},
                 report,
-            )["night-market-allergen-v6"]
+            )["night-market-allergen-v6:codex-gpt-5.4-mini"]
         self.assertLessEqual(len(feedback), 500)
         self.assertNotIn("\n", feedback)
         self.assertNotIn("\x1b", feedback)

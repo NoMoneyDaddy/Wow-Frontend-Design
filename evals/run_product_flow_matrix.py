@@ -393,7 +393,14 @@ def should_retry_attempt(attempt: dict[str, object]) -> bool:
     )
 
 
-def apply_case_feedback(environment: dict[str, str], case_id: str, retry_feedback: str | None) -> None:
+def apply_case_feedback(
+    environment: dict[str, str],
+    case_id: str,
+    retry_feedback: str | None,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+) -> None:
     mapping_text = environment.pop("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE", "")
     selected = retry_feedback
     if selected is None and mapping_text:
@@ -403,7 +410,10 @@ def apply_case_feedback(environment: dict[str, str], case_id: str, retry_feedbac
             raise ValueError("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE must be valid JSON") from error
         if not isinstance(mapping, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in mapping.items()):
             raise ValueError("PRODUCT_FLOW_RETRY_FEEDBACK_BY_CASE must map case ids to strings")
-        selected = mapping.get(case_id)
+        target_key = f"{case_id}:{provider}-{model}" if provider and model else None
+        selected = mapping.get(target_key) if target_key else None
+        if selected is None:
+            selected = mapping.get(case_id)
     environment.pop("PRODUCT_FLOW_RETRY_FEEDBACK", None)
     if selected is None:
         return
@@ -451,7 +461,13 @@ def run_case_attempt(
                 target.mkdir(mode=0o755)
             environment = os.environ.copy()
             environment["PRODUCT_FLOW_TARGET_ROOT"] = str(target.parent)
-            apply_case_feedback(environment, case_id, retry_feedback)
+            apply_case_feedback(
+                environment,
+                case_id,
+                retry_feedback,
+                provider=provider,
+                model=model,
+            )
             completed = run_isolated(
                 command_for(provider, model, case_id),
                 timeout_seconds,
