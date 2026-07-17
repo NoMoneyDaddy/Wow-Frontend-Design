@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-source-probe-v5.json \
+  --manifest evals/v7-pilot-manifest-20260718-breakpoint-probe-v7.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -101,6 +101,8 @@ npm run eval:v7-repair-cycle -- \
 `brief-map.json` 必須逐一綁定 development full matrix 的 evaluator-owned absolute brief path 與 SHA-256。Packet 是可執行回饋接口，不是修正成功證據；affected receipt 只能證明其 SHA-256 綁定 rows，不能替代 release/full-support matrix。這個 runner 已通過 synthetic contract tests，但尚未執行 live model/browser repair cycle，因此自動修正能力仍是 `PARTIALLY VERIFIED`。
 
 P2 在每個 repair target 的生成前、affected Playwright matrix 後執行一個 hash-pinned `source_layout_audit.py` supporting probe。它只投影 `global_emergency_breaking`、`prose_wrap_disabled`、`fixed_text_clipping` 三種高可信 source-risk code，去除原始 evidence、confirmation、selector、HTML 與產品文字，依 `probe × code × path` 去重並限制最多三筆。Sidecar 以 target SHA-256、probe contract、script 與 dependency 綁定；未知 schema/code、truncated coverage、tool drift、timeout 或 unavailable 都留下明確 receipt，不得被解讀成 clean。這些 advisory 只有與已驗證 browser finding 共用根因時才可協助定位，不改變 failure key、best-artifact rank、promotion 或 release gate；Playwright 仍是 rendered behavior 的權威。Pretext 暫不接入自修正閉環，因目前缺少穩定 CLI／versioned result schema 與 bounded computed-style provenance。
+
+P3a `eval:v7-breakpoints` 是獨立、零截圖的 Chromium supporting-discovery sidecar。它不接受模型自報的 breakpoint；先量固定 11 個 coarse widths，只有相鄰 categorical layout signature 不同時才二分到 1 CSS px，單一 route/state 最多 48 samples、8 transitions、depth 11。Signature 只保留 hidden spec ID、display/position/writing-mode/flex 類別、可見數、child row/column topology、viewport clipping、overflow 與 assertion 結果，不輸出 selector、產品文字或連續 rect。相同寬度的兩次 animation-frame sample 必須穩定；route/spec/manifest/contract/script 漂移、字型、互動、runtime、外部 request 或 budget 問題都明示 unavailable。只有兩個 fresh context 都重現的 horizontal overflow／required assertion failure 才列 finding；mode transition 本身只是 advisory。它不產生 screenshot/trace/video，也不被 repair packet、failure key、rank 或 promotion 讀取。第一版只宣稱 bounded Chromium width observation；cross-engine、touch、height、zoom、motion、physical-device 與視覺品質仍未驗證。
 
 ## 目前案例
 

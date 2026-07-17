@@ -213,6 +213,8 @@
     "evals/run_v7_repair_cycle.py",
     "evals/v7-source-layout-probe-contract.json",
     "evals/v7_supporting_probe_registry.py",
+    "evals/v7-breakpoint-probe-contract.json",
+    "evals/playwright_v7_breakpoint_probe.cjs",
     "wow-frontend-design/scripts/source_layout_audit.py",
     "wow-frontend-design/scripts/project_scan.py",
     "wow-frontend-design/scripts/evidence_ledger.py",
