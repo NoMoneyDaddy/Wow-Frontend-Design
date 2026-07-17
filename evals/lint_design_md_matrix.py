@@ -7,7 +7,9 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,12 +21,80 @@ DEFAULT_RETRY_LEDGER = ROOT / "evals" / "product-flow-v4-infrastructure-retry.js
 DEFAULT_OUTPUT = ROOT / "evals" / "product-flow-v4-design-md-results.json"
 
 
-def locked_package_version() -> str:
+def locked_package_record() -> dict[str, str]:
     payload = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
-    version = payload.get("packages", {}).get("node_modules/@google/design.md", {}).get("version")
-    if not isinstance(version, str) or not version or any(character.isspace() for character in version):
-        raise ValueError("package-lock.json has no exact @google/design.md version")
-    return version
+    package = payload.get("packages", {}).get("node_modules/@google/design.md", {})
+    record = {field: package.get(field) for field in ("version", "resolved", "integrity")}
+    if any(
+        not isinstance(value, str) or not value or any(character.isspace() for character in value)
+        for value in record.values()
+    ):
+        raise ValueError("package-lock.json has no exact integrity-bound @google/design.md record")
+    return record  # type: ignore[return-value]
+
+
+def safe_tool_root(path: Path) -> Path:
+    absolute = Path(os.path.abspath(path.expanduser()))
+    trusted_platform_links = {Path("/etc"), Path("/tmp"), Path("/var")} if sys.platform == "darwin" else set()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink() and current not in trusted_platform_links:
+            raise ValueError(f"DESIGN.md tool root crosses a symbolic link: {current}")
+    return absolute
+
+
+def locked_linter_command(tool_root: Path, timeout_seconds: int) -> tuple[list[str], dict[str, str]]:
+    tool_root = safe_tool_root(tool_root)
+    if tool_root.exists() and (tool_root.is_symlink() or not tool_root.is_dir()):
+        raise ValueError(f"DESIGN.md tool root is unsafe: {tool_root}")
+    tool_root.mkdir(parents=True, exist_ok=True)
+    for name in ("package.json", "package-lock.json"):
+        source = ROOT / name
+        destination = tool_root / name
+        if source.is_symlink() or not source.is_file() or destination.is_symlink():
+            raise ValueError(f"locked install input is missing or unsafe: {source}")
+        shutil.copyfile(source, destination)
+        os.chmod(destination, 0o600)
+    npm = shutil.which("npm")
+    node = shutil.which("node")
+    if npm is None or node is None:
+        raise ValueError("npm and Node.js are required for the locked DESIGN.md linter")
+    completed = subprocess.run(
+        [
+            npm,
+            "ci",
+            "--ignore-scripts",
+            "--no-audit",
+            "--no-fund",
+        ],
+        cwd=tool_root,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    if completed.returncode != 0:
+        diagnostic = " ".join((completed.stderr or completed.stdout or "npm ci failed").split())[:500]
+        raise ValueError(f"locked DESIGN.md linter install failed: {diagnostic}")
+    package_record = locked_package_record()
+    installed_package = tool_root / "node_modules" / "@google" / "design.md" / "package.json"
+    entrypoint = tool_root / "node_modules" / "@google" / "design.md" / "dist" / "index.js"
+    if (
+        installed_package.is_symlink()
+        or not installed_package.is_file()
+        or entrypoint.is_symlink()
+        or not entrypoint.is_file()
+    ):
+        raise ValueError("locked DESIGN.md linter install is missing or unsafe")
+    installed = json.loads(installed_package.read_text(encoding="utf-8"))
+    if installed.get("version") != package_record["version"]:
+        raise ValueError("locked DESIGN.md linter version disagrees after install")
+    return [node, str(entrypoint), "lint"], package_record
+
+
+def locked_package_version() -> str:
+    return locked_package_record()["version"]
 
 
 def digest(path: Path) -> str:
@@ -48,6 +118,7 @@ def parse_args() -> argparse.Namespace:
         dest="supplemental_retry",
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--tool-root", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true", help="atomically replace an existing report")
     parser.add_argument("--timeout-seconds", type=int, default=60)
     args = parser.parse_args()
@@ -123,7 +194,12 @@ def write_report(path: Path, report: dict[str, object]) -> None:
 
 def main() -> int:
     args = parse_args()
-    package_version = locked_package_version()
+    tool_root = args.tool_root
+    try:
+        command_prefix, package_record = locked_linter_command(tool_root, args.timeout_seconds)
+    except (OSError, UnicodeError, json.JSONDecodeError, subprocess.TimeoutExpired, ValueError) as error:
+        raise SystemExit(str(error)) from error
+    package_version = package_record["version"]
     ledger_path = args.ledger.expanduser().resolve()
     output = args.output.expanduser().resolve()
     if output.exists() and not args.overwrite:
@@ -148,7 +224,6 @@ def main() -> int:
         if isinstance(candidate, dict) and candidate.get("visual_evaluation_eligible") is True:
             supplemental = candidate
 
-    command_prefix = ["npx", "--yes", f"@google/design.md@{package_version}", "lint"]
     report: dict[str, object] = {
         "schema_version": 1,
         "generated_at": utc_now(),

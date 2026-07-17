@@ -53,6 +53,35 @@ def write_manifest(target: Path, provider: str, model: str, case_id: str) -> dic
 
 
 class ProductFlowMatrixTests(unittest.TestCase):
+    def test_evaluator_inputs_freeze_the_active_transitive_chain(self) -> None:
+        inputs = {path.relative_to(ROOT).as_posix() for path in matrix.EVALUATOR_INPUTS}
+        self.assertEqual(len(inputs), len(matrix.EVALUATOR_INPUTS))
+        self.assertNotIn("evals/playwright_visual_v6_audit.cjs", inputs)
+        self.assertTrue(
+            {
+                "package.json",
+                "package-lock.json",
+                "evals/playwright_visual_v7_audit.cjs",
+                "wow-frontend-design/scripts/evidence_ledger.py",
+                "wow-frontend-design/scripts/validate_quality_result.py",
+                "wow-frontend-design/scripts/score_weak_model_output.py",
+                "wow-frontend-design/scripts/weak_model_output.schema.json",
+            }.issubset(inputs)
+        )
+        self.assertTrue(all(path.is_file() and not path.is_symlink() for path in matrix.EVALUATOR_INPUTS))
+
+    def test_frozen_input_mutation_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evaluator = root / "evaluator.py"
+            evaluator.write_text("before", encoding="utf-8")
+            entries = [{"path": "evaluator.py", "sha256": matrix.digest(evaluator)}]
+            evaluator.write_text("after", encoding="utf-8")
+            with patch.object(matrix, "ROOT", root), self.assertRaisesRegex(
+                SystemExit, "frozen evaluation input changed"
+            ):
+                matrix.verify_frozen_files(entries)
+
     def test_fixed_selection_contains_one_model_and_eight_themes(self) -> None:
         cases = matrix.selected_cases("all", "all")
         self.assertEqual(8, len(cases))

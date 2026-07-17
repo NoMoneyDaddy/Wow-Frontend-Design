@@ -432,6 +432,39 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
+def verify_generation_evaluator_inputs(generation_output: Path) -> dict[str, str]:
+    ledger = _load_json(generation_output, "generation ledger")
+    contract = ledger.get("contract")
+    entries = contract.get("evaluator_inputs") if isinstance(contract, dict) else None
+    if not isinstance(entries, list):
+        raise EvaluationError("generation ledger has no frozen evaluator inputs")
+    expected_paths = [path.relative_to(ROOT).as_posix() for path in matrix.EVALUATOR_INPUTS]
+    recorded_paths: list[str] = []
+    records: list[dict[str, str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+            raise EvaluationError("generation ledger has malformed frozen evaluator inputs")
+        path_value = entry.get("path")
+        sha256 = entry.get("sha256")
+        candidate = PurePosixPath(path_value) if isinstance(path_value, str) else None
+        if (
+            candidate is None
+            or candidate.is_absolute()
+            or ".." in candidate.parts
+            or not re.fullmatch(r"[0-9a-f]{64}", sha256 if isinstance(sha256, str) else "")
+        ):
+            raise EvaluationError("generation ledger has unsafe frozen evaluator inputs")
+        recorded_paths.append(candidate.as_posix())
+        records.append({"path": candidate.as_posix(), "sha256": str(sha256)})
+    if recorded_paths != expected_paths or len(set(recorded_paths)) != len(recorded_paths):
+        raise EvaluationError("generation ledger frozen evaluator chain disagrees with the active evaluator")
+    try:
+        matrix.verify_frozen_files(records)
+    except SystemExit as error:
+        raise EvaluationError(str(error)) from error
+    return {entry["path"]: entry["sha256"] for entry in records}
+
+
 def _safe_target(value: Any, artifact_root: Path) -> Path:
     if not isinstance(value, str) or not value:
         raise EvaluationError("generation target path is invalid")
@@ -1674,6 +1707,7 @@ def _run_design_repair(
             file=sys.stderr,
         )
         return 1
+    verify_generation_evaluator_inputs(generation_output)
     next_round = args.design_repair_round + 1
     archived = _archive_visual_repair_state(
         [target_root, generation_output, design_output],
@@ -1727,6 +1761,7 @@ def _run_visual_repair(
             file=sys.stderr,
         )
         return 1
+    verify_generation_evaluator_inputs(generation_output)
     next_round = args.visual_repair_round + 1
     feedback_by_case = visual_repair_feedback(findings, visual_output)
     archived = _archive_visual_repair_state(
@@ -1971,6 +2006,7 @@ def resolve_visual_tools(args: argparse.Namespace) -> dict[str, str]:
 
 
 def _run_design_attempt(args: argparse.Namespace, generation_output: Path, design_output: Path) -> subprocess.CompletedProcess[str]:
+    verify_generation_evaluator_inputs(generation_output)
     environment = os.environ.copy()
     environment["npm_config_cache"] = str(_safe_tool_root(args) / "npm-cache")
     environment["npm_config_ignore_scripts"] = "true"
@@ -1983,6 +2019,8 @@ def _run_design_attempt(args: argparse.Namespace, generation_output: Path, desig
             "--no-supplemental-retry",
             "--output",
             str(design_output),
+            "--tool-root",
+            str(_safe_tool_root(args) / "design-md"),
             "--timeout-seconds",
             str(min(args.lint_timeout_seconds, 300)),
         ],
@@ -1999,6 +2037,9 @@ def _run_visual_attempt(
     screenshot_dir: Path,
     tool_environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    if len(targets) != len(bases):
+        raise EvaluationError("visual target/base counts disagree")
+    verify_generation_evaluator_inputs(args.generation_output.expanduser().resolve())
     command = [
         "node",
         str(VISUAL_AUDITOR),
@@ -2007,8 +2048,6 @@ def _run_visual_attempt(
         "--artifact-dir",
         os.path.relpath(screenshot_dir, ROOT),
     ]
-    if len(targets) != len(bases):
-        raise EvaluationError("visual target/base counts disagree")
     for target, base in zip(targets, bases):
         command.extend(["--target", f"{target['case_id']}:{target['alias']}={base}"])
     environment = dict(tool_environment or os.environ)
@@ -2087,14 +2126,17 @@ def main() -> int:
         )
         return 1
     try:
+        verify_generation_evaluator_inputs(generation_output)
         targets = completed_targets(generation_output)
         design_complete = False
         if design_output.exists():
             if not args.resume:
                 raise EvaluationError(f"refusing to overwrite DESIGN.md report: {design_output}")
             try:
+                verify_generation_evaluator_inputs(generation_output)
                 clean, findings = validate_design_completion(design_output, targets, generation_output)
             except DesignFindingsError as error:
+                verify_generation_evaluator_inputs(generation_output)
                 return _run_design_repair(
                     args,
                     error.findings,
@@ -2116,8 +2158,10 @@ def main() -> int:
                     completed = subprocess.CompletedProcess([], 124, "", f"timed out: {error}")
                 if completed.returncode == 0:
                     try:
+                        verify_generation_evaluator_inputs(generation_output)
                         clean, findings = validate_design_completion(design_output, targets, generation_output)
                     except DesignFindingsError as error:
+                        verify_generation_evaluator_inputs(generation_output)
                         return _run_design_repair(
                             args,
                             error.findings,
@@ -2143,8 +2187,10 @@ def main() -> int:
                     time.sleep(args.retry_delay_seconds)
             if not design_complete:
                 raise EvaluationError("DESIGN.md lint failed after retries")
+        verify_generation_evaluator_inputs(generation_output)
         should_capture = _prepare_capture_paths(visual_output, screenshot_dir, args.resume)
         if not should_capture:
+            verify_generation_evaluator_inputs(generation_output)
             count = validate_visual_completion(visual_output, screenshot_dir, targets, generation_output)
             blockers = blocking_visual_findings(visual_output, require_discovery=True)
             if blockers:
@@ -2153,6 +2199,7 @@ def main() -> int:
                     f"repair required for {len(blockers)} target(s): {repair_summary(blockers)}",
                     file=sys.stderr,
                 )
+                verify_generation_evaluator_inputs(generation_output)
                 return _run_visual_repair(
                     args,
                     blockers,
@@ -2181,6 +2228,7 @@ def main() -> int:
             else:
                 print(f"product-flow execution complete and acceptance passed: {len(targets)} targets and {count} screenshots retained")
             return 0
+        verify_generation_evaluator_inputs(generation_output)
         tool_environment = resolve_visual_tools(args)
         with serve_targets(targets) as bases:
             for attempt in range(1, args.capture_max_attempts + 1):
@@ -2197,6 +2245,7 @@ def main() -> int:
                     completed = subprocess.CompletedProcess([], 124, "", f"timed out: {error}")
                 if completed.returncode == 0:
                     try:
+                        verify_generation_evaluator_inputs(generation_output)
                         bind_visual_report(visual_output, generation_output, targets)
                         count = validate_visual_completion(visual_output, screenshot_dir, targets, generation_output)
                     except EvaluationError as error:
@@ -2209,6 +2258,7 @@ def main() -> int:
                                 f"repair required for {len(blockers)} target(s): {repair_summary(blockers)}",
                                 file=sys.stderr,
                             )
+                            verify_generation_evaluator_inputs(generation_output)
                             return _run_visual_repair(
                                 args,
                                 blockers,

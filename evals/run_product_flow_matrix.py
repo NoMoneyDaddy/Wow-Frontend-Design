@@ -48,16 +48,22 @@ TRUSTED_CONTEXT = (
     ROOT / "wow-frontend-design" / "assets" / "DESIGN.template.md",
 )
 EVALUATOR_INPUTS = (
+    ROOT / "package.json",
+    ROOT / "package-lock.json",
     ROOT / "evals" / "run_product_flow_evaluation.py",
     ROOT / "evals" / "run_product_flow_matrix.py",
     ROOT / "evals" / "lint_design_md_matrix.py",
-    ROOT / "evals" / "playwright_visual_v6_audit.cjs",
+    ROOT / "evals" / "playwright_visual_v7_audit.cjs",
     ROOT / "evals" / "run_claude_case.sh",
     ROOT / "evals" / "run_codex_case.sh",
     ROOT / "evals" / "monitor_codex_progress.py",
     ROOT / "evals" / "validate_visual_web_output.py",
     ROOT / "evals" / "validate_design_md_clean.py",
     ROOT / "evals" / "validate_codex_log_policy.py",
+    ROOT / "wow-frontend-design" / "scripts" / "evidence_ledger.py",
+    ROOT / "wow-frontend-design" / "scripts" / "validate_quality_result.py",
+    ROOT / "wow-frontend-design" / "scripts" / "score_weak_model_output.py",
+    ROOT / "wow-frontend-design" / "scripts" / "weak_model_output.schema.json",
 )
 PROVIDERS = {"codex": ("gpt-5.4-mini",)}
 MODELS = tuple(model for models in PROVIDERS.values() for model in models)

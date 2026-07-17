@@ -27,6 +27,12 @@ assert SPEC and SPEC.loader
 evaluation = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(evaluation)
 
+LINTER_MODULE_PATH = EVALS / "lint_design_md_matrix.py"
+LINTER_SPEC = importlib.util.spec_from_file_location("lint_design_md_matrix", LINTER_MODULE_PATH)
+assert LINTER_SPEC and LINTER_SPEC.loader
+design_linter = importlib.util.module_from_spec(LINTER_SPEC)
+LINTER_SPEC.loader.exec_module(design_linter)
+
 
 def fake_png(width: int, height: int) -> bytes:
     def chunk(kind: bytes, data: bytes) -> bytes:
@@ -64,7 +70,125 @@ def write_completed_manifest(target: Path, provider: str, model: str, case_id: s
     return evaluation.matrix._manifest_receipt(target, manifest)
 
 
+def frozen_evaluator_inputs(*, drifted_path: str | None = None) -> list[dict[str, str]]:
+    records = []
+    for path in evaluation.matrix.EVALUATOR_INPUTS:
+        relative = path.relative_to(ROOT).as_posix()
+        records.append(
+            {
+                "path": relative,
+                "sha256": "0" * 64 if relative == drifted_path else hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        )
+    return records
+
+
+def write_frozen_generation(path: Path, *, drifted_path: str | None = None) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "contract": {"evaluator_inputs": frozen_evaluator_inputs(drifted_path=drifted_path)},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class ProductFlowEvaluationTests(unittest.TestCase):
+    def test_design_linter_command_comes_from_locked_install(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            tool_root = Path(directory)
+            package_root = tool_root / "node_modules" / "@google" / "design.md"
+            entrypoint = package_root / "dist" / "index.js"
+            entrypoint.parent.mkdir(parents=True)
+            entrypoint.write_text("export {};\n", encoding="utf-8")
+            package_root.joinpath("package.json").write_text(
+                json.dumps({"version": design_linter.locked_package_version()}),
+                encoding="utf-8",
+            )
+            completed = SimpleNamespace(returncode=0, stdout="", stderr="")
+            with (
+                mock.patch.object(design_linter.shutil, "which", side_effect=lambda name: f"/usr/bin/{name}"),
+                mock.patch.object(design_linter.subprocess, "run", return_value=completed) as run,
+            ):
+                command, record = design_linter.locked_linter_command(tool_root, 30)
+            install = run.call_args.args[0]
+            self.assertEqual(["/usr/bin/node", str(entrypoint), "lint"], command)
+            self.assertEqual(design_linter.locked_package_version(), record["version"])
+            self.assertEqual(["/usr/bin/npm", "ci"], install[:2])
+            self.assertIn("--ignore-scripts", install)
+            self.assertNotIn("npx", command + install)
+
+    def test_design_linter_rejects_symlinked_tool_root_before_install(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            for linked_tool_root in (root / "design-md", root / "linked-parent" / "design-md"):
+                link = linked_tool_root if linked_tool_root.name == "design-md" and linked_tool_root.parent == root else linked_tool_root.parent
+                link.symlink_to(outside, target_is_directory=True)
+                with self.subTest(tool_root=linked_tool_root):
+                    with mock.patch.object(design_linter.subprocess, "run") as run:
+                        with self.assertRaisesRegex(ValueError, "crosses a symbolic link"):
+                            design_linter.locked_linter_command(linked_tool_root, 30)
+                    run.assert_not_called()
+
+    def test_design_stage_rejects_evaluator_drift_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generation = root / "generation.json"
+            generation.write_text(
+                json.dumps(
+                    {
+                        "status": "completed",
+                        "contract": {
+                            "evaluator_inputs": frozen_evaluator_inputs(
+                                drifted_path="evals/playwright_visual_v7_audit.cjs"
+                            )
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(lint_timeout_seconds=30)
+            with mock.patch.object(evaluation.matrix, "run_isolated") as run:
+                with self.assertRaisesRegex(evaluation.EvaluationError, "frozen evaluation input changed"):
+                    evaluation._run_design_attempt(args, generation, root / "design.json")
+            run.assert_not_called()
+
+    def test_visual_stage_rejects_evaluator_drift_before_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generation = root / "generation.json"
+            write_frozen_generation(generation, drifted_path="wow-frontend-design/scripts/weak_model_output.schema.json")
+            args = SimpleNamespace(generation_output=generation, chrome_executable=None)
+            with mock.patch.object(evaluation.subprocess, "Popen") as popen:
+                with self.assertRaisesRegex(evaluation.EvaluationError, "frozen evaluation input changed"):
+                    evaluation._run_visual_attempt(
+                        args,
+                        [{}],
+                        ["http://fixture.test/"],
+                        root / "visual.json",
+                        root / "screenshots",
+                    )
+            popen.assert_not_called()
+
+    def test_frozen_evaluator_chain_rejects_missing_transitive_input(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            generation = Path(directory) / "generation.json"
+            entries = frozen_evaluator_inputs()
+            entries = [
+                entry for entry in entries
+                if entry["path"] != "wow-frontend-design/scripts/score_weak_model_output.py"
+            ]
+            generation.write_text(
+                json.dumps({"status": "completed", "contract": {"evaluator_inputs": entries}}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(evaluation.EvaluationError, "frozen evaluator chain disagrees"):
+                evaluation.verify_generation_evaluator_inputs(generation)
+
     def test_visual_inventory_replays_every_declared_page(self) -> None:
         keys = evaluation.expected_visual_keys(
             [{"case_id": "packaging-configurator-v6", "alias": "codex-gpt-5.4", "directory": Path(".")}]
@@ -800,8 +924,8 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             (target_root / "target.txt").write_text("original target", encoding="utf-8")
             generation = root / "generation.json"
             design = root / "design.json"
-            for path in (generation, design):
-                path.write_text("{}\n", encoding="utf-8")
+            write_frozen_generation(generation)
+            design.write_text("{}\n", encoding="utf-8")
             args = SimpleNamespace(
                 provider="codex",
                 model="gpt-5.4-mini",
@@ -1133,7 +1257,8 @@ class ProductFlowEvaluationTests(unittest.TestCase):
             generation = root / "generation.json"
             design = root / "design.json"
             visual = root / "visual.json"
-            for path in (generation, design, visual):
+            write_frozen_generation(generation)
+            for path in (design, visual):
                 path.write_text("{}\n", encoding="utf-8")
             args = SimpleNamespace(
                 provider="codex",
