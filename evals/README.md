@@ -66,6 +66,21 @@ npm run validate:evidence-v7 -- \
   --gate full
 ```
 
+驗證成功後，可把同一組 Playwright evidence 編譯成 evaluator-owned、不可覆寫的 bounded repair packet。它只保留 issue code、case/state/profile、受限量測、artifact hash 與最小重測矩陣，不轉送原始頁面文字、console body、URL 或完整報告；輸出必須位於 repository 外。`a1_target_contract_unresolved` 與未知 schema 會中止編譯，避免把 evaluator defect 誤導成產品修正：
+
+```bash
+npm run eval:v7-repair-packet -- \
+  --manifest evals/v7-pilot-manifest-20260717-tools.json \
+  --ledger "$RUN_ROOT/ledger.json" \
+  --result-dir "$RUN_ROOT/results" \
+  --screenshot-dir "$RUN_ROOT/screenshots" \
+  --output "$RUN_ROOT/repair-packet.json" \
+  --repository-root . \
+  --gate full
+```
+
+下游 repair runner 只重生 packet 中的 `variant × case_id`，保留其他 target；先依 `narrow_retest` 重拍失敗 state 的 desktop/mobile Chromium 與原失敗 engine，通過後才擴大到受影響矩陣。Packet 是可執行回饋接口，不是修正成功證據；修正後仍須重新產生並驗證 ledger、results 與 screenshots。
+
 ## 目前案例
 
 - `trigger_cases.json`：Skill 是否應啟用，以及啟用後應載入哪些最小 reference 的 evaluator-owned 正／反例。`validate_trigger_cases.py` 只檢查 fixture schema、正反例集合、ID／locale 與 reference 檔案的 self-consistency；它不呼叫 host、模型或 router，也不證明實際 activation/routing。

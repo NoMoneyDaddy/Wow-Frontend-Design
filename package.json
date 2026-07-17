@@ -18,6 +18,7 @@
     "check:evidence-v7-cli": "python3 wow-frontend-design/scripts/validate_v7_evidence.py --help",
     "validate:evidence-v7": "python3 wow-frontend-design/scripts/validate_v7_evidence.py",
     "eval:product-flow": "python3 evals/run_product_flow_evaluation.py",
+    "eval:v7-repair-packet": "python3 evals/compile_v7_repair_packet.py",
     "eval:v7-visual": "python3 evals/run_v7_visual_matrix.py",
     "eval:v7-case": "python3 evals/run_v7_codex_case.py",
     "capture:showcase": "node evals/capture_showcase.cjs"

@@ -1,0 +1,402 @@
+#!/usr/bin/env python3
+"""Compile validated v7 Playwright findings into a bounded repair packet."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+import re
+import sys
+import tempfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "wow-frontend-design" / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+import validate_v7_evidence as evidence  # noqa: E402
+
+
+MAX_PACKET_BYTES = 256 * 1024
+MAX_FINDINGS_PER_TARGET = 64
+MAX_FEEDBACK_CHARS = 500
+ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+TYPOGRAPHY_CODES = {
+    "a1_heading_han_orphan",
+    "a1_heading_track_void",
+    "a1_layout_column_void",
+    "a1_prose_han_orphan",
+    "a1_prose_track_void",
+    "a1_target_contract_unresolved",
+}
+RUNTIME_CODES = {
+    "external_requests",
+    "fonts_not_ready",
+    "interaction_assertion_failed",
+    "page_capture_area_exceeded",
+    "page_errors",
+    "page_horizontal_overflow",
+    "runtime_event_limit_exceeded",
+    "console_errors",
+}
+NUMERIC_EVIDENCE = {
+    "lineCount",
+    "trackRatio",
+    "inlineStartGap",
+    "inlineEndGap",
+    "ownerWidth",
+    "trackWidth",
+    "nodeCount",
+    "ownerCount",
+    "voidHeight",
+    "threshold",
+    "ownerHeight",
+    "peerHeight",
+    "parentWidth",
+    "count",
+}
+
+
+class RepairPacketError(ValueError):
+    """Raised when validated evidence cannot safely become repair feedback."""
+
+
+def _digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _load(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file() or path.is_symlink() or path.stat().st_size > 4 * 1024 * 1024:
+        raise RepairPacketError(f"{label} is missing, unsafe or oversized")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RepairPacketError(f"cannot read {label}: {error}") from error
+    if not isinstance(value, dict):
+        raise RepairPacketError(f"{label} root must be an object")
+    return value
+
+
+def _record_id(value: Any, label: str) -> str:
+    if not isinstance(value, str) or ID_PATTERN.fullmatch(value) is None:
+        raise RepairPacketError(f"{label} must be lowercase kebab-case")
+    return value
+
+
+def _safe_route(value: Any) -> str:
+    if not isinstance(value, str) or "\x00" in value or "\\" in value:
+        raise RepairPacketError("result route is invalid")
+    route = PurePosixPath(value)
+    if route.is_absolute() or not route.parts or "." in route.parts or ".." in route.parts:
+        raise RepairPacketError("result route is unsafe")
+    if route.suffix.lower() not in {".html", ".htm"}:
+        raise RepairPacketError("result route is not an HTML document")
+    return route.as_posix()
+
+
+def _bounded_number(value: Any, label: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise RepairPacketError(f"{label} must be a finite number")
+    if abs(value) > 10_000_000:
+        raise RepairPacketError(f"{label} exceeds the repair evidence bound")
+    return value if isinstance(value, int) else round(value, 4)
+
+
+def _measurement(issue: dict[str, Any]) -> dict[str, int | float | str]:
+    source = issue.get("measurement")
+    if source is None:
+        source = issue
+    if not isinstance(source, dict):
+        raise RepairPacketError("typography issue measurement is malformed")
+    selected: dict[str, int | float | str] = {}
+    for name in NUMERIC_EVIDENCE:
+        if name in source:
+            selected[name] = _bounded_number(source[name], f"measurement.{name}")
+    column_void = source.get("columnVoid")
+    if column_void is not None:
+        if not isinstance(column_void, dict):
+            raise RepairPacketError("column void measurement is malformed")
+        for name in ("voidHeight", "threshold", "ownerHeight", "peerHeight", "parentWidth"):
+            if name in column_void:
+                selected[name] = _bounded_number(column_void[name], f"columnVoid.{name}")
+        for name in ("source", "parentDisplay"):
+            value = column_void.get(name)
+            if value is not None:
+                allowed = {"owner", "target"} if name == "source" else {
+                    "grid", "inline-grid", "flex", "inline-flex",
+                }
+                if value not in allowed:
+                    raise RepairPacketError(f"columnVoid.{name} is invalid")
+                selected[name] = value
+    return dict(sorted(selected.items()))
+
+
+def _finding(code: str, classification: str, locator: str, values: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "code": code,
+        "classification": classification,
+        "locator": _record_id(locator, "finding locator"),
+        "evidence": values,
+    }
+
+
+def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Project a validated result onto a prompt-safe, actionable finding set."""
+    runtime = result.get("runtime")
+    typography = result.get("typography")
+    if not isinstance(runtime, dict) or not isinstance(typography, dict):
+        raise RepairPacketError("result runtime or typography evidence is malformed")
+    findings: list[dict[str, Any]] = []
+    for issue in typography.get("issues", []):
+        if not isinstance(issue, dict) or set(issue).difference({"code", "targetId", "measurement", "nodeCount", "ownerCount"}):
+            raise RepairPacketError("typography issue contract changed")
+        code = issue.get("code")
+        if code not in TYPOGRAPHY_CODES:
+            raise RepairPacketError(f"unknown typography issue code: {code!r}")
+        if code == "a1_target_contract_unresolved":
+            raise RepairPacketError(
+                "unresolved hidden target is an evaluator contract defect, not an automatic product repair"
+            )
+        findings.append(_finding(code, "composition", issue.get("targetId"), _measurement(issue)))
+
+    for code in runtime.get("issues", []):
+        if code not in RUNTIME_CODES:
+            raise RepairPacketError(f"unknown runtime issue code: {code!r}")
+        findings.append(_finding(code, "runtime", "page", {}))
+    if runtime.get("fontsReady") is not True:
+        findings.append(_finding("fonts_not_ready", "runtime", "page", {}))
+    assertions = runtime.get("assertions")
+    if not isinstance(assertions, list):
+        raise RepairPacketError("runtime assertions are malformed")
+    for assertion in assertions:
+        if isinstance(assertion, dict) and assertion.get("passed") is False:
+            findings.append(_finding("interaction_assertion_failed", "interaction", assertion.get("id"), {
+                "count": _bounded_number(assertion.get("count"), "assertion.count"),
+            }))
+    event_counts = runtime.get("eventCounts")
+    if not isinstance(event_counts, dict):
+        raise RepairPacketError("runtime event counts are malformed")
+    for field, code in (
+        ("consoleErrors", "console_errors"),
+        ("pageErrors", "page_errors"),
+        ("externalRequests", "external_requests"),
+    ):
+        count = _bounded_number(event_counts.get(field), f"eventCounts.{field}")
+        if count:
+            findings.append(_finding(code, "runtime", "page", {"count": count}))
+    return findings
+
+
+def _detail(occurrence: dict[str, Any], finding: dict[str, Any]) -> str:
+    where = f"{occurrence['state']}/{occurrence['profile']}/{occurrence['engine']}"
+    detail = f"{finding['code']}@{where} target={finding['locator']}"
+    if finding["evidence"]:
+        measurements = ",".join(f"{key}={value}" for key, value in finding["evidence"].items())
+        detail += f" {measurements}"
+    return detail
+
+
+def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
+    suffix = " Preserve passed behavior and required content; change only affected composition; do not edit the evaluator."
+    message = f"REPAIR REQUIRED: {total} validated finding(s)."
+    seen: set[str] = set()
+    for occurrence in occurrences:
+        for finding in occurrence["findings"]:
+            detail = _detail(occurrence, finding)
+            if detail in seen:
+                continue
+            seen.add(detail)
+            separator = " Evidence: " if len(seen) == 1 else "; "
+            if len(message) + len(separator) + len(detail) + len(suffix) > MAX_FEEDBACK_CHARS:
+                return message + suffix
+            message += separator + detail
+    return message + suffix
+
+
+def _narrow_retest(occurrences: list[dict[str, Any]]) -> list[dict[str, str]]:
+    states = sorted({item["state"] for item in occurrences})
+    selected = {(state, profile, "chromium") for state in states for profile in evidence.FAST_PROFILES}
+    selected.update((item["state"], item["profile"], item["engine"]) for item in occurrences)
+    return [
+        {"state": state, "profile": profile, "engine": engine}
+        for state, profile, engine in sorted(selected)
+    ]
+
+
+def _completed_attempts(ledger: dict[str, Any]) -> dict[tuple[str, str, str, str, str], dict[str, Any]]:
+    completed: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
+    for record in ledger["attempts"]:
+        identity = record["key"]
+        key = tuple(identity[name] for name in ("variant", "case_id", "state", "profile", "engine"))
+        completed[key] = record["attempts"][-1]
+    return completed
+
+
+def _append_occurrence(
+    grouped: dict[tuple[str, str], list[dict[str, Any]]],
+    target_key: tuple[str, str],
+    occurrence: dict[str, Any],
+) -> None:
+    occurrences = grouped.setdefault(target_key, [])
+    current_count = sum(len(item["findings"]) for item in occurrences)
+    if current_count + len(occurrence["findings"]) > MAX_FINDINGS_PER_TARGET:
+        raise RepairPacketError(
+            f"repair target exceeds {MAX_FINDINGS_PER_TARGET} findings; split the evaluator run before automatic repair"
+        )
+    occurrences.append(occurrence)
+
+
+def build_packet(
+    manifest_path: Path,
+    ledger_path: Path,
+    result_dir: Path,
+    screenshot_dir: Path,
+    repository_root: Path,
+    gate: str,
+) -> dict[str, Any]:
+    first_validation = evidence.validate(
+        manifest_path, ledger_path, result_dir, screenshot_dir, repository_root, gate
+    )
+    screenshot_count, finding_run_count = first_validation
+    initial_ledger_sha256 = _digest(ledger_path)
+    initial_manifest_sha256 = _digest(manifest_path)
+    ledger = _load(ledger_path, "visual ledger")
+    manifest = _load(manifest_path, "cohort manifest")
+    attempts = _completed_attempts(ledger)
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    total_by_target: dict[tuple[str, str], int] = {}
+    for key in evidence.expected_inventory(manifest, ledger["split"], gate):
+        attempt = attempts[key]
+        result_path = result_dir / attempt["result"]
+        if _digest(result_path) != attempt["result_sha256"]:
+            raise RepairPacketError(f"visual result changed after validation: {evidence.artifact_stem(key)}")
+        result = _load(result_path, "visual result")
+        if result.get("verdict") == "clean":
+            continue
+        findings = extract_findings(result)
+        if not findings:
+            raise RepairPacketError(f"finding verdict has no actionable projection: {evidence.artifact_stem(key)}")
+        target_key = (key[0], key[1])
+        total_by_target[target_key] = total_by_target.get(target_key, 0) + len(findings)
+        occurrence = {
+            "state": key[2],
+            "profile": key[3],
+            "engine": key[4],
+            "route": _safe_route(result["input"].get("route")),
+            "result": {"path": attempt["result"], "sha256": attempt["result_sha256"]},
+            "screenshot": {"path": attempt["screenshot"], "sha256": attempt["screenshot_sha256"]},
+            "findings": findings,
+        }
+        _append_occurrence(grouped, target_key, occurrence)
+
+    targets = []
+    for (variant, case_id), occurrences in sorted(grouped.items()):
+        total = total_by_target[(variant, case_id)]
+        targets.append({
+            "variant": variant,
+            "case_id": case_id,
+            "finding_count": total,
+            "occurrences": occurrences,
+            "narrow_retest": _narrow_retest(occurrences),
+            "feedback": _feedback(occurrences, total),
+        })
+    second_validation = evidence.validate(
+        manifest_path, ledger_path, result_dir, screenshot_dir, repository_root, gate
+    )
+    if (
+        second_validation != first_validation
+        or _digest(ledger_path) != initial_ledger_sha256
+        or _digest(manifest_path) != initial_manifest_sha256
+    ):
+        raise RepairPacketError("v7 evidence changed while compiling the repair packet")
+    return {
+        "schema_version": 1,
+        "status": "repair_required" if targets else "clean",
+        "source": {
+            "cohort_manifest": ledger["cohort_manifest"],
+            "ledger": {"path": ledger_path.name, "sha256": initial_ledger_sha256},
+            "compiler": {"path": Path(__file__).resolve().relative_to(repository_root).as_posix(), "sha256": _digest(Path(__file__))},
+            "split": ledger["split"],
+            "gate": gate,
+            "input_inventory_sha256": ledger["input_inventory_sha256"],
+            "screenshot_count": screenshot_count,
+            "finding_run_count": finding_run_count,
+        },
+        "targets": targets,
+    }
+
+
+def write_once(path: Path, packet: dict[str, Any], repository_root: Path) -> None:
+    requested = Path(os.path.abspath(path.expanduser()))
+    if requested.name in {"", ".", ".."} or os.path.lexists(requested) and requested.is_symlink():
+        raise RepairPacketError("repair packet output path is invalid or a symlink")
+    parent = requested.parent.resolve(strict=True)
+    if parent != requested.parent:
+        raise RepairPacketError("repair packet output parent must not traverse a symlink")
+    output = parent / requested.name
+    try:
+        parent.relative_to(repository_root)
+    except ValueError:
+        pass
+    else:
+        raise RepairPacketError("repair packet must remain evaluator-owned outside the repository")
+    if os.path.lexists(output):
+        raise RepairPacketError(f"refusing to overwrite repair packet: {output.name}")
+    body = (json.dumps(packet, ensure_ascii=False, indent=2) + "\n").encode()
+    if len(body) > MAX_PACKET_BYTES:
+        raise RepairPacketError("repair packet exceeds the byte limit")
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{output.name}.", suffix=".tmp", dir=parent)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(body)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, output)
+        except FileExistsError as error:
+            raise RepairPacketError(f"refusing to overwrite repair packet: {output.name}") from error
+        os.unlink(temporary)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", required=True, type=Path)
+    parser.add_argument("--ledger", required=True, type=Path)
+    parser.add_argument("--result-dir", required=True, type=Path)
+    parser.add_argument("--screenshot-dir", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--repository-root", type=Path, default=ROOT)
+    parser.add_argument("--gate", choices=evidence.GATES, default="full")
+    args = parser.parse_args()
+    try:
+        root = args.repository_root.resolve(strict=True)
+        packet = build_packet(
+            args.manifest.resolve(strict=True),
+            args.ledger.resolve(strict=True),
+            args.result_dir.resolve(strict=True),
+            args.screenshot_dir.resolve(strict=True),
+            root,
+            args.gate,
+        )
+        write_once(args.output, packet, root)
+    except (OSError, RepairPacketError, evidence.V7EvidenceError, evidence.preflight.PreflightError) as error:
+        print(f"v7 repair packet failed: {error}", file=sys.stderr)
+        return 1
+    print(f"v7 repair packet {packet['status']}: {len(packet['targets'])} target(s)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
