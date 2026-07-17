@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-cohort-budget-v12.json \
+  --manifest evals/v7-pilot-manifest-20260718-paired-decision-v13.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -101,6 +101,15 @@ npm run eval:v7-repair-cycle -- \
 ```
 
 `brief-map.json` 必須逐一綁定 development full matrix 的 evaluator-owned absolute brief path 與 SHA-256。Packet 是可執行回饋接口，不是修正成功證據；affected receipt 只能證明其 SHA-256 綁定 rows，不能替代 release/full-support matrix。Runner 啟動前會凍結 packet target hash、全 cohort `max-total-generations` 與 monotonic wall deadline；每個 generation、affected capture、full verification 和 promotion 前都會檢查預算。觸頂只可留下 `PARTIALLY VERIFIED` 的 `cohort_budget_fuse`，保留目前 staged best artifact 與尚未 narrow 的 inflight artifact，不能繼續後續 browser/model 呼叫或 promotion；receipt 明示 staged artifact 只屬 `pre_promotion_only`，不宣稱已通過 full matrix。Wall deadline 是步驟間的保險絲，不會取代各 delegated operation 自己的 timeout。計數與 elapsed 只代表 evaluator 工作量，不參與品質 rank；沒有官方 usage receipt 時 token／cost 明示 unavailable，不做估算。這個 runner 已通過 synthetic contract tests，但尚未執行 live model/browser repair cycle，因此自動修正能力仍是 `PARTIALLY VERIFIED`。
+
+P7 paired decision compiler 把 promotion ratchet 固定為唯讀、無 promotion 權限的四態 receipt。它只接受 frozen manifest 與 evaluator-owned hash-bound bundle；accepted package 與 evaluator toolchain digest 必須由 manifest baseline／toolchain／evaluator records 重算，development、validation summary、每組 pair 與 sealed-test 兩個 arm 也各自以不可重用的 evaluator receipt 綁定對應 payload。每個 arm 另須列出 generation manifest、output inventory、visual ledger、visual result inventory 與 attempt history SHA；pair 內的 brief／input／execution contract 必須相同，run-specific sources 必須跨 arm／pair 唯一。Sealed test 沿用 execution contract，但不得重用 validation 的 brief、input、run source 或 receipt。Development 有預指定 deterministic family 嚴格改善且無較高優先 regression，才可 `READY_FOR_SEALED`。Sealed validation 必須是三組未重用 evidence、同時包含兩種呈現順序的 eligible pairs；hard gate、material craft loss、budget exceeded 或 untouched sealed test failure 都是 `REJECTED_STOP`，缺資料／`not_run`／hash drift 則是 `UNAVAILABLE`。全數成立也只能輸出 `ELIGIBLE_FOR_EVALUATOR_ACCEPTANCE`，不能自行 promotion。Receipt compiler 不重新解析 hidden brief、raw screenshot 或 browser ledger 內容；它只套用已通過 schema、source binding 與 hash 驗證的 evaluator receipts。`REJECTED_STOP` 只停止目前 frozen candidate，不宣稱已有跨 candidate history；「連續兩候選無增益」仍需另一份 hash-bound history receipt。現行 manifest 仍是 `pilot_ready`，因此以下命令會誠實輸出 `candidate_not_frozen`；它不會啟動 model、browser、network 或額外截圖：
+
+```bash
+npm run eval:v7-paired-decision -- \
+  --manifest evals/v7-pilot-manifest-20260718-paired-decision-v13.json \
+  --output "$DECISION_ROOT/v7-paired-decision.json" \
+  --repository-root .
+```
 
 P2 在每個 repair target 的生成前、affected Playwright matrix 後執行一個 hash-pinned `source_layout_audit.py` supporting probe。它只投影 `global_emergency_breaking`、`prose_wrap_disabled`、`fixed_text_clipping` 三種高可信 source-risk code，去除原始 evidence、confirmation、selector、HTML 與產品文字，依 `probe × code × path` 去重並限制最多三筆。Sidecar 以 target SHA-256、probe contract、script 與 dependency 綁定；未知 schema/code、truncated coverage、tool drift、timeout 或 unavailable 都留下明確 receipt，不得被解讀成 clean。這些 advisory 只有與已驗證 browser finding 共用根因時才可協助定位，不改變 failure key、best-artifact rank、promotion 或 release gate；Playwright 仍是 rendered behavior 的權威。Pretext 暫不接入自修正閉環，因目前缺少穩定 CLI／versioned result schema 與 bounded computed-style provenance。
 

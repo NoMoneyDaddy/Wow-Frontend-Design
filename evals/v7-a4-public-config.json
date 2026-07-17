@@ -211,6 +211,7 @@
     "evals/v7-repair-support-contract.json",
     "evals/v7_repair_policy.py",
     "evals/run_v7_repair_cycle.py",
+    "evals/compile_v7_paired_decision.py",
     "evals/v7-source-layout-probe-contract.json",
     "evals/v7_supporting_probe_registry.py",
     "evals/v7-breakpoint-probe-contract.json",
