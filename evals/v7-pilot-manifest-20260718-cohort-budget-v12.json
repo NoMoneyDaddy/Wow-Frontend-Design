@@ -1,0 +1,1153 @@
+{
+  "schema_version": 1,
+  "cohort_id": "v7-a1-task-safe-vertical-flow",
+  "stage": "pilot_ready",
+  "frozen_at": "2026-07-17T20:52:49Z",
+  "config": {
+    "path": "evals/v7-a4-public-config.json",
+    "bytes": 6787,
+    "sha256": "945c869aa116ab0d14ddfaec4b075eccdccdcf578e97b3ec7352860ddf0586c8"
+  },
+  "baseline": {
+    "commit": "78157b64a7ef67ba8944c7430092474297ce7516",
+    "file_count": 136,
+    "total_bytes": 1748412,
+    "tree_sha256": "b6be24192463091b221482151750bc4032bed659143001ef22009a655257c57f",
+    "files": [
+      {
+        "path": "wow-frontend-design/LICENSE",
+        "mode": "100644",
+        "bytes": 1080,
+        "sha256": "9ca9946cb2ee6f90146d94381766b91702f87dac0e6a9a4ea28b1c4d343e299c"
+      },
+      {
+        "path": "wow-frontend-design/SKILL.md",
+        "mode": "100644",
+        "bytes": 39832,
+        "sha256": "42be7edc5b351f59c27e8a2438fba8b40892db883b4f028a8ae0282f0303bea9"
+      },
+      {
+        "path": "wow-frontend-design/adapters/prompt-only-compact.md",
+        "mode": "100644",
+        "bytes": 10840,
+        "sha256": "f496001918019ac949beec602f29213148d3863eefa5b25fe729b9ab889313b5"
+      },
+      {
+        "path": "wow-frontend-design/agents/openai.yaml",
+        "mode": "100644",
+        "bytes": 706,
+        "sha256": "e4e18773b8fb27120fa6199b548d8760a466abae8222a8f2bbe34569f83dea8a"
+      },
+      {
+        "path": "wow-frontend-design/assets/DESIGN.template.md",
+        "mode": "100644",
+        "bytes": 1748,
+        "sha256": "b0151780e69ca8dcd2b83b8b2bbd265646d31c139ae9b9e54abc30f49ad7028d"
+      },
+      {
+        "path": "wow-frontend-design/references/advanced-media.md",
+        "mode": "100644",
+        "bytes": 13180,
+        "sha256": "d97937cd048fa769bde5dc87abdf1ad1a67cedef30f5643d4131c33f1db8ee7e"
+      },
+      {
+        "path": "wow-frontend-design/references/anti-ai-slop.md",
+        "mode": "100644",
+        "bytes": 9218,
+        "sha256": "bc7e7011841d826b39cfd0394f0fdf5370c47759da332ea3e99271a5d138c371"
+      },
+      {
+        "path": "wow-frontend-design/references/award-quality-lens.md",
+        "mode": "100644",
+        "bytes": 11090,
+        "sha256": "d2fc9b89c5a4b5ffd65d2d373b545d584879a222c2b4be477fca5db2c3d07f32"
+      },
+      {
+        "path": "wow-frontend-design/references/behavioral-design-evidence.md",
+        "mode": "100644",
+        "bytes": 7505,
+        "sha256": "8bdec3b0f85dc71ac621ebcf16cade2f4e46f37d6ebdbedfcea6707b583d297f"
+      },
+      {
+        "path": "wow-frontend-design/references/brand-system-fidelity.md",
+        "mode": "100644",
+        "bytes": 6790,
+        "sha256": "6832a043b5959e0c646f29b5f3e6dc4d475a609d6417425ae70811584953b0e1"
+      },
+      {
+        "path": "wow-frontend-design/references/color-system-psychology.md",
+        "mode": "100644",
+        "bytes": 18819,
+        "sha256": "33727abcdae02c43056a2f80c1783d595635bcd35444ff7cc1f3754e186f341a"
+      },
+      {
+        "path": "wow-frontend-design/references/component-composition.md",
+        "mode": "100644",
+        "bytes": 12432,
+        "sha256": "3d9ac53f4dbb1537fdddd5a73d9913f2a120600a859b4d042498ccd2792174d9"
+      },
+      {
+        "path": "wow-frontend-design/references/creative-direction.md",
+        "mode": "100644",
+        "bytes": 12624,
+        "sha256": "8f72317aba74cb1774446dc90fb377f0258b8789fda561df19bec5b854c6e6dc"
+      },
+      {
+        "path": "wow-frontend-design/references/curated-skill-integration.md",
+        "mode": "100644",
+        "bytes": 25082,
+        "sha256": "e85efa38c91492bae27e227cc815bf2d4ed44d0bf367e60ee9bb55e1afea2fe9"
+      },
+      {
+        "path": "wow-frontend-design/references/data-visualization-color.md",
+        "mode": "100644",
+        "bytes": 5890,
+        "sha256": "263e7e03a3d7255afdc4f60804d3144a73870ce974ce4f309b7d7fee819098d5"
+      },
+      {
+        "path": "wow-frontend-design/references/design-exploration.md",
+        "mode": "100644",
+        "bytes": 5192,
+        "sha256": "fcb57980e9594551d8900fc7a43fce2c22b0010758fa8393b4d60a74813e6ff5"
+      },
+      {
+        "path": "wow-frontend-design/references/design-md-contract.md",
+        "mode": "100644",
+        "bytes": 12248,
+        "sha256": "872fc89acdbf32a8c884d2b2399de4b4c436cf9dde0ac290d33cbbb5442b0f6e"
+      },
+      {
+        "path": "wow-frontend-design/references/design-token-portability.md",
+        "mode": "100644",
+        "bytes": 5615,
+        "sha256": "42f57e242caa0ed1c86d6f07ee1e96a7f11b1d92be62dba5dd99f7c785e8d9e9"
+      },
+      {
+        "path": "wow-frontend-design/references/external-sources.lock.json",
+        "mode": "100644",
+        "bytes": 17813,
+        "sha256": "64600ae85dfbca4ff86b86e8ed6761508a40052fe588ad5073f36dbc36504bcc"
+      },
+      {
+        "path": "wow-frontend-design/references/frontend-security.md",
+        "mode": "100644",
+        "bytes": 6691,
+        "sha256": "0e3a25f99e8ef75c8cbbe6fe3b95c740a141837081db030d2fe0172fa602432f"
+      },
+      {
+        "path": "wow-frontend-design/references/github-skill-research.md",
+        "mode": "100644",
+        "bytes": 37533,
+        "sha256": "72a04963e331ff6aa9531764977e02895da93822cde5499c08b47ecfd6dabac7"
+      },
+      {
+        "path": "wow-frontend-design/references/implementation.md",
+        "mode": "100644",
+        "bytes": 9644,
+        "sha256": "4474d1fbde8666c1342861b1b260e948d977eed018417c2873295739e09c22be"
+      },
+      {
+        "path": "wow-frontend-design/references/interaction-audit.md",
+        "mode": "100644",
+        "bytes": 4284,
+        "sha256": "4702b74028dbbe169e46a12a3d1e2c00fce3f4b02d8871f4bda249b67a5551a4"
+      },
+      {
+        "path": "wow-frontend-design/references/localization.md",
+        "mode": "100644",
+        "bytes": 14356,
+        "sha256": "66ef015935847f2883f3574c0328e8763542c29efdd9e3c202e100374e7c937c"
+      },
+      {
+        "path": "wow-frontend-design/references/mobile-responsive.md",
+        "mode": "100644",
+        "bytes": 10963,
+        "sha256": "ca67b3a22f4b284a3e38e9ae69ef53651c710e18a008a7348fda2a9b30fc4dba"
+      },
+      {
+        "path": "wow-frontend-design/references/model-routing.md",
+        "mode": "100644",
+        "bytes": 24028,
+        "sha256": "447e8d7e7cfea126414b633015ac9c66b1f48cd80eaa92cac8de4891838c894a"
+      },
+      {
+        "path": "wow-frontend-design/references/motion-system.md",
+        "mode": "100644",
+        "bytes": 26564,
+        "sha256": "496d4dae37b8c2f6cd9e0cc36719e38006991137ed3798453e0e2cc5a9f2406e"
+      },
+      {
+        "path": "wow-frontend-design/references/no-visual-first-pass.md",
+        "mode": "100644",
+        "bytes": 5125,
+        "sha256": "3e86138c1a6ada6dc250b7bd29266f243d86f9c03d05721e07b178578a39c9e1"
+      },
+      {
+        "path": "wow-frontend-design/references/pattern-catalog.md",
+        "mode": "100644",
+        "bytes": 10240,
+        "sha256": "a658f1b535d5e2bcbffd6e505889f04d96a5f1ea7c4c4486cae1c5fc30da206e"
+      },
+      {
+        "path": "wow-frontend-design/references/platform-adapters.md",
+        "mode": "100644",
+        "bytes": 9736,
+        "sha256": "8d4a960d748cf2ac4b27fee648b2d44b13d75a34279bdb7f7d5421ceb4ce2660"
+      },
+      {
+        "path": "wow-frontend-design/references/platform-support-sources.json",
+        "mode": "100644",
+        "bytes": 1821,
+        "sha256": "86e91429de5b086a61a020c821a3698e8d135a6c4d9a46ef754d76c6eec10f6b"
+      },
+      {
+        "path": "wow-frontend-design/references/product-discovery-usability.md",
+        "mode": "100644",
+        "bytes": 6152,
+        "sha256": "89fdb302971b01ae0b9d9ebf3422ec98324be6da08975d84b38ea845281e662c"
+      },
+      {
+        "path": "wow-frontend-design/references/quality-gates.md",
+        "mode": "100644",
+        "bytes": 23991,
+        "sha256": "5b2bbac3142b81e441ce0b248e3c17c3ad2dc779cad2c543af1659443691efec"
+      },
+      {
+        "path": "wow-frontend-design/references/research-validation-loop.md",
+        "mode": "100644",
+        "bytes": 23223,
+        "sha256": "ca38c43bf0f501d147caa0e0f5b525cd3aee1c2b8729452cdc4dc6045a5fdcb4"
+      },
+      {
+        "path": "wow-frontend-design/references/retrofit.md",
+        "mode": "100644",
+        "bytes": 5741,
+        "sha256": "f2313ec6c31b161c2d47714e4b42ef82ee06646cbe739e4aee3861aad930aa49"
+      },
+      {
+        "path": "wow-frontend-design/references/search-discovery.md",
+        "mode": "100644",
+        "bytes": 11826,
+        "sha256": "3ffd2526ddaa4398471d4e5f56e89f3b01306b3a99574264f4a1deccde00c37a"
+      },
+      {
+        "path": "wow-frontend-design/references/site-planning-wireframes.md",
+        "mode": "100644",
+        "bytes": 10180,
+        "sha256": "f68a5cff29f3b7e020d50acb64f5afebf434c5d97d8b8d5a304bbc1d73b81e08"
+      },
+      {
+        "path": "wow-frontend-design/references/svg-system.md",
+        "mode": "100644",
+        "bytes": 16750,
+        "sha256": "1b1188230149d3d536d863adcae735f4e30209e7a598e9524fd1bd232f61ba87"
+      },
+      {
+        "path": "wow-frontend-design/references/typographic-layout.md",
+        "mode": "100644",
+        "bytes": 41975,
+        "sha256": "4d8c317a18bca32b981e71d2673eb06f389de53db74646346e91d61d5f154cc0"
+      },
+      {
+        "path": "wow-frontend-design/references/typography-webfonts.md",
+        "mode": "100644",
+        "bytes": 10246,
+        "sha256": "e63f4dc1d0afff88354206fb48747a8104e92290232cb8a46c27e7a4f2ee35a1"
+      },
+      {
+        "path": "wow-frontend-design/references/ui-skills-ecosystem.md",
+        "mode": "100644",
+        "bytes": 18145,
+        "sha256": "20d670de72c317f6664008472295685c2e90d11784f62dd563734af551c6f177"
+      },
+      {
+        "path": "wow-frontend-design/references/visual-material-system.md",
+        "mode": "100644",
+        "bytes": 11257,
+        "sha256": "c4a045f3321e910a54f9c08a5e86051083c1468f990ee4481c219871c32e659b"
+      },
+      {
+        "path": "wow-frontend-design/references/visual-regression-evidence.md",
+        "mode": "100644",
+        "bytes": 5974,
+        "sha256": "cd5fc131af0b24f8e2953cf22c6cf99170b39e5da661c7f03926dc3157899a0e"
+      },
+      {
+        "path": "wow-frontend-design/references/visual-storytelling.md",
+        "mode": "100644",
+        "bytes": 8762,
+        "sha256": "fcea389bace2cda37c80c604c469e12a0f0de57a230742c76750b8167c9c7fae"
+      },
+      {
+        "path": "wow-frontend-design/references/wcag-aa-checklist.md",
+        "mode": "100644",
+        "bytes": 9070,
+        "sha256": "555e13b1c28829958f4f76991252e3cddced4392216ffb867da90542b6e526f3"
+      },
+      {
+        "path": "wow-frontend-design/references/weak-model-playbook.md",
+        "mode": "100644",
+        "bytes": 13951,
+        "sha256": "14ebaeb9c0097a9438d9d2c3da15565981bfe4f7f95d07ce120645d82982e285"
+      },
+      {
+        "path": "wow-frontend-design/scripts/capture_runtime_profile.py",
+        "mode": "100644",
+        "bytes": 5833,
+        "sha256": "88e6dbf46d874bba072d3367fb744d2b36a6eaeb42a149bb193c8f6701f7ff06"
+      },
+      {
+        "path": "wow-frontend-design/scripts/contrast_pair_audit.py",
+        "mode": "100644",
+        "bytes": 4918,
+        "sha256": "b766687975ee3f3f93584bed53575be57f3ce9c7e1a56da447c55c6b4fd49820"
+      },
+      {
+        "path": "wow-frontend-design/scripts/cross_output_template_audit.cjs",
+        "mode": "100644",
+        "bytes": 11492,
+        "sha256": "0702029439a62fca69337937a2ecc78e19e312eb286102a8570ce436723015ce"
+      },
+      {
+        "path": "wow-frontend-design/scripts/evidence_ledger.py",
+        "mode": "100755",
+        "bytes": 41770,
+        "sha256": "9db197ba0458676fdc0bf3b4a14bf74108870e33b350559b32ca38f9f9ce09fd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/evidence_policy.example.json",
+        "mode": "100644",
+        "bytes": 2691,
+        "sha256": "feff6f0db93fab4bbd0aedb908d93d25e50b83eb2363749c61fabdd3010a11ec"
+      },
+      {
+        "path": "wow-frontend-design/scripts/lottie_asset_audit.py",
+        "mode": "100644",
+        "bytes": 11360,
+        "sha256": "f142e68b196180d6fe057bc9f914e6b35aea269caea2dc384f1c6fd7b2cdf364"
+      },
+      {
+        "path": "wow-frontend-design/scripts/model_profile.example.json",
+        "mode": "100644",
+        "bytes": 1002,
+        "sha256": "6c46defa47fd3502a7f48c28a43cbb457e03e90a85c1bba849a01f59736393a9"
+      },
+      {
+        "path": "wow-frontend-design/scripts/motion_svg_audit.py",
+        "mode": "100755",
+        "bytes": 20913,
+        "sha256": "b87f48fd02d008cee72b0fc30d4097fbdbb05b49b42449829d352713a94d8753"
+      },
+      {
+        "path": "wow-frontend-design/scripts/pretext_typography_adapter.mjs",
+        "mode": "100644",
+        "bytes": 4327,
+        "sha256": "a844726bec70a38705dde75ce2d52ffc15c172072219d94b5f2a51a96fea61c2"
+      },
+      {
+        "path": "wow-frontend-design/scripts/project_scan.py",
+        "mode": "100755",
+        "bytes": 25837,
+        "sha256": "d0c77228c144d5f5313d631dfd252607bc0c0d4b78c857e7b4daede9fb54c729"
+      },
+      {
+        "path": "wow-frontend-design/scripts/quality_result.example.json",
+        "mode": "100644",
+        "bytes": 2935,
+        "sha256": "4b87df1ae930186ae5acab6e2ae490fbb35fd1ae6e1e1935b0505a34780c4da2"
+      },
+      {
+        "path": "wow-frontend-design/scripts/route_model.py",
+        "mode": "100644",
+        "bytes": 11761,
+        "sha256": "1f5d174673c9a0ff8ea4d504374d2eb0d7510de683b1b86c284576ad37d9103d"
+      },
+      {
+        "path": "wow-frontend-design/scripts/runtime_downgrade.py",
+        "mode": "100644",
+        "bytes": 8239,
+        "sha256": "572ab54b5f6443233c9c21eda2a7d69e4f4aca9b28a183176d14dafaab1b42d7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/runtime_events.example.json",
+        "mode": "100644",
+        "bytes": 470,
+        "sha256": "20e2410c51ab07618969d480f80ef25c157ade288add881352e84fb8d976cc51"
+      },
+      {
+        "path": "wow-frontend-design/scripts/score_weak_model_output.py",
+        "mode": "100644",
+        "bytes": 30448,
+        "sha256": "607f6b59900e7d0fc18bc00746875565961b716150697cb0ea88527597e9a4b8"
+      },
+      {
+        "path": "wow-frontend-design/scripts/search_discovery_audit.py",
+        "mode": "100644",
+        "bytes": 11458,
+        "sha256": "951c53e180220bf40860587a7354e8b027e31fba8a0c2186173607090db48649"
+      },
+      {
+        "path": "wow-frontend-design/scripts/site_manifest.example.json",
+        "mode": "100644",
+        "bytes": 1801,
+        "sha256": "c74d6076a55778ac3108229d83bd4ec3d29de707fc304086158eb68c69039771"
+      },
+      {
+        "path": "wow-frontend-design/scripts/site_manifest.schema.json",
+        "mode": "100644",
+        "bytes": 3616,
+        "sha256": "7ca61c7cb4c4c90c9e2e023c824e72a26e8af15308f154225ddfc6d3b1504582"
+      },
+      {
+        "path": "wow-frontend-design/scripts/sitemap.example.xml",
+        "mode": "100644",
+        "bytes": 198,
+        "sha256": "099bf2026599b66ece8b39202a6a71c0769d1d9665c4604b25a2b66b34a8b51f"
+      },
+      {
+        "path": "wow-frontend-design/scripts/source_layout_audit.py",
+        "mode": "100644",
+        "bytes": 9089,
+        "sha256": "b12cc0d550de2b0a886afef2df3282dd305ff0d28cfa19247405917ec579d75c"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_assemble_product_flow_v6_repaired_ledger.py",
+        "mode": "100644",
+        "bytes": 4037,
+        "sha256": "eba40f342fc3611e3758110c62454058848665de5eab07abc27353822f3fd2bd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_browser_egress_controls.py",
+        "mode": "100644",
+        "bytes": 12121,
+        "sha256": "6086084a890d824a4986af782691fa794f113c79408789efca34f2f3d3e81fa3"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_capture_runtime_profile.py",
+        "mode": "100644",
+        "bytes": 3888,
+        "sha256": "31e19d06af103ade6b38f1a307a52de121f8743ff4eb47ed549c8f749efc003a"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_codex_resource_monitor.py",
+        "mode": "100644",
+        "bytes": 3132,
+        "sha256": "ddd43f994e7a6ebb89f64731179f07702702ac8af96aa275a56f9a7ce390975e"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_color_system_reference.py",
+        "mode": "100644",
+        "bytes": 3303,
+        "sha256": "6128e002f1b7cc26add203d78430fd7a41031a45a63877932428ec0a9629d969"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_contrast_pair_audit.py",
+        "mode": "100644",
+        "bytes": 3219,
+        "sha256": "9999a5943e6e87c3a251bcef046de52a306076aa7d76032b6c97c9c94f7513a1"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_cross_output_template_audit.py",
+        "mode": "100644",
+        "bytes": 10521,
+        "sha256": "9bc6648653062d19409be434ab2cc82849921ffd56f1792649c85550f69abfb5"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_design_md_reference.py",
+        "mode": "100644",
+        "bytes": 2092,
+        "sha256": "eff02b928844439a198c038ccfe850e4694e3cbc4448c0e3d0615c767cc5adcd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_evidence_ledger.py",
+        "mode": "100644",
+        "bytes": 16365,
+        "sha256": "34d77782e048c6d51a618ab1a81bbdabba6e9ba44e98f46e3cd6839ad8c026cd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_evidence_workflow_smoke.py",
+        "mode": "100644",
+        "bytes": 12312,
+        "sha256": "a51dc3f392317578ec9423996c39a1fef2d990b7ac2e297efb532fd3231ad9a6"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_lottie_asset_audit.py",
+        "mode": "100644",
+        "bytes": 5153,
+        "sha256": "3034e49d0c03ec033b2b4b7454dd0c06df096c9a9e37f440fe5dc080911f6dfc"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_motion_svg_audit.py",
+        "mode": "100644",
+        "bytes": 8059,
+        "sha256": "c9128cee18e045ca0cf95e079e493d56cc1db275cae3c3510edc2c29badcae66"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_playwright_v7_a1_audit.py",
+        "mode": "100644",
+        "bytes": 5807,
+        "sha256": "6de52a7583004b3e5310b0f1e317906d4eba024033d21f1739d32f7510968531"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_playwright_visual_v4_audit.py",
+        "mode": "100644",
+        "bytes": 6326,
+        "sha256": "5e61b809c38dcaad8855c1dfdf73b6190cfe91fc3133e27539ba767d458b227f"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_playwright_visual_v5_audit.py",
+        "mode": "100644",
+        "bytes": 7118,
+        "sha256": "07d629676b9ac198d3187af9190f91c0c4ced86275c7017c204787e52928c7e6"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_playwright_visual_v6_audit.py",
+        "mode": "100644",
+        "bytes": 9592,
+        "sha256": "8f7242775892a5b87bfa1a25867027b031cc03eb70f825a12e727075af826ed7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_playwright_visual_v7_audit.py",
+        "mode": "100644",
+        "bytes": 168944,
+        "sha256": "9e251f6ec9c8f2b26e6c415a90fb2fa5807ac84ea0c1d7f661d452b8c00c1756"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_pretext_typography_adapter.py",
+        "mode": "100644",
+        "bytes": 8388,
+        "sha256": "793cd74a1f165dae19adbdd60ab24f2c592aefd7f2fb0701495d8f0a977baa88"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_project_scan.py",
+        "mode": "100755",
+        "bytes": 13097,
+        "sha256": "43dd398a8a2c482f76d79d0cd4d954ee252a982b2efd1e58149b0b05fdb415c5"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_publish_product_flow_v6_repair.py",
+        "mode": "100644",
+        "bytes": 7286,
+        "sha256": "785d2f9a3aebbdf898d8cf660d8297e1ac991e78294b36de76977cdb4ca1c777"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_route_model.py",
+        "mode": "100644",
+        "bytes": 6469,
+        "sha256": "0c499824213bc967a070f64098fff50a64c97dadb9c1c1041075347515698878"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_run_claude_case.py",
+        "mode": "100644",
+        "bytes": 22703,
+        "sha256": "7c4e4c97806f6032bb3d5e029110603a7c81b5afdbc9ad5562f23549648f59b1"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_run_codex_case.py",
+        "mode": "100644",
+        "bytes": 28774,
+        "sha256": "049b9899323052522b719cb7a81ca44325c9dae9a1be8831db6f44147b8612e8"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_run_product_flow_evaluation.py",
+        "mode": "100644",
+        "bytes": 94150,
+        "sha256": "bea21ee8de6fa1cbaa413344f1edf64a30462f4e7f9804cf4e4105af45cea9e0"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_run_product_flow_matrix.py",
+        "mode": "100644",
+        "bytes": 21613,
+        "sha256": "cd0dd45721b7ec0b5b62ea5d15a089507efb9af4afd8cba7c112f89c59828305"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_run_v7_codex_case.py",
+        "mode": "100644",
+        "bytes": 6784,
+        "sha256": "70312d9adc006201026bd7d26731f37b808863093ba883ad0462467b0b6f0551"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_run_v7_visual_matrix.py",
+        "mode": "100644",
+        "bytes": 4064,
+        "sha256": "5121929949d341bcce0ac026c469aa32e00e6022a05628f57a867ca08e063655"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_runtime_downgrade.py",
+        "mode": "100644",
+        "bytes": 6565,
+        "sha256": "e979cec90b525ee2bd6186e9acd2ff15edc56de68356e519457d578e40896b27"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_score_weak_model_output.py",
+        "mode": "100644",
+        "bytes": 28197,
+        "sha256": "86ac97709f7444a5a0cfd65dbc674368ce581d510dd20a3e3b6a9472e5dc9f7f"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_search_discovery_audit.py",
+        "mode": "100644",
+        "bytes": 5129,
+        "sha256": "59a20e08a05c5771bf587a343a4bc364cf002a382f6d502392e8fcbe6a9073bd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_source_layout_audit.py",
+        "mode": "100644",
+        "bytes": 3244,
+        "sha256": "9f2c5dce07d05ba0204a527a74c1d38721cd67e55d72ff9b7bbe79f62d6f8d1f"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_v7_a1_typography_metrics.py",
+        "mode": "100644",
+        "bytes": 8447,
+        "sha256": "9ee325aa6ee34bb2c563bb5b6cf888209a3454c38b8bcabc715602d8d0f06817"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_v7_preflight.py",
+        "mode": "100644",
+        "bytes": 14066,
+        "sha256": "bb5eb7bb821cdf85d048e231182b3653203168ed15c3e458f113c1759e8d94f7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_capability_status.py",
+        "mode": "100644",
+        "bytes": 2538,
+        "sha256": "9a3205f33de36ba9dd23545d44446fc714c5f139e086ee948e60848bc9a52dd8"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_codex_log_policy.py",
+        "mode": "100644",
+        "bytes": 6387,
+        "sha256": "69b220db970c99ed5a46bb999e15127d0736f50846b59f930a27b9323625aae8"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_dashboard_evidence.py",
+        "mode": "100644",
+        "bytes": 1416,
+        "sha256": "863fa81c44cd2f7f1c933e8a5a1b8fb11d358782a61688a1e58891808b4450bd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_design_md_clean.py",
+        "mode": "100644",
+        "bytes": 1125,
+        "sha256": "a2820d68633f8dbb348e6601ec612787848be6543e5343ed3b7906aa62644eaf"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_external_sources.py",
+        "mode": "100644",
+        "bytes": 2347,
+        "sha256": "bec18845fd790826f22b58e25de5a0dc421aadae4a1db156b1b20d3b9b0bd104"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_installability.py",
+        "mode": "100644",
+        "bytes": 5731,
+        "sha256": "656821a8632512ee799680ec4fb1c07615bf57cecab3680da6d0d8e754f7cbbe"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_isolated_web_output.py",
+        "mode": "100644",
+        "bytes": 2874,
+        "sha256": "5866b83a74e21e3b4c6a5e6ed66e4ed74e643876fd5c98230c1c05af1e6c82bd"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_platform_support.py",
+        "mode": "100644",
+        "bytes": 6738,
+        "sha256": "22738bc6cff057bcb01bfe58e5ecd1700745c1104f84912d49ede0408ad5802b"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_product_cases.py",
+        "mode": "100644",
+        "bytes": 2041,
+        "sha256": "dc96d85b3637611172f269cd85f367c119726a0e15a9f1a5effe1c91f66ea32c"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_product_flow_evidence.py",
+        "mode": "100644",
+        "bytes": 2306,
+        "sha256": "2a00d4c817aa8858488d42a0dddde72b13025c1e8011c19453b11a154431852e"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_product_flow_v5_evidence.py",
+        "mode": "100644",
+        "bytes": 2350,
+        "sha256": "bd86087cc0f8a18f9c307b646528b3afc6fbe6c4a4fbcc0b407725493d1abcc2"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_product_flow_v6_evidence.py",
+        "mode": "100644",
+        "bytes": 16102,
+        "sha256": "61d05c2f533f6ac017b3f9c6a4620ae6667807ade20dde0799c5b977f0778c0e"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_quality_result.py",
+        "mode": "100644",
+        "bytes": 31092,
+        "sha256": "4580c4318779327feb196b8f9df61d4df22f225b0e6172030c95507b1e6f9621"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_screenshot_manifest.py",
+        "mode": "100644",
+        "bytes": 2035,
+        "sha256": "f83104f63c1b67a9f576ea68e0848005596e60d4cd7e605ccd6a0c4486b8c607"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_site_plan.py",
+        "mode": "100644",
+        "bytes": 13214,
+        "sha256": "5dae468a5638f9aa7d47ea84ef60941aaa3f78426440c73f078ffb644a603206"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_trigger_cases.py",
+        "mode": "100644",
+        "bytes": 1854,
+        "sha256": "a2b7d279c3236dd4d35ddf61f2291c0641422bd48b7e1eff93f2b3838a8232d9"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_v7_evidence.py",
+        "mode": "100644",
+        "bytes": 12032,
+        "sha256": "4a25a71f690e0b74db808fa6148c450aab4477eff4b6c5daf6712e2ecaf5b1ae"
+      },
+      {
+        "path": "wow-frontend-design/scripts/test_validate_visual_web_output.py",
+        "mode": "100644",
+        "bytes": 1413,
+        "sha256": "b97e52817cd1e70f2fe96fe1dca11f4b3f4efda55953fd139e144f47b2862ba3"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_capability_status.py",
+        "mode": "100644",
+        "bytes": 5825,
+        "sha256": "fc5b73aae784b7d305e8724c42914f6d9222732e54ac931c380e7a72c3b6dad4"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_dashboard_evidence.py",
+        "mode": "100644",
+        "bytes": 6870,
+        "sha256": "2617e9a260c3e115361d4371c6ef409689adb9e5f2db2398604c03e4583f69dc"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_external_sources.py",
+        "mode": "100644",
+        "bytes": 4691,
+        "sha256": "d5a866e426c5bedf4644c6eb617508665719c51830b07042798b7f59282eb156"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_installability.py",
+        "mode": "100644",
+        "bytes": 7249,
+        "sha256": "8fbe79958da4a4a93b094031332fba43406325f23f680e1edd4fd7f5b62eb406"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_platform_support.py",
+        "mode": "100644",
+        "bytes": 18596,
+        "sha256": "a3a1c8fb7624b89bf26ef57d49d0d7570ef123d089d1e8229d777fdb6c54a837"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_product_cases.py",
+        "mode": "100644",
+        "bytes": 7505,
+        "sha256": "2bdc4da33cde489b804c95d0b790bdef34e64dcf5c963e9118e4e0333eeb8682"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_product_flow_evidence.py",
+        "mode": "100644",
+        "bytes": 16724,
+        "sha256": "74ca19754f0b098724c1fa21987e433884293525c86195f4b2a3ef790ed2f9a7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_product_flow_v5_evidence.py",
+        "mode": "100644",
+        "bytes": 16326,
+        "sha256": "bd3f600becca8ef4a579910619b4350151c26a33688287d5d79cf79fe83b081d"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py",
+        "mode": "100644",
+        "bytes": 32222,
+        "sha256": "a52a12f85caf762461163194717640464d8f6abe35db077a87ec859d26ebc5c6"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_quality_result.py",
+        "mode": "100644",
+        "bytes": 25727,
+        "sha256": "45ead0b3ed04676786f99a02edc89008980f271b91c5566d8420f2fe1aa6ed1e"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_screenshot_manifest.py",
+        "mode": "100644",
+        "bytes": 6238,
+        "sha256": "117b6c1010c1c4cb04a2e024908e3589882a14b01adad5ccedbc1d4010a6c400"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_site_plan.py",
+        "mode": "100644",
+        "bytes": 50383,
+        "sha256": "09e4a915e68b35f7500e7e2e3f05160c82aed0a5670ac3509b49ec320f7c1cf7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_trigger_cases.py",
+        "mode": "100644",
+        "bytes": 4199,
+        "sha256": "e6a9cec09edba480d7810f27e60faeb3a52bbde0056af555661344514bb12e04"
+      },
+      {
+        "path": "wow-frontend-design/scripts/validate_v7_evidence.py",
+        "mode": "100644",
+        "bytes": 24350,
+        "sha256": "a4fe43cea45520ffd808ccfa97de41076c34d08669f29f365c442fec82a2f3d7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/weak_model_output.example.json",
+        "mode": "100644",
+        "bytes": 3031,
+        "sha256": "61d43edb65c9c3357e933d48a2fa23225e9f59fa8aa2214faf6d786c92bbee7c"
+      },
+      {
+        "path": "wow-frontend-design/scripts/weak_model_output.schema.json",
+        "mode": "100644",
+        "bytes": 12713,
+        "sha256": "fe3e69e730d251fdf0499ec4e4e426d590e28ca536c6379913aae44536ebfcd9"
+      },
+      {
+        "path": "wow-frontend-design/scripts/wireframe_plan.example.json",
+        "mode": "100644",
+        "bytes": 13428,
+        "sha256": "b4d9d012a71e78f96825f6109360cb0cbfce52cbff40bfabda31032a03272da7"
+      },
+      {
+        "path": "wow-frontend-design/scripts/wireframe_plan.schema.json",
+        "mode": "100644",
+        "bytes": 9053,
+        "sha256": "1c8610018220e8df5ae436b4d2f14b43c5dbabd20d100459354392cd1d3e0313"
+      },
+      {
+        "path": "wow-frontend-design/test-prompts.json",
+        "mode": "100644",
+        "bytes": 2632,
+        "sha256": "ccb9b00307f7cc9c2bde7e874836ce3ec915c27bf70f0a871571672f46358d8f"
+      }
+    ]
+  },
+  "candidate": {
+    "id": "v7-a4",
+    "hypothesis": "在既有寬欄位重排規則上，明確禁止以刪減比較證據、狀態、回饋、主動作或結果摘要消除空白，並以正確 logical inline axis 限制直排列高，可同時保留決策工具的完整流程並避免閱讀頁出現單一 page-height 直排欄。",
+    "editable_paths": [
+      "wow-frontend-design/references/typographic-layout.md"
+    ],
+    "reference_sha256": null,
+    "forbidden_families": [
+      "intrinsic-layout",
+      "native-controls",
+      "color",
+      "motion",
+      "framework-adapter",
+      "registry-security"
+    ]
+  },
+  "model": {
+    "provider": "codex",
+    "requested": "gpt-5.4-mini",
+    "silent_fallback": false
+  },
+  "timeouts": {
+    "generation": {
+      "inactivity_seconds": 300,
+      "hard_seconds": 1800,
+      "source": "observed-after-pilot"
+    },
+    "lint": {
+      "inactivity_seconds": 30,
+      "hard_seconds": 180,
+      "source": "observed-after-pilot"
+    },
+    "capture": {
+      "inactivity_seconds": 30,
+      "hard_seconds": 180,
+      "source": "observed-after-pilot"
+    }
+  },
+  "splits": {
+    "development": [
+      {
+        "id": "civic-decision-brief-v7-dev",
+        "family": "公民政策決策摘要工具",
+        "primary_task": "比較三個公共空間改善方案，確認取捨依據後保存一份可分享的決策摘要。",
+        "pressures": [
+          "繁中長標題與政策術語",
+          "說明段落不可浮在寬卡左側",
+          "手機需改成逐案比較"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      },
+      {
+        "id": "nature-observation-learning-v7-dev",
+        "family": "親子自然觀察學習頁",
+        "primary_task": "依觀察線索辨識一種潮間帶生物，切換注音提示並完成一筆親子觀察紀錄。",
+        "pressures": [
+          "語意 ruby 與注音",
+          "編輯式閱讀欄與產品操作並存",
+          "直排展示需有橫排 fallback"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      }
+    ],
+    "sealed_validation": [
+      {
+        "id": "shift-course-conflict-v7-val",
+        "family": "輪班課表衝突審核工具",
+        "primary_task": "找出輪班與課程時段衝突，調整一筆安排並確認新的可行方案。",
+        "pressures": [
+          "高密度時間資料",
+          "窄螢幕表格重組",
+          "狀態改變後不得留下空軌"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      },
+      {
+        "id": "rental-handover-check-v7-val",
+        "family": "租屋交屋點檢工具",
+        "primary_task": "逐項核對交屋狀態，記錄一項瑕疵並產生雙方可確認的點交摘要。",
+        "pressures": [
+          "長地址與設備名稱",
+          "手機拇指操作",
+          "錯誤與確認語氣"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      },
+      {
+        "id": "independent-publishing-preorder-v7-val",
+        "family": "獨立出版預購頁面",
+        "primary_task": "理解刊物內容與版本差異，選擇一個預購方案並檢查訂購摘要。",
+        "pressures": [
+          "長篇編輯內容",
+          "方案比較與固定術語",
+          "標題層級與自然換行"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      },
+      {
+        "id": "heritage-restoration-reader-v7-val",
+        "family": "歷史建築修復工法導讀",
+        "primary_task": "比較兩種修復工法的證據與限制，切換註解後保存一段閱讀筆記。",
+        "pressures": [
+          "直排與橫排並存",
+          "工法術語與混合語系",
+          "窄閱讀欄不得誤判"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      }
+    ],
+    "sealed_test": [
+      {
+        "id": "durable-product-detail-v7-test",
+        "family": "單一耐用品詳情頁面",
+        "primary_task": "比較耐用品規格、維修承諾與交期，選定一個配置並查看最終摘要。",
+        "pressures": [
+          "規格與單位混排",
+          "高質感產品敘事",
+          "短標題與長說明共存"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      },
+      {
+        "id": "lab-calibration-record-v7-test",
+        "family": "科研設備校正紀錄工具",
+        "primary_task": "檢查設備校正紀錄與異常值，更新一筆判定並確認下一次校正日期。",
+        "pressures": [
+          "科學代碼與數字密度",
+          "權責狀態與可追溯性",
+          "短桌機高度與手機重排"
+        ],
+        "required_states": [
+          "base",
+          "interaction"
+        ]
+      }
+    ]
+  },
+  "screenshots": {
+    "required_profiles": [
+      "desktop",
+      "mobile"
+    ],
+    "affected_profiles": [
+      "desktop",
+      "standard-desktop",
+      "short-desktop",
+      "tablet",
+      "mobile",
+      "compact-mobile"
+    ],
+    "engine_parity": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "required_states": [
+      "base",
+      "interaction"
+    ],
+    "before_after_on_finding": true,
+    "blind_review": true
+  },
+  "hidden_material_policy": {
+    "storage": "evaluator-owned-outside-repository",
+    "forbidden_keys": [
+      "expected_dom",
+      "expected_html",
+      "full_prompt",
+      "prompt",
+      "rubric_answer",
+      "selector",
+      "selectors",
+      "weight",
+      "weights"
+    ]
+  },
+  "toolchain": {
+    "lockfile": {
+      "path": "package-lock.json",
+      "bytes": 58478,
+      "sha256": "6880491cb722c50c544af8587f5be9129ca6a20bc7ad77b962a59d37a1edff30"
+    },
+    "packages": {
+      "playwright": {
+        "version": "1.61.1",
+        "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.61.1.tgz",
+        "integrity": "sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ=="
+      },
+      "@google/design.md": {
+        "version": "0.3.0",
+        "resolved": "https://registry.npmjs.org/@google/design.md/-/design.md-0.3.0.tgz",
+        "integrity": "sha512-/mhxpEkR4iWNuHRN3xEOlvP0nR6rlZ/CONADzh3TbqsaTPYxXJojH4GjW3G9/U9uF2fuOdBUdRB72GTbWLRbRg=="
+      }
+    }
+  },
+  "evaluators": [
+    {
+      "path": "evals/v7_preflight.py",
+      "bytes": 24608,
+      "sha256": "f7489d4291903b106a8926dd5fec9029fc8983d6a3d19e6e5d37fd684d76acf2"
+    },
+    {
+      "path": "evals/run_v7_codex_case.py",
+      "bytes": 63185,
+      "sha256": "adfaa194bc591cb85792f410bad174fad2be3efc337d90544d57b76a768bdd0d"
+    },
+    {
+      "path": "evals/validate_codex_log_policy.py",
+      "bytes": 5919,
+      "sha256": "694ffeb5faeab7726caf6ad812017fd9215327559b04f250313750e94a35cd55"
+    },
+    {
+      "path": "evals/v7_a1_typography_metrics.cjs",
+      "bytes": 13024,
+      "sha256": "1e4b82f424619773161ba6cd86ad6926c70b011522e47f5cfc7c65c66e1d61ed"
+    },
+    {
+      "path": "evals/playwright_v7_a1_audit.cjs",
+      "bytes": 15055,
+      "sha256": "f329d68994b48b29db1a271cde93f6c83bf3a10103d9ddac3a143018a7e87720"
+    },
+    {
+      "path": "evals/run_v7_visual_matrix.py",
+      "bytes": 22953,
+      "sha256": "cdf1ee54118be49759b78947576c7a3d927dd0f25ca3688502a8bb24d271f603"
+    },
+    {
+      "path": "evals/compile_v7_repair_packet.py",
+      "bytes": 20631,
+      "sha256": "6e3c6e160f5ac6532e90ebb9dbe1424fe58bdc97ddcbef7371551f802a6d02eb"
+    },
+    {
+      "path": "evals/v7-repair-support-contract.json",
+      "bytes": 832,
+      "sha256": "b1da3d20caa02ab45163069a6563b2856fa8cfca3f0d6e174165395053c239ca"
+    },
+    {
+      "path": "evals/v7_repair_policy.py",
+      "bytes": 17909,
+      "sha256": "563a88aae82cc64889d10e7c7903328082b1a07abf5affa9f037de30359df633"
+    },
+    {
+      "path": "evals/run_v7_repair_cycle.py",
+      "bytes": 57988,
+      "sha256": "bbfb59c5e597071ff090f16d78ef5c7ea2afe9a9a018c85e0c18ce5da5f0d32b"
+    },
+    {
+      "path": "evals/v7-source-layout-probe-contract.json",
+      "bytes": 1255,
+      "sha256": "dc1c15aec2863d2820b346305c59b1255568156594ae4dbb92f17ad7fd9dd140"
+    },
+    {
+      "path": "evals/v7_supporting_probe_registry.py",
+      "bytes": 16977,
+      "sha256": "5d00f2ef0db2ef2b3d45c213944ea6c74ba98bc9a9b113dff8bcbebee933f0ed"
+    },
+    {
+      "path": "evals/v7-breakpoint-probe-contract.json",
+      "bytes": 1059,
+      "sha256": "0e93a0bbb803f237eb854e70b691b5407caacf4db3589601ad00c884174c8611"
+    },
+    {
+      "path": "evals/playwright_v7_breakpoint_probe.cjs",
+      "bytes": 35485,
+      "sha256": "8079cf820d5c9f6f81caa48e1c57bfaec13decaa062fdd572607e2a86ce4c6cd"
+    },
+    {
+      "path": "evals/v7-motion-probe-contract.json",
+      "bytes": 1161,
+      "sha256": "c49f7cb9549f3ba8901ee5f9bebc7dd0a1b47f476e08e9d652919513e0e13ec6"
+    },
+    {
+      "path": "evals/playwright_v7_motion_probe.cjs",
+      "bytes": 24984,
+      "sha256": "4ba59946e349508b06a8a177cf04c03e4217493017decda28c2a4de276f09d58"
+    },
+    {
+      "path": "wow-frontend-design/scripts/source_layout_audit.py",
+      "bytes": 9089,
+      "sha256": "b12cc0d550de2b0a886afef2df3282dd305ff0d28cfa19247405917ec579d75c"
+    },
+    {
+      "path": "wow-frontend-design/scripts/project_scan.py",
+      "bytes": 32693,
+      "sha256": "fa813234da45f1e64d7d63f76a530e2ecb115fbd38da2411210945aab03dd8e0"
+    },
+    {
+      "path": "wow-frontend-design/scripts/evidence_ledger.py",
+      "bytes": 41770,
+      "sha256": "9db197ba0458676fdc0bf3b4a14bf74108870e33b350559b32ca38f9f9ce09fd"
+    },
+    {
+      "path": "wow-frontend-design/scripts/validate_v7_evidence.py",
+      "bytes": 24350,
+      "sha256": "a4fe43cea45520ffd808ccfa97de41076c34d08669f29f365c442fec82a2f3d7"
+    }
+  ]
+}

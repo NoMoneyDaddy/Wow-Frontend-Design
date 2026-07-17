@@ -8,9 +8,11 @@ import copy
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import shutil
 import sys
+import time
 from argparse import Namespace
 from pathlib import Path
 from typing import Any, Callable
@@ -330,8 +332,49 @@ def execute_cycle(
     retain_best: Callable[[tuple[str, str], dict[str, Any], tuple[Any, ...]], None] | None = None,
     max_generations: int = 3,
     max_full_runs: int = 3,
+    max_total_generations: int = 9,
+    max_wall_seconds: float = 1800,
+    monotonic: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
     """State-machine seam used by synthetic tests and the evaluator-owned CLI."""
+    if (
+        isinstance(max_total_generations, bool)
+        or not isinstance(max_total_generations, int)
+        or not 1 <= max_total_generations <= 30
+    ):
+        raise V7RepairCycleError("max_total_generations must be an integer from 1 through 30")
+    if (
+        isinstance(max_wall_seconds, bool)
+        or not isinstance(max_wall_seconds, (int, float))
+        or not math.isfinite(max_wall_seconds)
+        or not 1 <= max_wall_seconds <= 7200
+    ):
+        raise V7RepairCycleError("max_wall_seconds must be finite and from 1 through 7200")
+    initial_targets = initial_packet.get("targets")
+    if initial_packet.get("status") != "repair_required" or not isinstance(initial_targets, list) or not initial_targets:
+        raise V7RepairCycleError("cycle received no actionable repair target")
+    initial_identities = [list(_target_identity(target)) for target in initial_targets]
+    started_at = monotonic()
+    if isinstance(started_at, bool) or not isinstance(started_at, (int, float)) or not math.isfinite(started_at):
+        raise V7RepairCycleError("monotonic clock returned an invalid start value")
+    work_budget = {
+        "schema_version": 1,
+        "limits": {
+            "max_total_generations": max_total_generations,
+            "max_full_runs": max_full_runs,
+            "max_wall_seconds": max_wall_seconds,
+        },
+        "initial_packet": {
+            "sha256": _canonical_sha256(initial_packet),
+            "target_count": len(initial_targets),
+            "target_identities_sha256": _canonical_sha256(initial_identities),
+        },
+        "claim_boundary": (
+            "Evaluator-owned between-step work limits only; delegated operations retain their own "
+            "timeouts, and elapsed time or call counts do not prove quality, token usage, cost, "
+            "stability or completion."
+        ),
+    }
     pending = initial_packet
     staged: dict[tuple[str, str], Path] = {}
     generation_counts: dict[tuple[str, str], int] = {}
@@ -339,6 +382,90 @@ def execute_cycle(
     best_ranks: dict[tuple[str, str], tuple[Any, ...]] = {}
     full_runs = 0
     verification_runs = 0
+    total_generations = 0
+    narrow_captures = 0
+
+    def observation(now: float) -> dict[str, Any]:
+        elapsed = max(0.0, now - started_at)
+        return {
+            "elapsed_seconds": round(elapsed, 6),
+            "consumed": {
+                "total_generations": total_generations,
+                "narrow_captures": narrow_captures,
+                "verification_runs": verification_runs,
+                "full_runs": full_runs,
+            },
+            "remaining": {
+                "total_generations": max(0, max_total_generations - total_generations),
+                "verification_runs": max(0, max_full_runs - verification_runs),
+                "wall_seconds": round(max(0.0, max_wall_seconds - elapsed), 6),
+            },
+            "model_usage": {
+                "status": "unavailable",
+                "reason": "not-represented-in-evaluator-artifacts",
+            },
+        }
+
+    def retained_artifacts() -> list[dict[str, Any]]:
+        return [
+            {
+                "variant": key[0],
+                "case_id": key[1],
+                "root": str(staged[key]),
+                "rank": policy.rank_receipt(best_ranks[key]) if key in best_ranks else None,
+                "verification_scope": "pre_promotion_only",
+                "full_matrix_verification_claim": "not_made",
+            }
+            for key in sorted(staged)
+        ]
+
+    def observed_now() -> float:
+        now = monotonic()
+        if isinstance(now, bool) or not isinstance(now, (int, float)) or not math.isfinite(now) or now < started_at:
+            raise V7RepairCycleError("monotonic clock returned an invalid cycle value")
+        return now
+
+    def checked_now(
+        step: str,
+        *,
+        consumes_generation: bool = False,
+        inflight_artifact: dict[str, Any] | None = None,
+    ) -> float:
+        now = observed_now()
+        reason_code = None
+        if now - started_at >= max_wall_seconds:
+            reason_code = "wall_deadline_exhausted"
+        elif consumes_generation and total_generations >= max_total_generations:
+            reason_code = "total_generations_exhausted"
+        if reason_code is not None:
+            write_receipt({
+                "schema_version": 1,
+                "status": "PARTIALLY VERIFIED",
+                "outcome": "cohort_budget_fuse",
+                "reason_code": reason_code,
+                "blocked_step": step,
+                "work_budget": copy.deepcopy(work_budget),
+                "observation": observation(now),
+                "retained_best_artifacts": retained_artifacts(),
+                "inflight_artifact": (
+                    copy.deepcopy(inflight_artifact)
+                    if inflight_artifact is not None
+                    else {"status": "none"}
+                ),
+                "continuation": {
+                    "status": "manual_review_required",
+                    "reason": "a new empty work root and explicitly reviewed budget are required",
+                },
+            })
+            raise V7RepairCycleFuse("cohort work budget exhausted before the next expensive step")
+        return now
+
+    write_receipt({
+        "schema_version": 1,
+        "status": "work_budget_frozen",
+        "work_budget": copy.deepcopy(work_budget),
+        "observation": observation(started_at),
+    })
     while True:
         if pending.get("status") != "repair_required" or not pending.get("targets"):
             raise V7RepairCycleError("cycle received no actionable repair target")
@@ -350,16 +477,19 @@ def execute_cycle(
                 if rank_source is not None:
                     best_ranks[identity] = rank_source(target)
             while True:
-                generation_counts[identity] = generation_counts.get(identity, 0) + 1
-                if generation_counts[identity] > max_generations:
+                next_generation = generation_counts.get(identity, 0) + 1
+                if next_generation > max_generations:
                     receipt = {
                         "status": "PARTIALLY VERIFIED",
                         "outcome": "generation_fuse",
                         "identity": list(identity),
-                        "generation_count": generation_counts[identity] - 1,
+                        "generation_count": next_generation - 1,
                     }
                     write_receipt(receipt)
                     raise V7RepairCycleFuse("target exhausted its bounded repair generations")
+                checked_now("generation", consumes_generation=True)
+                generation_counts[identity] = next_generation
+                total_generations += 1
                 try:
                     generation = generate(target, pending, generation_counts[identity])
                 except V7RepairCycleFuse:
@@ -372,6 +502,14 @@ def execute_cycle(
                         "error": str(error)[:500],
                     })
                     raise
+                checked_now("narrow_capture", inflight_artifact={
+                    "variant": identity[0],
+                    "case_id": identity[1],
+                    "root": str(generation["root"]),
+                    "status": "unverified_after_generation",
+                    "promotion_eligible": False,
+                })
+                narrow_captures += 1
                 try:
                     narrow = capture_narrow(target, generation, generation_counts[identity])
                 except BaseException as error:
@@ -436,15 +574,16 @@ def execute_cycle(
                 break
         if restart_pending:
             continue
-        verification_runs += 1
-        if verification_runs > max_full_runs:
+        if verification_runs >= max_full_runs:
             receipt = {
                 "status": "PARTIALLY VERIFIED",
                 "outcome": "verification_fuse",
-                "verification_runs": verification_runs - 1,
+                "verification_runs": verification_runs,
             }
             write_receipt(receipt)
             raise V7RepairCycleFuse("repair verification exhausted its bounded runs")
+        checked_now("full_verification")
+        verification_runs += 1
         try:
             full = run_full(staged, verification_runs)
         except BaseException as error:
@@ -463,6 +602,7 @@ def execute_cycle(
             "full": full["receipt"],
         })
         if full["packet"]["status"] == "clean":
+            checked_now("promotion")
             try:
                 verified_targets = full.get("verified_targets")
                 if not isinstance(verified_targets, dict):
@@ -490,6 +630,8 @@ def execute_cycle(
                     }
                     for key in sorted(staged)
                 ],
+                "work_budget": copy.deepcopy(work_budget),
+                "work_observation": observation(observed_now()),
                 "promotion": promotion,
             }
             write_receipt(completed)
@@ -1065,6 +1207,8 @@ def run(args: Namespace) -> dict[str, Any]:
         retain_best=retain_best,
         max_generations=args.max_generations,
         max_full_runs=args.max_full_runs,
+        max_total_generations=args.max_total_generations,
+        max_wall_seconds=args.max_wall_seconds,
     )
     _write_once(output, completed)
     return completed
@@ -1088,7 +1232,13 @@ def main() -> int:
     parser.add_argument("--max-attempts", type=int, choices=(1, 2, 3), default=3)
     parser.add_argument("--max-generations", type=int, choices=(1, 2, 3), default=3)
     parser.add_argument("--max-full-runs", type=int, choices=(1, 2, 3), default=3)
+    parser.add_argument("--max-total-generations", type=int, default=9)
+    parser.add_argument("--max-wall-seconds", type=int, default=1800)
     args = parser.parse_args()
+    if not 1 <= args.max_total_generations <= 30:
+        parser.error("--max-total-generations must be from 1 through 30")
+    if not 1 <= args.max_wall_seconds <= 7200:
+        parser.error("--max-wall-seconds must be from 1 through 7200")
     try:
         result = run(args)
     except (

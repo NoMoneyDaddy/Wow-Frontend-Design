@@ -93,7 +93,10 @@ class V7RepairCycleTests(unittest.TestCase):
         self.assertEqual([("case-one", 1), ("case-one", 2)], generated)
         self.assertEqual(1, len(full_calls))
         self.assertEqual(1, len(promotions))
-        self.assertEqual(["narrow_failed", "narrow_clean", "full_clean", "completed"], [item["status"] for item in receipts])
+        self.assertEqual(
+            ["work_budget_frozen", "narrow_failed", "narrow_clean", "full_clean", "completed"],
+            [item["status"] for item in receipts],
+        )
         self.assertEqual("completed", result["status"])
 
     def test_repeated_narrow_finding_fuses_without_full_or_promotion(self) -> None:
@@ -148,6 +151,182 @@ class V7RepairCycleTests(unittest.TestCase):
         self.assertEqual([("case-one", 1), ("case-two", 1)], generated)
         self.assertEqual(2, result["full_runs"])
         self.assertEqual(1, len(promoted))
+
+    def test_cohort_generation_budget_stops_before_a_second_target(self) -> None:
+        first = _target("case-one")
+        second = _target("case-two")
+        generated = []
+        captured = []
+        full_calls = []
+        promotions = []
+        receipts = []
+
+        with self.assertRaisesRegex(cycle.V7RepairCycleFuse, "cohort work budget"):
+            cycle.execute_cycle(
+                _packet(first, second),
+                generate=lambda item, *_args: generated.append(item["case_id"]) or {
+                    "root": f"/tmp/{item['case_id']}",
+                    "receipt": {},
+                },
+                capture_narrow=lambda item, *_args: captured.append(item["case_id"]) or {
+                    "targets": [],
+                    "packet": {"status": "clean"},
+                    "receipt": {},
+                },
+                run_full=lambda *_args: full_calls.append(True),
+                promote=lambda *_args: promotions.append(True),
+                write_receipt=receipts.append,
+                max_total_generations=1,
+            )
+        self.assertEqual(["case-one"], generated)
+        self.assertEqual(["case-one"], captured)
+        self.assertEqual([], full_calls)
+        self.assertEqual([], promotions)
+        fused = receipts[-1]
+        frozen = receipts[0]
+        self.assertEqual("work_budget_frozen", frozen["status"])
+        self.assertEqual(2, frozen["work_budget"]["initial_packet"]["target_count"])
+        self.assertEqual(
+            cycle._canonical_sha256(_packet(first, second)),
+            frozen["work_budget"]["initial_packet"]["sha256"],
+        )
+        self.assertEqual("cohort_budget_fuse", fused["outcome"])
+        self.assertEqual("total_generations_exhausted", fused["reason_code"])
+        self.assertEqual("generation", fused["blocked_step"])
+        self.assertEqual(1, fused["observation"]["consumed"]["total_generations"])
+        self.assertEqual(1, len(fused["retained_best_artifacts"]))
+        self.assertEqual("pre_promotion_only", fused["retained_best_artifacts"][0]["verification_scope"])
+        self.assertEqual("not_made", fused["retained_best_artifacts"][0]["full_matrix_verification_claim"])
+        self.assertEqual("unavailable", fused["observation"]["model_usage"]["status"])
+
+    def test_wall_budget_stops_before_capture_and_keeps_calls_bounded(self) -> None:
+        target = _target()
+        now = [0.0]
+        captures = []
+        full_calls = []
+        promotions = []
+        receipts = []
+
+        def generate(*_args) -> dict:
+            now[0] = 5.0
+            return {"root": "/tmp/generated", "receipt": {}}
+
+        with self.assertRaisesRegex(cycle.V7RepairCycleFuse, "cohort work budget"):
+            cycle.execute_cycle(
+                _packet(target),
+                generate=generate,
+                capture_narrow=lambda *_args: captures.append(True),
+                run_full=lambda *_args: full_calls.append(True),
+                promote=lambda *_args: promotions.append(True),
+                write_receipt=receipts.append,
+                max_wall_seconds=5,
+                monotonic=lambda: now[0],
+            )
+        self.assertEqual([], captures)
+        self.assertEqual([], full_calls)
+        self.assertEqual([], promotions)
+        self.assertEqual("narrow_capture", receipts[-1]["blocked_step"])
+        self.assertEqual("wall_deadline_exhausted", receipts[-1]["reason_code"])
+        self.assertEqual("/tmp/generated", receipts[-1]["inflight_artifact"]["root"])
+        self.assertEqual("unverified_after_generation", receipts[-1]["inflight_artifact"]["status"])
+        self.assertFalse(receipts[-1]["inflight_artifact"]["promotion_eligible"])
+
+    def test_wall_budget_stops_after_clean_full_before_promotion(self) -> None:
+        target = _target()
+        now = [0.0]
+        promotions = []
+        receipts = []
+
+        def full(*_args) -> dict:
+            now[0] = 10.0
+            return {
+                "packet": {"status": "clean"},
+                "receipt": {"mode": "full"},
+                "verified_targets": {},
+            }
+
+        with self.assertRaisesRegex(cycle.V7RepairCycleFuse, "cohort work budget"):
+            cycle.execute_cycle(
+                _packet(target),
+                generate=lambda *_args: {"root": "/tmp/generated", "receipt": {}},
+                capture_narrow=lambda *_args: {
+                    "targets": [],
+                    "packet": {"status": "clean"},
+                    "receipt": {},
+                },
+                run_full=full,
+                promote=lambda *_args: promotions.append(True),
+                write_receipt=receipts.append,
+                max_wall_seconds=10,
+                monotonic=lambda: now[0],
+            )
+        self.assertEqual([], promotions)
+        self.assertEqual("promotion", receipts[-1]["blocked_step"])
+        self.assertEqual("PARTIALLY VERIFIED", receipts[-1]["status"])
+
+    def test_existing_full_verification_fuse_remains_bounded(self) -> None:
+        target = _target()
+        full_calls = []
+        promotions = []
+        receipts = []
+
+        def full(*_args) -> dict:
+            full_calls.append(True)
+            return {
+                "packet": _packet(target),
+                "receipt": {"mode": "full"},
+                "verified_targets": {},
+            }
+
+        with self.assertRaisesRegex(cycle.V7RepairCycleFuse, "verification exhausted"):
+            cycle.execute_cycle(
+                _packet(target),
+                generate=lambda _item, _packet_value, number: {
+                    "root": f"/tmp/generated-{number}",
+                    "receipt": {},
+                },
+                capture_narrow=lambda *_args: {
+                    "targets": [],
+                    "packet": {"status": "clean"},
+                    "receipt": {},
+                },
+                run_full=full,
+                promote=lambda *_args: promotions.append(True),
+                write_receipt=receipts.append,
+                max_full_runs=1,
+            )
+        self.assertEqual([True], full_calls)
+        self.assertEqual([], promotions)
+        self.assertEqual("verification_fuse", receipts[-1]["outcome"])
+        self.assertEqual(1, receipts[-1]["verification_runs"])
+
+    def test_exact_generation_limit_can_complete_without_cost_becoming_quality(self) -> None:
+        target = _target()
+        receipts = []
+        result = cycle.execute_cycle(
+            _packet(target),
+            generate=lambda *_args: {"root": "/tmp/generated", "receipt": {}},
+            capture_narrow=lambda *_args: {
+                "targets": [],
+                "packet": {"status": "clean"},
+                "receipt": {},
+            },
+            run_full=lambda *_args: {
+                "packet": {"status": "clean"},
+                "receipt": {"mode": "full"},
+                "verified_targets": {},
+            },
+            promote=lambda *_args: {"status": "promoted"},
+            write_receipt=receipts.append,
+            max_total_generations=1,
+            max_full_runs=1,
+            max_wall_seconds=1,
+            monotonic=lambda: 0.5,
+        )
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(1, result["work_observation"]["consumed"]["total_generations"])
+        self.assertEqual("unavailable", result["work_observation"]["model_usage"]["status"])
+        self.assertNotIn("estimated_cost", json.dumps(result, sort_keys=True))
 
     def test_unexpected_narrow_target_fails_closed(self) -> None:
         target = _target("case-one")
@@ -402,8 +581,8 @@ class V7RepairCycleTests(unittest.TestCase):
             write_receipt=receipts.append,
         )
         self.assertEqual("completed", result["status"])
-        self.assertEqual("unavailable", receipts[0]["generation"]["supporting_probe"]["coverage_status"])
-        self.assertEqual("unavailable", receipts[0]["narrow"]["supporting_probe"]["coverage_status"])
+        self.assertEqual("unavailable", receipts[1]["generation"]["supporting_probe"]["coverage_status"])
+        self.assertEqual("unavailable", receipts[1]["narrow"]["supporting_probe"]["coverage_status"])
 
     def test_missing_probe_receipt_is_explicitly_unavailable(self) -> None:
         bindings = [{"target": ["candidate", "case-one"]}]
