@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { chromium, firefox, webkit } = require("playwright");
 const { auditV7A1Typography, validateSpecs } = require("./v7_a1_typography_metrics.cjs");
+const { auditFocusedControls } = require("./v7_focus_obscuration.cjs");
 
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_PAGE_WIDTH = 10_000;
@@ -107,6 +108,39 @@ function validateAssertion(assertion, index) {
   return assertion;
 }
 
+function validateFocusTargets(focusTargets, steps) {
+  if (!Array.isArray(focusTargets) || focusTargets.length < 1 || focusTargets.length > 8) {
+    fail("spec focusTargets must contain 1..8 entries");
+  }
+  const stepById = new Map(steps.map((step) => [step.id, step]));
+  const allowedActions = {
+    "form-control": new Set(["fill", "select"]),
+    "primary-action": new Set(["click", "press"]),
+  };
+  const targets = focusTargets.map((target, index) => {
+    if (!target || typeof target !== "object" || Array.isArray(target)
+        || Object.keys(target).sort().join("|") !== "id|role|stepId") {
+      fail(`focusTargets[${index}] has an invalid contract`);
+    }
+    if (typeof target.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(target.id)) {
+      fail(`focusTargets[${index}].id is invalid`);
+    }
+    if (typeof target.stepId !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(target.stepId)) {
+      fail(`focusTargets[${index}].stepId is invalid`);
+    }
+    if (!Object.hasOwn(allowedActions, target.role)) fail(`focusTargets[${index}].role is invalid`);
+    const step = stepById.get(target.stepId);
+    if (!step) fail(`focusTargets[${index}].stepId does not identify a step`);
+    if (!allowedActions[target.role].has(step.action)) fail(`focusTargets[${index}] role does not match its step action`);
+    return target;
+  });
+  for (const key of ["id", "stepId"]) {
+    const values = targets.map((target) => target[key]);
+    if (values.length !== new Set(values).size) fail(`focusTargets ${key}s must be unique`);
+  }
+  return targets;
+}
+
 function loadSpec(file, expectedCase, expectedState) {
   const absolute = regularInput(file, "spec");
   let data;
@@ -115,9 +149,12 @@ function loadSpec(file, expectedCase, expectedState) {
   } catch (error) {
     fail(`spec is not valid JSON: ${error.message}`);
   }
-  const keys = ["assertions", "caseId", "schemaVersion", "state", "steps", "targets"];
-  if (!data || typeof data !== "object" || Array.isArray(data)
-      || Object.keys(data).sort().join("|") !== keys.sort().join("|") || data.schemaVersion !== 1) {
+  const rootKeys = {
+    1: ["assertions", "caseId", "schemaVersion", "state", "steps", "targets"],
+    2: ["assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
+  };
+  const expectedKeys = data && typeof data === "object" && !Array.isArray(data) ? rootKeys[data.schemaVersion] : null;
+  if (!expectedKeys || Object.keys(data).sort().join("|") !== expectedKeys.sort().join("|")) {
     fail("spec root contract is invalid");
   }
   if (data.caseId !== expectedCase || data.state !== expectedState) fail("spec identity does not match CLI identity");
@@ -135,6 +172,7 @@ function loadSpec(file, expectedCase, expectedState) {
     const ids = entries.map((entry) => entry.id);
     if (ids.length !== new Set(ids).size) fail(`${label} ids must be unique`);
   }
+  if (data.schemaVersion === 2) data.focusTargets = validateFocusTargets(data.focusTargets, data.steps);
   return { absolute, data };
 }
 
@@ -208,17 +246,18 @@ async function main() {
     browser = await browserType.launch({ headless: true });
     const mobileRequested = profile.isMobile;
     const fullMobileEmulation = mobileRequested && args.engine !== "firefox";
-    context = await browser.newContext({
-    viewport: { width: profile.width, height: profile.height },
-    screen: { width: profile.width, height: profile.height },
-    deviceScaleFactor: profile.deviceScaleFactor,
-    hasTouch: profile.hasTouch,
-    isMobile: fullMobileEmulation,
-    userAgent: mobileRequested ? MOBILE_UA[args.engine] : undefined,
-    serviceWorkers: "block",
-    locale: "zh-TW",
-    timezoneId: "Asia/Taipei",
-  });
+    const contextOptions = {
+      viewport: { width: profile.width, height: profile.height },
+      screen: { width: profile.width, height: profile.height },
+      deviceScaleFactor: profile.deviceScaleFactor,
+      hasTouch: profile.hasTouch,
+      isMobile: fullMobileEmulation,
+      userAgent: mobileRequested ? MOBILE_UA[args.engine] : undefined,
+      serviceWorkers: "block",
+      locale: "zh-TW",
+      timezoneId: "Asia/Taipei",
+    };
+    context = await browser.newContext(contextOptions);
     const externalRequests = [];
   let externalRequestCount = 0;
   const allowedOrigin = url.protocol === "file:" ? null : url.origin;
@@ -264,6 +303,7 @@ async function main() {
   await page.waitForTimeout(150);
   const assertions = await runAssertions(page, spec.data.assertions);
   const typography = await page.evaluate(auditV7A1Typography, spec.data.targets);
+  const focusEvidence = await auditFocusedControls(browser, url, contextOptions, spec.data);
   const pageBounds = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
   const horizontalOverflow = pageBounds.width > profile.width + 2;
   const devicePixelArea = pageBounds.width * pageBounds.height * profile.deviceScaleFactor ** 2;
@@ -271,9 +311,14 @@ async function main() {
     && devicePixelArea <= MAX_SCREENSHOT_PIXELS;
   const eventOverflow = consoleErrorCount > MAX_RUNTIME_EVENTS
     || pageErrorCount > MAX_RUNTIME_EVENTS || externalRequestCount > MAX_RUNTIME_EVENTS;
+  const focusedControlObscured = focusEvidence.focusedControls.some(
+    (control) => control.status === "confirmed" && control.fullyObscured === true,
+  );
+  const focusVerificationUnavailable = spec.data.schemaVersion === 2
+    && focusEvidence.focusCoverage.status === "unavailable";
   await page.screenshot({ path: screenshot, fullPage, animations: "disabled" });
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: spec.data.schemaVersion,
     identity: { variant: args.variant, caseId: args["case-id"], state: args.state, profile: args.profile, engine: args.engine },
     input: { scheme: url.protocol.slice(0, -1), route: url.pathname.split("/").pop() || "/", specSha256: sha256(spec.absolute) },
     browser: {
@@ -292,15 +337,23 @@ async function main() {
       devicePixelArea,
       horizontalOverflow,
       eventOverflow,
+      ...(spec.data.schemaVersion === 2 ? {
+        focusCoverage: focusEvidence.focusCoverage,
+        focusedControls: focusEvidence.focusedControls,
+      } : {}),
       eventCounts: { consoleErrors: consoleErrorCount, pageErrors: pageErrorCount, externalRequests: externalRequestCount },
       issues: [
         ...(horizontalOverflow ? ["page_horizontal_overflow"] : []),
         ...(!fullPage ? ["page_capture_area_exceeded"] : []),
         ...(eventOverflow ? ["runtime_event_limit_exceeded"] : []),
+        ...(focusedControlObscured ? ["focused_control_obscured"] : []),
+        ...(focusVerificationUnavailable ? ["focus_obscuration_verification_unavailable"] : []),
       ],
     },
     typography,
-    verdict: fontsReady && fullPage && !horizontalOverflow && !eventOverflow && assertions.every((item) => item.passed)
+    verdict: fontsReady && fullPage && !horizontalOverflow && !eventOverflow && !focusedControlObscured
+      && !focusVerificationUnavailable
+      && assertions.every((item) => item.passed)
       && consoleErrors.length === 0 && pageErrors.length === 0 && externalRequests.length === 0
       && typography.issues.length === 0 ? "clean" : "findings",
     screenshot: { path: path.basename(screenshot), fullPage, ...pngDimensions(screenshot) },
@@ -321,4 +374,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { PROFILES, loadSpec, parseArguments, pngDimensions, targetUrl };
+module.exports = { PROFILES, loadSpec, parseArguments, pngDimensions, targetUrl, validateFocusTargets };

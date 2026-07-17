@@ -13,7 +13,7 @@
   },
   "auditor": {
     "path": "evals/playwright_v7_a1_audit.cjs",
-    "sha256": "f329d68994b48b29db1a271cde93f6c83bf3a10103d9ddac3a143018a7e87720"
+    "sha256": "1e7abc269878f0fb6b61377f31780174d05e7a9eaaaa0af8a19d7ec7408b995f"
   },
   "isolation": {
     "capture": "opaque-copy-single-entry",

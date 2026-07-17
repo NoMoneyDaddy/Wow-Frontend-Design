@@ -36,6 +36,8 @@ TYPOGRAPHY_CODES = {
 }
 RUNTIME_CODES = {
     "external_requests",
+    "focus_obscuration_verification_unavailable",
+    "focused_control_obscured",
     "fonts_not_ready",
     "interaction_assertion_failed",
     "page_capture_area_exceeded",
@@ -164,10 +166,34 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             )
         findings.append(_finding(code, "composition", issue.get("targetId"), _measurement(issue)))
 
-    for code in runtime.get("issues", []):
+    runtime_issues = runtime.get("issues", [])
+    if not isinstance(runtime_issues, list):
+        raise RepairPacketError("runtime issue inventory is malformed")
+    for code in runtime_issues:
         if code not in RUNTIME_CODES:
             raise RepairPacketError(f"unknown runtime issue code: {code!r}")
+        if code == "focus_obscuration_verification_unavailable":
+            raise RepairPacketError("focus obscuration verification is unavailable, not a product repair")
+        if code == "focused_control_obscured":
+            continue
         findings.append(_finding(code, "runtime", "page", {}))
+    focused_controls = runtime.get("focusedControls", [])
+    if not isinstance(focused_controls, list):
+        raise RepairPacketError("focused control evidence is malformed")
+    confirmed_focus = []
+    for record in focused_controls:
+        if not isinstance(record, dict):
+            raise RepairPacketError("focused control record is malformed")
+        if record.get("status") != "confirmed":
+            continue
+        confirmed_focus.append(record)
+        findings.append(_finding("focused_control_obscured", "runtime", record.get("id"), {
+            "occluderCount": _bounded_number(record.get("occluderCount"), "focusedControl.occluderCount"),
+            "targetArea": _bounded_number(record.get("targetArea"), "focusedControl.targetArea"),
+            "coveredArea": _bounded_number(record.get("coveredArea"), "focusedControl.coveredArea"),
+        }))
+    if ("focused_control_obscured" in runtime_issues) != bool(confirmed_focus):
+        raise RepairPacketError("focused control issue and evidence disagree")
     if runtime.get("fontsReady") is not True:
         findings.append(_finding("fonts_not_ready", "runtime", "page", {}))
     assertions = runtime.get("assertions")
@@ -202,7 +228,17 @@ def _detail(occurrence: dict[str, Any], finding: dict[str, Any]) -> str:
 
 
 def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
-    suffix = " Preserve passed behavior and required content; change only affected composition; do not edit the evaluator."
+    focus_repair = any(
+        finding.get("code") == "focused_control_obscured"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
+    suffix = (
+        " Preserve passed behavior and required content; for focus obscuration, preserve the control and reserve space "
+        "or reposition the affected fixed/sticky layer; change only affected composition; do not edit the evaluator."
+        if focus_repair
+        else " Preserve passed behavior and required content; change only affected composition; do not edit the evaluator."
+    )
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()
     for occurrence in occurrences:

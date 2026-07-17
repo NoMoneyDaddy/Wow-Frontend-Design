@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -53,6 +54,11 @@ LEDGER_KEYS = {
     "input_inventory_sha256",
     "attempts",
 }
+FOCUS_CLAIM_BOUNDARY = (
+    "Programmatic focus of evaluator-declared task controls against simple opaque author-created fixed/sticky "
+    "DOM rectangles in the named browser/profile/state; no keyboard, virtual-keyboard, assistive-technology, "
+    "or WCAG conformance claim."
+)
 
 
 class V7EvidenceError(ValueError):
@@ -129,6 +135,110 @@ def _validate_timestamp(value: Any, label: str) -> str:
     return value
 
 
+def _validate_focus_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
+    """Validate optional spec-v2 focus evidence and return blocking finding/unavailable flags."""
+
+    has_coverage = "focusCoverage" in runtime
+    has_controls = "focusedControls" in runtime
+    if has_coverage != has_controls:
+        raise V7EvidenceError(f"focus evidence is incomplete for {label}")
+    if not has_coverage:
+        return False, False
+    coverage = runtime["focusCoverage"]
+    controls = runtime["focusedControls"]
+    coverage_keys = {
+        "status", "reason", "declaredTargets", "completedTargets", "freshReplays", "claimBoundary",
+    }
+    if not isinstance(coverage, dict) or set(coverage) != coverage_keys or not isinstance(controls, list):
+        raise V7EvidenceError(f"focus evidence schema changed for {label}")
+    if coverage.get("status") not in {"complete", "unavailable"}:
+        raise V7EvidenceError(f"focus coverage status is invalid for {label}")
+    if coverage.get("claimBoundary") != FOCUS_CLAIM_BOUNDARY:
+        raise V7EvidenceError(f"focus claim boundary changed for {label}")
+    for field in ("declaredTargets", "completedTargets", "freshReplays"):
+        value = coverage.get(field)
+        if type(value) is not int or value < 0:
+            raise V7EvidenceError(f"focus coverage counts are invalid for {label}")
+    declared = coverage["declaredTargets"]
+    completed = coverage["completedTargets"]
+    replays = coverage["freshReplays"]
+    if declared > 8 or completed > declared or replays > declared * 2 or len(controls) != declared:
+        raise V7EvidenceError(f"focus coverage bounds changed for {label}")
+    ids: set[str] = set()
+    completed_records = 0
+    confirmed = 0
+    unavailable = 0
+    for record in controls:
+        if not isinstance(record, dict):
+            raise V7EvidenceError(f"focused control record is malformed for {label}")
+        status = record.get("status")
+        expected_keys = (
+            {"id", "role", "status", "fullyObscured", "replays", "reason"}
+            if status == "unavailable"
+            else {"id", "role", "status", "fullyObscured", "replays", "occluderCount", "targetArea", "coveredArea"}
+        )
+        if set(record) != expected_keys:
+            raise V7EvidenceError(f"focused control record schema changed for {label}")
+        control_id = record.get("id")
+        if not isinstance(control_id, str) or RECORD_ID.fullmatch(control_id) is None or control_id in ids:
+            raise V7EvidenceError(f"focused control id is invalid or duplicated for {label}")
+        ids.add(control_id)
+        if record.get("role") not in {"form-control", "primary-action"}:
+            raise V7EvidenceError(f"focused control role is invalid for {label}")
+        if status not in {"clear", "confirmed", "unavailable"} or type(record.get("fullyObscured")) is not bool:
+            raise V7EvidenceError(f"focused control status is invalid for {label}")
+        if record.get("replays") != 2:
+            raise V7EvidenceError(f"focused control replay count is invalid for {label}")
+        if status == "unavailable":
+            reason = record.get("reason")
+            if (
+                record["fullyObscured"] is not False
+                or not isinstance(reason, str)
+                or RECORD_ID.fullmatch(reason.replace("_", "-")) is None
+            ):
+                raise V7EvidenceError(f"focused control unavailable record is invalid for {label}")
+            unavailable += 1
+            continue
+        if record["replays"] != 2 or record["fullyObscured"] is not (status == "confirmed"):
+            raise V7EvidenceError(f"focused control confirmation is inconsistent for {label}")
+        count = record.get("occluderCount")
+        target_area = record.get("targetArea")
+        covered_area = record.get("coveredArea")
+        if (
+            type(count) is not int
+            or not 0 <= count <= 12
+            or isinstance(target_area, bool)
+            or not isinstance(target_area, (int, float))
+            or not math.isfinite(target_area)
+            or target_area <= 0
+            or isinstance(covered_area, bool)
+            or not isinstance(covered_area, (int, float))
+            or not math.isfinite(covered_area)
+            or not 0 <= covered_area <= target_area + 1
+        ):
+            raise V7EvidenceError(f"focused control geometry is invalid for {label}")
+        if status == "confirmed" and (count < 1 or abs(covered_area - target_area) > 1):
+            raise V7EvidenceError(f"focused control obscuration is not fully covered for {label}")
+        if status == "clear" and covered_area >= target_area:
+            raise V7EvidenceError(f"clear focused control is fully covered for {label}")
+        completed_records += 1
+        confirmed += int(status == "confirmed")
+    if completed != completed_records:
+        raise V7EvidenceError(f"focus completed target count changed for {label}")
+    status = coverage["status"]
+    reason = coverage["reason"]
+    if declared == 0:
+        raise V7EvidenceError(f"focus coverage must declare at least one target for {label}")
+    if replays != declared * 2:
+        raise V7EvidenceError(f"focus replay inventory is incomplete for {label}")
+    if unavailable:
+        if status != "unavailable" or reason != "one_or_more_targets_unavailable":
+            raise V7EvidenceError(f"unavailable focus coverage is inconsistent for {label}")
+    elif status != "complete" or reason is not None or completed != declared or replays != declared * 2:
+        raise V7EvidenceError(f"complete focus coverage is inconsistent for {label}")
+    return confirmed > 0, unavailable > 0
+
+
 def _validate_result(
     key: tuple[str, str, str, str, str],
     result_path: Path,
@@ -166,7 +276,8 @@ def _validate_result(
     }
     if set(evidence) != {"schemaVersion", "identity", "input", "browser", "runtime", "typography", "verdict", "screenshot"}:
         raise V7EvidenceError(f"result root schema changed for {artifact_stem(key)}")
-    if evidence.get("schemaVersion") != 1 or identity != expected_identity:
+    result_schema = evidence.get("schemaVersion")
+    if result_schema not in {1, 2} or identity != expected_identity:
         raise V7EvidenceError(f"result identity changed for {artifact_stem(key)}")
     if evidence.get("verdict") not in {"clean", "findings"}:
         raise V7EvidenceError(f"result verdict is invalid for {artifact_stem(key)}")
@@ -206,11 +317,17 @@ def _validate_result(
             raise V7EvidenceError(f"mobile engine support claim is wrong for {artifact_stem(key)}")
     runtime = evidence.get("runtime")
     typography = evidence.get("typography")
-    if not isinstance(runtime, dict) or set(runtime) != {
+    base_runtime_keys = {
         "fontsReady", "interactions", "assertions", "consoleErrors", "pageErrors",
         "externalRequests", "pageBounds", "devicePixelArea", "horizontalOverflow", "eventOverflow",
         "eventCounts", "issues",
-    }:
+    }
+    expected_runtime_keys = (
+        base_runtime_keys
+        if result_schema == 1
+        else base_runtime_keys | {"focusCoverage", "focusedControls"}
+    )
+    if not isinstance(runtime, dict) or set(runtime) != expected_runtime_keys:
         raise V7EvidenceError(f"runtime schema changed for {artifact_stem(key)}")
     if not isinstance(typography, dict) or set(typography) != {
         "schemaVersion", "issues", "observations", "targets", "environment",
@@ -268,10 +385,13 @@ def _validate_result(
         raise V7EvidenceError(f"runtime event counts are invalid for {artifact_stem(key)}")
     if runtime["eventOverflow"] != any(value > 50 for value in counts.values()):
         raise V7EvidenceError(f"runtime event overflow changed for {artifact_stem(key)}")
+    focus_blocking, focus_unavailable = _validate_focus_evidence(runtime, artifact_stem(key))
     expected_runtime_issues = [
         *(["page_horizontal_overflow"] if runtime["horizontalOverflow"] else []),
         *(["page_capture_area_exceeded"] if screenshot.get("fullPage") is not True else []),
         *(["runtime_event_limit_exceeded"] if runtime["eventOverflow"] else []),
+        *(["focused_control_obscured"] if focus_blocking else []),
+        *(["focus_obscuration_verification_unavailable"] if focus_unavailable else []),
     ]
     if runtime.get("issues") != expected_runtime_issues:
         raise V7EvidenceError(f"runtime issue derivation changed for {artifact_stem(key)}")
@@ -281,6 +401,8 @@ def _validate_result(
         and screenshot.get("fullPage") is True
         and runtime.get("horizontalOverflow") is False
         and runtime.get("eventOverflow") is False
+        and not focus_blocking
+        and not focus_unavailable
         and assertions_pass
         and runtime["consoleErrors"] == []
         and runtime["pageErrors"] == []

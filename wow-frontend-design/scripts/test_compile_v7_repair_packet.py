@@ -128,6 +128,71 @@ class V7RepairPacketTests(unittest.TestCase):
         }, {item["code"] for item in findings})
         self.assertNotIn("untrusted", json.dumps(findings))
 
+    def test_focus_obscuration_projects_target_id_and_bounded_geometry(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["focused_control_obscured"],
+            "focusedControls": [
+                {
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "confirmed",
+                    "fullyObscured": True,
+                    "replays": 2,
+                    "occluderCount": 2,
+                    "targetArea": 2400.12567,
+                    "coveredArea": 2400.12567,
+                },
+                {
+                    "id": "secondary-field",
+                    "role": "form-control",
+                    "status": "clear",
+                    "fullyObscured": False,
+                    "replays": 2,
+                    "occluderCount": 0,
+                    "targetArea": 1800,
+                    "coveredArea": 0,
+                },
+            ],
+        })
+        self.assertEqual([{
+            "code": "focused_control_obscured",
+            "classification": "runtime",
+            "locator": "primary-submit",
+            "evidence": {"coveredArea": 2400.1257, "occluderCount": 2, "targetArea": 2400.1257},
+        }], compiler.extract_findings(result))
+        occurrence = {
+            "state": "interaction",
+            "profile": "mobile",
+            "engine": "chromium",
+            "findings": compiler.extract_findings(result),
+        }
+        feedback = compiler._feedback([occurrence], 1)
+        self.assertIn("reserve space or reposition", feedback)
+        self.assertIn("target=primary-submit", feedback)
+
+    def test_focus_obscuration_issue_without_confirmed_record_fails_closed(self) -> None:
+        result = _result()
+        result["runtime"].update({"issues": ["focused_control_obscured"], "focusedControls": []})
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(result)
+
+    def test_focus_obscuration_unavailable_is_not_projected_as_product_repair(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["focus_obscuration_verification_unavailable"],
+            "focusedControls": [{
+                "id": "primary-submit",
+                "role": "primary-action",
+                "status": "unavailable",
+                "fullyObscured": False,
+                "replays": 2,
+                "reason": "complex_occluder_geometry",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+            compiler.extract_findings(result)
+
     def test_unknown_issue_fails_closed_instead_of_becoming_prompt_text(self) -> None:
         with self.assertRaisesRegex(compiler.RepairPacketError, "unknown typography issue code"):
             compiler.extract_findings(_result(typography=[{

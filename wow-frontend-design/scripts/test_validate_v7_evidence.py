@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import hashlib
 import contextlib
@@ -182,6 +183,123 @@ class V7EvidenceTests(unittest.TestCase):
                 "clean",
                 evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"),
             )
+            unavailable_focus = copy.deepcopy(payload)
+            unavailable_focus["schemaVersion"] = 2
+            unavailable_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "unavailable",
+                    "reason": "focus_targets_not_declared",
+                    "declaredTargets": 0,
+                    "completedTargets": 0,
+                    "freshReplays": 0,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [],
+            })
+            result.write_text(json.dumps(unavailable_focus), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "at least one target"):
+                evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1")
+            unavailable_focus = copy.deepcopy(payload)
+            unavailable_focus["schemaVersion"] = 2
+            unavailable_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "unavailable",
+                    "reason": "one_or_more_targets_unavailable",
+                    "declaredTargets": 1,
+                    "completedTargets": 0,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "unavailable",
+                    "fullyObscured": False,
+                    "replays": 2,
+                    "reason": "external_request_blocked",
+                }],
+                "issues": ["focus_obscuration_verification_unavailable"],
+            })
+            unavailable_focus["verdict"] = "findings"
+            result.write_text(json.dumps(unavailable_focus), encoding="utf-8")
+            unavailable_focus_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(
+                    key, result, screenshot, unavailable_focus_hash, screenshot_hash, "0" * 64, "1.61.1",
+                ),
+            )
+            clear_focus = copy.deepcopy(payload)
+            clear_focus["schemaVersion"] = 2
+            clear_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "complete",
+                    "reason": None,
+                    "declaredTargets": 1,
+                    "completedTargets": 1,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "clear",
+                    "fullyObscured": False,
+                    "replays": 2,
+                    "occluderCount": 1,
+                    "targetArea": 2400,
+                    "coveredArea": 1200,
+                }],
+            })
+            result.write_text(json.dumps(clear_focus), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "clean",
+                evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"),
+            )
+            forged_clear = copy.deepcopy(clear_focus)
+            forged_clear["runtime"]["focusedControls"][0]["coveredArea"] = 2400
+            result.write_text(json.dumps(forged_clear), encoding="utf-8")
+            forged_clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "clear focused control is fully covered"):
+                evidence._validate_result(key, result, screenshot, forged_clear_hash, screenshot_hash, "0" * 64, "1.61.1")
+            obscured_focus = copy.deepcopy(payload)
+            obscured_focus["schemaVersion"] = 2
+            obscured_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "complete",
+                    "reason": None,
+                    "declaredTargets": 1,
+                    "completedTargets": 1,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "confirmed",
+                    "fullyObscured": True,
+                    "replays": 2,
+                    "occluderCount": 1,
+                    "targetArea": 2400,
+                    "coveredArea": 2400,
+                }],
+                "issues": ["focused_control_obscured"],
+            })
+            obscured_focus["verdict"] = "findings"
+            result.write_text(json.dumps(obscured_focus), encoding="utf-8")
+            obscured_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(key, result, screenshot, obscured_hash, screenshot_hash, "0" * 64, "1.61.1"),
+            )
+            forged_focus = copy.deepcopy(obscured_focus)
+            forged_focus["runtime"]["focusedControls"][0]["coveredArea"] = 1200
+            result.write_text(json.dumps(forged_focus), encoding="utf-8")
+            forged_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "not fully covered"):
+                evidence._validate_result(key, result, screenshot, forged_hash, screenshot_hash, "0" * 64, "1.61.1")
             interaction_key = ("accepted", "case-one", "interaction", "desktop", "chromium")
             payload["identity"]["state"] = "interaction"
             result.write_text(json.dumps(payload), encoding="utf-8")
