@@ -79,7 +79,26 @@ npm run eval:v7-repair-packet -- \
   --gate full
 ```
 
-下游 repair runner 只重生 packet 中的 `variant × case_id`，保留其他 target；先依 `narrow_retest` 重拍失敗 state 的 desktop/mobile Chromium 與原失敗 engine，通過後才擴大到受影響矩陣。Packet 是可執行回饋接口，不是修正成功證據；修正後仍須重新產生並驗證 ledger、results 與 screenshots。
+P0 repair cycle 只重生 packet 中的 `variant × case_id`，保留其他 target；先精確執行 `narrow_retest` 明示 rows。全部 narrow clean 後仍須重跑凍結的 full matrix；只有完整 evidence clean 才會批次 promotion，任何 generation、capture、full fallback 或 promotion 失敗都保留 append-only receipt 並停止。P1 才會以可證明的 affected selector 取代這個保守 fallback：
+
+```bash
+npm run eval:v7-repair-cycle -- \
+  --manifest evals/v7-pilot-manifest-20260718-repair-cycle.json \
+  --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
+  --split development \
+  --packet "$RUN_ROOT/repair-packet.json" \
+  --source-ledger "$RUN_ROOT/ledger.json" \
+  --source-result-dir "$RUN_ROOT/results" \
+  --source-screenshot-dir "$RUN_ROOT/screenshots" \
+  --brief-map "$RUN_ROOT/brief-map.json" \
+  --candidate-reference wow-frontend-design/references/typographic-layout.md \
+  --work-root "$REPAIR_ROOT" \
+  --log-dir "$REPAIR_LOGS" \
+  --output "$REPAIR_ROOT/cycle-ledger.json" \
+  --repository-root .
+```
+
+`brief-map.json` 必須逐一綁定 development full matrix 的 evaluator-owned absolute brief path 與 SHA-256。Packet 是可執行回饋接口，不是修正成功證據；cycle 的 narrow receipt 也不能替代 full ledger。
 
 ## 目前案例
 

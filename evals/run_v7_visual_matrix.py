@@ -38,6 +38,15 @@ class V7VisualRunnerError(ValueError):
     """Raised when the hidden matrix or capture run is unsafe or incomplete."""
 
 
+class V7CaptureFailure(V7VisualRunnerError):
+    """Raised with bounded attempt evidence when one selected row cannot be captured."""
+
+    def __init__(self, stem: str, attempts: list[dict[str, Any]]) -> None:
+        super().__init__(f"capture exhausted retries: {stem}")
+        self.stem = stem
+        self.attempts = attempts
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -299,52 +308,34 @@ def _write_completed_ledger(
         raise
 
 
-def run(args: argparse.Namespace) -> dict[str, Any]:
-    root = args.repository_root.resolve(strict=True)
-    manifest_path = args.manifest.resolve(strict=True)
-    preflight.validate_manifest(manifest_path, root)
-    cohort = _load(manifest_path, "cohort manifest")
-    if args.split not in cohort["splits"]:
-        raise V7VisualRunnerError("split is not present in cohort")
-    hidden_path = _outside_repository(args.hidden_matrix, root, "hidden matrix")
-    targets = load_hidden_matrix(hidden_path, cohort, args.split, root)
-    roots = [Path(target["root"]).resolve(strict=True) for target in targets.values()]
-    if len(roots) != len(set(roots)):
-        raise V7VisualRunnerError("accepted and candidate targets must use distinct roots")
-    generation_records: dict[tuple[str, str], dict[str, str]] = {}
-    for (variant, case_id), target in targets.items():
-        generation_records[(variant, case_id)] = validate_target_provenance(
-            Path(target["root"]), variant, case_id, cohort, manifest_path, root
-        )
-    validate_generation_cohort(generation_records, {item["id"] for item in cohort["splits"][args.split]})
-    input_records = [
-        {
-            "variant": variant,
-            "case_id": case_id,
-            "state": state,
-            "route_sha256": contract["route_sha256"],
-            "spec_sha256": contract["spec_sha256"],
-        }
-        for (variant, case_id), target in sorted(targets.items())
-        for state, contract in sorted(target["states"].items())
-    ]
-    input_inventory_sha256 = hashlib.sha256(
-        json.dumps(input_records, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    capture_timeout = cohort["timeouts"]["capture"]["hard_seconds"]
-    result_dir = _empty_directory(args.result_dir, "result directory")
-    screenshot_dir = _empty_directory(args.screenshot_dir, "screenshot directory")
-    gate = getattr(args, "gate", "full")
-    expected = evidence.expected_inventory(cohort, args.split, gate)
+def capture_inventory(
+    targets: dict[tuple[str, str], dict[str, Any]],
+    keys: list[tuple[str, str, str, str, str]],
+    result_dir: Path,
+    screenshot_dir: Path,
+    capture_timeout: int,
+    max_attempts: int,
+    repository_root: Path,
+    *,
+    allowed_keys: set[tuple[str, str, str, str, str]],
+    auditor_runner: Any = _run_auditor,
+) -> list[dict[str, Any]]:
+    if (
+        not keys
+        or len(keys) != len(set(keys))
+        or any(key not in allowed_keys for key in keys)
+        or any((key[0], key[1]) not in targets or key[2] not in targets[(key[0], key[1])]["states"] for key in keys)
+    ):
+        raise V7VisualRunnerError("selected capture inventory is empty, duplicated or outside the frozen matrix")
     attempts: list[dict[str, Any]] = []
-    for key in expected:
+    for key in keys:
         variant, case_id, state, profile, engine = key
         state_input = targets[(variant, case_id)]["states"][state]
         stem = evidence.artifact_stem(key)
         result = result_dir / f"{stem}.json"
         screenshot = screenshot_dir / f"{stem}.png"
         history: list[dict[str, Any]] = []
-        for number in range(1, args.max_attempts + 1):
+        for number in range(1, max_attempts + 1):
             if _digest(Path(state_input["route"])) != state_input["route_sha256"] or _digest(Path(state_input["spec"])) != state_input["spec_sha256"]:
                 raise V7VisualRunnerError(f"route or hidden spec drifted during capture: {stem}")
             for partial in (result, screenshot):
@@ -366,7 +357,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "--screenshot", str(screenshot),
                     "--output", str(result),
                 ]
-                exit_code, failure_class = _run_auditor(command, root, capture_timeout)
+                exit_code, failure_class = auditor_runner(command, repository_root, capture_timeout)
             finished = _now()
             if exit_code in {0, 2} and result.is_file() and screenshot.is_file():
                 completed_attempt = {
@@ -410,20 +401,73 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         identity = dict(zip(("variant", "case_id", "state", "profile", "engine"), key))
         attempts.append({"key": identity, "attempts": history})
         if history[-1]["status"] != "completed":
-            ledger = {
-                "schema_version": 1,
-                "cohort_manifest": {"path": manifest_path.relative_to(root).as_posix(), "sha256": _digest(manifest_path)},
-                "split": args.split,
-                "gate": gate,
-                "status": "failed",
-                "variants": list(evidence.VARIANTS),
-                "expected_count": len(expected),
-                "hidden_matrix_sha256": _digest(hidden_path),
-                "input_inventory_sha256": input_inventory_sha256,
-                "attempts": attempts,
-            }
-            _write_once(args.ledger.resolve(strict=False), ledger)
-            raise V7VisualRunnerError(f"capture exhausted retries: {stem}")
+            raise V7CaptureFailure(stem, attempts)
+    return attempts
+
+
+def run(args: argparse.Namespace) -> dict[str, Any]:
+    root = args.repository_root.resolve(strict=True)
+    manifest_path = args.manifest.resolve(strict=True)
+    preflight.validate_manifest(manifest_path, root)
+    cohort = _load(manifest_path, "cohort manifest")
+    if args.split not in cohort["splits"]:
+        raise V7VisualRunnerError("split is not present in cohort")
+    hidden_path = _outside_repository(args.hidden_matrix, root, "hidden matrix")
+    targets = load_hidden_matrix(hidden_path, cohort, args.split, root)
+    roots = [Path(target["root"]).resolve(strict=True) for target in targets.values()]
+    if len(roots) != len(set(roots)):
+        raise V7VisualRunnerError("accepted and candidate targets must use distinct roots")
+    generation_records: dict[tuple[str, str], dict[str, str]] = {}
+    for (variant, case_id), target in targets.items():
+        generation_records[(variant, case_id)] = validate_target_provenance(
+            Path(target["root"]), variant, case_id, cohort, manifest_path, root
+        )
+    validate_generation_cohort(generation_records, {item["id"] for item in cohort["splits"][args.split]})
+    input_records = [
+        {
+            "variant": variant,
+            "case_id": case_id,
+            "state": state,
+            "route_sha256": contract["route_sha256"],
+            "spec_sha256": contract["spec_sha256"],
+        }
+        for (variant, case_id), target in sorted(targets.items())
+        for state, contract in sorted(target["states"].items())
+    ]
+    input_inventory_sha256 = hashlib.sha256(
+        json.dumps(input_records, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    capture_timeout = cohort["timeouts"]["capture"]["hard_seconds"]
+    result_dir = _empty_directory(args.result_dir, "result directory")
+    screenshot_dir = _empty_directory(args.screenshot_dir, "screenshot directory")
+    gate = getattr(args, "gate", "full")
+    expected = evidence.expected_inventory(cohort, args.split, gate)
+    try:
+        attempts = capture_inventory(
+            targets,
+            expected,
+            result_dir,
+            screenshot_dir,
+            capture_timeout,
+            args.max_attempts,
+            root,
+            allowed_keys=set(evidence.expected_inventory(cohort, args.split, "full")),
+        )
+    except V7CaptureFailure as error:
+        ledger = {
+            "schema_version": 1,
+            "cohort_manifest": {"path": manifest_path.relative_to(root).as_posix(), "sha256": _digest(manifest_path)},
+            "split": args.split,
+            "gate": gate,
+            "status": "failed",
+            "variants": list(evidence.VARIANTS),
+            "expected_count": len(expected),
+            "hidden_matrix_sha256": _digest(hidden_path),
+            "input_inventory_sha256": input_inventory_sha256,
+            "attempts": error.attempts,
+        }
+        _write_once(args.ledger.resolve(strict=False), ledger)
+        raise
     ledger = {
         "schema_version": 1,
         "cohort_manifest": {"path": manifest_path.relative_to(root).as_posix(), "sha256": _digest(manifest_path)},

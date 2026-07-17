@@ -35,6 +35,45 @@ def _result(*, typography: list[dict] | None = None) -> dict:
 
 
 class V7RepairPacketTests(unittest.TestCase):
+    def test_validated_narrow_attempts_use_the_same_bounded_projection(self) -> None:
+        key = ("candidate", "case-one", "base", "desktop", "chromium")
+        stem = compiler.evidence.artifact_stem(key)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            results = root / "results"
+            screenshots = root / "screenshots"
+            results.mkdir()
+            screenshots.mkdir()
+            result = results / f"{stem}.json"
+            screenshot = screenshots / f"{stem}.png"
+            result.write_text(json.dumps(_result(typography=[{
+                "code": "a1_heading_track_void",
+                "targetId": "page-title",
+                "measurement": {"trackRatio": 0.45, "lineCount": 4},
+            }])), encoding="utf-8")
+            screenshot.write_bytes(b"png")
+            attempts = [{
+                "key": dict(zip(("variant", "case_id", "state", "profile", "engine"), key)),
+                "attempts": [{
+                    "number": 1,
+                    "status": "completed",
+                    "exit_code": 2,
+                    "result": result.name,
+                    "result_sha256": "a" * 64,
+                    "screenshot": screenshot.name,
+                    "screenshot_sha256": "b" * 64,
+                    "spec_sha256": "c" * 64,
+                }],
+            }]
+            with mock.patch.object(compiler.evidence, "_validate_result", return_value="findings"):
+                targets, finding_runs = compiler.targets_from_validated_attempts(
+                    attempts, results, screenshots
+                )
+            self.assertEqual(1, finding_runs)
+            self.assertEqual(1, len(targets))
+            self.assertEqual("case-one", targets[0]["case_id"])
+            self.assertEqual(compiler._feedback(targets[0]["occurrences"], 1), targets[0]["feedback"])
+
     def test_typography_projection_keeps_actionable_metrics_without_copy_or_fonts(self) -> None:
         result = _result(typography=[{
             "code": "a1_prose_han_orphan",

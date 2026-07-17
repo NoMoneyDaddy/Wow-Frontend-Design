@@ -8,6 +8,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,6 +20,65 @@ SPEC.loader.exec_module(runner)
 
 
 class V7VisualMatrixTests(unittest.TestCase):
+    def test_capture_inventory_runs_only_exact_selected_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            target.mkdir()
+            route = target / "index.html"
+            spec = root / "spec.json"
+            route.write_text("<!doctype html><title>test</title>", encoding="utf-8")
+            spec.write_text("{}", encoding="utf-8")
+            targets = {("candidate", "case-one"): {
+                "root": str(target),
+                "states": {"base": {
+                    "route": str(route),
+                    "route_sha256": runner._digest(route),
+                    "spec": str(spec),
+                    "spec_sha256": runner._digest(spec),
+                }},
+            }}
+            key = ("candidate", "case-one", "base", "desktop", "chromium")
+            results = root / "results"
+            screenshots = root / "screenshots"
+            results.mkdir()
+            screenshots.mkdir()
+            commands = []
+
+            def fake_auditor(command: list[str], _root: Path, _timeout: int) -> tuple[int, str]:
+                commands.append(command)
+                Path(command[command.index("--output") + 1]).write_text("{}", encoding="utf-8")
+                Path(command[command.index("--screenshot") + 1]).write_bytes(b"png")
+                return 0, "auditor_nonzero"
+
+            with mock.patch.object(runner.evidence, "_validate_result", return_value="clean"):
+                attempts = runner.capture_inventory(
+                    targets,
+                    [key],
+                    results,
+                    screenshots,
+                    30,
+                    1,
+                    ROOT,
+                    allowed_keys={key},
+                    auditor_runner=fake_auditor,
+                )
+            self.assertEqual(1, len(commands))
+            self.assertEqual("desktop", commands[0][commands[0].index("--profile") + 1])
+            self.assertEqual("completed", attempts[0]["attempts"][-1]["status"])
+            with self.assertRaisesRegex(runner.V7VisualRunnerError, "duplicated"):
+                runner.capture_inventory(
+                    targets,
+                    [key, key],
+                    results,
+                    screenshots,
+                    30,
+                    1,
+                    ROOT,
+                    allowed_keys={key},
+                    auditor_runner=fake_auditor,
+                )
+
     def test_gate_inventory_defaults_to_full_and_fast_is_sixteen(self) -> None:
         cohort = {
             "splits": {"development": [

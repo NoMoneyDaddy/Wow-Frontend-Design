@@ -2,7 +2,7 @@
 
 狀態：v6 固定 cohort `COMPLETED`（2026-07-15）；v7 roadmap `IN PROGRESS`。
 
-v7 狀態（2026-07-18）：development instrumentation 與 A4 pilot 已執行；A4 因 deterministic findings 增加及 civic desktop material regression，未晉級為全域品質改善。v7 尚未完成 sealed promotion。Playwright evidence 現可編譯為 bounded repair packet，但正式 repair consumer、affected-matrix selector 與 append-only fuse receipt 尚未完成；不得把「已產生診斷」轉述成「已自動修正」。
+v7 狀態（2026-07-18）：development instrumentation 與 A4 pilot 已執行；A4 因 deterministic findings 增加及 civic desktop material regression，未晉級為全域品質改善。v7 尚未完成 sealed promotion。Playwright evidence 已可編譯為 bounded repair packet，P0 consumer 也已以合成 fixture 與契約回歸驗證 selective generation、packet-declared narrow retest、保守 frozen full fallback、append-only fuse receipt 與 transactional promotion；尚未執行 live model/browser repair cycle，因此自動修正能力維持 `PARTIALLY VERIFIED`。P1 affected-matrix selector 仍未完成；不得把「consumer 已實作」轉述成「live cohort 已修正」。
 
 方法定位：這 8 案同時參與缺陷發現、Skill／evaluator 修正、Darwin candidate 比較與最終回歸，因此是 **development/regression closure**，不是 held-out validation，也不證明 Skill 已泛化。下一次 promotion 必須另用未進 authoring context 的 sealed validation／test tasks，比較 accepted 與 candidate Skill，並對 stochastic case 重複執行。
 

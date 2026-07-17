@@ -251,6 +251,102 @@ def _append_occurrence(
     occurrences.append(occurrence)
 
 
+def _targets_from_grouped(
+    grouped: dict[tuple[str, str], list[dict[str, Any]]],
+    total_by_target: dict[tuple[str, str], int],
+) -> list[dict[str, Any]]:
+    targets = []
+    for (variant, case_id), occurrences in sorted(grouped.items()):
+        total = total_by_target[(variant, case_id)]
+        targets.append({
+            "variant": variant,
+            "case_id": case_id,
+            "finding_count": total,
+            "occurrences": occurrences,
+            "narrow_retest": _narrow_retest(occurrences),
+            "feedback": _feedback(occurrences, total),
+        })
+    return targets
+
+
+def targets_from_validated_attempts(
+    attempts: list[dict[str, Any]],
+    result_dir: Path,
+    screenshot_dir: Path,
+) -> tuple[list[dict[str, Any]], int]:
+    """Project an exact, already captured row subset through the canonical repair rules."""
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    total_by_target: dict[tuple[str, str], int] = {}
+    seen: set[tuple[str, str, str, str, str]] = set()
+    finding_runs = 0
+    for record in attempts:
+        if not isinstance(record, dict) or set(record) != {"key", "attempts"}:
+            raise RepairPacketError("narrow attempt record is malformed")
+        identity = record["key"]
+        if not isinstance(identity, dict) or set(identity) != {"variant", "case_id", "state", "profile", "engine"}:
+            raise RepairPacketError("narrow attempt identity is malformed")
+        key = tuple(identity[name] for name in ("variant", "case_id", "state", "profile", "engine"))
+        if (
+            key in seen
+            or key[0] not in evidence.VARIANTS
+            or any(not isinstance(value, str) for value in key)
+        ):
+            raise RepairPacketError("narrow attempt identity is invalid or duplicated")
+        seen.add(key)
+        history = record["attempts"]
+        if not isinstance(history, list) or not history or not isinstance(history[-1], dict):
+            raise RepairPacketError("narrow attempt history is incomplete")
+        final = history[-1]
+        if final.get("status") != "completed" or final.get("exit_code") not in {0, 2}:
+            raise RepairPacketError("narrow attempt did not complete")
+        stem = evidence.artifact_stem(key)
+        if final.get("result") != f"{stem}.json" or final.get("screenshot") != f"{stem}.png":
+            raise RepairPacketError("narrow artifact name changed")
+        result_path = result_dir / final["result"]
+        screenshot_path = screenshot_dir / final["screenshot"]
+        if (
+            not result_path.is_file()
+            or result_path.is_symlink()
+            or result_path.resolve().parent != result_dir.resolve(strict=True)
+            or not screenshot_path.is_file()
+            or screenshot_path.is_symlink()
+            or screenshot_path.resolve().parent != screenshot_dir.resolve(strict=True)
+        ):
+            raise RepairPacketError("narrow artifact is missing or unsafe")
+        try:
+            verdict = evidence._validate_result(
+                key,
+                result_path,
+                screenshot_path,
+                final.get("result_sha256"),
+                final.get("screenshot_sha256"),
+                final.get("spec_sha256"),
+            )
+        except evidence.V7EvidenceError as error:
+            raise RepairPacketError(f"narrow evidence is invalid: {error}") from error
+        if (verdict == "clean") != (final["exit_code"] == 0):
+            raise RepairPacketError("narrow exit code and verdict disagree")
+        if verdict == "clean":
+            continue
+        result = _load(result_path, "narrow visual result")
+        findings = extract_findings(result)
+        if not findings:
+            raise RepairPacketError(f"narrow finding verdict has no actionable projection: {stem}")
+        finding_runs += 1
+        target_key = (key[0], key[1])
+        total_by_target[target_key] = total_by_target.get(target_key, 0) + len(findings)
+        _append_occurrence(grouped, target_key, {
+            "state": key[2],
+            "profile": key[3],
+            "engine": key[4],
+            "route": _safe_route(result["input"].get("route")),
+            "result": {"path": final["result"], "sha256": final["result_sha256"]},
+            "screenshot": {"path": final["screenshot"], "sha256": final["screenshot_sha256"]},
+            "findings": findings,
+        })
+    return _targets_from_grouped(grouped, total_by_target), finding_runs
+
+
 def build_packet(
     manifest_path: Path,
     ledger_path: Path,
@@ -294,17 +390,7 @@ def build_packet(
         }
         _append_occurrence(grouped, target_key, occurrence)
 
-    targets = []
-    for (variant, case_id), occurrences in sorted(grouped.items()):
-        total = total_by_target[(variant, case_id)]
-        targets.append({
-            "variant": variant,
-            "case_id": case_id,
-            "finding_count": total,
-            "occurrences": occurrences,
-            "narrow_retest": _narrow_retest(occurrences),
-            "feedback": _feedback(occurrences, total),
-        })
+    targets = _targets_from_grouped(grouped, total_by_target)
     second_validation = evidence.validate(
         manifest_path, ledger_path, result_dir, screenshot_dir, repository_root, gate
     )
