@@ -81,6 +81,83 @@ process.stdout.write(JSON.stringify(auditCrossOutputTemplates({{schemaVersion:1,
         result = self.run_node(source)
         self.assertEqual([], result["advisories"])
 
+    def test_spacing_radius_and_track_ratio_tweaks_cannot_hide_dominant_template(self) -> None:
+        first = {
+            "version": 1,
+            "landmarks": [{"role": "main", "depth": 0, "box": [0, 0, 1, 1]}],
+            "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.65, 0.35], "gap": 0.02},
+            "regions": [
+                {"role": "region", "representation": "form", "box": [0, 0, 0.65, 1], "display": "block", "radius": "small"},
+                {"role": "complementary", "representation": "list", "box": [0.67, 0, 0.33, 1], "display": "block", "radius": "small"},
+            ],
+            "representationHistogram": [["form", 1], ["ul", 1]],
+        }
+        second = {
+            "version": 1,
+            "landmarks": [{"role": "main", "depth": 0, "box": [0, 0, 1, 0.95]}],
+            "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.6, 0.4], "gap": 0.05},
+            "regions": [
+                {"role": "region", "representation": "form", "box": [0, 0.05, 0.6, 0.9], "display": "block", "radius": "large"},
+                {"role": "complementary", "representation": "list", "box": [0.65, 0.05, 0.35, 0.9], "display": "block", "radius": "none"},
+            ],
+            "representationHistogram": [["form", 1], ["ul", 1]],
+        }
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row = (caseId, macroFingerprint) => ({{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}});
+process.stdout.write(JSON.stringify(auditCrossOutputTemplates({{schemaVersion:1,cohort:'near-1',observations:[row('repair',{json.dumps(first)}),row('royalty',{json.dumps(second)})]}})));
+"""
+        result = self.run_node(source)
+        self.assertEqual("advisories_present", result["status"])
+        self.assertEqual(1, len(result["advisories"]))
+        advisory = result["advisories"][0]
+        self.assertEqual("near_cross_output_template_candidate", advisory["code"])
+        self.assertEqual(["repair", "royalty"], advisory["caseIds"])
+        self.assertEqual(2, advisory["exactFingerprintCount"])
+        self.assertRegex(advisory["dominantFingerprintSha256"], r"^[a-f0-9]{64}$")
+        self.assertIn("not a defect", advisory["confirmation"])
+        self.assertIn("unverified", result["claimBoundary"])
+
+    def test_different_dominant_region_order_does_not_create_near_advisory(self) -> None:
+        base = {"version": 1, "landmarks": [], "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.5, 0.5], "gap": 0.02}, "representationHistogram": [["form", 1], ["table", 1]]}
+        first = {**base, "regions": [{"role": "region", "representation": "form", "box": [0, 0, 0.5, 1], "display": "block", "radius": "small"}, {"role": "region", "representation": "table", "box": [0.5, 0, 0.5, 1], "display": "block", "radius": "small"}]}
+        second = {**base, "regions": list(reversed(first["regions"]))}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row = (caseId, macroFingerprint) => ({{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}});
+process.stdout.write(JSON.stringify(auditCrossOutputTemplates({{schemaVersion:1,cohort:'near-2',observations:[row('a',{json.dumps(first)}),row('b',{json.dumps(second)})]}})));
+"""
+        result = self.run_node(source)
+        self.assertEqual([], result["advisories"])
+
+    def test_css_visual_position_swap_and_major_track_reweight_do_not_warn(self) -> None:
+        region = lambda representation, box: {"role": "region", "representation": representation, "box": box, "display": "block", "radius": "small"}
+        base = {"version": 1, "landmarks": [], "representationHistogram": [["form", 1], ["table", 1]]}
+        first = {**base, "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.6, 0.4], "gap": 0.02}, "regions": [region("form", [0, 0, 0.6, 1]), region("table", [0.6, 0, 0.4, 1])]}
+        swapped = {**base, "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.6, 0.4], "gap": 0.02}, "regions": [region("form", [0.6, 0, 0.4, 1]), region("table", [0, 0, 0.6, 1])]}
+        reweighted = {**base, "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.9, 0.1], "gap": 0.02}, "regions": [region("form", [0, 0, 0.9, 1]), region("table", [0.9, 0, 0.1, 1])]}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId,macroFingerprint)=>( {{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}} );
+const audit=(observations)=>auditCrossOutputTemplates({{schemaVersion:1,cohort:'near-3',observations}}).advisories;
+process.stdout.write(JSON.stringify({{swapped:audit([row('a',{json.dumps(first)}),row('b',{json.dumps(swapped)})]),reweighted:audit([row('a',{json.dumps(first)}),row('b',{json.dumps(reweighted)})])}}));
+"""
+        result = self.run_node(source)
+        self.assertEqual([], result["swapped"])
+        self.assertEqual([], result["reweighted"])
+
+    def test_receipt_is_stable_when_observation_input_order_changes(self) -> None:
+        fingerprint = {"version": 1, "landmarks": [], "mainFlow": {"display": "block", "flexDirection": "row", "gridTracks": [], "gap": 0}, "regions": [], "representationHistogram": []}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId,route)=>( {{caseId,route,surface:'primary',viewport:'desktop',state:'base',macroFingerprint:{json.dumps(fingerprint)}}} );
+const input=[row('zeta','/b'),row('alpha','/a'),row('middle','/c')];
+const audit=(observations)=>auditCrossOutputTemplates({{schemaVersion:1,cohort:'stable-1',observations}});
+process.stdout.write(JSON.stringify({{forward:audit(input),reverse:audit([...input].reverse())}}));
+"""
+        result = self.run_node(source)
+        self.assertEqual(result["forward"], result["reverse"])
+
     def test_key_order_does_not_change_hash(self) -> None:
         source = f"""
 const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});

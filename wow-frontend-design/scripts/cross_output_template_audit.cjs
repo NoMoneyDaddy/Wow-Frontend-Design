@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const MAX_INPUT_BYTES = 1024 * 1024;
-const CLAIM_BOUNDARY = "exact rendered macro-template candidate only; originality and design quality remain unverified";
+const CLAIM_BOUNDARY = "exact or categorical dominant rendered macro-template candidate only; product specificity, originality and design quality remain unverified";
 
 function fail(message) {
   throw new Error(message);
@@ -157,8 +157,47 @@ function projectFingerprint(value) {
   return { version: 1, landmarks, mainFlow, regions, representationHistogram };
 }
 
-function canonicalFingerprint(value) {
-  return JSON.stringify(projectFingerprint(value));
+function dominantFingerprint(value) {
+  const projected = projectFingerprint(value);
+  const tracks = projected.mainFlow.gridTracks;
+  const trackTotal = tracks.every((item) => typeof item === "number" && item > 0)
+    ? tracks.reduce((total, item) => total + item, 0) : 0;
+  const dominantShare = trackTotal > 0 ? Math.max(...tracks) / trackTotal : null;
+  const trackBalance = tracks.length === 0 ? "none"
+    : tracks.length === 1 ? "single"
+      : dominantShare === null ? "unknown"
+        : dominantShare <= 0.55 ? "balanced"
+          : dominantShare <= 0.75 ? "moderate-asymmetric" : "dominant-asymmetric";
+  const visualBand = (value) => typeof value === "number"
+    ? Math.max(-4, Math.min(8, Math.floor(value * 4 + 0.001))) : "unknown";
+  return {
+    version: 1,
+    landmarks: projected.landmarks.map(({ role, depth }) => ({ role, depth })),
+    mainFlow: {
+      display: projected.mainFlow.display,
+      flexDirection: projected.mainFlow.flexDirection,
+      gridTrackCount: projected.mainFlow.gridTracks.length,
+      trackBalance,
+    },
+    regions: projected.regions.map(({ role, representation, display, box }) => ({
+      role,
+      representation,
+      display,
+      visualRow: visualBand(box[1]),
+      visualColumn: visualBand(box[0]),
+    })),
+    representationHistogram: projected.representationHistogram,
+  };
+}
+
+function fingerprintHash(value) {
+  return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function compareReceipts(left, right) {
+  return ["caseId", "route", "surface", "viewport", "state", "fingerprintSha256"]
+    .map((key) => String(left[key]).localeCompare(String(right[key])))
+    .find((order) => order !== 0) || 0;
 }
 
 function auditCrossOutputTemplates(input) {
@@ -167,7 +206,8 @@ function auditCrossOutputTemplates(input) {
   if (typeof input.cohort !== "string" || !/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(input.cohort)) fail("cohort is invalid");
   if (!Array.isArray(input.observations) || input.observations.length < 2 || input.observations.length > 200) fail("observations must contain 2..200 entries");
   const identities = new Set();
-  const groups = new Map();
+  const exactGroups = new Map();
+  const dominantGroups = new Map();
   for (const [index, observation] of input.observations.entries()) {
     requireExactKeys(observation, ["caseId", "route", "surface", "viewport", "state", "macroFingerprint"], `observations[${index}]`);
     for (const field of ["caseId", "route", "surface", "viewport", "state"]) {
@@ -176,30 +216,64 @@ function auditCrossOutputTemplates(input) {
     const identity = JSON.stringify([observation.caseId, observation.route, observation.surface, observation.viewport, observation.state]);
     if (identities.has(identity)) fail(`duplicate observation identity: ${identity}`);
     identities.add(identity);
-    const canonical = canonicalFingerprint(observation.macroFingerprint);
-    const fingerprintSha256 = crypto.createHash("sha256").update(canonical).digest("hex");
+    const projected = projectFingerprint(observation.macroFingerprint);
+    const fingerprintSha256 = fingerprintHash(projected);
+    const dominantFingerprintSha256 = fingerprintHash(dominantFingerprint(projected));
     const groupKey = JSON.stringify([observation.surface, observation.viewport, observation.state, fingerprintSha256]);
-    const group = groups.get(groupKey) || { fingerprintSha256, observations: [] };
-    group.observations.push({
+    const dominantGroupKey = JSON.stringify([
+      observation.surface, observation.viewport, observation.state, dominantFingerprintSha256,
+    ]);
+    const receipt = {
       caseId: observation.caseId,
       route: observation.route,
       surface: observation.surface,
       viewport: observation.viewport,
       state: observation.state,
-    });
-    groups.set(groupKey, group);
+      fingerprintSha256,
+    };
+    const exactGroup = exactGroups.get(groupKey) || { fingerprintSha256, observations: [] };
+    exactGroup.observations.push(receipt);
+    exactGroups.set(groupKey, exactGroup);
+    const dominantGroup = dominantGroups.get(dominantGroupKey)
+      || { dominantFingerprintSha256, observations: [] };
+    dominantGroup.observations.push(receipt);
+    dominantGroups.set(dominantGroupKey, dominantGroup);
   }
-  const advisories = [...groups.values()].flatMap((group) => {
+  const exactAdvisories = [...exactGroups.values()].flatMap((group) => {
     const caseIds = [...new Set(group.observations.map((item) => item.caseId))].sort();
     if (caseIds.length < 2) return [];
+    const observations = [...group.observations].sort(compareReceipts)
+      .map(({ fingerprintSha256: _fingerprintSha256, ...identity }) => identity);
     return [{
       code: "cross_output_template_candidate",
       caseIds,
       fingerprintSha256: group.fingerprintSha256,
-      observations: group.observations,
+      observations,
       confirmation: "review product evidence and paired blind renders; do not auto-fail",
     }];
   });
+  const nearAdvisories = [...dominantGroups.values()].flatMap((group) => {
+    const caseIds = [...new Set(group.observations.map((item) => item.caseId))].sort();
+    const exactFingerprintCount = new Set(group.observations.map((item) => item.fingerprintSha256)).size;
+    if (caseIds.length < 2 || exactFingerprintCount < 2) return [];
+    const observations = [...group.observations].sort(compareReceipts);
+    return [{
+      code: "near_cross_output_template_candidate",
+      caseIds,
+      dominantFingerprintSha256: group.dominantFingerprintSha256,
+      exactFingerprintCount,
+      observations: observations.map(({ fingerprintSha256, ...identity }) => ({
+        ...identity, fingerprintSha256,
+      })),
+      confirmation: "review product evidence and paired blind renders; categorical structural similarity is not a defect",
+    }];
+  });
+  const advisories = [...exactAdvisories, ...nearAdvisories].sort((left, right) => (
+    left.code.localeCompare(right.code)
+      || left.caseIds.join("|").localeCompare(right.caseIds.join("|"))
+      || (left.fingerprintSha256 || left.dominantFingerprintSha256)
+        .localeCompare(right.fingerprintSha256 || right.dominantFingerprintSha256)
+  ));
   return {
     schemaVersion: 1,
     cohort: input.cohort,
@@ -227,7 +301,10 @@ function main(argv) {
   process.stdout.write(`${result.status}: ${result.advisories.length} advisory candidate(s)\n`);
 }
 
-module.exports = { CLAIM_BOUNDARY, auditCrossOutputTemplates, collectMacroFingerprint, projectFingerprint, quantize };
+module.exports = {
+  CLAIM_BOUNDARY, auditCrossOutputTemplates, collectMacroFingerprint, dominantFingerprint,
+  projectFingerprint, quantize,
+};
 
 if (require.main === module) {
   try {
