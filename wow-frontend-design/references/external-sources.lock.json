@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "retrieved_at": "2026-07-17",
+  "retrieved_at": "2026-07-18",
   "policy": "Research coordinates only. Re-fetch by the full content-addressed Git revision; verify the selected path and applicable license before copying or executing content.",
   "sources": [
     {"repository":"zeke/swiss-design-skill","revision":"d4e8daee5d051d81271b2a561d1a582e7d0e2d40","license":"MIT","paths":["swiss-design/SKILL.md"]},
@@ -32,6 +32,7 @@
     {"repository":"AccessLint/skills","revision":"ceb3fa80fc8be8d8959f5b3eb812ac8cc33a5a59","license":"NOASSERTION","paths":["plugins/accesslint/skills"]},
     {"repository":"github/awesome-copilot","revision":"e353a8cfb8124d44905fc73214d873cea4a0ba3b","license":"MIT","paths":["skills/web-design-reviewer/SKILL.md"]},
     {"repository":"LottieFiles/motion-design-skill","revision":"f9a8a041b85185ee4881b3471d3415e939aac772","license":"MIT","paths":["skills/motion-design/SKILL.md","skills/motion-design/director/context-adaptation.md","skills/motion-design/director/decision-framework.md","skills/motion-design/patterns/ambient-continuous.md","skills/motion-design/patterns/entrance-exit.md","skills/motion-design/patterns/multi-element.md","skills/motion-design/patterns/state-feedback.md","skills/motion-design/reference/property-selection.md","skills/motion-design/reference/quality-checklist.md","skills/motion-design/reference/timing-easing-tables.md","skills/motion-design/reference/troubleshooting.md"]},
+    {"repository":"emilkowalski/skills","revision":"6bf24434f7730ad169077756cf9c7cd7bd675fc6","license":"MIT","paths":["LICENSE","skills/find-animation-opportunities/SKILL.md","skills/improve-animations/SKILL.md","skills/improve-animations/AUDIT.md","skills/improve-animations/PLAN-TEMPLATE.md","skills/review-animations/SKILL.md","skills/apple-design/SKILL.md"]},
     {"repository":"diffusionstudio/lottie","revision":"da52e172e1bd76bd2a2839140cdd8c7cd5a57c2d","license":"MIT","paths":["skills/text-to-lottie/SKILL.md"]},
     {"repository":"elvisdragonmao/emfont","revision":"85158adc26313d73878b5ead0734d4540c46399a","license":"Apache-2.0","paths":["LICENSE","README.md","src/emfont.js"]},
     {"repository":"dgreenheck/webgpu-claude-skill","revision":"af2319bd01bb7cc881267a9ef42cafdaf5e9029d","license":"NOASSERTION","paths":["skills/webgpu-threejs-tsl/SKILL.md"]},

@@ -66,6 +66,16 @@ Record frequency as `once | per navigation | per state change | per input | ambi
 
 Do not copy an award-site motion recipe into every product type. The signature must reinforce the product's noun, verb, or mental model.
 
+### Admit motion before implementation
+
+Treat motion as a candidate, not a default layer. For each opportunity, test three things together:
+
+- **purpose:** what change, relationship, feedback, or product idea becomes clearer;
+- **frequency:** how often the person will encounter or retrigger it in the real task;
+- **function:** whether it improves orientation, causality, state recognition, direct manipulation, or one justified signature.
+
+Reject a candidate when its only evidence is novelty, “polish,” or empty visual space. Keep each prioritized opportunity list short: five to seven high-confidence additions are enough for one app-level pass, use fewer for one view, and partition a large product by surface. Record the important rejections and report existing defects separately so the bound never hides them. This is a handoff bound, not a required animation count. A restrained utility may need none. A campaign may earn one expressive sequence. Derive the motion personality from the brief, product verb, audience, input methods, and usage frequency instead of importing a house spring, duration, or platform aesthetic.
+
 ### Compose a page narrative instead of repeating entrances
 
 Treat the page as beats, not a list of elements waiting for the same fade-up. First write the static reading order and one sentence for each beat: `establish → reveal → explain → resolve/act`. Use density changes, stillness, typography, crop and whitespace before adding motion. A transition earns its place only when it explains the relationship between adjacent beats.
@@ -212,6 +222,17 @@ Motion personality, emotional intent, staging, and narrative can guide an author
 
 ## 7. Verify behavior and performance
 
+Run the audit in this order: inspect the existing interaction and motion vocabulary; review purpose/frequency, timing/easing, origin/physical relationship, interruption, runtime cost, accessibility/input modes, token cohesion, and genuinely missed opportunities; prioritize by user impact and repair effort; implement the smallest coherent change; then replay the same paths.
+
+Every repair packet must be independently executable:
+
+```text
+exact location → observed state → target behavior → existing local precedent
+→ scope boundary + source/version stamp → mechanical check → rendered interaction check
+```
+
+Stop when the source or surrounding contract has drifted; re-inspect instead of applying a stale plan. For stateful motion, verify that rapid input never queues a stale destination; a continuously redirectable interaction should retarget from its current rendered state, while an irreversible or staged result may finish or cancel coherently. Check that enter/exit paths share a believable origin. For draggable direct manipulation that owns a Pointer Events sequence, verify grab offset plus capture and release behavior; do not impose that model on native scrolling, pinch/multi-pointer input, or delegated gestures. Test reduced motion and every input mode relevant to the interaction, including coarse pointer when applicable. Use slow-motion replay or named-frame capture only when normal-speed interaction and DOM/runtime evidence leave a real ambiguity; screenshots are diagnostic evidence, not a mandatory count.
+
 Minimum matrix:
 
 | State | Desktop | 390px touch | Keyboard | Reduced motion | Background/off-screen |
@@ -259,6 +280,8 @@ The official [GSAP Agent Skills@aed9cfd](https://github.com/greensock/gsap-skill
 The [UI Skills registry](https://www.ui-skills.com/skills) is a useful discovery layer for animation vocabulary, motion-performance review, and production-audit patterns. Treat its fixed timing, easing, blur, mechanism, or reduced-motion recipes as author heuristics until target-browser evidence validates them.
 
 Additional research boundaries:
+
+- [emilkowalski/skills@6bf2443](https://github.com/emilkowalski/skills/tree/6bf24434f7730ad169077756cf9c7cd7bd675fc6) contributes the opportunity gate, eight-part motion review, rapid-retrigger checks, and self-contained repair handoff. This Skill paraphrases those MIT-licensed methods; it does not import the repository's framework recipes, fixed timings, platform taste, or absolute performance claims.
 
 - [LottieFiles motion-design-skill](https://github.com/LottieFiles/motion-design-skill) contributes purpose, emotion, narrative, choreography, frequency, and context vocabulary. Mandatory ambient layers, fixed personalities, universal duration tables, and compulsory overshoot remain creative hypotheses.
 - [airbnb/lottie-web](https://github.com/airbnb/lottie-web) is the runtime authority for its API, events, SVG renderer settings, performance notes, and `destroy` lifecycle. The MIT runtime license does not grant rights to animation artwork.
