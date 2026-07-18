@@ -2438,9 +2438,9 @@ function grantInteractionPlan(viewportName) {
   };
 }
 
-async function settleRenderedStateInIsolatedWorld(frameDurationMs) {
+async function settleRenderedStateInIsolatedWorld(maxAnimationWallTimeMs) {
   await new Promise((resolve) => requestAnimationFrame(resolve));
-  const shortAnimations = Document.prototype.getAnimations.call(document).filter((animation) => {
+  const boundedAnimations = Document.prototype.getAnimations.call(document).filter((animation) => {
       const timing = animation.effect?.getComputedTiming();
       const currentTime = Number(animation.currentTime);
       const endTime = Number(timing?.endTime);
@@ -2455,14 +2455,16 @@ async function settleRenderedStateInIsolatedWorld(frameDurationMs) {
         && Number.isFinite(remainingTime)
         && Number.isFinite(totalWallTime)
         && Number.isFinite(remainingWallTime)
-        && endTime <= frameDurationMs
-        && remainingTime <= frameDurationMs
-        && totalWallTime <= frameDurationMs
-        && remainingWallTime <= frameDurationMs;
+        && remainingTime >= 0
+        && totalWallTime <= maxAnimationWallTimeMs
+        && remainingWallTime <= maxAnimationWallTimeMs;
   });
   const finishedGetter = Object.getOwnPropertyDescriptor(Animation.prototype, "finished")?.get;
   if (typeof finishedGetter !== "function") throw new Error("native animation.finished unavailable");
-  await Promise.allSettled(shortAnimations.map((animation) => finishedGetter.call(animation)));
+  await Promise.race([
+    Promise.allSettled(boundedAnimations.map((animation) => finishedGetter.call(animation))),
+    new Promise((resolve) => setTimeout(resolve, maxAnimationWallTimeMs)),
+  ]);
   await new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
   });
@@ -2470,6 +2472,7 @@ async function settleRenderedStateInIsolatedWorld(frameDurationMs) {
 
 async function waitForRenderedStateToSettle(page) {
   const singleFrameDurationMs = 1000 / 60;
+  const maxAnimationWallTimeMs = 250;
   const session = await page.context().newCDPSession(page);
   await session.send("Page.enable");
   await session.send("Runtime.enable");
@@ -2481,7 +2484,7 @@ async function waitForRenderedStateToSettle(page) {
   });
   const settleAttempt = session.send("Runtime.evaluate", {
     contextId: executionContextId,
-    expression: `(${settleRenderedStateInIsolatedWorld.toString()})(${JSON.stringify(singleFrameDurationMs)})`,
+    expression: `(${settleRenderedStateInIsolatedWorld.toString()})(${JSON.stringify(maxAnimationWallTimeMs)})`,
     returnByValue: true,
     awaitPromise: true,
     silent: true,
@@ -2492,8 +2495,8 @@ async function waitForRenderedStateToSettle(page) {
       settleAttempt,
       new Promise((_, reject) => {
         deadline = setTimeout(() => {
-          reject(new Error("rendered state did not settle within eight frame budgets"));
-        }, singleFrameDurationMs * 8);
+          reject(new Error("rendered state did not settle within the bounded animation budget"));
+        }, maxAnimationWallTimeMs + singleFrameDurationMs * 8);
       }),
     ]);
     if (exceptionDetails) {

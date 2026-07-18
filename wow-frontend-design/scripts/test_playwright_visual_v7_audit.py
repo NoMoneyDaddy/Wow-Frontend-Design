@@ -469,7 +469,7 @@ const {{ waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
 (async () => {{
   const browser = await chromium.launch({{ headless: true }});
   const page = await browser.newPage();
-  await page.setContent('<style>#control {{ transition: transform 0.01ms linear }} #control.done {{ transform: translateY(-1px) }}</style><button id="control">原始狀態</button><span id="delayed"></span><span id="repeated"></span><span id="paused"></span><span id="zero-rate"></span><span id="slow-rate"></span>');
+  await page.setContent('<style>#control {{ transition: transform 0.01ms linear }} #control.done {{ transform: translateY(-1px) }}</style><button id="control">原始狀態</button><span id="delayed"></span><span id="repeated"></span><span id="paused"></span><span id="zero-rate"></span><span id="slow-rate"></span><span id="mutating-rate"></span>');
   await page.evaluate(() => {{
     const control = document.querySelector('#control');
     void control.offsetWidth;
@@ -477,6 +477,10 @@ const {{ waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
     window.__delayedAnimation = document.querySelector('#delayed').animate(
       [{{ opacity: 0 }}, {{ opacity: 1 }}],
       {{ duration: 1, delay: 500 }},
+    );
+    window.__boundedAnimation = control.animate(
+      [{{ backgroundColor: 'rgb(255, 255, 255)' }}, {{ backgroundColor: 'rgb(0, 0, 0)' }}],
+      {{ duration: 180 }},
     );
     window.__repeatedAnimation = document.querySelector('#repeated').animate(
       [{{ opacity: 0 }}, {{ opacity: 1 }}],
@@ -497,13 +501,20 @@ const {{ waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
       {{ duration: 1 }},
     );
     window.__slowRateAnimation.playbackRate = 0.001;
+    window.__mutatingRateAnimation = document.querySelector('#mutating-rate').animate(
+      [{{ opacity: 0 }}, {{ opacity: 1 }}],
+      {{ duration: 180 }},
+    );
+    setTimeout(() => {{ window.__mutatingRateAnimation.playbackRate = 0; }}, 20);
   }});
   await waitForRenderedStateToSettle(page);
   const result = await page.evaluate(() => ({{
     animations: document.getAnimations().length,
     delayedPlayState: window.__delayedAnimation.playState,
+    boundedPlayState: window.__boundedAnimation.playState,
     pausedPlayState: window.__pausedAnimation.playState,
     repeatedPlayState: window.__repeatedAnimation.playState,
+    mutatingRatePlayState: window.__mutatingRateAnimation.playState,
     slowRatePlayState: window.__slowRateAnimation.playState,
     transform: getComputedStyle(document.querySelector('#control')).transform,
     zeroRatePlayState: window.__zeroRateAnimation.playState,
@@ -520,13 +531,45 @@ const {{ waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
             text=True,
         )
         result = json.loads(completed.stdout)
-        self.assertEqual(5, result["animations"])
+        self.assertEqual(6, result["animations"])
+        self.assertEqual("finished", result["boundedPlayState"])
         self.assertEqual("running", result["delayedPlayState"])
         self.assertEqual("paused", result["pausedPlayState"])
         self.assertEqual("running", result["repeatedPlayState"])
+        self.assertEqual("running", result["mutatingRatePlayState"])
         self.assertEqual("running", result["slowRatePlayState"])
         self.assertNotEqual("none", result["transform"])
         self.assertEqual("running", result["zeroRatePlayState"])
+
+    def test_interaction_settle_finishes_bounded_paint_before_font_evidence(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ captureFontEvidenceForAudit, waitForRenderedStateToSettle }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.setContent(`
+    <style>
+      button {{ transition: background-color 180ms, border-color 180ms; background:#fff; border:2px solid #fff }}
+      button.active {{ background:#000; border-color:#000 }}
+    </style>
+    <h1>字型證據</h1><main><button>切換樣式</button></main>
+  `);
+  await page.locator('button').evaluate((node) => {{
+    void node.offsetWidth;
+    node.classList.add('active');
+  }});
+  await waitForRenderedStateToSettle(page);
+  const evidence = await captureFontEvidenceForAudit(context, page, 'fixture/desktop/interaction');
+  const activeAnimations = await page.locator('button').evaluate((node) => node.getAnimations().filter((animation) => animation.playState === 'running').length);
+  await browser.close();
+  process.stdout.write(JSON.stringify({{ status: evidence.status, activeAnimations }}));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("captured", result["status"])
+        self.assertEqual(0, result["activeAnimations"])
 
     def test_interaction_settle_uses_an_isolated_world(self) -> None:
         source = f"""
