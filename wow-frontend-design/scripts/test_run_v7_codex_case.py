@@ -26,6 +26,18 @@ class V7CodexRunnerTests(unittest.TestCase):
     def _git(self, root: Path, *args: str) -> str:
         return subprocess.run(["git", *args], cwd=root, text=True, capture_output=True, check=True).stdout.strip()
 
+    def _copy_execution_fixture(self, root: Path) -> Path:
+        evals = root / "evals"
+        evals.mkdir()
+        for name in (
+            "run_v7_codex_case.py",
+            "codex_isolated_build_core.py",
+            "validate_codex_log_policy.py",
+            "validate_design_md_clean.py",
+        ):
+            shutil.copy2(ROOT / "evals" / name, evals / name)
+        return evals / "run_v7_codex_case.py"
+
     def test_candidate_materialization_changes_only_allowed_reference(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -408,17 +420,178 @@ class V7CodexRunnerTests(unittest.TestCase):
                     {"failure_key": old_key, "prior_count": 3, "maximum_rounds": 3},
                 )
 
-    def test_valid_codex_output_events_count_as_progress(self) -> None:
-        lines = [
-            json.dumps({"type": "thread.started", "thread_id": "test"}),
-            json.dumps({"type": "turn.started"}),
-            json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
-            json.dumps({"type": "item.started", "item": {"type": "command_execution"}}),
-            json.dumps({"type": "item.completed", "item": {"type": "command_execution"}}),
-            json.dumps({"type": "item.completed", "item": {"type": "file_change"}}),
-            "not-json",
-        ]
-        self.assertEqual(6, runner.meaningful_event_count(lines))
+    def test_runner_delegates_execution_architecture_to_shared_core(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_runner = self._copy_execution_fixture(Path(directory))
+            source = fixture_runner.read_text(encoding="utf-8")
+            self.assertTrue((fixture_runner.parent / "codex_isolated_build_core.py").is_file())
+            self.assertTrue((fixture_runner.parent / "validate_codex_log_policy.py").is_file())
+            self.assertTrue((fixture_runner.parent / "validate_design_md_clean.py").is_file())
+            self.assertIn("execution_core.execute_isolated", source)
+            self.assertIn("execution_core.ExecutionSpec", source)
+            for forbidden in ("subprocess.Popen", "os.killpg", "auth.json"):
+                self.assertNotIn(forbidden, source)
+            self.assertNotRegex(source, r"\bcodex\s*,\s*[\"']exec[\"']")
+
+    def test_fake_run_preserves_execution_contract_manifest_timeouts_and_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            outside = Path(directory).resolve()
+            repository = outside / "repository"
+            repository.mkdir()
+            manifest_path = repository / "manifest.json"
+            manifest = {
+                "splits": {
+                    "development": [{"id": "case-one"}],
+                    "sealed_validation": [],
+                    "sealed_test": [],
+                },
+                "timeouts": {
+                    "generation": {"inactivity_seconds": 60, "hard_seconds": 120},
+                    "lint": {"hard_seconds": 30},
+                },
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            brief = outside / "brief.md"
+            brief.write_text("Build a calm archive.\n", encoding="utf-8")
+            target = outside / "target"
+            target.mkdir()
+            log_dir = outside / "logs"
+            log_dir.mkdir()
+            repair_source = outside / "repair-source"
+            repair_source.mkdir()
+            source_manifest = repair_source / "run-manifest.json"
+            source_manifest.write_text("{}\n", encoding="utf-8")
+            seeded = {
+                "DESIGN.md": "# Seeded design\n",
+                "index.html": "<!doctype html><html><body><main>Seeded</main></body></html>",
+            }
+            source_outputs = []
+            for name, body in seeded.items():
+                path = repair_source / name
+                path.write_text(body, encoding="utf-8")
+                source_outputs.append({
+                    "path": name,
+                    "bytes": path.stat().st_size,
+                    "sha256": runner._digest(path),
+                })
+            repair_record = {
+                "round": 2,
+                "source_manifest_sha256": runner._digest(source_manifest),
+                "source_outputs": source_outputs,
+                "finding_signature": "f" * 64,
+            }
+            package_record = {
+                "variant": "accepted",
+                "materialized_tree_sha256": "a" * 64,
+            }
+            calls: list[dict[str, object]] = []
+
+            def materialize(
+                _manifest: dict[str, object],
+                _variant: str,
+                _candidate: Path | None,
+                destination: Path,
+                _root: Path,
+            ) -> dict[str, object]:
+                destination.mkdir()
+                (destination / "SKILL.md").write_text("# Fixture Skill\n", encoding="utf-8")
+                return package_record
+
+            def execute(spec: object) -> dict[str, object]:
+                call_number = len(calls) + 1
+                calls.append({
+                    "model": spec.model,
+                    "hard_seconds": spec.hard_seconds,
+                    "inactivity_seconds": spec.inactivity_seconds,
+                    "skill_source_name": spec.skill_source.name,
+                    "seeded": sorted(path.name for path in spec.stage.iterdir()),
+                    "prompt": spec.prompt,
+                })
+                spec.stdout_log.write_text('{"type":"turn.completed"}\n', encoding="utf-8")
+                spec.stderr_log.write_text("", encoding="utf-8")
+                if call_number == 2:
+                    (spec.stage / "DESIGN.md").write_text("# Repaired design\n", encoding="utf-8")
+                    (spec.stage / "index.html").write_text(
+                        "<!doctype html><html><body><main>Repaired</main></body></html>",
+                        encoding="utf-8",
+                    )
+                return {
+                    "execution": {
+                        "exit_code": -9 if call_number == 1 else 0,
+                        "reason": "hard_timeout" if call_number == 1 else "completed",
+                        "progress_events": call_number + 2,
+                    },
+                    "tools": {
+                        "codex": {
+                            "version": "codex-cli 9.9.9-test",
+                            "bytes": 123,
+                            "mode": "0755",
+                            "sha256": "c" * 64,
+                        },
+                        "execution_core": {"sha256": "d" * 64},
+                    },
+                    "skill_snapshot": {"tree_sha256": "e" * 64},
+                }
+
+            design_tool = {
+                "package": "@google/design.md",
+                "version": "0.3.0",
+                "lock_integrity": "sha512-fixture",
+                "cli_path": "node_modules/@google/design.md/dist/index.js",
+                "cli_sha256": "1" * 64,
+                "package_json_sha256": "2" * 64,
+            }
+            arguments = runner.argparse.Namespace(
+                repository_root=repository,
+                manifest=manifest_path,
+                case_id="case-one",
+                brief=brief,
+                target=target,
+                log_dir=log_dir,
+                candidate_reference=None,
+                variant="accepted",
+                inactivity_seconds=45,
+                hard_seconds=90,
+                max_attempts=2,
+                repair_source=repair_source,
+                repair_context=outside / "repair-context.json",
+                repair_packet=outside / "repair-packet.json",
+                repair_round=2,
+            )
+            with mock.patch.object(runner.preflight, "validate_manifest"), mock.patch.object(
+                runner, "materialize_package", side_effect=materialize
+            ), mock.patch.object(
+                runner, "_validate_repair_source",
+                return_value=(repair_source, "bounded repair feedback", "bounded advisory", repair_record),
+            ), mock.patch.object(
+                runner.execution_core, "execute_isolated", side_effect=execute
+            ), mock.patch.object(
+                runner, "_design_lint", return_value=(True, "", design_tool, {"findings": []})
+            ):
+                result = runner.run(arguments)
+
+            self.assertEqual(2, len(calls))
+            for call in calls:
+                self.assertEqual("gpt-5.4-mini", call["model"])
+                self.assertEqual(90, call["hard_seconds"])
+                self.assertEqual(45, call["inactivity_seconds"])
+                self.assertEqual("wow-frontend-design", call["skill_source_name"])
+                self.assertEqual(["DESIGN.md", "index.html"], call["seeded"])
+                self.assertIn("bounded repair feedback", call["prompt"])
+            self.assertIn("UNTRUSTED PRIOR ATTEMPT DIAGNOSTIC", calls[1]["prompt"])
+            self.assertEqual("retryable_generation_failure", result["attempts"][0]["status"])
+            self.assertEqual("completed", result["attempts"][1]["status"])
+            self.assertEqual("codex-cli 9.9.9-test", result["cli"]["version"])
+            self.assertEqual(
+                {"inactivity_seconds": 45, "hard_seconds": 90, "progress_extends_inactivity_only": True},
+                result["timeouts"],
+            )
+            self.assertEqual(repair_record, result["repair"])
+            self.assertTrue(result["isolation"]["ephemeral_home"])
+            self.assertFalse(result["isolation"]["builder_network"])
+            self.assertFalse(result["isolation"]["builder_browser"])
+            self.assertFalse(result["isolation"]["builder_subagents"])
+            self.assertEqual(result, json.loads((target / "run-manifest.json").read_text(encoding="utf-8")))
 
     def test_host_runner_rejects_sealed_case_split(self) -> None:
         manifest = {
@@ -432,33 +605,6 @@ class V7CodexRunnerTests(unittest.TestCase):
         self.assertEqual("sealed_validation", runner._case_split(manifest, "sealed-case"))
         with self.assertRaisesRegex(runner.V7CodexRunnerError, "exactly once"):
             runner._case_split(manifest, "missing-case")
-
-    def test_login_status_accepts_codex_stderr_channel(self) -> None:
-        result = subprocess.CompletedProcess(
-            args=["codex", "login", "status"],
-            returncode=0,
-            stdout="",
-            stderr="Logged in using ChatGPT\n",
-        )
-        self.assertIsNone(runner._validate_first_party_login(result))
-
-    def test_login_status_rejects_ambiguous_or_failed_output(self) -> None:
-        ambiguous = subprocess.CompletedProcess(
-            args=["codex", "login", "status"],
-            returncode=0,
-            stdout="Logged in using ChatGPT\n",
-            stderr="warning\n",
-        )
-        with self.assertRaisesRegex(runner.V7CodexRunnerError, "not first-party"):
-            runner._validate_first_party_login(ambiguous)
-        failed = subprocess.CompletedProcess(
-            args=["codex", "login", "status"],
-            returncode=1,
-            stdout="",
-            stderr="Logged in using ChatGPT\n",
-        )
-        with self.assertRaisesRegex(runner.V7CodexRunnerError, "not first-party"):
-            runner._validate_first_party_login(failed)
 
     def test_design_lint_uses_preinstalled_locked_tool(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

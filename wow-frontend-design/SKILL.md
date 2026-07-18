@@ -96,6 +96,18 @@ Create or extend only roles consumed by the implementation: semantic color, typo
 
 When implementation creates or changes a visual system, create or update repository-root `DESIGN.md` and map its roles to shared runtime tokens or primitives. Run the project-pinned clean validator immediately when available. If it is unavailable and installation is not authorized, preserve the document/runtime mapping, continue to the runnable slice, and mark document validation `UNVERIFIED`; do not install or alter the lockfile merely to unblock composition. Document lint proves syntax, not rendered fidelity. Extend the existing system instead of creating a parallel one.
 
+When linked references are unavailable, `DESIGN.md` must still begin with this product-derived machine-readable frontmatter:
+
+```yaml
+---
+version: alpha
+name: [product design system name]
+description: [product-specific scope and intent]
+---
+```
+
+Then use `Overview`, `Colors`, `Typography`, `Layout`, `Elevation & Depth`, `Shapes`, `Components`, and `Do's and Don'ts` in order. Omit unsupported YAML properties. Load [design-md-contract.md](references/design-md-contract.md) before adding more frontmatter.
+
 ### 5. Vertical slice
 
 Implement one runnable representative route or task path before expanding architecture. Use real project content or clearly labelled fixtures. The slice must prove together:
@@ -104,7 +116,7 @@ Implement one runnable representative route or task path before expanding archit
 - the product-derived direction and system;
 - the supported viewports, including a real mobile transformation when viewport UI is in scope;
 - default plus at least one consequential pending, error, recovery, or success state when applicable;
-- keyboard and focus behavior, long-content resilience, and a useful static or reduced-motion result;
+- keyboard and focus behavior, one coherent native role/state/keyboard model per control, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
 - framework, route, API, state, analytics, and business-contract preservation.
 
 Only after the slice works should shared primitives, components, routes, effects, and optimization expand. Prefer semantic HTML, modern CSS, and the smallest sufficient JavaScript or framework surface. Do not rewrite a framework for a CSS-level problem.

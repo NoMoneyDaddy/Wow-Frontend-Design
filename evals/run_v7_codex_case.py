@@ -8,16 +8,11 @@ import hashlib
 import importlib.util
 import json
 import math
-import os
 import re
-import resource
 import shutil
-import signal
-import stat
 import subprocess
 import sys
 import tempfile
-import time
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -25,16 +20,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFLIGHT_PATH = ROOT / "evals" / "v7_preflight.py"
-TRACE_VALIDATOR_PATH = ROOT / "evals" / "validate_codex_log_policy.py"
+EXECUTION_CORE_PATH = ROOT / "evals" / "codex_isolated_build_core.py"
 REPAIR_COMPILER_PATH = ROOT / "evals" / "compile_v7_repair_packet.py"
 SUPPORTING_PROBE_PATH = ROOT / "evals" / "v7_supporting_probe_registry.py"
 EXPECTED_OUTPUTS = ("DESIGN.md", "index.html")
 EDITABLE_PATH = "wow-frontend-design/references/typographic-layout.md"
-STAGE_LIMIT = 8 * 1024 * 1024
-LOG_LIMIT = 16 * 1024 * 1024
-FILE_LIMIT = 2 * 1024 * 1024
-MAX_ENTRIES = 16
-PROGRESS_EVENT_TYPES = {"thread.started", "turn.started", "item.started", "item.completed", "turn.completed", "turn.failed"}
 CASE_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 REPAIR_CONTEXT_KEYS = {
@@ -62,7 +52,7 @@ def _module(name: str, path: Path) -> Any:
 
 
 preflight = _module("v7_preflight_codex", PREFLIGHT_PATH)
-trace_policy = _module("validate_codex_log_policy_v7", TRACE_VALIDATOR_PATH)
+execution_core = _module("codex_isolated_build_core_v7", EXECUTION_CORE_PATH)
 repair_compiler = _module("compile_v7_repair_packet_runner", REPAIR_COMPILER_PATH)
 supporting_probes = _module("v7_supporting_probe_codex", SUPPORTING_PROBE_PATH)
 
@@ -258,140 +248,6 @@ def build_prompt(
         f"{brief.rstrip()}\n"
         "--- UNTRUSTED PRODUCT BRIEF: END ---\n"
     )
-
-
-def _stage_fingerprint(stage: Path) -> tuple[tuple[str, int, int], ...]:
-    records = []
-    count = 0
-    for path in sorted(stage.rglob("*")):
-        count += 1
-        if count > MAX_ENTRIES:
-            raise V7CodexRunnerError("stage entry quota exceeded")
-        info = path.lstat()
-        if stat.S_ISDIR(info.st_mode):
-            continue
-        if not stat.S_ISREG(info.st_mode):
-            raise V7CodexRunnerError("stage contains a non-regular entry")
-        records.append((path.relative_to(stage).as_posix(), info.st_size, info.st_mtime_ns))
-    return tuple(records)
-
-
-def _stage_bytes(stage: Path) -> int:
-    total = 0
-    for name, size, _ in _stage_fingerprint(stage):
-        del name
-        total += size
-    return total
-
-
-def meaningful_event_count(lines: list[str]) -> int:
-    count = 0
-    for line in lines:
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(event, dict) and event.get("type") in PROGRESS_EVENT_TYPES:
-            count += 1
-    return count
-
-
-def _terminate(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=2)
-        return
-    except subprocess.TimeoutExpired:
-        pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
-    process.wait(timeout=5)
-
-
-def _child_limits() -> None:
-    os.setsid()
-    resource.setrlimit(resource.RLIMIT_FSIZE, (FILE_LIMIT, FILE_LIMIT))
-
-
-def _run_codex(
-    command: list[str],
-    prompt: str,
-    environment: dict[str, str],
-    stage: Path,
-    stdout_log: Path,
-    stderr_log: Path,
-    inactivity_seconds: int,
-    hard_seconds: int,
-) -> tuple[int, str, int]:
-    with stdout_log.open("xb") as stdout, stderr_log.open("xb") as stderr:
-        process: subprocess.Popen[bytes] | None = None
-        try:
-            process = subprocess.Popen(
-                command,
-                cwd=stage,
-                env=environment,
-                stdin=subprocess.PIPE,
-                stdout=stdout,
-                stderr=stderr,
-                start_new_session=False,
-                preexec_fn=_child_limits,
-            )
-            assert process.stdin is not None
-            process.stdin.write(prompt.encode("utf-8"))
-            process.stdin.close()
-            started = time.monotonic()
-            last_progress = started
-            last_fingerprint: tuple[tuple[str, int, int], ...] = ()
-            log_offset = 0
-            progress_events = 0
-            buffered = ""
-            reason = "completed"
-            while process.poll() is None:
-                now = time.monotonic()
-                fingerprint = _stage_fingerprint(stage)
-                if fingerprint != last_fingerprint:
-                    last_fingerprint = fingerprint
-                    last_progress = now
-                    progress_events += 1
-                    print(f"v7 生成進度：輸出區已變更（{len(fingerprint)} 個檔案）", flush=True)
-                if stdout_log.stat().st_size > log_offset:
-                    with stdout_log.open("rb") as reader:
-                        reader.seek(log_offset)
-                        chunk = reader.read()
-                        log_offset += len(chunk)
-                    text = buffered + chunk.decode("utf-8", errors="replace")
-                    lines = text.splitlines(keepends=True)
-                    buffered = "" if not lines or lines[-1].endswith(("\n", "\r")) else lines.pop()
-                    meaningful = meaningful_event_count([line.rstrip("\r\n") for line in lines])
-                    if meaningful:
-                        last_progress = now
-                        progress_events += meaningful
-                        print(f"v7 生成進度：收到 {meaningful} 個合法輸出事件", flush=True)
-                if _stage_bytes(stage) > STAGE_LIMIT or stdout_log.stat().st_size + stderr_log.stat().st_size > LOG_LIMIT:
-                    reason = "resource_quota"
-                    _terminate(process)
-                    break
-                if now - started >= hard_seconds:
-                    reason = "hard_timeout"
-                    _terminate(process)
-                    break
-                if now - last_progress >= inactivity_seconds:
-                    reason = "inactivity_timeout"
-                    _terminate(process)
-                    break
-                time.sleep(0.5)
-            exit_code = process.wait(timeout=5)
-        finally:
-            if process is not None:
-                _terminate(process)
-    return exit_code, reason, progress_events
 
 
 def _case_split(manifest: dict[str, Any], case_id: str) -> str:
@@ -1058,59 +914,6 @@ def _seed_repair_stage(
         shutil.copy2(source_path, stage / name)
 
 
-def _isolated_environment(skill_source: Path) -> tuple[Path, dict[str, str], str, str]:
-    isolation = Path(tempfile.mkdtemp(prefix="wow-v7-codex-"))
-    try:
-        home = isolation / "home"
-        codex_home = isolation / "codex"
-        temp = isolation / "tmp"
-        home.mkdir(mode=0o700)
-        codex_home.mkdir(mode=0o700)
-        temp.mkdir(mode=0o700)
-        original_codex = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
-        auth = original_codex / "auth.json"
-        if not auth.is_file() or auth.is_symlink():
-            raise V7CodexRunnerError("Codex auth.json is missing or unsafe")
-        shutil.copy2(auth, codex_home / "auth.json")
-        (codex_home / "auth.json").chmod(0o600)
-        installed_skill = codex_home / "skills" / "wow-frontend-design"
-        shutil.copytree(skill_source, installed_skill, symlinks=False)
-        codex = shutil.which("codex")
-        if not codex:
-            raise V7CodexRunnerError("codex CLI is unavailable")
-        safe_path = f"{Path(codex).parent}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        environment = {
-            "HOME": str(home),
-            "CODEX_HOME": str(codex_home),
-            "PATH": safe_path,
-            "TMPDIR": str(temp),
-            "LANG": "C.UTF-8",
-            "LC_ALL": "C.UTF-8",
-        }
-        version = subprocess.run([codex, "--version"], env=environment, text=True, capture_output=True, check=True, timeout=15).stdout.strip()
-        login_result = subprocess.run(
-            [codex, "login", "status"],
-            env=environment,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=15,
-        )
-        _validate_first_party_login(login_result)
-        return isolation, environment, codex, version
-    except BaseException:
-        shutil.rmtree(isolation, ignore_errors=True)
-        raise
-
-
-def _validate_first_party_login(result: subprocess.CompletedProcess[str]) -> None:
-    channels = [value.strip() for value in (result.stdout, result.stderr) if value and value.strip()]
-    status = "\n".join(channels)
-    if result.returncode != 0 or status != "Logged in using ChatGPT":
-        detail = " ".join(status.split())[:200]
-        raise V7CodexRunnerError(f"Codex login status is not first-party ChatGPT: {detail}")
-
-
 def run(args: argparse.Namespace) -> dict[str, Any]:
     root = args.repository_root.resolve(strict=True)
     manifest_path = args.manifest.resolve(strict=True)
@@ -1135,7 +938,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
     materialization_root = Path(tempfile.mkdtemp(prefix="wow-v7-package-"))
     skill_source = materialization_root / "wow-frontend-design"
-    isolation: Path | None = None
     active_stage: Path | None = None
     attempt_history = []
     attempt_diagnostics = []
@@ -1146,6 +948,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     repair_feedback = ""
     supporting_advisory = ""
     repair_record: dict[str, Any] | None = None
+    execution_provenance: dict[str, Any] | None = None
+    codex_version = ""
     try:
         package_record = materialize_package(manifest, args.variant, candidate_reference, skill_source, root)
         if args.repair_source is not None:
@@ -1176,7 +980,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 raise V7CodexRunnerError(
                     f"automatic repair reached its three-round fuse; see {receipt.name}"
                 ) from error
-        isolation, environment, codex, codex_version = _isolated_environment(skill_source)
         for attempt in range(1, args.max_attempts + 1):
             stage = Path(tempfile.mkdtemp(prefix=f"wow-v7-stage-{args.case_id}-"))
             active_stage = stage
@@ -1198,25 +1001,48 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 repair_feedback,
                 supporting_advisory,
             )
-            shell_path = json.dumps(environment["PATH"])
-            shell_home = json.dumps(str(stage))
-            command = [
-                codex, "exec", "--model", "gpt-5.4-mini", "--sandbox", "workspace-write",
-                "--cd", str(stage), "--skip-git-repo-check", "--ephemeral",
-                "--disable", "apps", "--disable", "multi_agent", "--disable", "browser_use",
-                "--disable", "computer_use", "--disable", "image_generation", "--disable", "plugins",
-                "--disable", "shell_tool",
-                "--disable", "skill_mcp_dependency_install", "--disable", "tool_call_mcp_elicitation",
-                "--disable", "tool_suggest", "--ignore-user-config", "--ignore-rules", "--strict-config",
-                "-c", 'shell_environment_policy.inherit="none"',
-                "-c", "sandbox_workspace_write.network_access=false",
-                "-c", f"shell_environment_policy.set={{PATH={shell_path},HOME={shell_home}}}",
-                "-c", 'model_reasoning_summary="none"', "--color", "never", "--json", "-",
-            ]
             started = _now()
-            exit_code, reason, progress_events = _run_codex(
-                command, prompt, environment, stage, stdout_log, stderr_log, inactivity, hard
-            )
+            try:
+                execution_receipt = execution_core.execute_isolated(
+                    execution_core.ExecutionSpec(
+                        stage=stage,
+                        stdout_log=stdout_log,
+                        stderr_log=stderr_log,
+                        skill_source=skill_source,
+                        skill_name="wow-frontend-design",
+                        prompt=prompt,
+                        model="gpt-5.4-mini",
+                        hard_seconds=hard,
+                        inactivity_seconds=inactivity,
+                    )
+                )
+            except execution_core.RunnerError as error:
+                raise V7CodexRunnerError(str(error)) from error
+            try:
+                execution = execution_receipt["execution"]
+                exit_code = execution["exit_code"]
+                reason = execution["reason"]
+                progress_events = execution["progress_events"]
+                codex_record = execution_receipt["tools"]["codex"]
+                current_provenance = {
+                    "tools": execution_receipt["tools"],
+                    "skill_snapshot": execution_receipt["skill_snapshot"],
+                }
+                current_version = codex_record["version"]
+            except (KeyError, TypeError) as error:
+                raise V7CodexRunnerError("execution core returned an incomplete receipt") from error
+            if (
+                type(exit_code) is not int
+                or not isinstance(reason, str)
+                or type(progress_events) is not int
+                or not isinstance(current_version, str)
+            ):
+                raise V7CodexRunnerError("execution core returned an invalid receipt")
+            if execution_provenance is None:
+                execution_provenance = current_provenance
+                codex_version = current_version
+            elif current_provenance != execution_provenance:
+                raise V7CodexRunnerError("execution core provenance drifted across attempts")
             finished = _now()
             attempt_record = {
                 "number": attempt,
@@ -1228,16 +1054,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "stdout_log": {"path": stdout_log.name, "bytes": stdout_log.stat().st_size, "sha256": _digest(stdout_log)},
                 "stderr_log": {"path": stderr_log.name, "bytes": stderr_log.stat().st_size, "sha256": _digest(stderr_log)},
             }
-            if stdout_log.stat().st_size + stderr_log.stat().st_size > LOG_LIMIT:
-                attempt_record["status"] = "resource_failure"
-                attempt_history.append(attempt_record)
-                raise V7CodexRunnerError("generation log quota exceeded")
-            try:
-                trace_policy.validate(stdout_log, stage, allow_commands=False)
-            except (OSError, UnicodeError, trace_policy.PolicyError) as error:
-                attempt_record["status"] = "security_rejection"
-                attempt_history.append(attempt_record)
-                raise V7CodexRunnerError(f"Codex trace violated the controlled policy: {error}") from error
             if exit_code != 0 or reason != "completed":
                 attempt_record["status"] = "retryable_generation_failure"
                 retry_diagnostic = f"前次生成未完成（{reason}，exit={exit_code}）；請重新建立完整的兩個輸出檔。"[:500]
@@ -1340,8 +1156,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             shutil.rmtree(completed_stage, ignore_errors=True)
         if active_stage is not None:
             shutil.rmtree(active_stage, ignore_errors=True)
-        if isolation is not None:
-            shutil.rmtree(isolation, ignore_errors=True)
         shutil.rmtree(materialization_root, ignore_errors=True)
 
 

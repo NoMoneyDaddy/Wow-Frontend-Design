@@ -34,6 +34,26 @@ class SkillCoreContractTests(unittest.TestCase):
         offsets = [self.text.index(heading) for heading in headings]
         self.assertEqual(offsets, sorted(offsets))
 
+    def test_restricted_hosts_still_receive_the_minimum_design_md_contract(self) -> None:
+        self.assertIn("machine-readable frontmatter", self.text)
+        for field in ("version: alpha", "name:", "description:"):
+            self.assertIn(field, self.text)
+        ordered_sections = (
+            "`Overview`",
+            "`Colors`",
+            "`Typography`",
+            "`Layout`",
+            "`Elevation & Depth`",
+            "`Shapes`",
+            "`Components`",
+            "`Do's and Don'ts`",
+        )
+        system = self.text.split("### 4. System", 1)[1].split("### 5. Vertical slice", 1)[0]
+        positions = [system.index(section) for section in ordered_sections]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("one coherent native role/state/keyboard model per control", self.text)
+        self.assertIn("a live enabled focus target after re-render", self.text)
+
     def test_evidence_and_browser_contracts_remain_public(self) -> None:
         for status in ("`VERIFIED`", "`OBSERVED`", "`INFERRED`", "`UNVERIFIED`"):
             with self.subTest(status=status):
