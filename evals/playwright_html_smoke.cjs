@@ -14,9 +14,166 @@ function fail(message) {
   process.exitCode = 2;
 }
 
+function exactKeys(value, expected) {
+  const keys = Object.keys(value).sort();
+  return keys.length === expected.length && keys.every((key, index) => key === [...expected].sort()[index]);
+}
+
+function validateBrowserContract(value, pages) {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || !exactKeys(value, ["cases", "schema_version"])
+    || value.schema_version !== 1 || !Array.isArray(value.cases)
+    || value.cases.length < 1 || value.cases.length > 4) throw new Error("invalid browser contract");
+  const ids = new Set();
+  const routes = new Set();
+  for (const contractCase of value.cases) {
+    if (!contractCase || typeof contractCase !== "object" || Array.isArray(contractCase)
+      || !exactKeys(contractCase, ["id", "page", "profile", "steps"])
+      || !/^[a-z][a-z0-9-]{0,47}$/.test(contractCase.id)
+      || ids.has(contractCase.id) || !pages.includes(contractCase.page)
+      || !["desktop", "mobile"].includes(contractCase.profile)
+      || !Array.isArray(contractCase.steps) || contractCase.steps.length < 1 || contractCase.steps.length > 24) {
+      throw new Error("invalid browser contract case");
+    }
+    const route = `${contractCase.page}\0${contractCase.profile}`;
+    if (routes.has(route)) throw new Error("duplicate browser contract route");
+    ids.add(contractCase.id);
+    routes.add(route);
+    const stepIds = new Set();
+    let actionObserved = false;
+    for (const step of contractCase.steps) {
+      const expectedKeys = ["action", "id", "selector"];
+      if (["fill", "select"].includes(step?.action)) expectedKeys.push("value");
+      if (step?.action === "press") expectedKeys.push("key");
+      if (step?.action === "assert") {
+        expectedKeys.push("expect");
+        if (["attribute-equals", "text-includes"].includes(step.expect)) expectedKeys.push("value");
+        if (step.expect === "attribute-equals") expectedKeys.push("attribute");
+        if (step.expect === "count-equals") expectedKeys.push("count");
+      }
+      if (!step || typeof step !== "object" || Array.isArray(step)
+        || !exactKeys(step, expectedKeys)
+        || !/^[a-z][a-z0-9-]{0,47}$/.test(step.id) || stepIds.has(step.id)
+        || !["assert", "click", "fill", "press", "select"].includes(step.action)
+        || typeof step.selector !== "string" || step.selector.length < 1 || Buffer.byteLength(step.selector) > 256) {
+        throw new Error("invalid browser contract step");
+      }
+      if (["fill", "select"].includes(step.action)
+        && (typeof step.value !== "string" || !step.value || Buffer.byteLength(step.value) > 256)) {
+        throw new Error("invalid browser contract value");
+      }
+      if (step.action === "press"
+        && !["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Enter", "Escape", "Home", "Space", "Tab"].includes(step.key)) {
+        throw new Error("invalid browser contract key");
+      }
+      if (step.action === "assert") {
+        if (!["attribute-equals", "count-equals", "fully-visible-in-viewport", "text-includes", "visible"].includes(step.expect)) {
+          throw new Error("invalid browser contract assertion");
+        }
+        if (step.expect === "fully-visible-in-viewport" && actionObserved) {
+          throw new Error("first viewport assertion must precede actions");
+        }
+        if (step.expect === "attribute-equals"
+          && (typeof step.attribute !== "string" || !/^[A-Za-z_:][A-Za-z0-9_.:-]{0,63}$/.test(step.attribute)
+            || typeof step.value !== "string" || Buffer.byteLength(step.value) > 256)) {
+          throw new Error("invalid browser contract attribute assertion");
+        }
+        if (step.expect === "text-includes"
+          && (typeof step.value !== "string" || !step.value || Buffer.byteLength(step.value) > 256)) {
+          throw new Error("invalid browser contract text assertion");
+        }
+        if (step.expect === "count-equals"
+          && (!Number.isInteger(step.count) || step.count < 0 || step.count > 1000)) {
+          throw new Error("invalid browser contract count assertion");
+        }
+      } else {
+        actionObserved = true;
+      }
+      stepIds.add(step.id);
+    }
+  }
+  return value;
+}
+
+async function settleStep(page) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.waitForTimeout(20);
+}
+
+async function runBrowserContract(page, contractCase) {
+  const findingIds = [];
+  let stepsExecuted = 0;
+  for (const step of contractCase.steps) {
+    const finding = `contract-${contractCase.id}-${step.id}`;
+    const locator = page.locator(step.selector);
+    let passed = false;
+    try {
+      if (step.action === "click") {
+        await locator.click({ timeout: 2_000 });
+        passed = true;
+      } else if (step.action === "fill") {
+        await locator.fill(step.value, { timeout: 2_000 });
+        passed = true;
+      } else if (step.action === "select") {
+        await locator.selectOption(step.value, { timeout: 2_000 });
+        passed = true;
+      } else if (step.action === "press") {
+        await locator.press(step.key, { timeout: 2_000 });
+        passed = true;
+      } else if (step.action === "assert") {
+        const count = await locator.count();
+        if (step.expect === "count-equals") {
+          passed = count === step.count;
+        } else if (count === 1) {
+          if (step.expect === "visible") passed = await locator.isVisible();
+          if (step.expect === "attribute-equals") passed = await locator.getAttribute(step.attribute) === step.value;
+          if (step.expect === "text-includes") passed = (await locator.textContent() || "").includes(step.value);
+          if (step.expect === "fully-visible-in-viewport") {
+            passed = await locator.evaluate(async (element) => {
+              const box = element.getBoundingClientRect();
+              let current = element;
+              while (current instanceof Element) {
+                const style = getComputedStyle(current);
+                if (style.display === "none" || style.visibility === "hidden"
+                  || style.visibility === "collapse" || Number(style.opacity) === 0) return false;
+                current = current.parentElement;
+              }
+              if (!(box.width > 0 && box.height > 0 && box.left >= 0 && box.top >= 0
+                && box.right <= innerWidth && box.bottom <= innerHeight)) return false;
+              return new Promise((resolve) => {
+                const observer = new IntersectionObserver(([entry]) => {
+                  observer.disconnect();
+                  resolve(Boolean(entry?.isIntersecting && entry.intersectionRatio === 1));
+                }, { threshold: [1] });
+                observer.observe(element);
+              });
+            });
+          }
+        }
+      }
+    } catch {
+      passed = false;
+    }
+    stepsExecuted += 1;
+    if (!passed) {
+      findingIds.push(finding);
+      break;
+    }
+    if (step.action !== "assert") await settleStep(page);
+  }
+  await page.waitForTimeout(300);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  return {
+    case_id: contractCase.id,
+    status: findingIds.length === 0 ? "passed" : "rejected",
+    finding_ids: findingIds,
+    steps_executed: stepsExecuted,
+  };
+}
+
 async function main() {
-  if (process.argv.length !== 5) {
-    fail("expected stage, JSON page list and JSON output list");
+  if (![5, 6].includes(process.argv.length)) {
+    fail("expected stage, JSON page list, JSON output list and optional browser contract");
     return;
   }
   const stage = process.argv[2];
@@ -27,12 +184,15 @@ async function main() {
     fail("invalid page list");
     return;
   }
+  const browserContract = process.argv.length === 6
+    ? validateBrowserContract(JSON.parse(process.argv[5]), pages)
+    : null;
   const { browserVersion, results } = await runLocalPageMatrix({
     stage,
     pages,
     allowedFiles,
     profiles: VIEWPORTS,
-    inspectPage: async (page) => {
+    inspectPage: async (page, { relativePage, profile }) => {
       const analysis = await new AxeBuilder({ page }).analyze();
       const layoutHazards = await page.evaluate(() => {
         const visible = (element) => {
@@ -115,11 +275,18 @@ async function main() {
           fixed_content_obstruction_count: fixedContentObstructions,
         };
       });
-      return {
+      const matchingContract = browserContract?.cases.find((item) =>
+        item.page === relativePage && item.profile === profile.name);
+      const browserContractResult = matchingContract
+        ? await runBrowserContract(page, matchingContract)
+        : null;
+      const inspection = {
         axe_violation_count: analysis.violations.length,
         axe_rule_ids: analysis.violations.map((violation) => violation.id).sort(),
         layout_hazards: layoutHazards,
       };
+      if (browserContractResult) inspection.browser_contract = browserContractResult;
+      return inspection;
     },
   });
   for (const result of results) {
@@ -131,12 +298,13 @@ async function main() {
       && Object.values(result.counters).every((count) => count === 0)
       && result.inspection.axe_violation_count === 0
       && result.inspection.layout_hazards.hidden_attribute_visible_count === 0
-      && result.inspection.layout_hazards.fixed_content_obstruction_count === 0;
+      && result.inspection.layout_hazards.fixed_content_obstruction_count === 0
+      && (!("browser_contract" in result.inspection) || result.inspection.browser_contract.status === "passed");
     result.status = passed ? "passed" : "rejected";
   }
 
   const status = results.every((result) => result.status === "passed") ? "passed" : "rejected";
-  process.stdout.write(`${JSON.stringify({
+  const receipt = {
     schema_version: 1,
     status,
     tool: {
@@ -148,7 +316,15 @@ async function main() {
     settle_ms: 300,
     profiles: VIEWPORTS.map(({ name, viewport, reducedMotion }) => ({ name, viewport, reduced_motion: reducedMotion })),
     results,
-  })}\n`);
+  };
+  if (browserContract) {
+    receipt.browser_contract = {
+      schema_version: 1,
+      case_count: browserContract.cases.length,
+      case_ids: browserContract.cases.map((item) => item.id).sort(),
+    };
+  }
+  process.stdout.write(`${JSON.stringify(receipt)}\n`);
 }
 
 main().catch((error) => fail(error && error.name ? error.name : "unknown"));

@@ -16,9 +16,12 @@ SMOKE = ROOT / "evals" / "playwright_html_smoke.cjs"
 
 
 class PlaywrightHtmlSmokeTests(unittest.TestCase):
-    def invoke(self, stage: Path, pages: list[str], outputs: list[str]) -> dict:
+    def invoke(self, stage: Path, pages: list[str], outputs: list[str], contract: dict | None = None) -> dict:
+        command = ["node", str(SMOKE), str(stage), json.dumps(pages), json.dumps(outputs)]
+        if contract is not None:
+            command.append(json.dumps(contract))
         completed = subprocess.run(
-            ["node", str(SMOKE), str(stage), json.dumps(pages), json.dumps(outputs)],
+            command,
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -27,6 +30,198 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
         )
         self.assertEqual(0, completed.returncode, completed.stderr)
         return json.loads(completed.stdout)
+
+    def test_browser_contract_rejects_mobile_task_below_first_viewport_without_autoscroll(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Fold</title></head><body>
+<main><h1>Task</h1><div style="height:850px"></div><button id="primary">Continue</button></main>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "mobile-primary-task",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [{
+                        "id": "primary-in-first-viewport",
+                        "action": "assert",
+                        "selector": "#primary",
+                        "expect": "fully-visible-in-viewport",
+                    }],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            self.assertEqual("rejected", receipt["status"])
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", desktop["status"])
+            self.assertEqual("rejected", mobile["status"])
+            self.assertEqual(
+                ["contract-mobile-primary-task-primary-in-first-viewport"],
+                mobile["inspection"]["browser_contract"]["finding_ids"],
+            )
+
+    def test_browser_contract_rejects_viewport_element_clipped_by_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Clip</title><style>
+.clip { height: 32px; overflow: hidden; }
+#primary { height: 64px; }
+</style></head><body><main><h1>Task</h1><div class="clip"><button id="primary">Continue</button></div></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "mobile-primary-task",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [{
+                        "id": "primary-fully-visible",
+                        "action": "assert",
+                        "selector": "#primary",
+                        "expect": "fully-visible-in-viewport",
+                    }],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("rejected", mobile["status"])
+            self.assertEqual(
+                ["contract-mobile-primary-task-primary-fully-visible"],
+                mobile["inspection"]["browser_contract"]["finding_ids"],
+            )
+
+    def test_browser_contract_rejects_subpixel_ancestor_clipping(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Clip</title><style>
+.clip { width: 299.8px; overflow: hidden; }
+#primary { display: block; width: 300px; height: 64px; }
+</style></head><body><main><h1>Task</h1><div class="clip"><button id="primary">Continue</button></div></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "mobile-primary-task",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [{
+                        "id": "primary-fully-visible",
+                        "action": "assert",
+                        "selector": "#primary",
+                        "expect": "fully-visible-in-viewport",
+                    }],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("rejected", mobile["status"])
+
+    def test_browser_contract_observes_delayed_error_after_final_step(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Delayed</title></head><body><main>
+<h1>Task</h1><button id="primary">Continue</button>
+</main><script>document.querySelector('#primary').onclick=()=>setTimeout(()=>{console.error('PRIVATE delayed');throw new Error('PRIVATE delayed')},80)</script></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "desktop-primary-task",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [{"id": "activate", "action": "click", "selector": "#primary"}],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("rejected", desktop["status"])
+            self.assertGreater(desktop["counters"]["page_errors"], 0)
+            self.assertGreater(desktop["counters"]["console_errors"], 0)
+            self.assertNotIn("PRIVATE delayed", json.dumps(receipt))
+
+    def test_browser_contract_runs_all_declarative_actions_and_assertions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Flow</title></head><body><main>
+<h1>Configure</h1><label>Name <input id="name"></label>
+<label>Plan <select id="plan"><option value="basic">Basic</option><option value="pro">Pro</option></select></label>
+<button id="activate" aria-pressed="false">Activate</button><output id="state">Idle</output>
+</main><script>
+const nameInput = document.querySelector('#name');
+const planSelect = document.querySelector('#plan');
+const stateOutput = document.querySelector('#state');
+const activateButton = document.querySelector('#activate');
+nameInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') stateOutput.textContent = `${nameInput.value}:${planSelect.value}`;
+});
+activateButton.onclick = () => activateButton.setAttribute('aria-pressed', 'true');
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "desktop-primary-flow",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "name-visible", "action": "assert", "selector": "#name", "expect": "visible"},
+                        {"id": "name-first-viewport", "action": "assert", "selector": "#name", "expect": "fully-visible-in-viewport"},
+                        {"id": "fill-name", "action": "fill", "selector": "#name", "value": "Ada"},
+                        {"id": "select-plan", "action": "select", "selector": "#plan", "value": "pro"},
+                        {"id": "submit-key", "action": "press", "selector": "#name", "key": "Enter"},
+                        {"id": "state-text", "action": "assert", "selector": "#state", "expect": "text-includes", "value": "Ada:pro"},
+                        {"id": "activate", "action": "click", "selector": "#activate"},
+                        {"id": "activated", "action": "assert", "selector": "#activate", "expect": "attribute-equals", "attribute": "aria-pressed", "value": "true"},
+                        {"id": "single-state", "action": "assert", "selector": "#state", "expect": "count-equals", "count": 1},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            self.assertEqual("passed", receipt["status"])
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
+            self.assertEqual(9, desktop["inspection"]["browser_contract"]["steps_executed"])
+
+    def test_browser_contract_exercises_role_state_and_reports_runtime_error_without_raw_details(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Role</title></head><body><main>
+<button id="buyer" aria-pressed="false">Buyer</button><section id="detail">Manager</section>
+</main><script>buyer.onclick=()=>{throw new Error('PRIVATE buyer crash')}</script></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "buyer-role",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "activate", "action": "click", "selector": "#buyer"},
+                        {"id": "pressed", "action": "assert", "selector": "#buyer", "expect": "attribute-equals", "attribute": "aria-pressed", "value": "true"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            result = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("rejected", result["status"])
+            self.assertGreater(result["counters"]["page_errors"], 0)
+            self.assertEqual(["contract-buyer-role-pressed"], result["inspection"]["browser_contract"]["finding_ids"])
+            self.assertNotIn("PRIVATE buyer crash", json.dumps(receipt))
 
     def test_launch_failure_closes_server_and_exits_quickly(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

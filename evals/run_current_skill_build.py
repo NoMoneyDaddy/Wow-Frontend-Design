@@ -43,6 +43,7 @@ BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
 REPAIR_POLICY = ROOT / "evals" / "current_skill_repair.py"
 EXPECTED_OUTPUTS = ("DESIGN.md", "index.html")
 BRIEF_LIMIT = 128 * 1024
+BROWSER_CONTRACT_LIMIT = 32 * 1024
 FILE_LIMIT = 1_048_576
 SEED_PROMPT_LIMIT = 256 * 1024
 REPAIR_PROMPT_LIMIT = 512 * 1024
@@ -51,6 +52,11 @@ CURRENT_DEFAULT_MODEL = "gpt-5.4-mini"
 CURRENT_DEFAULT_REASONING_EFFORT = "high"
 CASE_MODES = ("greenfield", "retrofit", "patch")
 PATCH_LANES = {"polish": "POLISH", "repair": "REPAIR"}
+BROWSER_PROFILES = {"desktop", "mobile"}
+BROWSER_STEP_ACTIONS = {"assert", "click", "fill", "press", "select"}
+BROWSER_ASSERTIONS = {"attribute-equals", "count-equals", "fully-visible-in-viewport", "text-includes", "visible"}
+CONTRACT_ID = re.compile(r"[a-z][a-z0-9-]{0,47}")
+ATTRIBUTE_NAME = re.compile(r"[A-Za-z_:][A-Za-z0-9_.:-]{0,63}")
 
 
 def _module(name: str, path: Path) -> Any:
@@ -91,6 +97,143 @@ def _regular_absolute_file(path: Path, label: str, maximum: int) -> Path:
     if not stat.S_ISREG(info.st_mode) or path.is_symlink() or not 1 <= info.st_size <= maximum:
         raise RunnerError(f"{label} must be a non-empty regular file no larger than {maximum} bytes")
     return path
+
+
+def _exact_keys(value: dict[str, Any], expected: set[str], label: str) -> None:
+    if set(value) != expected:
+        raise RunnerError(f"{label} has an invalid shape")
+
+
+def _bounded_contract_text(value: Any, label: str, maximum: int) -> str:
+    if not isinstance(value, str) or not value or len(value.encode("utf-8")) > maximum:
+        raise RunnerError(f"browser contract {label} is invalid")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise RunnerError(f"browser contract {label} is invalid")
+    return value
+
+
+def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, dict[str, Any], dict[str, Any]]:
+    source = _regular_absolute_file(path, "browser contract", BROWSER_CONTRACT_LIMIT)
+    try:
+        canonical = source.resolve(strict=True)
+        raw = source.read_bytes()
+        decoded = raw.decode("utf-8")
+        payload = json.loads(decoded)
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RunnerError("browser contract must be strict UTF-8 JSON") from error
+    if canonical != source or "\x00" in decoded or not isinstance(payload, dict):
+        raise RunnerError("browser contract must be a canonical regular JSON file")
+    _exact_keys(payload, {"schema_version", "cases"}, "browser contract")
+    cases = payload.get("cases")
+    if type(payload.get("schema_version")) is not int or payload["schema_version"] != 1 or not isinstance(cases, list) or not 1 <= len(cases) <= 4:
+        raise RunnerError("browser contract schema or case quota is invalid")
+    output_set = set(outputs)
+    seen_cases: set[str] = set()
+    seen_routes: set[tuple[str, str]] = set()
+    normalized_cases: list[dict[str, Any]] = []
+    for case in cases:
+        if not isinstance(case, dict):
+            raise RunnerError("browser contract case is invalid")
+        _exact_keys(case, {"id", "page", "profile", "steps"}, "browser contract case")
+        case_id = case.get("id")
+        page = case.get("page")
+        profile = case.get("profile")
+        steps = case.get("steps")
+        if not isinstance(case_id, str) or CONTRACT_ID.fullmatch(case_id) is None or case_id in seen_cases:
+            raise RunnerError("browser contract case id is invalid")
+        if not isinstance(page, str) or page not in output_set or not page.casefold().endswith(".html"):
+            raise RunnerError("browser contract page must be a declared HTML output")
+        if profile not in BROWSER_PROFILES or (page, profile) in seen_routes:
+            raise RunnerError("browser contract page/profile pair is invalid or duplicated")
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 24:
+            raise RunnerError("browser contract step quota is invalid")
+        seen_cases.add(case_id)
+        seen_routes.add((page, profile))
+        seen_steps: set[str] = set()
+        normalized_steps: list[dict[str, Any]] = []
+        action_observed = False
+        for step in steps:
+            if not isinstance(step, dict):
+                raise RunnerError("browser contract step is invalid")
+            action = step.get("action")
+            expected_keys = {"id", "action", "selector"}
+            if action in {"fill", "select"}:
+                expected_keys.add("value")
+            elif action == "press":
+                expected_keys.add("key")
+            elif action == "assert":
+                expected_keys.add("expect")
+                expectation = step.get("expect")
+                if expectation in {"attribute-equals", "text-includes"}:
+                    expected_keys.add("value")
+                if expectation == "attribute-equals":
+                    expected_keys.add("attribute")
+                if expectation == "count-equals":
+                    expected_keys.add("count")
+            _exact_keys(step, expected_keys, "browser contract step")
+            step_id = step.get("id")
+            selector = step.get("selector")
+            if (
+                action not in BROWSER_STEP_ACTIONS
+                or not isinstance(step_id, str)
+                or CONTRACT_ID.fullmatch(step_id) is None
+                or step_id in seen_steps
+            ):
+                raise RunnerError("browser contract step id or action is invalid")
+            _bounded_contract_text(selector, "selector", 256)
+            if action in {"fill", "select"}:
+                _bounded_contract_text(step.get("value"), "value", 256)
+            elif action == "press":
+                if step.get("key") not in {"ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Enter", "Escape", "Home", "Space", "Tab"}:
+                    raise RunnerError("browser contract key is invalid")
+            elif action == "assert":
+                expectation = step.get("expect")
+                if expectation not in BROWSER_ASSERTIONS:
+                    raise RunnerError("browser contract assertion is invalid")
+                if expectation == "fully-visible-in-viewport" and action_observed:
+                    raise RunnerError("browser contract first viewport assertion must precede actions")
+                if expectation == "attribute-equals":
+                    attribute = step.get("attribute")
+                    if not isinstance(attribute, str) or ATTRIBUTE_NAME.fullmatch(attribute) is None:
+                        raise RunnerError("browser contract attribute is invalid")
+                    if not isinstance(step.get("value"), str) or len(step["value"].encode("utf-8")) > 256:
+                        raise RunnerError("browser contract value is invalid")
+                elif expectation == "text-includes":
+                    _bounded_contract_text(step.get("value"), "value", 256)
+                elif expectation == "count-equals":
+                    count = step.get("count")
+                    if type(count) is not int or not 0 <= count <= 1000:
+                        raise RunnerError("browser contract count is invalid")
+            else:
+                action_observed = True
+            seen_steps.add(step_id)
+            normalized_steps.append(dict(step))
+        normalized_cases.append({"id": case_id, "page": page, "profile": profile, "steps": normalized_steps})
+    normalized = {"schema_version": 1, "cases": normalized_cases}
+    record = {
+        "schema_version": 1,
+        "bytes": len(raw),
+        "sha256": _digest_bytes(raw),
+        "case_count": len(normalized_cases),
+        "step_count": sum(len(case["steps"]) for case in normalized_cases),
+    }
+    return canonical, normalized, record
+
+
+def _browser_contract_unchanged(path: Path | None, expected: dict[str, Any] | None) -> None:
+    if path is None or expected is None:
+        return
+    try:
+        info = path.lstat()
+    except OSError as error:
+        raise RunnerError("browser contract provenance drifted during execution") from error
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or path.is_symlink()
+        or info.st_size != expected["bytes"]
+        or _digest(path) != expected["sha256"]
+    ):
+        raise RunnerError("browser contract provenance drifted during execution")
 
 
 def _fresh_target(path: Path) -> tuple[Path, tuple[int, int]]:
@@ -456,7 +599,12 @@ def _communicate_process_group(
         raise
 
 
-def _run_html_smoke(stage: Path, outputs: tuple[str, ...], timeout: int) -> dict[str, Any]:
+def _run_html_smoke(
+    stage: Path,
+    outputs: tuple[str, ...],
+    timeout: int,
+    browser_contract: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     html_outputs = [name for name in outputs if name.casefold().endswith(".html")]
     node_raw = shutil.which("node", path=design_policy.SYSTEM_PATH)
     if not node_raw:
@@ -494,8 +642,11 @@ def _run_html_smoke(stage: Path, outputs: tuple[str, ...], timeout: int) -> dict
         if name in os.environ:
             environment[name] = os.environ[name]
     try:
+        command = [str(node), str(validator), str(stage), json.dumps(html_outputs), json.dumps(list(outputs))]
+        if browser_contract is not None:
+            command.append(json.dumps(browser_contract, ensure_ascii=False, separators=(",", ":")))
         process = subprocess.Popen(
-            [str(node), str(validator), str(stage), json.dumps(html_outputs), json.dumps(list(outputs))],
+            command,
             cwd=ROOT,
             env=environment,
             text=True,
@@ -520,6 +671,8 @@ def _run_html_smoke(stage: Path, outputs: tuple[str, ...], timeout: int) -> dict
         for record in results
         if isinstance(record, dict)
     }
+    result_statuses = [record.get("status") for record in results if isinstance(record, dict)]
+    aggregate_status = "passed" if result_statuses and all(status == "passed" for status in result_statuses) else "rejected"
     if (
         process.returncode != 0
         or receipt.get("schema_version") != 1
@@ -528,8 +681,64 @@ def _run_html_smoke(stage: Path, outputs: tuple[str, ...], timeout: int) -> dict
         or tool.get("version") != version
         or len(results) != len(expected)
         or observed != expected
+        or len(result_statuses) != len(results)
+        or any(status not in {"passed", "rejected"} for status in result_statuses)
+        or receipt.get("status") != aggregate_status
     ):
         raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    contract_summary = receipt.get("browser_contract")
+    if browser_contract is None:
+        if contract_summary is not None:
+            raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    else:
+        expected_contract_cases = {case["id"] for case in browser_contract["cases"]}
+        expected_contract_routes = {
+            (case["page"], case["profile"]): case for case in browser_contract["cases"]
+        }
+        summary_case_ids = contract_summary.get("case_ids") if isinstance(contract_summary, dict) else None
+        if (
+            not isinstance(contract_summary, dict)
+            or contract_summary.get("schema_version") != 1
+            or contract_summary.get("case_count") != len(expected_contract_cases)
+            or not isinstance(summary_case_ids, list)
+            or len(summary_case_ids) != len(expected_contract_cases)
+            or set(summary_case_ids) != expected_contract_cases
+        ):
+            raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+        for result in results:
+            route = (result.get("page"), result.get("profile"))
+            inspection = result.get("inspection")
+            if not isinstance(inspection, dict):
+                raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+            expected_case = expected_contract_routes.get(route)
+            observed_case = inspection.get("browser_contract")
+            if expected_case is None:
+                if "browser_contract" in inspection:
+                    raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+                continue
+            if not isinstance(observed_case, dict) or set(observed_case) != {
+                "case_id", "finding_ids", "status", "steps_executed"
+            }:
+                raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+            finding_ids = observed_case.get("finding_ids")
+            steps_executed = observed_case.get("steps_executed")
+            contract_steps = expected_case["steps"]
+            status = observed_case.get("status")
+            if (
+                observed_case.get("case_id") != expected_case["id"]
+                or status not in {"passed", "rejected"}
+                or not isinstance(finding_ids, list)
+                or type(steps_executed) is not int
+                or not 1 <= steps_executed <= len(contract_steps)
+                or (status == "passed" and (finding_ids or steps_executed != len(contract_steps)))
+                or (status == "rejected" and len(finding_ids) != 1)
+                or (status == "rejected" and result.get("status") != "rejected")
+            ):
+                raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+            if status == "rejected":
+                failed_step = contract_steps[steps_executed - 1]
+                if finding_ids != [f"contract-{expected_case['id']}-{failed_step['id']}"]:
+                    raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     tool.update(
         {
             "lockfile_sha256": _digest(lockfile),
@@ -658,6 +867,7 @@ def _receipt(
     repair_failure: dict[str, Any] | None = None,
     failure_artifact: dict[str, Any] | None = None,
     policy_tools: dict[str, Any] | None = None,
+    browser_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     logs = {}
     for name, path in (("trace", stdout_log), ("stderr", stderr_log)):
@@ -700,6 +910,8 @@ def _receipt(
         payload["failure_artifact"] = failure_artifact
     if policy_tools is not None:
         payload["tools"] = policy_tools
+    if browser_contract is not None:
+        payload["browser_contract"] = browser_contract
     return payload
 
 
@@ -857,6 +1069,7 @@ def run(
     patch_lane: str | None = None,
     seed_root: Path | None = None,
     allow_changes: list[str] | tuple[str, ...] | None = None,
+    browser_contract: Path | None = None,
 ) -> dict[str, Any]:
     if type(max_repair_rounds) is not int or not 0 <= max_repair_rounds <= MAX_REPAIR_ROUNDS:
         raise RunnerError(f"max repair rounds must be within 0..{MAX_REPAIR_ROUNDS}")
@@ -922,6 +1135,22 @@ def run(
         for boundary in (target, log_dir, ROOT, SKILL_SOURCE):
             if seed_root == boundary or seed_root in boundary.parents or boundary in seed_root.parents:
                 raise RunnerError("seed root must be outside evaluator, log, and publish paths")
+    browser_contract_path: Path | None = None
+    browser_contract_data: dict[str, Any] | None = None
+    browser_contract_record: dict[str, Any] | None = None
+    if browser_contract is not None:
+        browser_contract_path, browser_contract_data, browser_contract_record = _load_browser_contract(
+            browser_contract, output_names
+        )
+        for boundary in tuple(
+            item for item in (target, log_dir, ROOT, SKILL_SOURCE, seed_root) if item is not None
+        ):
+            if (
+                browser_contract_path == boundary
+                or browser_contract_path in boundary.parents
+                or boundary in browser_contract_path.parents
+            ):
+                raise RunnerError("browser contract must remain outside repository, seed, log, and publish paths")
     seed_prompt = (
         _prompt_file_records(
             seed_root,
@@ -1122,7 +1351,12 @@ def run(
             if design_gate.get("status") != "passed":
                 raise RunnerError("DESIGN.md clean gate returned an invalid status")
             try:
-                html_smoke_gate = _run_html_smoke(stage, output_names, min(120, max(15, hard_seconds)))
+                html_smoke_gate = _run_html_smoke(
+                    stage,
+                    output_names,
+                    min(120, max(15, hard_seconds)),
+                    browser_contract_data,
+                )
             except RunnerError:
                 html_smoke_unavailable = {
                     "quarantine": _quarantine_outputs(
@@ -1137,6 +1371,7 @@ def run(
                 raise
             if validate_candidate() != output_records:
                 raise RunnerError("output content or mode drifted during HTML smoke validation")
+            _browser_contract_unchanged(browser_contract_path, browser_contract_record)
             if html_smoke_gate.get("status") == "rejected":
                 if repair_rounds < max_repair_rounds:
                     try:
@@ -1165,6 +1400,7 @@ def run(
             raise RunnerError("seed root provenance drifted during execution")
         if seed_root is not None and _directory_records(seed_root) != seed_directories:
             raise RunnerError("seed directory provenance drifted during execution")
+        _browser_contract_unchanged(browser_contract_path, browser_contract_record)
         published_directories = _directory_records(stage)
         _create_frozen_directories(publish, published_directories)
         for name in output_names:
@@ -1198,6 +1434,8 @@ def run(
             "tools": {**execution["tools"], **wrapper_tools},
             "outputs": output_records,
         }
+        if browser_contract_record is not None:
+            manifest["browser_contract"] = browser_contract_record
         if seed_snapshot:
             seed_tree = {"directories": seed_directories, "files": seed_snapshot}
             manifest["seed_snapshot"] = {
@@ -1233,6 +1471,7 @@ def run(
             execution=execution,
             repair=repair_summary(),
             policy_tools=wrapper_tools,
+            browser_contract=browser_contract_record,
         )
         encoded_success = _json_bytes(success)
         expected_execution_receipt = {
@@ -1303,6 +1542,7 @@ def run(
                 repair_failure=repair_failure,
                 failure_artifact=failure_artifact,
                 policy_tools=wrapper_tools,
+                browser_contract=browser_contract_record,
             )
             try:
                 _write_json_exclusive(receipt_path, failure)
@@ -1337,6 +1577,11 @@ def main() -> int:
     parser.add_argument("--patch-lane", choices=tuple(PATCH_LANES))
     parser.add_argument("--seed-root", type=Path)
     parser.add_argument(
+        "--browser-contract",
+        type=Path,
+        help="absolute evaluator-owned bounded Playwright contract JSON",
+    )
+    parser.add_argument(
         "--allow-change",
         action="append",
         help="repeat for each evaluator-authorized seeded path that may change",
@@ -1357,6 +1602,7 @@ def main() -> int:
             patch_lane=args.patch_lane,
             seed_root=args.seed_root,
             allow_changes=args.allow_change,
+            browser_contract=args.browser_contract,
         )
     except (OSError, RunnerError) as error:
         message = str(error)

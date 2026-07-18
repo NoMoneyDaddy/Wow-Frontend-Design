@@ -124,6 +124,24 @@ def compile_html_feedback(receipt: dict[str, Any]) -> dict[str, Any]:
                 value = layout_hazards.get(key)
                 if type(value) is int and value > 0:
                     identifiers.extend([identifier] * min(value, 100))
+        browser_contract = inspection.get("browser_contract") if isinstance(inspection, dict) else None
+        if browser_contract is not None:
+            if not isinstance(browser_contract, dict):
+                raise ValueError("HTML browser contract findings are malformed")
+            contract_status = browser_contract.get("status")
+            contract_ids = browser_contract.get("finding_ids")
+            if (
+                contract_status not in {"passed", "rejected"}
+                or not isinstance(contract_ids, list)
+                or len(contract_ids) > 24
+                or (contract_status == "passed" and contract_ids)
+                or (contract_status == "rejected" and not contract_ids)
+            ):
+                raise ValueError("HTML browser contract findings are malformed")
+            for identifier in contract_ids:
+                if not isinstance(identifier, str) or re.fullmatch(r"contract-[a-z][a-z0-9-]{2,103}", identifier) is None:
+                    raise ValueError("HTML browser contract findings are malformed")
+                identifiers.append(identifier)
     if not identifiers:
         identifiers = ["unclassified-1"]
     return _bounded_payload("html", identifiers)

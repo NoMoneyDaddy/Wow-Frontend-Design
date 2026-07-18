@@ -101,6 +101,9 @@ if mode == "output-symlink":
     (stage / "index.html").symlink_to(stage / "DESIGN.md")
 elif mode == "oversized-output":
     (stage / "index.html").write_bytes({SAFE_HTML.encode()!r} + b"x" * 1048577)
+elif mode in ("browser-contract-repairable", "browser-contract-persistent"):
+    spacer = '<div style="height:900px"></div>' if attempt == 1 or mode == "browser-contract-persistent" else ''
+    (stage / "index.html").write_text('<!doctype html><html lang="en"><head><title>Task</title></head><body><main><h1>Task</h1>' + spacer + '<button id="primary">Continue</button></main></body></html>', encoding="utf-8")
 elif mode == "page-error" or (mode in ("page-error-repairable", "seeded-repairable") and attempt == 1):
     (stage / "index.html").write_text({SAFE_HTML.replace('</main>', '<script>throw new Error("broken boot")</script></main>')!r}, encoding="utf-8")
 else:
@@ -119,6 +122,8 @@ if mode == "skill-content-drift":
     (root / "skill-source" / "SKILL.md").write_text("drifted", encoding="utf-8")
 if mode == "skill-mode-drift":
     (root / "skill-source" / "SKILL.md").chmod(0o700)
+if mode == "browser-contract-drift":
+    (root / "browser-contract.json").write_text('{{"schema_version":1,"cases":[]}}', encoding="utf-8")
 print(json.dumps({{"type":"turn.completed"}}))
 if mode == "exit-one" or (mode == "exit-on-repair" and attempt > 1):
     print("provider rejected the requested model", file=sys.stderr)
@@ -182,6 +187,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         patch_lane: str | None = None,
         seed_root: Path | None = None,
         allow_changes: tuple[str, ...] = (),
+        browser_contract: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
         selected_log_dir = log_dir or Path(environment["CODEX_HOME"]).parent / "logs"
         selected_log_dir.mkdir(exist_ok=True)
@@ -204,6 +210,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             command.extend(("--patch-lane", patch_lane))
         if seed_root is not None:
             command.extend(("--seed-root", str(seed_root)))
+        if browser_contract is not None:
+            command.extend(("--browser-contract", str(browser_contract)))
         for path in allow_changes:
             command.extend(("--allow-change", path))
         command.extend(("--hard-seconds", str(hard_seconds)))
@@ -219,6 +227,192 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             check=False,
         )
 
+    def browser_contract_fixture(self, root: Path, *, selector: str = "#primary") -> Path:
+        contract = (root / "browser-contract.json").resolve()
+        contract.write_text(json.dumps({
+            "schema_version": 1,
+            "cases": [{
+                "id": "mobile-primary-task",
+                "page": "index.html",
+                "profile": "mobile",
+                "steps": [{
+                    "id": "primary-in-first-viewport",
+                    "action": "assert",
+                    "selector": selector,
+                    "expect": "fully-visible-in-viewport",
+                }],
+            }],
+        }), encoding="utf-8")
+        return contract
+
+    def test_browser_contract_rejection_repairs_then_fully_regates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "browser-contract-repairable")
+            contract = self.browser_contract_fixture(root, selector="#primary")
+            completed = self.invoke(brief, target, environment, browser_contract=contract)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
+            self.assertEqual(1, manifest["repair"]["rounds_used"])
+            trigger = manifest["repair"]["attempts"][1]["trigger"]
+            self.assertEqual(["contract-mobile-primary-task-primary-in-first-viewport"], trigger["finding_ids"])
+            self.assertEqual(
+                {"schema_version", "bytes", "sha256", "case_count", "step_count"},
+                set(manifest["browser_contract"]),
+            )
+            serialized_manifest = json.dumps(manifest)
+            self.assertNotIn(str(contract), serialized_manifest)
+            self.assertNotIn("#primary", serialized_manifest)
+            repair_prompt = json.loads((capture / "invocation-2.json").read_text(encoding="utf-8"))["prompt"]
+            self.assertIn("contract-mobile-primary-task-primary-in-first-viewport", repair_prompt)
+            self.assertNotIn("#primary", repair_prompt)
+
+    def test_persistent_browser_contract_rejection_hits_repair_fuse(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "browser-contract-persistent")
+            contract = self.browser_contract_fixture(root)
+            completed = self.invoke(brief, target, environment, browser_contract=contract)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("html_smoke_rejection", completed.stderr)
+            self.assertEqual("3", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual([], list(target.iterdir()))
+            log_dir = root / "logs"
+            self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("html_smoke_rejection", receipt["classification"])
+            self.assertEqual(2, receipt["repair"]["rounds_used"])
+            self.assertEqual(3, len(receipt["repair"]["attempts"]))
+            self.assertEqual(1, receipt["browser_contract"]["schema_version"])
+            self.assertEqual(hashlib.sha256(contract.read_bytes()).hexdigest(), receipt["browser_contract"]["sha256"])
+            self.assertNotIn("#primary", json.dumps(receipt))
+
+    def test_browser_contract_provenance_drift_is_rejected_before_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root, "browser-contract-drift")
+            contract = self.browser_contract_fixture(root)
+            completed = self.invoke(brief, target, environment, browser_contract=contract)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("execution_infrastructure_failure", completed.stderr)
+            self.assertEqual([], list(target.iterdir()))
+            receipt = json.loads((root / "logs" / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertNotIn("#primary", json.dumps(receipt))
+
+    def test_invalid_browser_contract_is_rejected_before_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            contract = (root / "browser-contract.json").resolve()
+            contract.write_text(json.dumps({"schema_version": 1, "cases": [], "extra": True}), encoding="utf-8")
+            completed = self.invoke(brief, target, environment, browser_contract=contract)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("input_or_setup_rejection", completed.stderr)
+            self.assertFalse((capture / "invocation-count.txt").exists())
+            self.assertEqual([], list(target.iterdir()))
+
+    def test_browser_contract_schema_matrix_is_rejected_before_generation(self) -> None:
+        valid_case = {
+            "id": "mobile-primary-task",
+            "page": "index.html",
+            "profile": "mobile",
+            "steps": [{
+                "id": "primary-visible",
+                "action": "assert",
+                "selector": "#primary",
+                "expect": "visible",
+            }],
+        }
+        invalid_payloads = {
+            "boolean-schema-version": {"schema_version": True, "cases": [valid_case]},
+            "unknown-root-key": {"schema_version": 1, "cases": [valid_case], "extra": True},
+            "unknown-case-key": {"schema_version": 1, "cases": [{**valid_case, "extra": True}]},
+            "duplicate-route": {"schema_version": 1, "cases": [valid_case, {**valid_case, "id": "mobile-secondary-task"}]},
+            "undeclared-page": {"schema_version": 1, "cases": [{**valid_case, "page": "private.html"}]},
+            "control-character-selector": {"schema_version": 1, "cases": [{**valid_case, "steps": [{**valid_case["steps"][0], "selector": "#primary\nprivate"}]}]},
+            "first-viewport-after-action": {"schema_version": 1, "cases": [{**valid_case, "steps": [
+                {"id": "activate", "action": "click", "selector": "#primary"},
+                {"id": "late-fold", "action": "assert", "selector": "#primary", "expect": "fully-visible-in-viewport"},
+            ]}]},
+            "step-quota": {"schema_version": 1, "cases": [{**valid_case, "steps": [{**valid_case["steps"][0], "id": f"step-{index}"} for index in range(25)]}]},
+        }
+        for label, payload in invalid_payloads.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                brief, target, capture, environment = self.fixture(root)
+                contract = (root / "browser-contract.json").resolve()
+                contract.write_text(json.dumps(payload), encoding="utf-8")
+                completed = self.invoke(brief, target, environment, browser_contract=contract)
+                self.assertNotEqual(0, completed.returncode)
+                self.assertIn("input_or_setup_rejection", completed.stderr)
+                self.assertFalse((capture / "invocation-count.txt").exists())
+                self.assertEqual([], list(target.iterdir()))
+
+    def test_browser_contract_summary_cannot_impersonate_case_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            contract_path = self.browser_contract_fixture(root)
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            version = json.loads((ROOT / "node_modules" / "playwright" / "package.json").read_text(encoding="utf-8"))["version"]
+            receipt = {
+                "schema_version": 1,
+                "status": "passed",
+                "tool": {"package": "playwright", "version": version},
+                "results": [
+                    {"page": "index.html", "profile": "desktop", "inspection": {}},
+                    {"page": "index.html", "profile": "mobile", "inspection": {}},
+                ],
+                "browser_contract": {
+                    "schema_version": 1,
+                    "case_count": 1,
+                    "case_ids": ["mobile-primary-task"],
+                },
+            }
+            process = mock.Mock(returncode=0)
+            with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
+                policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")
+            ), self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._run_html_smoke(root, ("DESIGN.md", "index.html"), 1, contract)
+
+    def test_browser_contract_rejection_cannot_impersonate_passed_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            contract_path = self.browser_contract_fixture(root)
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            version = json.loads((ROOT / "node_modules" / "playwright" / "package.json").read_text(encoding="utf-8"))["version"]
+            receipt = {
+                "schema_version": 1,
+                "status": "passed",
+                "tool": {"package": "playwright", "version": version},
+                "results": [
+                    {"page": "index.html", "profile": "desktop", "status": "passed", "inspection": {}},
+                    {
+                        "page": "index.html",
+                        "profile": "mobile",
+                        "status": "passed",
+                        "inspection": {"browser_contract": {
+                            "case_id": "mobile-primary-task",
+                            "status": "rejected",
+                            "finding_ids": ["contract-mobile-primary-task-primary-in-first-viewport"],
+                            "steps_executed": 1,
+                        }},
+                    },
+                ],
+                "browser_contract": {
+                    "schema_version": 1,
+                    "case_count": 1,
+                    "case_ids": ["mobile-primary-task"],
+                },
+            }
+            process = mock.Mock(returncode=0)
+            with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
+                policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")
+            ), self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._run_html_smoke(root, ("DESIGN.md", "index.html"), 1, contract)
+
     def test_fresh_build_publishes_only_outputs_and_privacy_safe_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -230,6 +424,11 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 {path.name for path in target.iterdir()},
             )
             manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertNotIn("browser_contract", manifest)
+            self.assertTrue(all(
+                "browser_contract" not in result["inspection"]
+                for result in manifest["html_smoke_gate"]["results"]
+            ))
             self.assertEqual(
                 {"mode": "greenfield", "lane_contract": "BUILD"}, manifest["case"]
             )

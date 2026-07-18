@@ -29,6 +29,38 @@ npm run build:current -- \
   --allow-change styles.css
 ```
 
+需要驗證特定產品關鍵路徑時，可再傳 evaluator-owned 的 declarative Playwright contract：
+
+```bash
+npm run build:current -- \
+  --brief /absolute/evaluator-root/brief.md \
+  --target /absolute/evaluator-root/output \
+  --log-dir /absolute/evaluator-root/logs \
+  --output DESIGN.md \
+  --output index.html \
+  --browser-contract /absolute/evaluator-root/browser-contract.json
+```
+
+最小 contract：
+
+```json
+{
+  "schema_version": 1,
+  "cases": [{
+    "id": "mobile-primary-task",
+    "page": "index.html",
+    "profile": "mobile",
+    "steps": [
+      {"id": "action-in-first-viewport", "action": "assert", "selector": "[data-primary-action]", "expect": "fully-visible-in-viewport"},
+      {"id": "activate", "action": "click", "selector": "[data-primary-action]"},
+      {"id": "state-changed", "action": "assert", "selector": "[data-task-state]", "expect": "text-includes", "value": "Ready"}
+    ]
+  }]
+}
+```
+
+Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 會保存 bounded case／step ID，但 selector、輸入值、預期文字及外部絕對路徑不會進 repair prompt 或發布產物。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
+
 `--case-mode patch` 使用相同契約，並必須用 `--patch-lane polish|repair` 明示它是受限呈現調整（`POLISH`）或有證據的缺陷修復（`REPAIR`），不建立平行 lane。Retrofit／patch 必須提供 seed 與至少一個 `--allow-change`；任何未授權修改、刪除、重新命名、新增路徑、file／directory mode 漂移、空目錄遺失、seed 漂移或輸出集合漂移都會拒絕發布。Manifest 只保存 mode、實際 Skill lane、seed file/directory hashes 或 modes 與 observed mutation，不保存外部絕對路徑或 brief 內容。
 
 Runner 不開放 shell 讀檔。小型 seed 會在 hash 重驗後，以最多 256 KiB 的 strict UTF-8 untrusted JSON 放入初始 prompt；每次 repair 另以最多 512 KiB 的當前 output snapshot 提供最小修正所需內容。檔案內的 instruction-like text 一律視為資料，retrofit／patch 的 repair prompt 也會重申原 mutation allowlist；超出 context quota 會 fail closed，不會改成開放 shell 或截斷內容。
