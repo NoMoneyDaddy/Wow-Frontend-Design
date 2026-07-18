@@ -20,6 +20,12 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from codex_isolated_build_core import DEFAULT_MODEL, ExecutionSpec, RunnerError, execute_isolated
+from current_skill_repair import (
+    MAX_REPAIR_ROUNDS,
+    build_repair_prompt,
+    compile_design_feedback,
+    compile_html_feedback,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +33,7 @@ SKILL_SOURCE = ROOT / "wow-frontend-design"
 DESIGN_VALIDATOR = ROOT / "evals" / "validate_design_md_clean.py"
 HTML_SMOKE_VALIDATOR = ROOT / "evals" / "playwright_html_smoke.cjs"
 BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
+REPAIR_POLICY = ROOT / "evals" / "current_skill_repair.py"
 EXPECTED_OUTPUTS = ("DESIGN.md", "index.html")
 BRIEF_LIMIT = 128 * 1024
 FILE_LIMIT = 1_048_576
@@ -309,6 +316,7 @@ def _wrapper_tool_records() -> dict[str, Any]:
         ("design_validator", DESIGN_VALIDATOR),
         ("html_smoke_validator", HTML_SMOKE_VALIDATOR),
         ("browser_runtime", BROWSER_RUNTIME),
+        ("repair_policy", REPAIR_POLICY),
     ):
         info = path.stat()
         records[name] = {
@@ -333,7 +341,9 @@ def _target_unchanged(target: Path, identity: tuple[int, int]) -> None:
         raise RunnerError("target changed before publish")
 
 
-def _log_paths(log_dir: Path, target: Path) -> tuple[Path, Path, Path, Path, Path, Path]:
+def _log_paths(
+    log_dir: Path, target: Path
+) -> tuple[Path, Path, Path, Path, Path, Path, tuple[tuple[Path, Path], ...]]:
     if not log_dir.is_absolute():
         raise RunnerError("log directory must be an absolute real directory")
     try:
@@ -347,7 +357,7 @@ def _log_paths(log_dir: Path, target: Path) -> tuple[Path, Path, Path, Path, Pat
         raise RunnerError("log directory must be outside the publish target")
     if log_dir == ROOT or ROOT in log_dir.parents or log_dir == SKILL_SOURCE or SKILL_SOURCE in log_dir.parents:
         raise RunnerError("log directory must be outside repository-sensitive paths")
-    paths = (
+    base_paths = (
         log_dir / f"{LOG_STEM}.trace.jsonl",
         log_dir / f"{LOG_STEM}.stderr.txt",
         log_dir / f"{LOG_STEM}.execution.json",
@@ -355,9 +365,17 @@ def _log_paths(log_dir: Path, target: Path) -> tuple[Path, Path, Path, Path, Pat
         log_dir / f"{LOG_STEM}.html-smoke.json",
         log_dir / f"{LOG_STEM}.quarantine",
     )
+    repair_paths = tuple(
+        (
+            log_dir / f"{LOG_STEM}.repair-{round_number:02d}.trace.jsonl",
+            log_dir / f"{LOG_STEM}.repair-{round_number:02d}.stderr.txt",
+        )
+        for round_number in range(1, MAX_REPAIR_ROUNDS + 1)
+    )
+    paths = base_paths + tuple(path for pair in repair_paths for path in pair)
     if any(path.exists() or path.is_symlink() for path in paths):
         raise RunnerError("run-specific log path collision")
-    return paths
+    return (*base_paths, repair_paths)
 
 
 def _classification(error: BaseException, execution: dict[str, Any] | None) -> str:
@@ -371,6 +389,8 @@ def _classification(error: BaseException, execution: dict[str, Any] | None) -> s
     message = str(error)
     if "trace" in message.casefold():
         return "trace_policy_rejection"
+    if "infrastructure failure" in message.casefold():
+        return "execution_infrastructure_failure"
     if "HTML Playwright smoke gate rejected" in message:
         return "html_smoke_rejection"
     if "DESIGN.md clean gate" in message:
@@ -396,6 +416,10 @@ def _receipt(
     design_rejection: dict[str, Any] | None = None,
     html_smoke_rejection: dict[str, Any] | None = None,
     html_smoke_unavailable: dict[str, Any] | None = None,
+    repair: dict[str, Any] | None = None,
+    repair_failure: dict[str, Any] | None = None,
+    failure_artifact: dict[str, Any] | None = None,
+    policy_tools: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     logs = {}
     for name, path in (("trace", stdout_log), ("stderr", stderr_log)):
@@ -428,6 +452,14 @@ def _receipt(
         payload["html_smoke_rejection"] = html_smoke_rejection
     if html_smoke_unavailable is not None:
         payload["html_smoke_unavailable"] = html_smoke_unavailable
+    if repair is not None:
+        payload["repair"] = repair
+    if repair_failure is not None:
+        payload["repair_failure"] = repair_failure
+    if failure_artifact is not None:
+        payload["failure_artifact"] = failure_artifact
+    if policy_tools is not None:
+        payload["tools"] = policy_tools
     return payload
 
 
@@ -472,6 +504,47 @@ def _quarantine_outputs(
             shutil.rmtree(temporary, ignore_errors=True)
 
 
+def _snapshot_outputs(
+    destination: Path,
+    stage: Path,
+    outputs: tuple[str, ...],
+    expected: list[dict[str, Any]],
+) -> None:
+    destination.mkdir(mode=0o700)
+    for name in outputs:
+        copied = destination / name
+        copied.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        shutil.copy2(stage / name, copied, follow_symlinks=False)
+    if _validate_outputs(destination, outputs) != expected:
+        raise RunnerError("repair checkpoint provenance disagrees with validated outputs")
+
+
+def _attempt_summary(
+    number: int,
+    execution: dict[str, Any],
+    feedback: dict[str, Any] | None,
+) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "number": number,
+        "model": execution["model"],
+        "prompt": execution["prompt"],
+        "skill_snapshot": execution["skill_snapshot"],
+        "configured_isolation": execution["configured_isolation"],
+        "execution": execution["execution"],
+        "trace_observed": execution["trace_observed"],
+        "tools": execution["tools"],
+    }
+    if feedback is not None:
+        summary["trigger"] = {
+            "gate": feedback["gate"],
+            "finding_ids": feedback["finding_ids"],
+            "counts": feedback["counts"],
+            "truncated": feedback["truncated"],
+            "signature": feedback["signature"],
+        }
+    return summary
+
+
 def run(
     brief: Path,
     target: Path,
@@ -481,7 +554,10 @@ def run(
     inactivity_seconds: int | None = None,
     outputs: list[str] | tuple[str, ...] | None = None,
     log_dir: Path,
+    max_repair_rounds: int = MAX_REPAIR_ROUNDS,
 ) -> dict[str, Any]:
+    if type(max_repair_rounds) is not int or not 0 <= max_repair_rounds <= MAX_REPAIR_ROUNDS:
+        raise RunnerError(f"max repair rounds must be within 0..{MAX_REPAIR_ROUNDS}")
     brief = _regular_absolute_file(brief, "brief", BRIEF_LIMIT)
     target, target_identity = _fresh_target(target)
     output_names = normalize_outputs(outputs)
@@ -493,18 +569,101 @@ def run(
     if not 1 <= len(brief_bytes) <= BRIEF_LIMIT or "\x00" in brief_text:
         raise RunnerError("brief must be bounded UTF-8 text without NUL")
     prompt = build_prompt(brief_text, output_names)
-    stdout_log, stderr_log, receipt_path, design_gate_path, html_smoke_path, quarantine_path = _log_paths(log_dir, target)
+    (
+        stdout_log,
+        stderr_log,
+        receipt_path,
+        design_gate_path,
+        html_smoke_path,
+        quarantine_path,
+        repair_log_paths,
+    ) = _log_paths(log_dir, target)
     wrapper_tools = _wrapper_tool_records()
     work_root = Path(tempfile.mkdtemp(prefix="wow-current-build-")).resolve()
     stage = work_root / "stage"
     stage.mkdir(mode=0o700)
     publish = Path(tempfile.mkdtemp(prefix=f".{target.name}.publish-", dir=target.parent))
     execution: dict[str, Any] | None = None
+    initial_execution: dict[str, Any] | None = None
     design_rejection: dict[str, Any] | None = None
     html_smoke_rejection: dict[str, Any] | None = None
     html_smoke_unavailable: dict[str, Any] | None = None
+    repair_failure: dict[str, Any] | None = None
+    failure_artifact: dict[str, Any] | None = None
+    attempts: list[dict[str, Any]] = []
+    repair_rounds = 0
+    active_stdout_log = stdout_log
+    active_stderr_log = stderr_log
+    active_prompt = prompt
     work_root_cleaned = False
     committed = False
+
+    def repair_summary() -> dict[str, Any] | None:
+        if repair_rounds == 0:
+            return None
+        return {
+            "max_rounds": max_repair_rounds,
+            "rounds_used": repair_rounds,
+            "attempts": attempts,
+        }
+
+    def perform_repair(
+        feedback: dict[str, Any],
+        validated_outputs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        nonlocal active_prompt, active_stderr_log, active_stdout_log
+        nonlocal execution, repair_failure, repair_rounds
+        checkpoint = work_root / f"checkpoint-{repair_rounds + 1:02d}"
+        _snapshot_outputs(checkpoint, stage, output_names, validated_outputs)
+        repair_rounds += 1
+        active_stdout_log, active_stderr_log = repair_log_paths[repair_rounds - 1]
+        repair_prompt = build_repair_prompt(output_names, feedback)
+        active_prompt = repair_prompt
+        next_execution: dict[str, Any] | None = None
+        try:
+            next_execution = execute_isolated(
+                ExecutionSpec(
+                    stage=stage,
+                    stdout_log=active_stdout_log,
+                    stderr_log=active_stderr_log,
+                    skill_source=SKILL_SOURCE,
+                    skill_name="wow-frontend-design",
+                    prompt=repair_prompt,
+                    model=model,
+                    hard_seconds=hard_seconds,
+                    inactivity_seconds=inactivity_seconds,
+                )
+            )
+            execution = next_execution
+            attempts.append(_attempt_summary(repair_rounds, next_execution, feedback))
+            if initial_execution is not None and (
+                next_execution["skill_snapshot"] != initial_execution["skill_snapshot"]
+            ):
+                raise RunnerError("skill snapshot drifted between repair attempts")
+            outcome = next_execution["execution"]
+            if outcome["exit_code"] != 0 or outcome["reason"] != "completed":
+                raise RunnerError(f"generation failed: {outcome['reason']}, exit={outcome['exit_code']}")
+            return _validate_outputs(stage, output_names)
+        except BaseException:
+            if next_execution is None:
+                execution = None
+            quarantine_record = _quarantine_outputs(
+                log_dir,
+                quarantine_path,
+                checkpoint,
+                output_names,
+                validated_outputs,
+            )
+            repair_failure = {
+                "round": repair_rounds,
+                "gate": feedback["gate"],
+                "finding_ids": feedback["finding_ids"],
+                "quarantine": quarantine_record,
+            }
+            raise
+        finally:
+            shutil.rmtree(checkpoint, ignore_errors=True)
+
     try:
         execution = execute_isolated(
             ExecutionSpec(
@@ -520,53 +679,71 @@ def run(
             )
         )
         outcome = execution["execution"]
+        initial_execution = execution
+        attempts.append(_attempt_summary(0, execution, None))
         if outcome["exit_code"] != 0 or outcome["reason"] != "completed":
             raise RunnerError(f"generation failed: {outcome['reason']}, exit={outcome['exit_code']}")
         output_records = _validate_outputs(stage, output_names)
-        design_gate = _run_design_validator(stage / "DESIGN.md", min(300, max(5, hard_seconds)))
-        if _validate_outputs(stage, output_names) != output_records:
-            raise RunnerError("output content or mode drifted during validation")
-        if design_gate.get("status") == "rejected":
-            gate_record = _write_json_exclusive(design_gate_path, design_gate)
-            quarantine_record = _quarantine_outputs(
-                log_dir,
-                quarantine_path,
-                stage,
-                output_names,
-                output_records,
-            )
-            design_rejection = {"gate_receipt": gate_record, "quarantine": quarantine_record}
-            raise RunnerError("DESIGN.md clean gate rejected output")
-        if design_gate.get("status") != "passed":
-            raise RunnerError("DESIGN.md clean gate returned an invalid status")
-        try:
-            html_smoke_gate = _run_html_smoke(stage, output_names, min(120, max(15, hard_seconds)))
-        except RunnerError:
-            html_smoke_unavailable = {
-                "quarantine": _quarantine_outputs(
+        while True:
+            design_gate = _run_design_validator(stage / "DESIGN.md", min(300, max(5, hard_seconds)))
+            if _validate_outputs(stage, output_names) != output_records:
+                raise RunnerError("output content or mode drifted during validation")
+            if design_gate.get("status") == "rejected":
+                if repair_rounds < max_repair_rounds:
+                    try:
+                        feedback = compile_design_feedback(design_gate)
+                    except ValueError as error:
+                        raise RunnerError("DESIGN.md repair feedback infrastructure failure") from error
+                    output_records = perform_repair(feedback, output_records)
+                    continue
+                gate_record = _write_json_exclusive(design_gate_path, design_gate)
+                quarantine_record = _quarantine_outputs(
                     log_dir,
                     quarantine_path,
                     stage,
                     output_names,
                     output_records,
                 )
-            }
-            raise
-        if _validate_outputs(stage, output_names) != output_records:
-            raise RunnerError("output content or mode drifted during HTML smoke validation")
-        if html_smoke_gate.get("status") == "rejected":
-            gate_record = _write_json_exclusive(html_smoke_path, html_smoke_gate)
-            quarantine_record = _quarantine_outputs(
-                log_dir,
-                quarantine_path,
-                stage,
-                output_names,
-                output_records,
-            )
-            html_smoke_rejection = {"gate_receipt": gate_record, "quarantine": quarantine_record}
-            raise RunnerError("HTML Playwright smoke gate rejected output")
-        if html_smoke_gate.get("status") != "passed":
-            raise RunnerError("HTML Playwright smoke gate returned an invalid status")
+                design_rejection = {"gate_receipt": gate_record, "quarantine": quarantine_record}
+                raise RunnerError("DESIGN.md clean gate rejected output")
+            if design_gate.get("status") != "passed":
+                raise RunnerError("DESIGN.md clean gate returned an invalid status")
+            try:
+                html_smoke_gate = _run_html_smoke(stage, output_names, min(120, max(15, hard_seconds)))
+            except RunnerError:
+                html_smoke_unavailable = {
+                    "quarantine": _quarantine_outputs(
+                        log_dir,
+                        quarantine_path,
+                        stage,
+                        output_names,
+                        output_records,
+                    )
+                }
+                raise
+            if _validate_outputs(stage, output_names) != output_records:
+                raise RunnerError("output content or mode drifted during HTML smoke validation")
+            if html_smoke_gate.get("status") == "rejected":
+                if repair_rounds < max_repair_rounds:
+                    try:
+                        feedback = compile_html_feedback(html_smoke_gate)
+                    except ValueError as error:
+                        raise RunnerError("HTML repair feedback infrastructure failure") from error
+                    output_records = perform_repair(feedback, output_records)
+                    continue
+                gate_record = _write_json_exclusive(html_smoke_path, html_smoke_gate)
+                quarantine_record = _quarantine_outputs(
+                    log_dir,
+                    quarantine_path,
+                    stage,
+                    output_names,
+                    output_records,
+                )
+                html_smoke_rejection = {"gate_receipt": gate_record, "quarantine": quarantine_record}
+                raise RunnerError("HTML Playwright smoke gate rejected output")
+            if html_smoke_gate.get("status") != "passed":
+                raise RunnerError("HTML Playwright smoke gate returned an invalid status")
+            break
         if _wrapper_tool_records() != wrapper_tools:
             raise RunnerError("current policy tool provenance drifted during execution")
         for name in output_names:
@@ -599,6 +776,8 @@ def run(
             "tools": {**execution["tools"], **wrapper_tools},
             "outputs": output_records,
         }
+        if repair_summary() is not None:
+            manifest["repair"] = repair_summary()
         (publish / "run-manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
@@ -606,11 +785,13 @@ def run(
             status="execution_passed",
             classification="publication_pending",
             brief_bytes=brief_bytes,
-            prompt=prompt,
+            prompt=active_prompt,
             model=model,
-            stdout_log=stdout_log,
-            stderr_log=stderr_log,
+            stdout_log=active_stdout_log,
+            stderr_log=active_stderr_log,
             execution=execution,
+            repair=repair_summary(),
+            policy_tools=wrapper_tools,
         )
         _write_json_exclusive(receipt_path, success)
         shutil.rmtree(work_root, ignore_errors=True)
@@ -620,26 +801,50 @@ def run(
         committed = True
         return manifest
     except BaseException as error:
+        if (
+            not quarantine_path.exists()
+            and execution is not None
+            and execution.get("execution", {}).get("exit_code") == 0
+            and execution.get("execution", {}).get("reason") == "completed"
+            and stage.exists()
+        ):
+            try:
+                current_records = _validate_outputs(stage, output_names)
+                failure_artifact = {
+                    "quarantine": _quarantine_outputs(
+                        log_dir,
+                        quarantine_path,
+                        stage,
+                        output_names,
+                        current_records,
+                    )
+                }
+            except (OSError, RunnerError):
+                pass
         classification = _classification(error, execution)
         failure = _receipt(
             status="failed",
             classification=classification,
             brief_bytes=brief_bytes,
-            prompt=prompt,
+            prompt=active_prompt,
             model=model,
-            stdout_log=stdout_log,
-            stderr_log=stderr_log,
+            stdout_log=active_stdout_log,
+            stderr_log=active_stderr_log,
             execution=execution,
             design_rejection=design_rejection,
             html_smoke_rejection=html_smoke_rejection,
             html_smoke_unavailable=html_smoke_unavailable,
+            repair=repair_summary(),
+            repair_failure=repair_failure,
+            failure_artifact=failure_artifact,
+            policy_tools=wrapper_tools,
         )
         try:
             _write_json_exclusive(receipt_path, failure)
         except OSError:
             pass
         raise RunnerError(
-            f"{classification}; logs={stdout_log.name},{stderr_log.name},{receipt_path.name}"
+            f"{classification}; logs={active_stdout_log.name},{active_stderr_log.name},{receipt_path.name}"
         ) from error
     finally:
         if not work_root_cleaned:
@@ -656,6 +861,7 @@ def main() -> int:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--hard-seconds", type=int, default=1800)
     parser.add_argument("--inactivity-seconds", type=int)
+    parser.add_argument("--max-repair-rounds", type=int, default=MAX_REPAIR_ROUNDS)
     parser.add_argument("--output", action="append", help="repeat for each exact relative output path")
     args = parser.parse_args()
     try:
@@ -667,6 +873,7 @@ def main() -> int:
             inactivity_seconds=args.inactivity_seconds,
             outputs=args.output,
             log_dir=args.log_dir,
+            max_repair_rounds=args.max_repair_rounds,
         )
     except (OSError, RunnerError) as error:
         message = str(error)

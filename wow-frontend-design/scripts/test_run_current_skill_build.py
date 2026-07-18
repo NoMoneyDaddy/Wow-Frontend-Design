@@ -59,6 +59,9 @@ if sys.argv[1:] == ["--version"]:
 if sys.argv[1:] == ["login", "status"]:
     print("Logged in using API key" if mode == "bad-login" else "Logged in using ChatGPT")
     raise SystemExit(0)
+count_path = capture / "invocation-count.txt"
+attempt = int(count_path.read_text(encoding="utf-8")) + 1 if count_path.exists() else 1
+count_path.write_text(str(attempt), encoding="utf-8")
 args = sys.argv[1:]
 stage = pathlib.Path(args[args.index("--cd") + 1])
 prompt = sys.stdin.read()
@@ -73,6 +76,7 @@ snapshot = {{
     "environment_names": sorted(os.environ),
 }}
 (capture / "invocation.json").write_text(json.dumps(snapshot), encoding="utf-8")
+(capture / f"invocation-{{attempt}}.json").write_text(json.dumps(snapshot), encoding="utf-8")
 if mode == "timeout":
     time.sleep(10)
     raise SystemExit(0)
@@ -86,22 +90,22 @@ if mode == "output-symlink":
     (stage / "index.html").symlink_to(stage / "DESIGN.md")
 elif mode == "oversized-output":
     (stage / "index.html").write_bytes({SAFE_HTML.encode()!r} + b"x" * 1048577)
-elif mode == "page-error":
+elif mode == "page-error" or (mode == "page-error-repairable" and attempt == 1):
     (stage / "index.html").write_text({SAFE_HTML.replace('</main>', '<script>throw new Error("broken boot")</script></main>')!r}, encoding="utf-8")
 else:
     (stage / "index.html").write_text({SAFE_HTML!r}, encoding="utf-8")
-if mode == "extra-output":
+if mode == "extra-output" or (mode == "extra-on-repair" and attempt > 1):
     (stage / "extra.txt").write_text("unexpected", encoding="utf-8")
 if mode == "multi-output":
     (stage / "details.html").write_text({SAFE_HTML!r}, encoding="utf-8")
-if mode == "bad-trace":
+if mode == "bad-trace" or (mode == "bad-trace-on-repair" and attempt > 1):
     print(json.dumps({{"type":"item.completed","item":{{"type":"command_execution","command":"npx package"}}}}))
 if mode == "skill-content-drift":
     (root / "skill-source" / "SKILL.md").write_text("drifted", encoding="utf-8")
 if mode == "skill-mode-drift":
     (root / "skill-source" / "SKILL.md").chmod(0o700)
 print(json.dumps({{"type":"turn.completed"}}))
-if mode == "exit-one":
+if mode == "exit-one" or (mode == "exit-on-repair" and attempt > 1):
     print("provider rejected the requested model", file=sys.stderr)
     raise SystemExit(1)
 if mode == "exit-one-sensitive":
@@ -229,6 +233,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
             self.assertEqual("playwright", manifest["html_smoke_gate"]["tool"]["package"])
             self.assertEqual("@axe-core/playwright", manifest["html_smoke_gate"]["tool"]["accessibility_package"])
+            self.assertIn("repair_policy", manifest["tools"])
             receipt = json.loads(
                 (root / "logs" / "current-skill-build.execution.json").read_text(encoding="utf-8")
             )
@@ -438,9 +443,18 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             serialized = json.dumps(receipt)
             self.assertEqual("design_gate_rejection", receipt["classification"])
+            self.assertIn("repair_policy", receipt["tools"])
             self.assertNotIn("PRIVATE orphan token detail", serialized)
             self.assertNotIn(SAFE_DESIGN, serialized)
             self.assertNotIn(str(root), serialized)
+            self.assertEqual("3", (root / "capture" / "invocation-count.txt").read_text(encoding="utf-8"))
+            for attempt in (2, 3):
+                repair_invocation = json.loads(
+                    (root / "capture" / f"invocation-{attempt}.json").read_text(encoding="utf-8")
+                )
+                self.assertNotIn("PRIVATE orphan token detail", repair_invocation["prompt"])
+                self.assertNotIn("UNIQUE-BRIEF-CONTENT", repair_invocation["prompt"])
+                self.assertIn("orphan-token", repair_invocation["prompt"])
             self.assertEqual(
                 hashlib.sha256(gate_path.read_bytes()).hexdigest(),
                 receipt["design_rejection"]["gate_receipt"]["sha256"],
@@ -449,6 +463,219 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 self.assertEqual(
                     hashlib.sha256((quarantine / record["path"]).read_bytes()).hexdigest(), record["sha256"]
                 )
+
+    def test_design_rejection_is_repaired_then_fully_regated_before_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            rejected = {
+                "status": "rejected",
+                "findings": [{"message": "No YAML content found."}],
+            }
+            passed = {"status": "passed", "findings": []}
+            html_passed = {"status": "passed"}
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", side_effect=[rejected, passed]
+            ), mock.patch.object(policy, "_run_html_smoke", return_value=html_passed):
+                manifest = policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual(1, manifest["repair"]["rounds_used"])
+            self.assertEqual("design", manifest["repair"]["attempts"][1]["trigger"]["gate"])
+            self.assertEqual("passed", manifest["design_md_gate"]["status"])
+            self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
+            self.assertEqual(manifest["prompt"], manifest["repair"]["attempts"][-1]["prompt"])
+            self.assertEqual(
+                manifest["repair"]["attempts"][0]["skill_snapshot"],
+                manifest["repair"]["attempts"][1]["skill_snapshot"],
+            )
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["prompt"], receipt["prompt"])
+            self.assertEqual(manifest["execution"], receipt["execution"])
+            self.assertIn("repair_policy", receipt["tools"])
+            self.assertTrue((target / "run-manifest.json").is_file())
+            self.assertFalse((log_dir / "current-skill-build.design-gate.json").exists())
+
+    def test_html_rejection_is_repaired_then_design_and_html_are_regated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            design_passed = {"status": "passed", "findings": []}
+            html_rejected = {
+                "status": "rejected",
+                "results": [{
+                    "status": "rejected",
+                    "page": "PRIVATE-URL",
+                    "selector": "PRIVATE-SELECTOR",
+                    "console": ["PRIVATE-CONSOLE"],
+                    "navigation": "passed",
+                    "visible_main": True,
+                    "visible_text": True,
+                    "visible_primary_content": True,
+                    "root_horizontal_overflow": False,
+                    "counters": {"console_errors": 1},
+                    "inspection": {"axe_rule_ids": ["heading-order"]},
+                }],
+            }
+            html_passed = {"status": "passed"}
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value=design_passed
+            ) as design_validator, mock.patch.object(
+                policy, "_run_html_smoke", side_effect=[html_rejected, html_passed]
+            ):
+                manifest = policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual(2, design_validator.call_count)
+            trigger = manifest["repair"]["attempts"][1]["trigger"]
+            self.assertEqual("html", trigger["gate"])
+            self.assertEqual(["axe-heading-order", "console-errors"], trigger["finding_ids"])
+            repair_prompt = json.loads(
+                (capture / "invocation-2.json").read_text(encoding="utf-8")
+            )["prompt"]
+            for private_value in ("PRIVATE-URL", "PRIVATE-SELECTOR", "PRIVATE-CONSOLE", "UNIQUE-BRIEF-CONTENT"):
+                self.assertNotIn(private_value, repair_prompt)
+            self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
+
+    def test_real_html_gate_converges_after_one_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "page-error-repairable")
+            completed = self.invoke(brief, target, environment)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(1, manifest["repair"]["rounds_used"])
+            self.assertEqual("html", manifest["repair"]["attempts"][1]["trigger"]["gate"])
+            self.assertEqual("passed", manifest["design_md_gate"]["status"])
+            self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
+            self.assertTrue((root / "logs" / "current-skill-build.repair-01.trace.jsonl").is_file())
+
+    def test_repair_output_contract_failure_quarantines_last_valid_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "extra-on-repair")
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            rejected = {"status": "rejected", "findings": [{"message": "orphan token"}]}
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value=rejected
+            ), self.assertRaisesRegex(policy.RunnerError, "output_contract_rejection"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertFalse((log_dir / "current-skill-build.repair-02.trace.jsonl").exists())
+            quarantine = log_dir / "current-skill-build.quarantine"
+            self.assertEqual({"DESIGN.md", "index.html"}, {item.name for item in quarantine.iterdir()})
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("output_contract_rejection", receipt["classification"])
+            self.assertEqual(1, receipt["repair_failure"]["round"])
+
+    def test_repair_nonzero_stops_without_consuming_another_round(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "exit-on-repair")
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            rejected = {"status": "rejected", "findings": [{"message": "orphan token"}]}
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value=rejected
+            ), self.assertRaisesRegex(policy.RunnerError, "generation_exit_nonzero"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertFalse((log_dir / "current-skill-build.repair-02.trace.jsonl").exists())
+            self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())
+            self.assertEqual([], list(target.iterdir()))
+
+    def test_repair_pre_return_failure_keeps_receipt_on_the_active_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "bad-trace-on-repair")
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            rejected = {"status": "rejected", "findings": [{"message": "orphan token"}]}
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value=rejected
+            ), self.assertRaisesRegex(policy.RunnerError, "trace_policy_rejection"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            repair_prompt = json.loads(
+                (capture / "invocation-2.json").read_text(encoding="utf-8")
+            )["prompt"].encode("utf-8")
+            repair_trace = log_dir / "current-skill-build.repair-01.trace.jsonl"
+            self.assertEqual("trace_policy_rejection", receipt["classification"])
+            self.assertEqual(hashlib.sha256(repair_prompt).hexdigest(), receipt["prompt"]["sha256"])
+            self.assertEqual(hashlib.sha256(repair_trace.read_bytes()).hexdigest(), receipt["logs"]["trace"]["sha256"])
+            self.assertNotIn("execution", receipt)
+            self.assertEqual(1, len(receipt["repair"]["attempts"]))
+            self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())
+
+    def test_design_gate_infrastructure_failure_after_repair_preserves_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            rejected = {"status": "rejected", "findings": [{"message": "orphan token"}]}
+            failure = policy.design_policy.DesignMdInfrastructureError("validator unavailable")
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", side_effect=[rejected, failure]
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            quarantine = log_dir / "current-skill-build.quarantine"
+            self.assertEqual({"DESIGN.md", "index.html"}, {item.name for item in quarantine.iterdir()})
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertEqual({"DESIGN.md", "index.html"}, {
+                item["path"] for item in receipt["failure_artifact"]["quarantine"]["outputs"]
+            })
+
+    def test_malformed_repair_feedback_fails_as_infrastructure_and_preserves_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            malformed = {"status": "rejected", "findings": "PRIVATE malformed finding"}
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value=malformed
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual("1", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertNotIn("PRIVATE malformed finding", json.dumps(receipt))
+
+    def test_skill_snapshot_change_between_attempts_is_rejected_and_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            skill_source = root / "skill-source"
+            skill_source.mkdir()
+            (skill_source / "SKILL.md").write_text("initial skill\n", encoding="utf-8")
+            rejected = {"status": "rejected", "findings": [{"message": "orphan token"}]}
+
+            def drift_then_reject(*_args: object, **_kwargs: object) -> dict[str, object]:
+                (skill_source / "SKILL.md").write_text("changed skill\n", encoding="utf-8")
+                return rejected
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy, "SKILL_SOURCE", skill_source
+            ), mock.patch.object(
+                policy.design_policy, "validate_local", side_effect=drift_then_reject
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertNotEqual(
+                receipt["repair"]["attempts"][0]["skill_snapshot"],
+                receipt["repair"]["attempts"][1]["skill_snapshot"],
+            )
+            self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())
 
     def test_html_boot_error_is_rejected_and_quarantined_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
