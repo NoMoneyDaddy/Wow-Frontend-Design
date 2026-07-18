@@ -2196,6 +2196,56 @@ process.stdout.write(JSON.stringify({{
             self.assertFalse(any("右側排除樣本" in item["text"] for item in findings))
             self.assertFalse(any("左側排除樣本" in item["text"] for item in findings))
 
+    def test_ruby_annotations_do_not_hide_heading_orphans(self) -> None:
+        class QuietHandler(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, _format: str, *args: object) -> None:
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            screenshots = root / "screenshots"
+            screenshots.mkdir()
+            report_path = root / "report.json"
+            (root / "index.html").write_text(
+                """<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><title>Ruby 排版測試</title>
+<style>body{margin:0}main{width:700px}h1{width:10em;font:32px/1.2 monospace}rt{font-size:.4em}</style>
+</head><body><main><h1><span style="visibility:hidden"><span style="visibility:visible"><ruby>設<rt>ㄕㄜˋ</rt></ruby><ruby>計<rt>ㄐㄧˋ</rt></ruby><ruby>核<rt>ㄏㄜˊ</rt></ruby></span></span><br><ruby>心<rt>ㄒㄧㄣ</rt></ruby></h1><div style="opacity:0"><h2>市場攤商過敏查<br>核。</h2></div></main></body></html>""",
+                encoding="utf-8",
+            )
+            handler = functools.partial(QuietHandler, directory=str(root))
+            server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                completed = subprocess.run(
+                    [
+                        "node", str(AUDITOR), "--output", str(report_path),
+                        "--artifact-dir", str(screenshots), "--target",
+                        f"type-foundry-specimen-v6:ruby=http://127.0.0.1:{server.server_port}/",
+                    ],
+                    cwd=ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                    timeout=60,
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            desktop = next(
+                result for result in report["results"]
+                if result["viewport"] == "desktop" and result["state"] == "base"
+            )
+            findings = desktop["headingFlow"]["orphanedCjkHeadingLines"]
+            self.assertEqual(1, len(findings), desktop["headingFlow"])
+            self.assertEqual("心", findings[0]["lastLineText"])
+            self.assertEqual("設計核心", findings[0]["text"])
+            self.assertIn("cjk_heading_orphan_line", desktop["visualIssues"])
+
     def test_focus_probe_preserves_gradient_uncertainty_and_focus_within(self) -> None:
         source = f"""
 const {{ chromium }} = require('playwright');

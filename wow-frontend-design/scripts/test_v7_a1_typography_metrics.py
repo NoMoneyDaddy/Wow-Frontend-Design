@@ -91,6 +91,38 @@ const { auditV7A1Typography, validateSpecs } = require(process.argv[1]);
         self.assertEqual("核。", self.targets["orphan"]["lastLineText"])
         self.assertNotIn(("valid-line", "a1_heading_han_orphan"), self.codes)
 
+    def test_unpainted_descendant_text_cannot_hide_a_visible_orphan(self) -> None:
+        source = """
+const { chromium } = require("playwright");
+const { auditV7A1Typography } = require(process.argv[1]);
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+  await page.setContent(`<html lang="zh-Hant-TW"><style>
+    section { width: 512px } h1 { width: 224px; font: 32px/1.2 monospace }
+  </style><section id="visible-owner"><h1 id="visible-heading"><span style="visibility:hidden"><span style="visibility:visible">市場攤商過敏查</span></span><br>核。<span style="visibility:hidden">A</span><span style="opacity:.05"><span style="opacity:.1">B</span></span><span style="content-visibility:hidden">C</span></h1></section><div style="opacity:0"><section id="hidden-owner"><h2 id="hidden-heading">市場攤商過敏查<br>核。</h2></section></div>`);
+  const result = await page.evaluate(auditV7A1Typography, [
+    { id: "visible-text", selector: "#visible-heading", ownerSelector: "#visible-owner", role: "heading", mode: "product" },
+    { id: "hidden-ancestor", selector: "#hidden-heading", ownerSelector: "#hidden-owner", role: "heading", mode: "product" },
+  ]);
+  await browser.close();
+  process.stdout.write(JSON.stringify(result));
+})().catch((error) => { console.error(error); process.exit(1); });
+"""
+        completed = subprocess.run(
+            ["node", "-e", source, str(METRICS)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual("核。", result["targets"][0]["lastLineText"])
+        codes = {(item["targetId"], item["code"]) for item in result["issues"]}
+        self.assertIn(("visible-text", "a1_heading_han_orphan"), codes)
+        self.assertNotIn(("hidden-ancestor", "a1_heading_han_orphan"), codes)
+
     def test_display_and_vertical_intent_cannot_hard_fail(self) -> None:
         self.assertNotIn(("display", "a1_heading_han_orphan"), self.codes)
         self.assertEqual("display-intent", self.observations["display"]["reason"])

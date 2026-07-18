@@ -32,6 +32,21 @@ function auditV7A1Typography(specs) {
     return [...segmenter.segment(value)];
   };
 
+  const textPaintedThrough = (parent) => {
+    if (["hidden", "collapse"].includes(getComputedStyle(parent).visibility)) return false;
+    let effectiveOpacity = 1;
+    for (let current = parent; current; current = current.parentElement) {
+      const style = getComputedStyle(current);
+      effectiveOpacity *= Number(style.opacity);
+      if (
+        style.display === "none"
+        || effectiveOpacity <= 0.01
+        || style.contentVisibility === "hidden"
+      ) return false;
+    }
+    return true;
+  };
+
   const lineFragments = (node) => {
     const fragments = [];
     const locale = node.lang || document.documentElement.lang || "zh-Hant";
@@ -40,7 +55,11 @@ function auditV7A1Typography(specs) {
     while (walker.nextNode()) {
       const textNode = walker.currentNode;
       const parent = textNode.parentElement;
-      if (!parent || parent.closest("rt, rp, script, style, [aria-hidden='true'], [inert]")) continue;
+      if (
+        !parent
+        || parent.closest("rt, rp, script, style, [aria-hidden='true'], [inert]")
+        || !textPaintedThrough(parent)
+      ) continue;
       for (const item of graphemes(textNode.data, locale)) {
         const range = document.createRange();
         range.setStart(textNode, item.index);
@@ -197,7 +216,11 @@ function auditV7A1Typography(specs) {
     while (walker.nextNode()) {
       const textNode = walker.currentNode;
       const parent = textNode.parentElement;
-      if (!parent || parent.closest("rt, rp, script, style, [aria-hidden='true'], [inert]")) continue;
+      if (
+        !parent
+        || parent.closest("rt, rp, script, style, [aria-hidden='true'], [inert]")
+        || !textPaintedThrough(parent)
+      ) continue;
       for (const item of graphemes(textNode.data, locale)) {
         graphemeCount += 1;
         if (graphemeCount > 4096) return unavailable("grapheme_budget_exceeded", {

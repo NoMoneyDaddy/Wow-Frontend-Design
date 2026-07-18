@@ -3661,6 +3661,23 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
         const textNode = walker.currentNode;
+        const parent = textNode.parentElement;
+        if (!parent || parent.closest("rt, rp")) continue;
+        let textPainted = !["hidden", "collapse"].includes(getComputedStyle(parent).visibility);
+        let effectiveOpacity = 1;
+        for (let current = parent; current; current = current.parentElement) {
+          const currentStyle = getComputedStyle(current);
+          effectiveOpacity *= Number(currentStyle.opacity);
+          if (
+            currentStyle.display === "none"
+            || effectiveOpacity <= 0.01
+            || currentStyle.contentVisibility === "hidden"
+          ) {
+            textPainted = false;
+            break;
+          }
+        }
+        if (!textPainted) continue;
         let offset = 0;
         for (const character of textNode.data) {
           const end = offset + character.length;
@@ -3929,10 +3946,10 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       .map((node) => {
         const style = getComputedStyle(node);
         const fontSize = Number.parseFloat(style.fontSize);
-        const text = node.textContent.trim().replace(/\s+/g, " ");
+        const lines = textLineFragments(node);
+        const text = lines.map((line) => line.text).join("").trim().replace(/\s+/g, " ");
         const characters = [...text];
         const hanCount = characters.filter((character) => /\p{Script=Han}/u.test(character)).length;
-        const lines = textLineFragments(node);
         const meaningfulCount = (value) => [...value].filter((character) => /[\p{Letter}\p{Number}]/u.test(character)).length;
         const lastLine = lines.at(-1) || { text: "", width: 0 };
         const previousLine = lines.at(-2) || { text: "", width: 0 };
