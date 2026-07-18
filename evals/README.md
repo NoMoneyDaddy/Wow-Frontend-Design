@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-stale-completion-v17.json \
+  --manifest evals/v7-pilot-manifest-20260718-accessible-name-v18.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -106,7 +106,7 @@ P7 paired decision compiler 把 promotion ratchet 固定為唯讀、無 promotio
 
 ```bash
 npm run eval:v7-paired-decision -- \
-  --manifest evals/v7-pilot-manifest-20260718-stale-completion-v17.json \
+  --manifest evals/v7-pilot-manifest-20260718-accessible-name-v18.json \
   --output "$DECISION_ROOT/v7-paired-decision.json" \
   --repository-root .
 ```
@@ -124,6 +124,8 @@ P10 修補 P9 在 required `click` 被完整遮住時先撞上 Playwright action
 P11 在既有 A1 typography evaluator 補上 required product heading／prose 的直接裁切反例。它只檢查 target 自身的 client box，先以 scroll/client delta 超過 line-height-derived tolerance 判定候選，再以每個 grapheme 的 `Range.getClientRects()` 證明文字 fragment 確實落在 box 外；只接受 `text-overflow: ellipsis`、直接 inline `clip`、`line-clamp` 與直接 block `hidden/clip` 四種 bounded mechanism。具備命名、可聚焦 region 的 scroll container 記為 accessible，其他 scroll container 只 advisory；transform、zoom、pseudo content、複雜 clip/mask/filter、未知 `text-overflow`、非 product intent 與超過預算都 fail closed。它不掃 ancestor、不新增 screenshot，也不宣稱 cross-engine、assistive technology、全文語意或整體排版品質；repair packet 只投影 bounded geometry/enums，要求保留完整 copy 並移除直接裁切或重組 text track。此反例依 [CSS Overflow Level 3 `text-overflow`](https://www.w3.org/TR/css-overflow-3/#text-overflow) 與 [CSS Overflow Level 4 `line-clamp`](https://www.w3.org/TR/css-overflow-4/#line-clamp) 的規範語意建立。
 
 P12 以 input schema v3／result schema v4 驗證一個 evaluator-declared stale completion：主頁與一個 fresh context 都只攔截同源 exact method/path 的第一筆 request，確認 pending predicate 後執行唯一 identity-changing interruption，再以固定 response `fulfill`、`response.finished()`、兩個 animation frame 與 750ms post-release quiescence window 檢查 identity／success／content freshness及延遲重複 request。兩次都 stale 才產生 `stale_async_completion`；任一 phase unavailable 或兩次不一致只會阻斷 clean，不得成為產品修正。Result 與 repair packet 只留 evaluator IDs／fixed enums，不帶 selector、path、value、body、copy 或 raw error；v1/v2 input 與 v1–v3 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。這遵循 [Playwright Network API](https://playwright.dev/docs/network) 與 [`Route.fulfill()`](https://playwright.dev/docs/api/class-route#route-fulfill)；claim 只涵蓋兩次 declared controlled replay 與明示 window，不外推到所有 backend race、timer、WebSocket 或 async UX。
+
+P13 以 input schema v4／result schema v5 驗證 evaluator-declared native task control 的 accessible name。每個宣告都一對一綁定既有 form-control step，只接受 bounded native text/search/email/tel/url/number `input`、`textarea`、`select` 與 `textbox`、`searchbox`、`spinbutton`、`combobox`、`listbox` role；password、color、file、date 類型及 custom composite 不在此 probe 範圍。兩個 fresh Playwright context 重播 preceding steps，確認 target 唯一、可見且 native role 相符，再用 exact `getByRole(role, { name })` 驗證同一 DOM node。兩次都 mismatch 才產生 `declared_control_accessible_name_mismatch`；unsupported control、重複 role/name、字型／runtime／external request 或兩次狀態漂移只會阻斷 clean。Result 與 repair packet 只留 evaluator ID、role 與 fixed enums，不帶 expected name、selector、copy 或 raw error；v1–v4 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。此 bounded gate 依 [Playwright role locators](https://playwright.dev/docs/locators#locate-by-role) 與 [WAI form labels](https://www.w3.org/WAI/tutorials/forms/labels/) 建立反例，不宣稱全頁 WCAG、assistive technology、custom widget 或 Label in Name conformance。
 
 ## 目前案例
 

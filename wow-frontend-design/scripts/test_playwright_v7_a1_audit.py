@@ -26,6 +26,146 @@ EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v4_accessible_name_targets_emit_v5_with_focus_evidence_and_no_private_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "accessible-names.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<label for="native-input">PRIVATE-NATIVE-NAME</label><input id="native-input">
+<span id="unbound-copy">PRIVATE-UNBOUND-NAME</span><input id="unbound-input">
+<span id="aria-copy">PRIVATE-ARIA-NAME</span><input id="aria-input" aria-labelledby="aria-copy">
+</main></body></html>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 4,
+                "caseId": "accessible-name-case",
+                "state": "interaction",
+                "steps": [
+                    {"id": "native-input-step", "action": "fill", "selector": "#native-input", "value": "first"},
+                    {"id": "unbound-input-step", "action": "fill", "selector": "#unbound-input", "value": "second"},
+                    {"id": "aria-input-step", "action": "fill", "selector": "#aria-input", "value": "third"},
+                ],
+                "assertions": [{"id": "native-visible", "type": "visible", "selector": "#native-input"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "focusTargets": [
+                    {"id": "native-control", "stepId": "native-input-step", "role": "form-control"},
+                    {"id": "unbound-control", "stepId": "unbound-input-step", "role": "form-control"},
+                    {"id": "aria-control", "stepId": "aria-input-step", "role": "form-control"},
+                ],
+                "accessibleNameTargets": [
+                    {"id": "native-name", "focusTargetId": "native-control", "expectedRole": "textbox", "expectedName": "PRIVATE-NATIVE-NAME"},
+                    {"id": "unbound-name", "focusTargetId": "unbound-control", "expectedRole": "textbox", "expectedName": "PRIVATE-UNBOUND-NAME"},
+                    {"id": "aria-name", "focusTargetId": "aria-control", "expectedRole": "textbox", "expectedName": "PRIVATE-ARIA-NAME"},
+                ],
+            }
+            spec_path = root / "spec.json"
+            output = root / "result.json"
+            screenshot = root / "result.png"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "accessible-name-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertTrue(output.is_file(), completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(5, result["schemaVersion"])
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertIn("focusCoverage", result["runtime"])
+            self.assertIn("focusedControls", result["runtime"])
+            names = {item["id"]: item for item in result["runtime"]["accessibleNameControls"]}
+            self.assertEqual("clear", names["native-name"]["status"])
+            self.assertEqual("confirmed", names["unbound-name"]["status"])
+            self.assertEqual("clear", names["aria-name"]["status"])
+            self.assertEqual({"id", "role", "status", "replays"}, set(names["native-name"]))
+            self.assertEqual(1, len(list(root.glob("*.png"))))
+            serialized = json.dumps(result, ensure_ascii=False)
+            for private in (
+                "PRIVATE-NATIVE-NAME", "PRIVATE-UNBOUND-NAME", "PRIVATE-ARIA-NAME",
+                "#native-input", "#unbound-input", "#aria-input",
+            ):
+                self.assertNotIn(private, serialized)
+
+    def test_v4_accessible_name_contract_rejects_non_interaction_and_unbound_or_malformed_targets(self) -> None:
+        base = {
+            "schemaVersion": 4,
+            "caseId": "accessible-name-case",
+            "state": "interaction",
+            "steps": [
+                {"id": "native-input-step", "action": "fill", "selector": "#native-input", "value": "first"},
+                {"id": "unbound-input-step", "action": "fill", "selector": "#unbound-input", "value": "second"},
+            ],
+            "assertions": [{"id": "native-visible", "type": "visible", "selector": "#native-input"}],
+            "targets": [],
+            "focusTargets": [
+                {"id": "native-control", "stepId": "native-input-step", "role": "form-control"},
+                {"id": "unbound-control", "stepId": "unbound-input-step", "role": "form-control"},
+            ],
+            "accessibleNameTargets": [
+                {"id": "native-name", "focusTargetId": "native-control", "expectedRole": "textbox", "expectedName": "PRIVATE-NATIVE-NAME"},
+                {"id": "unbound-name", "focusTargetId": "unbound-control", "expectedRole": "textbox", "expectedName": "PRIVATE-UNBOUND-NAME"},
+            ],
+        }
+        variants = {
+            "non-interaction": {**base, "state": "base"},
+            "primary-action-focus": {
+                **base,
+                "steps": [
+                    {"id": "native-input-step", "action": "click", "selector": "#native-input"},
+                    base["steps"][1],
+                ],
+                "focusTargets": [
+                    {"id": "native-control", "stepId": "native-input-step", "role": "primary-action"},
+                    base["focusTargets"][1],
+                ],
+            },
+            "missing-name-target": {**base, "accessibleNameTargets": [base["accessibleNameTargets"][0]]},
+            "unbound-name-target": {
+                **base,
+                "accessibleNameTargets": [
+                    {"id": "different-name", "focusTargetId": "different-control", "expectedRole": "textbox", "expectedName": "PRIVATE-NATIVE-NAME"},
+                    base["accessibleNameTargets"][1],
+                ],
+            },
+            "bad-role": {
+                **base,
+                "accessibleNameTargets": [
+                    {"id": "native-name", "focusTargetId": "native-control", "expectedRole": "not-a-role", "expectedName": "PRIVATE-NATIVE-NAME"},
+                    base["accessibleNameTargets"][1],
+                ],
+            },
+            "bad-name": {
+                **base,
+                "accessibleNameTargets": [
+                    {"id": "native-name", "focusTargetId": "native-control", "expectedRole": "textbox", "expectedName": ""},
+                    base["accessibleNameTargets"][1],
+                ],
+            },
+            "extra-key": {
+                **base,
+                "accessibleNameTargets": [
+                    {"id": "native-name", "focusTargetId": "native-control", "expectedRole": "textbox", "expectedName": "PRIVATE-NATIVE-NAME", "selector": "#native-input"},
+                    base["accessibleNameTargets"][1],
+                ],
+            },
+        }
+        source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec(process.argv[1], 'accessible-name-case', process.argv[2]); process.exit(0); }}
+catch (error) {{ process.stderr.write(error.message); process.exit(1); }}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, spec in variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode, completed.stderr)
+
     def test_v3_stale_completion_uses_two_controlled_replays_and_result_v4(self) -> None:
         fixture_root = ROOT / "evals" / "fixtures"
         class QuietHandler(http.server.SimpleHTTPRequestHandler):

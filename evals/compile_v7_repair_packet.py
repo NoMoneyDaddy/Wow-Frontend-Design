@@ -36,6 +36,8 @@ TYPOGRAPHY_CODES = {
     "a1_target_contract_unresolved",
 }
 RUNTIME_CODES = {
+    "accessible_name_verification_unavailable",
+    "declared_control_accessible_name_mismatch",
     "external_requests",
     "focus_obscuration_verification_unavailable",
     "focused_control_obscured",
@@ -219,9 +221,11 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError(f"unknown runtime issue code: {code!r}")
         if code == "focus_obscuration_verification_unavailable":
             raise RepairPacketError("focus obscuration verification is unavailable, not a product repair")
+        if code == "accessible_name_verification_unavailable":
+            raise RepairPacketError("accessible name verification is unavailable, not a product repair")
         if code == "stale_completion_verification_unavailable":
             raise RepairPacketError("stale completion verification is unavailable, not a product repair")
-        if code in {"focused_control_obscured", "stale_async_completion"}:
+        if code in {"focused_control_obscured", "stale_async_completion", "declared_control_accessible_name_mismatch"}:
             continue
         findings.append(_finding(code, "runtime", "page", {}))
     focused_controls = runtime.get("focusedControls", [])
@@ -241,6 +245,48 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
         }))
     if ("focused_control_obscured" in runtime_issues) != bool(confirmed_focus):
         raise RepairPacketError("focused control issue and evidence disagree")
+    accessible_name_controls = runtime.get("accessibleNameControls", [])
+    if not isinstance(accessible_name_controls, list):
+        raise RepairPacketError("accessible name control evidence is malformed")
+    accessible_name_roles = {"textbox", "searchbox", "spinbutton", "combobox", "listbox"}
+    accessible_name_unavailable_reasons = {
+        "accessibility_tree_unavailable",
+        "control_not_rendered",
+        "external_request_blocked",
+        "replay_unstable",
+        "runtime_unavailable",
+    }
+    confirmed_accessible_names = []
+    unavailable_accessible_names = []
+    for record in accessible_name_controls:
+        if not isinstance(record, dict):
+            raise RepairPacketError("accessible name control record is malformed")
+        status = record.get("status")
+        expected_keys = {"id", "role", "status", "replays"}
+        if status == "unavailable":
+            expected_keys.add("reason")
+        if set(record) != expected_keys or record.get("role") not in accessible_name_roles or record.get("replays") != 2:
+            raise RepairPacketError("accessible name control evidence is inconsistent")
+        _record_id(record.get("id"), "accessible name control id")
+        if status == "unavailable":
+            if record.get("reason") not in accessible_name_unavailable_reasons:
+                raise RepairPacketError("accessible name unavailable reason is invalid")
+            unavailable_accessible_names.append(record)
+            continue
+        if status == "clear":
+            continue
+        if status != "confirmed":
+            raise RepairPacketError("accessible name control status is invalid")
+        confirmed_accessible_names.append(record)
+        findings.append(_finding("declared_control_accessible_name_mismatch", "runtime", record["id"], {
+            "role": record["role"],
+        }))
+    if ("declared_control_accessible_name_mismatch" in runtime_issues) != bool(confirmed_accessible_names):
+        raise RepairPacketError("accessible name issue and evidence disagree")
+    if ("accessible_name_verification_unavailable" in runtime_issues) != bool(unavailable_accessible_names):
+        raise RepairPacketError("accessible name unavailable issue and evidence disagree")
+    if unavailable_accessible_names:
+        raise RepairPacketError("accessible name verification is unavailable, not a product repair")
     async_completions = runtime.get("asyncCompletions", [])
     if not isinstance(async_completions, list):
         raise RepairPacketError("async completion evidence is malformed")
@@ -305,6 +351,11 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
+    accessible_name_repair = any(
+        finding.get("code") == "declared_control_accessible_name_mismatch"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
     suffix = " Preserve passed behavior and required content;"
     if focus_repair:
         suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
@@ -312,6 +363,8 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         suffix += " for clipped required text, preserve the full copy and remove direct clipping or recompose its text track;"
     if async_repair:
         suffix += " for stale completion, preserve the latest declared user intent and prevent an older completion from overwriting newer state;"
+    if accessible_name_repair:
+        suffix += " for declared-control accessible-name mismatch, preserve visible copy and make the computed name match by correcting the existing native or ARIA naming source;"
     suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()

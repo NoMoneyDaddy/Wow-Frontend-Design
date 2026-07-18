@@ -207,6 +207,7 @@
     "evals/v7_a1_typography_metrics.cjs",
     "evals/playwright_v7_a1_audit.cjs",
     "evals/v7_focus_obscuration.cjs",
+    "evals/v7_accessible_name.cjs",
     "evals/v7_stale_completion.cjs",
     "evals/run_v7_visual_matrix.py",
     "evals/compile_v7_repair_packet.py",

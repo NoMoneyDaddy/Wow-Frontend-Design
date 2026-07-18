@@ -7,6 +7,7 @@ const path = require("node:path");
 const { chromium, firefox, webkit } = require("playwright");
 const { auditV7A1Typography, validateSpecs } = require("./v7_a1_typography_metrics.cjs");
 const { auditFocusedControls } = require("./v7_focus_obscuration.cjs");
+const { auditAccessibleNames } = require("./v7_accessible_name.cjs");
 const { QUIESCENCE_MS, runStaleCompletionReplay, validateAsyncCompletion } = require("./v7_stale_completion.cjs");
 
 const MAX_JSON_BYTES = 1024 * 1024;
@@ -142,6 +143,41 @@ function validateFocusTargets(focusTargets, steps) {
   return targets;
 }
 
+function validateAccessibleNameTargets(accessibleNameTargets, focusTargets) {
+  if (!Array.isArray(accessibleNameTargets) || accessibleNameTargets.length < 1 || accessibleNameTargets.length > 8) {
+    fail("spec accessibleNameTargets must contain 1..8 entries");
+  }
+  if (focusTargets.some((target) => target.role !== "form-control")) {
+    fail("spec schema 4 focusTargets must all be form-control targets");
+  }
+  const focusIds = new Set(focusTargets.map((target) => target.id));
+  const allowedRoles = new Set(["textbox", "searchbox", "spinbutton", "combobox", "listbox"]);
+  const referencedFocusIds = new Set();
+  const targets = accessibleNameTargets.map((target, index) => {
+    if (!target || typeof target !== "object" || Array.isArray(target)
+        || Object.keys(target).sort().join("|") !== "expectedName|expectedRole|focusTargetId|id") {
+      fail(`accessibleNameTargets[${index}] has an invalid contract`);
+    }
+    if (typeof target.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(target.id)) {
+      fail(`accessibleNameTargets[${index}].id is invalid`);
+    }
+    if (typeof target.focusTargetId !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(target.focusTargetId)
+        || !focusIds.has(target.focusTargetId) || referencedFocusIds.has(target.focusTargetId)) {
+      fail(`accessibleNameTargets[${index}].focusTargetId is invalid or duplicated`);
+    }
+    referencedFocusIds.add(target.focusTargetId);
+    if (!allowedRoles.has(target.expectedRole)) fail(`accessibleNameTargets[${index}].expectedRole is invalid`);
+    boundedString(target.expectedName, `accessibleNameTargets[${index}].expectedName`, 120);
+    return target;
+  });
+  const ids = targets.map((target) => target.id);
+  if (ids.length !== new Set(ids).size) fail("accessibleNameTargets ids must be unique");
+  if (referencedFocusIds.size !== focusIds.size) {
+    fail("accessibleNameTargets must exactly cover focusTargets");
+  }
+  return targets;
+}
+
 function loadSpec(file, expectedCase, expectedState) {
   const absolute = regularInput(file, "spec");
   let data;
@@ -154,6 +190,7 @@ function loadSpec(file, expectedCase, expectedState) {
     1: ["assertions", "caseId", "schemaVersion", "state", "steps", "targets"],
     2: ["assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
     3: ["assertions", "asyncCompletion", "caseId", "schemaVersion", "state", "steps", "targets"],
+    4: ["accessibleNameTargets", "assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
   };
   const expectedKeys = data && typeof data === "object" && !Array.isArray(data) ? rootKeys[data.schemaVersion] : null;
   if (!expectedKeys || Object.keys(data).sort().join("|") !== expectedKeys.sort().join("|")) {
@@ -178,6 +215,11 @@ function loadSpec(file, expectedCase, expectedState) {
   if (data.schemaVersion === 3) {
     if (data.state !== "interaction") fail("spec schema 3 is reserved for interaction state");
     data.asyncCompletion = validateAsyncCompletion(data.asyncCompletion, data.steps);
+  }
+  if (data.schemaVersion === 4) {
+    if (data.state !== "interaction") fail("spec schema 4 is reserved for interaction state");
+    data.focusTargets = validateFocusTargets(data.focusTargets, data.steps);
+    data.accessibleNameTargets = validateAccessibleNameTargets(data.accessibleNameTargets, data.focusTargets);
   }
   return { absolute, data };
 }
@@ -396,6 +438,9 @@ async function main() {
     new Promise((resolve) => { fontTimer = setTimeout(() => resolve(false), 10_000); }),
   ]).finally(() => clearTimeout(fontTimer));
   const focusEvidence = await auditFocusedControls(browser, url, contextOptions, spec.data);
+  const accessibleNameEvidence = spec.data.schemaVersion === 4
+    ? await auditAccessibleNames(browser, url, contextOptions, spec.data)
+    : null;
   let asyncEvidence = null;
   let mainAsyncReplay = null;
   if (spec.data.schemaVersion === 3) {
@@ -412,7 +457,9 @@ async function main() {
       }).map((target) => target.stepId))
     : new Set();
   const blockedStepId = spec.data.steps.find((step) => confirmedClickStepIds.has(step.id))?.id || null;
-  const resultSchemaVersion = spec.data.schemaVersion === 3 ? 4 : blockedStepId === null ? spec.data.schemaVersion : 3;
+  const resultSchemaVersion = spec.data.schemaVersion === 3 ? 4
+    : spec.data.schemaVersion === 4 ? 5
+      : blockedStepId === null ? spec.data.schemaVersion : 3;
   const resultFocusEvidence = resultSchemaVersion === 3 ? {
     focusCoverage: focusEvidence.focusCoverage,
     focusedControls: focusEvidence.focusedControls.map((control) => ({
@@ -438,8 +485,14 @@ async function main() {
   const focusedControlObscured = focusEvidence.focusedControls.some(
     (control) => control.status === "confirmed" && control.fullyObscured === true,
   );
-  const focusVerificationUnavailable = spec.data.schemaVersion === 2
+  const focusVerificationUnavailable = [2, 4].includes(spec.data.schemaVersion)
     && focusEvidence.focusCoverage.status === "unavailable";
+  const accessibleNameMismatch = accessibleNameEvidence?.accessibleNameControls.some(
+    (control) => control.status === "confirmed",
+  ) || false;
+  const accessibleNameUnavailable = accessibleNameEvidence?.accessibleNameControls.some(
+    (control) => control.status === "unavailable",
+  ) || false;
   const staleCompletion = asyncEvidence?.asyncCompletions.some((item) => item.status === "confirmed") || false;
   const staleCompletionUnavailable = asyncEvidence?.asyncCompletions.some((item) => item.status === "unavailable") || false;
   await page.screenshot({ path: screenshot, fullPage, animations: "disabled" });
@@ -463,11 +516,12 @@ async function main() {
       devicePixelArea,
       horizontalOverflow,
       eventOverflow,
-      ...(spec.data.schemaVersion === 2 ? {
+      ...([2, 4].includes(spec.data.schemaVersion) ? {
         focusCoverage: resultFocusEvidence.focusCoverage,
         focusedControls: resultFocusEvidence.focusedControls,
       } : {}),
       ...(spec.data.schemaVersion === 3 ? asyncEvidence : {}),
+      ...(spec.data.schemaVersion === 4 ? accessibleNameEvidence : {}),
       eventCounts: { consoleErrors: consoleErrorCount, pageErrors: pageErrorCount, externalRequests: externalRequestCount },
       issues: [
         ...(horizontalOverflow ? ["page_horizontal_overflow"] : []),
@@ -477,12 +531,15 @@ async function main() {
         ...(focusVerificationUnavailable ? ["focus_obscuration_verification_unavailable"] : []),
         ...(staleCompletion ? ["stale_async_completion"] : []),
         ...(staleCompletionUnavailable ? ["stale_completion_verification_unavailable"] : []),
+        ...(accessibleNameMismatch ? ["declared_control_accessible_name_mismatch"] : []),
+        ...(accessibleNameUnavailable ? ["accessible_name_verification_unavailable"] : []),
       ],
     },
     typography,
     verdict: fontsReady && fullPage && !horizontalOverflow && !eventOverflow && !focusedControlObscured
       && !focusVerificationUnavailable
       && !staleCompletion && !staleCompletionUnavailable
+      && !accessibleNameMismatch && !accessibleNameUnavailable
       && assertions.every((item) => item.passed)
       && consoleErrors.length === 0 && pageErrors.length === 0 && externalRequests.length === 0
       && typography.issues.length === 0 ? "clean" : "findings",

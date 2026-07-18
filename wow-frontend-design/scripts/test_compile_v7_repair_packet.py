@@ -277,6 +277,59 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
             compiler.extract_findings(result)
 
+    def test_accessible_name_projection_is_confirmed_only_and_prompt_safe(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["declared_control_accessible_name_mismatch"],
+            "accessibleNameControls": [{
+                "id": "account-search", "role": "searchbox", "status": "confirmed", "replays": 2,
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "declared_control_accessible_name_mismatch",
+            "classification": "runtime",
+            "locator": "account-search",
+            "evidence": {"role": "searchbox"},
+        }], findings)
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("preserve visible copy", feedback)
+        self.assertIn("correcting the existing native or ARIA naming source", feedback)
+
+        unavailable = _result()
+        unavailable["runtime"].update({
+            "issues": ["accessible_name_verification_unavailable"],
+            "accessibleNameControls": [{
+                "id": "account-search", "role": "searchbox", "status": "unavailable", "replays": 2,
+                "reason": "accessibility_tree_unavailable",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+            compiler.extract_findings(unavailable)
+
+        unavailable_without_issue = _result()
+        unavailable_without_issue["runtime"].update({
+            "issues": [],
+            "accessibleNameControls": [{
+                "id": "account-search", "role": "searchbox", "status": "unavailable", "replays": 2,
+                "reason": "accessibility_tree_unavailable",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "unavailable issue and evidence disagree"):
+            compiler.extract_findings(unavailable_without_issue)
+
+        mismatched = _result()
+        mismatched["runtime"].update({
+            "issues": [],
+            "accessibleNameControls": [{
+                "id": "account-search", "role": "searchbox", "status": "confirmed", "replays": 2,
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(mismatched)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

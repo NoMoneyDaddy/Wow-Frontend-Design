@@ -255,6 +255,17 @@ def _validate_focus_evidence(
 
 
 ASYNC_CLAIM_BOUNDARY = "two controlled same-origin replays with a 750ms post-release quiescence window"
+ACCESSIBLE_NAME_CLAIM_BOUNDARY = (
+    "two fresh evaluator-controlled accessibility-name observations of declared form controls"
+)
+ACCESSIBLE_NAME_ROLES = {"textbox", "searchbox", "spinbutton", "combobox", "listbox"}
+ACCESSIBLE_NAME_UNAVAILABLE_REASONS = {
+    "accessibility_tree_unavailable",
+    "control_not_rendered",
+    "external_request_blocked",
+    "replay_unstable",
+    "runtime_unavailable",
+}
 
 
 def _validate_async_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
@@ -318,6 +329,65 @@ def _validate_async_evidence(runtime: dict[str, Any], label: str) -> tuple[bool,
     return status == "confirmed", False
 
 
+def _validate_accessible_name_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
+    """Validate v5 declared-control accessible-name evidence without exposing names."""
+
+    coverage = runtime.get("accessibleNameCoverage")
+    records = runtime.get("accessibleNameControls")
+    coverage_keys = {
+        "status", "reason", "declaredTargets", "completedTargets", "freshReplays", "claimBoundary",
+    }
+    if not isinstance(coverage, dict) or set(coverage) != coverage_keys or not isinstance(records, list):
+        raise V7EvidenceError(f"accessible name evidence schema changed for {label}")
+    if coverage.get("claimBoundary") != ACCESSIBLE_NAME_CLAIM_BOUNDARY:
+        raise V7EvidenceError(f"accessible name claim boundary changed for {label}")
+    counts = [coverage.get(field) for field in ("declaredTargets", "completedTargets", "freshReplays")]
+    if any(type(value) is not int or value < 0 for value in counts):
+        raise V7EvidenceError(f"accessible name coverage counts are invalid for {label}")
+    declared, completed, replays = counts
+    if not 1 <= declared <= 8 or completed > declared or replays != declared * 2 or len(records) != declared:
+        raise V7EvidenceError(f"accessible name coverage bounds changed for {label}")
+    ids: set[str] = set()
+    completed_records = 0
+    confirmed = 0
+    unavailable = 0
+    for record in records:
+        if not isinstance(record, dict):
+            raise V7EvidenceError(f"accessible name control record is malformed for {label}")
+        status = record.get("status")
+        expected_keys = {"id", "role", "status", "replays"}
+        if status == "unavailable":
+            expected_keys.add("reason")
+        if set(record) != expected_keys:
+            raise V7EvidenceError(f"accessible name control record schema changed for {label}")
+        control_id = record.get("id")
+        if not isinstance(control_id, str) or RECORD_ID.fullmatch(control_id) is None or control_id in ids:
+            raise V7EvidenceError(f"accessible name control id is invalid or duplicated for {label}")
+        ids.add(control_id)
+        if record.get("role") not in ACCESSIBLE_NAME_ROLES or record.get("replays") != 2:
+            raise V7EvidenceError(f"accessible name control role or replay count is invalid for {label}")
+        if status == "unavailable":
+            if record.get("reason") not in ACCESSIBLE_NAME_UNAVAILABLE_REASONS:
+                raise V7EvidenceError(f"accessible name unavailable reason is invalid for {label}")
+            unavailable += 1
+        elif status in {"clear", "confirmed"}:
+            completed_records += 1
+            confirmed += int(status == "confirmed")
+        else:
+            raise V7EvidenceError(f"accessible name control status is invalid for {label}")
+    if unavailable:
+        if coverage.get("status") != "unavailable" or coverage.get("reason") != "one_or_more_targets_unavailable" or completed != completed_records:
+            raise V7EvidenceError(f"accessible name unavailable coverage is inconsistent for {label}")
+    elif (
+        coverage.get("status") != "complete"
+        or coverage.get("reason") is not None
+        or completed != declared
+        or completed != completed_records
+    ):
+        raise V7EvidenceError(f"accessible name complete coverage is inconsistent for {label}")
+    return confirmed > 0, unavailable > 0
+
+
 def _validate_result(
     key: tuple[str, str, str, str, str],
     result_path: Path,
@@ -356,12 +426,14 @@ def _validate_result(
     if set(evidence) != {"schemaVersion", "identity", "input", "browser", "runtime", "typography", "verdict", "screenshot"}:
         raise V7EvidenceError(f"result root schema changed for {artifact_stem(key)}")
     result_schema = evidence.get("schemaVersion")
-    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4} or identity != expected_identity:
+    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4, 5} or identity != expected_identity:
         raise V7EvidenceError(f"result identity changed for {artifact_stem(key)}")
     if result_schema == 3 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 3 is reserved for blocked interaction evidence: {artifact_stem(key)}")
     if result_schema == 4 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 4 is reserved for async interaction evidence: {artifact_stem(key)}")
+    if result_schema == 5 and key[2] != "interaction":
+        raise V7EvidenceError(f"result schema 5 is reserved for accessible-name interaction evidence: {artifact_stem(key)}")
     if evidence.get("verdict") not in {"clean", "findings"}:
         raise V7EvidenceError(f"result verdict is invalid for {artifact_stem(key)}")
     screenshot = evidence.get("screenshot")
@@ -410,6 +482,10 @@ def _validate_result(
         expected_runtime_keys |= {"focusCoverage", "focusedControls"}
     elif result_schema == 4:
         expected_runtime_keys |= {"asyncCoverage", "asyncCompletions"}
+    elif result_schema == 5:
+        expected_runtime_keys |= {
+            "focusCoverage", "focusedControls", "accessibleNameCoverage", "accessibleNameControls",
+        }
     if not isinstance(runtime, dict) or set(runtime) != expected_runtime_keys:
         raise V7EvidenceError(f"runtime schema changed for {artifact_stem(key)}")
     if not isinstance(typography, dict) or set(typography) != {
@@ -424,6 +500,9 @@ def _validate_result(
     )
     stale_completion, stale_unavailable = (
         _validate_async_evidence(runtime, artifact_stem(key)) if result_schema == 4 else (False, False)
+    )
+    accessible_name_mismatch, accessible_name_unavailable = (
+        _validate_accessible_name_evidence(runtime, artifact_stem(key)) if result_schema == 5 else (False, False)
     )
     if key[2] == "interaction" and (not runtime["interactions"] or not runtime["assertions"]):
         raise V7EvidenceError(f"interaction evidence must record at least one step and one assertion for {artifact_stem(key)}")
@@ -546,6 +625,8 @@ def _validate_result(
         *(["focus_obscuration_verification_unavailable"] if focus_unavailable else []),
         *(["stale_async_completion"] if stale_completion else []),
         *(["stale_completion_verification_unavailable"] if stale_unavailable else []),
+        *(["declared_control_accessible_name_mismatch"] if accessible_name_mismatch else []),
+        *(["accessible_name_verification_unavailable"] if accessible_name_unavailable else []),
     ]
     if runtime.get("issues") != expected_runtime_issues:
         raise V7EvidenceError(f"runtime issue derivation changed for {artifact_stem(key)}")
@@ -561,6 +642,8 @@ def _validate_result(
         and not focus_unavailable
         and not stale_completion
         and not stale_unavailable
+        and not accessible_name_mismatch
+        and not accessible_name_unavailable
         and assertions_pass
         and runtime["consoleErrors"] == []
         and runtime["pageErrors"] == []

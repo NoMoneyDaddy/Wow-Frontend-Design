@@ -525,6 +525,57 @@ class V7EvidenceTests(unittest.TestCase):
         })
         self.assertEqual((False, True), evidence._validate_async_evidence(unavailable, "fixture"))
 
+    def test_result_v5_requires_bounded_accessible_name_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 5,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "open-form", "action": "click", "completed": True}],
+                    "assertions": [{"id": "form-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "focusCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY},
+                    "focusedControls": [{"id": "form-field", "role": "form-control", "status": "clear", "fullyObscured": False, "replays": 2, "occluderCount": 0, "targetArea": 1200, "coveredArea": 0}],
+                    "accessibleNameCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.ACCESSIBLE_NAME_CLAIM_BOUNDARY},
+                    "accessibleNameControls": [{"id": "account-search", "role": "searchbox", "status": "confirmed", "replays": 2}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_control_accessible_name_mismatch"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            unavailable = copy.deepcopy(payload)
+            unavailable["runtime"]["accessibleNameCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+            unavailable["runtime"]["accessibleNameControls"][0] = {"id": "account-search", "role": "searchbox", "status": "unavailable", "replays": 2, "reason": "accessibility_tree_unavailable"}
+            unavailable["runtime"]["issues"] = ["accessible_name_verification_unavailable"]
+            result.write_text(json.dumps(unavailable), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            forged = copy.deepcopy(payload)
+            forged["runtime"]["accessibleNameControls"][0]["name"] = "must-not-appear"
+            result.write_text(json.dumps(forged), encoding="utf-8")
+            forged_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "accessible name control record schema"):
+                evidence._validate_result(key, result, screenshot, forged_hash, screenshot_hash, "0" * 64, "1.61.1")
+
 
 if __name__ == "__main__":
     unittest.main()

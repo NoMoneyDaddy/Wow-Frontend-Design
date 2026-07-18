@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head><meta charset="utf-8"><title>accessible name fixture</title></head>
+  <body>
+    <button id="reveal">顯示欄位</button>
+    <div id="revealed" hidden><label for="named-input">Account secret label</label><input id="named-input"></div>
+    <input id="unnamed-input">
+    <label for="overridden-input">Visible account label</label><input id="overridden-input" aria-label="Wrong account label">
+    <label for="role-drift-input">Role drift label</label><input id="role-drift-input" role="combobox">
+    <label for="duplicate-one">Duplicate secret label</label><input id="duplicate-one">
+    <input id="duplicate-two" aria-label="Duplicate secret label">
+    <label for="password-input">Password secret label</label><input id="password-input" type="password">
+    <input id="hidden-input" type="hidden" aria-label="Hidden secret label">
+    <label for="notes">Notes secret label</label><textarea id="notes"></textarea>
+    <label for="choice">Choice secret label</label><select id="choice"><option>One</option></select>
+    <label for="color-input">Color secret label</label><input id="color-input" type="color">
+    <script>
+      document.querySelector("#reveal").addEventListener("click", () => { document.querySelector("#revealed").hidden = false; });
+      if (new URL(location.href).searchParams.get("external") === "1") {
+        const image = document.createElement("img");
+        image.src = "https://external.invalid/name-fixture.png";
+        document.body.append(image);
+      }
+    </script>
+  </body>
+</html>
