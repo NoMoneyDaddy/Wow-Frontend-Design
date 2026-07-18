@@ -44,12 +44,17 @@ Preserve a usable preview after every attempt. Classify findings before acting:
 
 - `REPAIR REQUIRED`: deterministic task, runtime, accessibility, content, or layout failure; fix automatically, run the narrow check, then the affected regression matrix.
 - `MANUAL VISUAL`: rendered composition or craft judgment; repair automatically only when the evidence and intended direction are clear, otherwise retain it as an advisory note.
-- `ADVISORY`: optional refinement; never interrupts delivery.
-- `EVALUATOR DEFECT`: valid counterexample or faulty measurement; fix and test the evaluator before touching product code.
+- `ADVISORY`: bounded or unproven risk, or optional refinement; disclose it without calling it a pass. It never blocks artifact delivery but may limit the affected claim.
+- `EVIDENCE UNAVAILABLE`: the subcheck could not stabilize or record provenance; preserve the report and mark only the affected claim `UNVERIFIED`. Never abort the cohort or upgrade unavailable evidence to a pass.
+- `EVALUATOR DEFECT`: valid counterexample or faulty measurement; preserve the counterexample and fix, freeze, and test the evaluator before touching product code.
 
-Withhold only the `verified` claim while a repair-required finding remains. Do not hide, delete, or refuse to hand off the best working artifact. After three failed repairs of the same root cause, return the best artifact and screenshots as `PARTIALLY VERIFIED` with the exact unresolved evidence and next command. Use `BLOCKED` only for unavailable required infrastructure, missing authority, unsafe action, or unrecoverable build/runtime failure.
+Evidence-only visual issues remain page-result scoped: bind each to route/page, state, viewport, screenshot, and bounded error provenance. Never move one into a cross-page comparison record or infer a gap without its source record.
+
+Withhold only the `verified` claim while a repair-required finding remains. Do not hide, delete, or refuse to hand off the best working artifact. Preserve exact `DESIGN.md` linter messages and case identity before visual capture. The user never relays diagnostics or restarts the Skill between attempts. After three failed repairs with the same evaluator-owned failure key, return the best artifact, screenshots, and logs as `PARTIALLY VERIFIED` with the exact unresolved evidence and next command. Use `BLOCKED` only for unavailable required infrastructure, missing authority, unsafe action, or unrecoverable build/runtime failure.
 
 Deduplicate repeated violations by root component, rule, and fix while retaining affected-route/instance counts. A scanner's severity is input, not release priority: order by user impact, reachability, task criticality, frequency, and confidence. Mark false-positive review and manual follow-up explicitly. Live-DOM source mappings, selectors, accessibility trees, and framework debug metadata are useful pointers, not proof that the proposed source edit is correct.
+
+When known, include the exact source file in the repair packet together with route, state, viewport, evidence, screenshot, and bounded error provenance.
 
 For accessibility regression reports, distinguish `new`, `fixed`, `pre-existing`, and `unverified` findings against the same pinned tool/ruleset and evaluator-owned baseline. Never mutate Git branches or stashes merely to compute this diff; use a clean evaluator checkout, worktree, build artifact, or recorded baseline.
 
@@ -141,6 +146,12 @@ Adapt rows to the product. Record why a row/cell is applicable, sampled, or excl
 
 Do not impose one screenshot quota on every user project. During an automatic repair, first recapture the failed route/state at one representative desktop and one true mobile browser profile. When that narrow result passes, run the affected breakpoints, states, locales, engines, and routes selected by the diff and declared support. A broad refactor expands the affected matrix because shared tokens, primitives, routing, state ownership, or layout foundations have greater blast radius. A release or formal support claim still requires the complete declared matrix.
 
+### Bounded discovery artifact
+
+For a completion claim, bind `novel-discovery` to an evaluator-owned JSON report with schema `1`, not a successful command or arbitrary file. It contains a non-empty `probes` array and a `findings` array. Each probe records `id`, route, viewport, state, method, outcome (`pass`, `candidate`, or `blocked`), and non-empty evidence. Each finding records its `novel:<surface>:<state>:<symptom>` ID, severity, reproduction, expected and actual result, owner, and confirmation evidence. `clean_after_probes` has no findings; `findings` has at least one. A finding is confirmed only when `confirmation.replays >= 2`; otherwise it remains advisory. Empty, command-only, blocked, or unconfirmed evidence cannot support `VERIFIED`.
+
+The packaged Playwright evaluator freezes its plan to the first declared route, desktop and mobile profiles, and two fresh replays per profile. It checks every reachable focusable control in each replay and accepts only measurable non-color focus geometry. A blocked probe is evaluator/infrastructure advisory, not a product repair finding. Disclose discovery advisories and keep acceptance out of a clean pass; only confirmed findings enter product repair.
+
 ## 4. Layered quality decision
 
 Do not collapse validity, product quality, award comparison, and Skill efficiency into one score. They answer different questions and must remain separate.
@@ -160,6 +171,18 @@ release != VERIFIED
 ```
 
 This rule is machine-enforced when a structured result is requested. Completion validation must pass `validate_quality_result.py` with the evaluator-owned `--ledger` and frozen `--policy`, its model-writable `--workspace-root`, and any additional evaluator-required `--require-gate` values; `--structure-only` checks shape and cannot validate a release. Ledgers are append-only repair histories: the latest event for a repeated label or artifact path is authoritative, and one label reused across command and artifact kinds is ambiguous. The policy must bind each positive reference to the exact scoped claim type and exact command, cwd, and command hash or to a current hashed artifact. `VERIFIED` automatically requires a passing required/applicable `novel-discovery` gate, evaluator-recorded release acceptance, and `OBSERVED` rendered evidence; rendered paths must use the approved policy artifact path, not a label alias. A high craft judgment can never compensate for a broken primary task, inaccessible action, data/safety failure, missing required evidence, or invalid run.
+
+For a machine-readable handoff, start from [quality_result.example.json](../scripts/quality_result.example.json) and run:
+
+```bash
+python3 <skill-dir>/scripts/validate_quality_result.py <result.json> \
+  --ledger <evaluator-root>/ledger.json \
+  --policy <evaluator-root>/policy.json \
+  --workspace-root <evaluator-root>/workspace \
+  --require-gate novel-discovery
+```
+
+Use more `--require-gate` values for evaluator-specific gates. Required applicable `FAIL` or `UNVERIFIED`, a missing discovery gate, implementation-owned ledger/policy, unapproved command, unbound evidence, or a rendered label alias makes the result ineligible and prevents `VERIFIED`.
 
 ### C. Independent core craft vector
 

@@ -89,7 +89,14 @@ Choose the delivery lane below before loading references. In `DIRECT`, load `qua
 
 ## Execute the workflow
 
-Do not skip a stage; scale its depth to the request. Keep one accepted artifact available throughout the run.
+Use one bounded outer loop for every task; the numbered stages below supply its detail:
+
+1. `SCOPE`: detect the project, preserve its contracts, and freeze acceptance plus a capped discovery matrix.
+2. `MAKE / OBSERVE`: for a build, create the first runnable vertical slice; then inspect source, live DOM, behavior, and rendered evidence. An audit starts at observation.
+3. `REPAIR`: group symptoms by root cause and change the smallest source surface that resolves an evidenced failure. Skip this phase when the first verified pass is clean.
+4. `REPLAY`: rerun the failed check, then the affected matrix. Stop on a clean bounded pass or the declared fuse; never create another probe merely to keep the loop running.
+
+Scale each stage to the request and keep one accepted artifact available throughout the run. This loop is control flow, not a mandatory artifact list.
 
 ### Choose the delivery lane before creating artifacts
 
@@ -105,8 +112,7 @@ Every verification cycle has two independent lanes:
 
 Record a new candidate as `novel:<surface>:<state>:<symptom>` with route, viewport, state, reproduction, expected result, actual result, raw evidence, severity, and owner. Confirm it by a second replay or a nearby valid counterexample. A confirmed novel finding enters the same smallest-repair → narrow-gate → affected-matrix loop and gains a regression check before completion; never discard it because no current evaluator code names it. Keep an unreproduced candidate as `ADVISORY`, not a pass or a fabricated failure.
 
-For a completion claim, bind `novel-discovery` to an evaluator-owned JSON report (schema `1`), not a successful shell command or an arbitrary file. The report must contain a non-empty `probes` array and a `findings` array: each probe records `id`, route, viewport, state, method, outcome (`pass`/`candidate`/`blocked`), and non-empty evidence; each finding records the `novel:surface:state:symptom` id, severity, reproduction, expected/actual result, owner, and confirmation evidence. A `clean_after_probes` report has no findings; a `findings` report has at least one. Mark a finding `confirmed` only after `confirmation.replays >= 2`; otherwise keep it `advisory`. An empty, command-only, or unconfirmed report cannot support `VERIFIED`.
-The packaged Playwright visual evaluator freezes the discovery plan to the first declared route, desktop and mobile profiles, and two fresh replays per profile. It checks every reachable focusable control in each replay and accepts only measurable non-color focus geometry; a blocked probe is an evaluator/infrastructure advisory, not a product repair finding. Discovery advisories must remain disclosed and keep acceptance out of a clean pass; only confirmed findings enter the product repair loop.
+For a completion claim, bind `novel-discovery` to the evaluator-owned bounded report defined in [quality-gates.md](references/quality-gates.md), never to shell success or an arbitrary file. Empty, command-only, blocked, or unconfirmed evidence cannot support `VERIFIED`; only confirmed findings enter product repair.
 
 ### 1. Inspect scope and capability
 
@@ -209,20 +215,9 @@ Before evaluator handoff, run a source-level counterexample preflight even when 
 
 When browser access is authorized, use the project-pinned Playwright library, test runner, or CLI exclusively for browser interaction and screenshots. Do not use Computer Use, an in-app browser controller, a Chrome extension, or general desktop control as a substitute. If Playwright is unavailable and adding it is not authorized, follow the no-visual fallback and mark rendered claims `UNVERIFIED`. Verify representative routes and reachable states at compact/common mobile, tablet portrait/landscape, desktop, and wide desktop as scope requires. Capture default and post-interaction screenshots separately with route, viewport, locale, state, DPR, engine, touch/isMobile, and emulation/device provenance. Decode every screenshot and require its pixel dimensions to equal the declared CSS viewport multiplied by the recorded scale; a positive 1×1 image cannot stand in for a viewport capture. Width-only resizing is not a physical-device claim. For a multi-page flow, replay every declared behavioral interaction on each mapped page at each required interaction viewport; pages with no declared interaction are `NOT APPLICABLE`, not a clean behavioral pass, and a DOM hook alone is never behavioral evidence. Inspect matched evidence for wrapping, clipping, collisions, visual order, state-created voids, fixed obstructions, interaction round-trips, focus, console/runtime/network errors, zoom/reflow, reduced motion, and computed tracks.
 
-Classify results:
+Classify, repair, fuse, and hand off according to [quality-gates.md](references/quality-gates.md). Preserve route/page, state, viewport, screenshot, and error provenance; deduplicate shared root causes without erasing affected instances. Keep the preview, make the smallest source repair, run the narrow gate and affected matrix, and let three consecutive failures with the same evaluator-owned key return the best artifact as `PARTIALLY VERIFIED`. The user must not relay diagnostics or restart the Skill.
 
-- REPAIR REQUIRED: deterministic contract/task/runtime/layout/accessibility/content failure. Return structured evidence to implementation automatically.
-- MANUAL VISUAL: rendered craft judgment. Repair only when evidence and direction are clear; otherwise keep advisory.
-- ADVISORY: bounded/unproven risk; disclose without calling it a pass.
-- EVIDENCE UNAVAILABLE: a subcheck could not stabilize or record provenance; preserve the report and mark the affected claim `UNVERIFIED`, never abort the cohort or upgrade it to a pass.
-- Evidence-only visual issues are page-result scoped: bind each one to route/page, state, viewport, screenshot, and bounded error provenance; never move it into a cross-page comparison record or infer a gap without that source record.
-- EVALUATOR DEFECT: preserve the counterexample and fix/freeze the evaluator before changing product code.
-
-For repair-required findings, preserve the preview, send exact file/route/viewport/state/evidence/screenshot into the loop, make the smallest repair, run the narrow gate, then the affected matrix. DESIGN.md lint findings follow the same bounded loop before visual capture, with exact linter messages and case identity preserved as evidence. The user must not relay diagnostics or restart the Skill. Three consecutive failures with the same evaluator-owned failure key trigger the fuse: stop blind retries, preserve the best artifact/screenshots/logs, and return PARTIALLY VERIFIED with the unresolved evidence and next executable command. Use BLOCKED only for missing authority, unavailable required infrastructure, unsafe action, or unrecoverable build/runtime failure.
-
-Acceptance is evaluator-owned. Never edit an active gate, accept your own score, fabricate evidence, or upgrade INFERRED/UNVERIFIED to passed.
-
-When the caller requests a machine-readable handoff, start from [quality_result.example.json](scripts/quality_result.example.json). Validate a completion claim with [validate_quality_result.py](scripts/validate_quality_result.py) against the evaluator-owned ledger and frozen policy: `python3 <skill-dir>/scripts/validate_quality_result.py <result.json> --ledger <evaluator-root>/ledger.json --policy <evaluator-root>/policy.json --workspace-root <evaluator-root>/workspace --require-gate novel-discovery`. The policy must bind each positive gate/craft/rendered reference to its scoped claim type and exact command, cwd, and command hash or to a current hashed artifact. A `VERIFIED` release automatically requires the `novel-discovery` gate, evaluator-recorded acceptance, and `OBSERVED` rendered evidence; every `rendered_evidence.paths` entry must be the approved artifact path rather than a label alias. Use additional `--require-gate` options for evaluator-specific gates. `--structure-only` preserves legacy schema checking but cannot support a completion claim. Required applicable `FAIL` or `UNVERIFIED`, a missing discovery gate, an implementation-owned ledger/policy, an unapproved command, or unbound evidence must make the result ineligible and prevent `VERIFIED`.
+Acceptance remains evaluator-owned. Never edit an active gate, accept your own score, fabricate evidence, or upgrade `INFERRED`/`UNVERIFIED` to passed. For a machine-readable handoff, use the example, command, ledger/policy binding, discovery requirement, and fail-closed rules in [quality-gates.md](references/quality-gates.md).
 
 ## Completion red-flag blacklist
 
