@@ -13,7 +13,7 @@
   },
   "auditor": {
     "path": "evals/playwright_v7_a1_audit.cjs",
-    "sha256": "6f402bf0258cd19b18c96b5671f7cc5485e78c6ad805c198c69d417109eaf726"
+    "sha256": "bd740cd3691d0a068ff1e165abc07306392d1eca508b285dfee64b5531e91670"
   },
   "dependencies": [
     {
@@ -31,6 +31,10 @@
     {
       "path": "evals/v7_dialog_focus.cjs",
       "sha256": "335b40350144c3a477ff916a0b11e0cbb9ce89849644b8be7f728b661e53080e"
+    },
+    {
+      "path": "evals/v7_invalid_feedback.cjs",
+      "sha256": "9e3181b54e65ee097e68db6dc953f130522264f95d9060683f3dfa3822219fb1"
     },
     {
       "path": "evals/v7_stale_completion.cjs",

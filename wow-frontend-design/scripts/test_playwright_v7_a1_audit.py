@@ -26,6 +26,125 @@ EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v6_invalid_feedback_targets_emit_v7_for_linked_and_unlinked_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "invalid-feedback.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<label for="described-input">描述式欄位</label><input id="described-input"><button id="described-invalidate">驗證描述式</button><p id="described-error" hidden>PRIVATE-DESCRIBED-ERROR</p>
+<label for="errormessage-input">錯誤訊息欄位</label><input id="errormessage-input"><button id="errormessage-invalidate">驗證錯誤訊息</button><p id="errormessage-error" hidden>PRIVATE-ERRORMESSAGE-ERROR</p>
+<label for="unlinked-input">未綁定欄位</label><input id="unlinked-input"><button id="unlinked-invalidate">驗證未綁定</button><p id="unlinked-error" hidden>PRIVATE-UNLINKED-ERROR</p>
+</main><script>
+for (const kind of ["described", "errormessage", "unlinked"]) {
+  document.querySelector(`#${kind}-invalidate`).addEventListener("click", () => {
+    const input = document.querySelector(`#${kind}-input`); const error = document.querySelector(`#${kind}-error`);
+    input.setAttribute("aria-invalid", "true"); error.hidden = false;
+    if (kind === "described") input.setAttribute("aria-describedby", error.id);
+    if (kind === "errormessage") input.setAttribute("aria-errormessage", error.id);
+  });
+}
+</script></body></html>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 6, "caseId": "invalid-feedback-case", "state": "interaction",
+                "steps": [
+                    {"id": "fill-described", "action": "fill", "selector": "#described-input", "value": "PRIVATE-INPUT-VALUE-ONE"},
+                    {"id": "invalidate-described", "action": "click", "selector": "#described-invalidate"},
+                    {"id": "fill-errormessage", "action": "fill", "selector": "#errormessage-input", "value": "PRIVATE-INPUT-VALUE-TWO"},
+                    {"id": "invalidate-errormessage", "action": "click", "selector": "#errormessage-invalidate"},
+                    {"id": "fill-unlinked", "action": "fill", "selector": "#unlinked-input", "value": "PRIVATE-INPUT-VALUE-THREE"},
+                    {"id": "invalidate-unlinked", "action": "click", "selector": "#unlinked-invalidate"},
+                ],
+                "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "invalidFeedbackTargets": [
+                    {"id": "described-feedback", "controlStepId": "fill-described", "invalidationStepId": "invalidate-described", "errorSelector": "#described-error"},
+                    {"id": "errormessage-feedback", "controlStepId": "fill-errormessage", "invalidationStepId": "invalidate-errormessage", "errorSelector": "#errormessage-error"},
+                    {"id": "unlinked-feedback", "controlStepId": "fill-unlinked", "invalidationStepId": "invalidate-unlinked", "errorSelector": "#unlinked-error"},
+                ],
+            }
+            spec_path = root / "spec.json"
+            output = root / "result.json"
+            screenshot = root / "result.png"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "invalid-feedback-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertTrue(output.is_file(), completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertEqual(7, result["schemaVersion"])
+            self.assertIn("invalidFeedbackCoverage", result["runtime"])
+            records = {item["id"]: item for item in result["runtime"]["invalidFeedbackTargets"]}
+            self.assertEqual(("clear", "describedby"), (records["described-feedback"]["status"], records["described-feedback"]["relation"]))
+            self.assertEqual(("clear", "errormessage"), (records["errormessage-feedback"]["status"], records["errormessage-feedback"]["relation"]))
+            self.assertEqual(("confirmed", "missing"), (records["unlinked-feedback"]["status"], records["unlinked-feedback"]["relation"]))
+            self.assertEqual({"id", "status", "replays", "relation"}, set(records["described-feedback"]))
+            self.assertIn("declared_invalid_feedback_unlinked", result["runtime"]["issues"])
+            self.assertEqual(len(spec["steps"]), len(result["runtime"]["interactions"]))
+            self.assertTrue(all(item["completed"] for item in result["runtime"]["interactions"]))
+            self.assertTrue(all(item["passed"] for item in result["runtime"]["assertions"]))
+            self.assertEqual(1, len(list(root.glob("*.png"))))
+            serialized = json.dumps(result, ensure_ascii=False)
+            for private in (
+                "#described-input", "#errormessage-input", "#unlinked-input", "#described-error",
+                "PRIVATE-DESCRIBED-ERROR", "PRIVATE-ERRORMESSAGE-ERROR", "PRIVATE-UNLINKED-ERROR",
+                "PRIVATE-INPUT-VALUE-ONE", "PRIVATE-INPUT-VALUE-TWO", "PRIVATE-INPUT-VALUE-THREE",
+            ):
+                self.assertNotIn(private, serialized)
+
+    def test_v6_invalid_feedback_target_contract_fails_closed(self) -> None:
+        target = {
+            "id": "described-feedback", "controlStepId": "fill-described",
+            "invalidationStepId": "invalidate-described", "errorSelector": "#described-error",
+        }
+        base = {
+            "schemaVersion": 6, "caseId": "invalid-feedback-case", "state": "interaction",
+            "steps": [
+                {"id": "fill-described", "action": "fill", "selector": "#described-input", "value": "PRIVATE-INPUT-VALUE"},
+                {"id": "invalidate-described", "action": "click", "selector": "#described-invalidate"},
+                {"id": "fill-other", "action": "select", "selector": "#other-select", "value": "one"},
+                {"id": "invalidate-other", "action": "click", "selector": "#other-invalidate"},
+            ],
+            "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+            "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+            "invalidFeedbackTargets": [target],
+        }
+        other = {"id": "other-feedback", "controlStepId": "fill-other", "invalidationStepId": "invalidate-other", "errorSelector": "#other-error"}
+        variants = {
+            "non-interaction": {**base, "state": "base"},
+            "empty": {**base, "invalidFeedbackTargets": []},
+            "too-many": {**base, "invalidFeedbackTargets": [target] * 9},
+            "extra-key": {**base, "invalidFeedbackTargets": [{**target, "selector": "#private"}]},
+            "bad-id": {**base, "invalidFeedbackTargets": [{**target, "id": "Bad_ID"}]},
+            "duplicate-id": {**base, "invalidFeedbackTargets": [target, {**other, "id": target["id"]}]},
+            "missing-control-step": {**base, "invalidFeedbackTargets": [{**target, "controlStepId": "missing-step"}]},
+            "non-fill-select-control": {**base, "steps": [{"id": "fill-described", "action": "click", "selector": "#described-input"}, *base["steps"][1:]]},
+            "missing-invalidation-step": {**base, "invalidFeedbackTargets": [{**target, "invalidationStepId": "missing-step"}]},
+            "non-click-invalidation": {**base, "steps": [base["steps"][0], {"id": "invalidate-described", "action": "fill", "selector": "#described-invalidate", "value": "value"}, *base["steps"][2:]]},
+            "reversed-order": {**base, "invalidFeedbackTargets": [{**target, "controlStepId": "invalidate-described", "invalidationStepId": "fill-described"}]},
+            "duplicate-control-binding": {**base, "invalidFeedbackTargets": [target, {**other, "controlStepId": "fill-described"}]},
+            "duplicate-error-binding": {**base, "invalidFeedbackTargets": [target, {**other, "errorSelector": "#described-error"}]},
+        }
+        source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec(process.argv[1], 'invalid-feedback-case', process.argv[2]); process.exit(0); }}
+catch (error) {{ process.stderr.write(error.message); process.exit(1); }}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, spec in variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode, completed.stderr)
+
     def test_v5_dialog_focus_lifecycle_emits_v6_for_clear_and_confirmed_replays(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

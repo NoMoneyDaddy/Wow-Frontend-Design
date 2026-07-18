@@ -40,6 +40,8 @@ RUNTIME_CODES = {
     "declared_control_accessible_name_mismatch",
     "declared_dialog_focus_lifecycle_mismatch",
     "dialog_focus_verification_unavailable",
+    "declared_invalid_feedback_unlinked",
+    "invalid_feedback_verification_unavailable",
     "external_requests",
     "focus_obscuration_verification_unavailable",
     "focused_control_obscured",
@@ -227,11 +229,13 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError("accessible name verification is unavailable, not a product repair")
         if code == "dialog_focus_verification_unavailable":
             raise RepairPacketError("dialog focus verification is unavailable, not a product repair")
+        if code == "invalid_feedback_verification_unavailable":
+            raise RepairPacketError("invalid feedback verification is unavailable, not a product repair")
         if code == "stale_completion_verification_unavailable":
             raise RepairPacketError("stale completion verification is unavailable, not a product repair")
         if code in {
             "focused_control_obscured", "stale_async_completion", "declared_control_accessible_name_mismatch",
-            "declared_dialog_focus_lifecycle_mismatch",
+            "declared_dialog_focus_lifecycle_mismatch", "declared_invalid_feedback_unlinked",
         }:
             continue
         findings.append(_finding(code, "runtime", "page", {}))
@@ -335,6 +339,46 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
         raise RepairPacketError("dialog focus unavailable issue and evidence disagree")
     if unavailable_dialog_focus:
         raise RepairPacketError("dialog focus verification is unavailable, not a product repair")
+    invalid_feedback_targets = runtime.get("invalidFeedbackTargets", [])
+    if not isinstance(invalid_feedback_targets, list):
+        raise RepairPacketError("invalid feedback evidence is malformed")
+    invalid_feedback_unavailable_reasons = {
+        "feedback_contract_unavailable",
+        "external_request_blocked",
+        "replay_unstable",
+        "runtime_unavailable",
+    }
+    confirmed_invalid_feedback = []
+    unavailable_invalid_feedback = []
+    for record in invalid_feedback_targets:
+        if not isinstance(record, dict):
+            raise RepairPacketError("invalid feedback record is malformed")
+        status = record.get("status")
+        expected_keys = {"id", "status", "replays", "relation"}
+        if status == "unavailable":
+            expected_keys = {"id", "status", "replays", "reason"}
+        if set(record) != expected_keys or record.get("replays") != 2:
+            raise RepairPacketError("invalid feedback evidence is inconsistent")
+        _record_id(record.get("id"), "invalid feedback target id")
+        if status == "unavailable":
+            if record.get("reason") not in invalid_feedback_unavailable_reasons:
+                raise RepairPacketError("invalid feedback unavailable reason is invalid")
+            unavailable_invalid_feedback.append(record)
+            continue
+        relation = record.get("relation")
+        if status not in {"clear", "confirmed"} or relation not in {"describedby", "errormessage", "both", "missing"}:
+            raise RepairPacketError("invalid feedback status is invalid")
+        if (status == "confirmed") != (relation == "missing"):
+            raise RepairPacketError("invalid feedback derivation is inconsistent")
+        if status == "confirmed":
+            confirmed_invalid_feedback.append(record)
+            findings.append(_finding("declared_invalid_feedback_unlinked", "runtime", record["id"], {"relation": "missing"}))
+    if ("declared_invalid_feedback_unlinked" in runtime_issues) != bool(confirmed_invalid_feedback):
+        raise RepairPacketError("invalid feedback issue and evidence disagree")
+    if ("invalid_feedback_verification_unavailable" in runtime_issues) != bool(unavailable_invalid_feedback):
+        raise RepairPacketError("invalid feedback unavailable issue and evidence disagree")
+    if unavailable_invalid_feedback:
+        raise RepairPacketError("invalid feedback verification is unavailable, not a product repair")
     async_completions = runtime.get("asyncCompletions", [])
     if not isinstance(async_completions, list):
         raise RepairPacketError("async completion evidence is malformed")
@@ -416,6 +460,11 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
+    invalid_feedback_repair = any(
+        finding.get("code") == "declared_invalid_feedback_unlinked"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
     suffix = " Preserve passed behavior and required content;"
     if focus_repair:
         suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
@@ -429,6 +478,8 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         suffix += " when opening the dialog, move focus to its declared dialog descendant;"
     if dialog_return_repair:
         suffix += " when closing the dialog, restore focus to the declared workflow target;"
+    if invalid_feedback_repair:
+        suffix += " for invalid feedback, preserve visible error and input, keep aria-invalid=true in the invalid state, retain the existing error stable id, and link it with aria-describedby or aria-errormessage;"
     suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()

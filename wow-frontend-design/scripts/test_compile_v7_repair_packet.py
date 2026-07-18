@@ -374,6 +374,50 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
             compiler.extract_findings(mismatched)
 
+    def test_invalid_feedback_projection_is_confirmed_only_and_prompt_safe(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["declared_invalid_feedback_unlinked"],
+            "invalidFeedbackTargets": [{
+                "id": "email-field", "status": "confirmed", "replays": 2, "relation": "missing",
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "declared_invalid_feedback_unlinked",
+            "classification": "runtime",
+            "locator": "email-field",
+            "evidence": {"relation": "missing"},
+        }], findings)
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("preserve visible error and input", feedback)
+        self.assertIn("aria-invalid=true", feedback)
+        self.assertIn("existing error stable id", feedback)
+        self.assertIn("aria-describedby or aria-errormessage", feedback)
+        self.assertNotIn("#email-field", feedback)
+
+        unavailable = _result()
+        unavailable["runtime"].update({
+            "issues": ["invalid_feedback_verification_unavailable"],
+            "invalidFeedbackTargets": [{
+                "id": "email-field", "status": "unavailable", "replays": 2, "reason": "feedback_contract_unavailable",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+            compiler.extract_findings(unavailable)
+
+        mismatched = _result()
+        mismatched["runtime"].update({
+            "issues": [],
+            "invalidFeedbackTargets": [{
+                "id": "email-field", "status": "confirmed", "replays": 2, "relation": "missing",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(mismatched)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

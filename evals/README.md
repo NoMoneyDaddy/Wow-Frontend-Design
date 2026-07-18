@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-dialog-focus-v19.json \
+  --manifest evals/v7-pilot-manifest-20260718-invalid-feedback-v20.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -106,7 +106,7 @@ P7 paired decision compiler 把 promotion ratchet 固定為唯讀、無 promotio
 
 ```bash
 npm run eval:v7-paired-decision -- \
-  --manifest evals/v7-pilot-manifest-20260718-dialog-focus-v19.json \
+  --manifest evals/v7-pilot-manifest-20260718-invalid-feedback-v20.json \
   --output "$DECISION_ROOT/v7-paired-decision.json" \
   --repository-root .
 ```
@@ -128,6 +128,8 @@ P12 以 input schema v3／result schema v4 驗證一個 evaluator-declared stale
 P13 以 input schema v4／result schema v5 驗證 evaluator-declared native task control 的 accessible name。每個宣告都一對一綁定既有 form-control step，只接受 bounded native text/search/email/tel/url/number `input`、`textarea`、`select` 與 `textbox`、`searchbox`、`spinbutton`、`combobox`、`listbox` role；password、color、file、date 類型及 custom composite 不在此 probe 範圍。兩個 fresh Playwright context 重播 preceding steps，確認 target 唯一、可見且 native role 相符，再用 exact `getByRole(role, { name })` 驗證同一 DOM node。兩次都 mismatch 才產生 `declared_control_accessible_name_mismatch`；unsupported control、重複 role/name、字型／runtime／external request 或兩次狀態漂移只會阻斷 clean。Result 與 repair packet 只留 evaluator ID、role 與 fixed enums，不帶 expected name、selector、copy 或 raw error；v1–v4 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。此 bounded gate 依 [Playwright role locators](https://playwright.dev/docs/locators#locate-by-role) 與 [WAI form labels](https://www.w3.org/WAI/tutorials/forms/labels/) 建立反例，不宣稱全頁 WCAG、assistive technology、custom widget 或 Label in Name conformance。
 
 P14 以 input schema v5／result schema v6 驗證 evaluator-declared modal dialog focus lifecycle。每筆 declaration 只綁既有 click/press open-close steps、唯一且可見的 `role=dialog`／`aria-modal=true` 容器、開啟後 descendant focus target 與關閉後 workflow return target；兩個 fresh context 重播相同 prefix/middle steps，在各 phase 兩個 animation frame 後比較 `document.activeElement`。普通非 focusable declaration 會 unavailable，明示 `tabindex=-1` 的合法 programmatic target可驗證；open Shadow DOM target暫時 fail closed。兩次都一致 mismatch 才產生 `declared_dialog_focus_lifecycle_mismatch`；role/modal/visibility/descendant/count、字型/runtime/external request 或 replay drift 只會阻斷 clean。Result 與 repair packet 只留 evaluator ID、open/return boolean 與 fixed enums，不帶 selector、copy 或 raw error；v1–v5 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。此 gate 依 [WAI-ARIA APG Modal Dialog Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) 與 [Playwright focus assertion](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-focused) 建立 bounded counterexample，不宣稱完整 focus trap、Escape、背景 inert、screen reader、APG 或 WCAG conformance。
+
+P15 以 input schema v6／result schema v7 驗證 evaluator-declared invalid-feedback linkage。每筆 declaration 只綁既有 fill/select control step、其後 click/press invalidation step、唯一且可見的原生文字輸入／`textarea`／`select` 與可見錯誤節點；兩個 fresh context 重播到 invalid state，要求 `aria-invalid="true"`，再確認錯誤節點的唯一 stable ID 是否出現在 control 的 `aria-describedby` IDREF list，或精確等於單一 `aria-errormessage` ID reference。兩次都穩定 missing 才產生 `declared_invalid_feedback_unlinked`；unsupported control、hidden/empty/duplicate-ID feedback、`aria-hidden`／`inert` subtree、multi-ID `aria-errormessage`、Shadow DOM、字型/runtime/external request 或 replay drift 只會阻斷 clean。Result 與 repair packet 只留 evaluator ID、fixed relation enum，不帶 selector、IDREF、copy、value 或 raw error；v1–v6 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。此 gate 依 [WAI Forms User Notifications](https://www.w3.org/WAI/tutorials/forms/notifications/)、[WAI ARIA21](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA21.html) 與 [WAI-ARIA `aria-errormessage`](https://www.w3.org/TR/wai-aria/#aria-errormessage) 建立 bounded counterexample，不宣稱全表單、screen reader、assistive technology 或 WCAG conformance。
 
 ## 目前案例
 
