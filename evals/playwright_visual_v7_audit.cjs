@@ -2959,8 +2959,8 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
       if (!active || active === document.body || active === document.documentElement) return null;
       const rect = active.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return null;
-      const readStyle = () => {
-        const style = getComputedStyle(active);
+      const readStyle = (node) => {
+        const style = getComputedStyle(node);
         return [
           style.outlineStyle,
           style.outlineWidth,
@@ -2986,77 +2986,114 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
           style.textDecorationColor,
         ].join("|");
       };
-      const before = (() => {
-        active.blur();
-        return readStyle();
-      })();
-      active.focus();
-      const after = readStyle();
-      let paintSuppressed = false;
-      let effectiveOpacity = 1;
-      let accessibilityHidden = Boolean(active.closest("[aria-hidden='true']"));
-      let backgroundColor = "transparent";
-      let backgroundImageUnknown = false;
       const ancestors = [];
       for (let node = active.parentElement; node && node.nodeType === 1; node = node.parentElement) ancestors.unshift(node);
-      let backdrop = [255, 255, 255];
-      let knownBackdrop = false;
-      for (const node of ancestors) {
-        const style = getComputedStyle(node);
-        if (style.backgroundImage !== "none") backgroundImageUnknown = true;
-        const match = style.backgroundColor.match(/rgba?\(([^)]*)\)/i);
-        if (!match) continue;
-        const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
-        if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) continue;
-        const alpha = parts.length > 3 && Number.isFinite(parts[3]) ? parts[3] : 1;
-        if (alpha <= 0) continue;
-        backdrop = parts.slice(0, 3).map((channel, index) => channel * alpha + backdrop[index] * (1 - alpha));
-        knownBackdrop = true;
-      }
-      if (knownBackdrop) {
-        backgroundColor = `rgb(${backdrop.map((channel) => Math.round(channel)).join(", ")})`;
-      } else {
-        backgroundColor = "transparent";
-      }
-      for (let node = active; node && node.nodeType === 1; node = node.parentElement) {
-        const style = getComputedStyle(node);
-        const opacity = Number.parseFloat(style.opacity);
-        effectiveOpacity *= Number.isFinite(opacity) ? opacity : 1;
-        const filterOpacity = style.filter.match(/opacity\(\s*([\d.]+)%?\s*\)/i);
-        if (filterOpacity) {
-          const value = Number.parseFloat(filterOpacity[1]);
-          effectiveOpacity *= style.filter.includes("%") ? value / 100 : value;
+      const focusableSelector = "a[href], area[href], button, input, select, textarea, summary, audio[controls], video[controls], iframe, object, embed, [contenteditable]:not([contenteditable='false']), [tabindex]:not([tabindex='-1'])";
+      const activeRect = active.getBoundingClientRect();
+      const localAncestors = ancestors.filter((node) => {
+        if (node === document.body || node === document.documentElement) return false;
+        const sequentialControls = [...node.querySelectorAll(focusableSelector)].filter((control) => {
+          const controlStyle = getComputedStyle(control);
+          const controlRect = control.getBoundingClientRect();
+          return control.tabIndex >= 0
+            && !control.matches(":disabled")
+            && !control.closest("[hidden], [inert]")
+            && controlStyle.display !== "none"
+            && controlStyle.visibility !== "hidden"
+            && controlRect.width > 0
+            && controlRect.height > 0;
+        });
+        if (sequentialControls.length !== 1 || sequentialControls[0] !== active) return false;
+        const nodeRect = node.getBoundingClientRect();
+        const containsActiveRect = nodeRect.width > 0
+          && nodeRect.height > 0
+          && nodeRect.left <= activeRect.left + 1
+          && nodeRect.right >= activeRect.right - 1
+          && nodeRect.top <= activeRect.top + 1
+          && nodeRect.bottom >= activeRect.bottom - 1;
+        if (!containsActiveRect) return false;
+        const isAssociatedLabel = node instanceof HTMLLabelElement && node.control === active;
+        const tightlyWrapsActive = activeRect.left - nodeRect.left <= 96
+          && nodeRect.right - activeRect.right <= 96
+          && activeRect.top - nodeRect.top <= 96
+          && nodeRect.bottom - activeRect.bottom <= 96;
+        return isAssociatedLabel || tightlyWrapsActive;
+      });
+      const indicatorNodes = [active, ...[...localAncestors].reverse()];
+      const beforeCandidates = (() => {
+        active.blur();
+        return indicatorNodes.map(readStyle);
+      })();
+      active.focus();
+      const afterCandidates = indicatorNodes.map(readStyle);
+      const paintContext = (indicatorNode) => {
+        let paintSuppressed = false;
+        let effectiveOpacity = 1;
+        const accessibilityHidden = Boolean(active.closest("[aria-hidden='true']"));
+        let backgroundColor = "transparent";
+        let backgroundImageUnknown = false;
+        const indicatorAncestors = [];
+        for (let node = indicatorNode.parentElement; node && node.nodeType === 1; node = node.parentElement) indicatorAncestors.unshift(node);
+        let backdrop = [255, 255, 255];
+        let knownBackdrop = false;
+        for (const node of indicatorAncestors) {
+          const style = getComputedStyle(node);
+          if (style.backgroundImage !== "none") backgroundImageUnknown = true;
+          const match = style.backgroundColor.match(/rgba?\(([^)]*)\)/i);
+          if (!match) continue;
+          const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
+          if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) continue;
+          const alpha = parts.length > 3 && Number.isFinite(parts[3]) ? parts[3] : 1;
+          if (alpha <= 0) continue;
+          backdrop = parts.slice(0, 3).map((channel, index) => channel * alpha + backdrop[index] * (1 - alpha));
+          knownBackdrop = true;
         }
-        const matrixValues = style.transform.match(/^matrix\(([^)]+)\)$/i)?.[1].split(",").map(Number);
-        const transformCollapsed = matrixValues?.length === 6
-          && (Math.hypot(matrixValues[0], matrixValues[1]) < 0.1 || Math.hypot(matrixValues[2], matrixValues[3]) < 0.1);
-        const clipInset = style.clipPath.match(/^inset\((.*?)(?:\s+round\s+.*)?\)$/i);
-        const clipInsetValues = clipInset ? clipInset[1].trim().split(/\s+/) : [];
-        const expandedInsets = clipInsetValues.length === 1
-          ? [clipInsetValues[0], clipInsetValues[0], clipInsetValues[0], clipInsetValues[0]]
-          : clipInsetValues.length === 2
-            ? [clipInsetValues[0], clipInsetValues[1], clipInsetValues[0], clipInsetValues[1]]
-            : clipInsetValues.length === 3
-              ? [clipInsetValues[0], clipInsetValues[1], clipInsetValues[2], clipInsetValues[1]]
-              : clipInsetValues.slice(0, 4);
-        const box = node.getBoundingClientRect();
-        const toPx = (value, extent) => value?.endsWith("%") ? Number.parseFloat(value) / 100 * extent : Number.parseFloat(value);
-        const clipCollapsesPaint = expandedInsets.length === 4
-          && ((toPx(expandedInsets[0], box.height) + toPx(expandedInsets[2], box.height)) >= box.height
-            || (toPx(expandedInsets[1], box.width) + toPx(expandedInsets[3], box.width)) >= box.width)
-          || /(?:circle|ellipse)\(\s*0(?:px|%|\s|\))/i.test(style.clipPath)
-          || /polygon\(\s*0\s+0\s*,\s*0\s+0/i.test(style.clipPath);
-        const maskImage = style.maskImage || style.webkitMaskImage || "none";
-        const maskHasVisibleStop = /black|white|currentcolor|#[0-9a-f]{3,8}|rgba?\([^)]*(?:,|\/)\s*(?:[1-9]|1(?:\.0+)?)\s*(?:%|\)|$)/i.test(maskImage);
-        if (opacity === 0 || style.visibility === "hidden" || style.display === "none"
-          || /opacity\(\s*0(?:[.%]|\s|\))/i.test(style.filter)
-          || clipCollapsesPaint
-          || (maskImage !== "none" && !maskHasVisibleStop)
-          || transformCollapsed) {
-          paintSuppressed = true;
-          break;
+        if (knownBackdrop) backgroundColor = `rgb(${backdrop.map((channel) => Math.round(channel)).join(", ")})`;
+        for (let node = indicatorNode; node && node.nodeType === 1; node = node.parentElement) {
+          const style = getComputedStyle(node);
+          const opacity = Number.parseFloat(style.opacity);
+          effectiveOpacity *= Number.isFinite(opacity) ? opacity : 1;
+          const filterOpacity = style.filter.match(/opacity\(\s*([\d.]+)%?\s*\)/i);
+          if (filterOpacity) {
+            const value = Number.parseFloat(filterOpacity[1]);
+            effectiveOpacity *= style.filter.includes("%") ? value / 100 : value;
+          }
+          const matrixValues = style.transform.match(/^matrix\(([^)]+)\)$/i)?.[1].split(",").map(Number);
+          const transformCollapsed = matrixValues?.length === 6
+            && (Math.hypot(matrixValues[0], matrixValues[1]) < 0.1 || Math.hypot(matrixValues[2], matrixValues[3]) < 0.1);
+          const clipInset = style.clipPath.match(/^inset\((.*?)(?:\s+round\s+.*)?\)$/i);
+          const clipInsetValues = clipInset ? clipInset[1].trim().split(/\s+/) : [];
+          const expandedInsets = clipInsetValues.length === 1
+            ? [clipInsetValues[0], clipInsetValues[0], clipInsetValues[0], clipInsetValues[0]]
+            : clipInsetValues.length === 2
+              ? [clipInsetValues[0], clipInsetValues[1], clipInsetValues[0], clipInsetValues[1]]
+              : clipInsetValues.length === 3
+                ? [clipInsetValues[0], clipInsetValues[1], clipInsetValues[2], clipInsetValues[1]]
+                : clipInsetValues.slice(0, 4);
+          const box = node.getBoundingClientRect();
+          const toPx = (value, extent) => value?.endsWith("%") ? Number.parseFloat(value) / 100 * extent : Number.parseFloat(value);
+          const clipCollapsesPaint = expandedInsets.length === 4
+            && ((toPx(expandedInsets[0], box.height) + toPx(expandedInsets[2], box.height)) >= box.height
+              || (toPx(expandedInsets[1], box.width) + toPx(expandedInsets[3], box.width)) >= box.width)
+            || /(?:circle|ellipse)\(\s*0(?:px|%|\s|\))/i.test(style.clipPath)
+            || /polygon\(\s*0\s+0\s*,\s*0\s+0/i.test(style.clipPath);
+          const maskImage = style.maskImage || style.webkitMaskImage || "none";
+          const maskHasVisibleStop = /black|white|currentcolor|#[0-9a-f]{3,8}|rgba?\([^)]*(?:,|\/)\s*(?:[1-9]|1(?:\.0+)?)\s*(?:%|\)|$)/i.test(maskImage);
+          if (opacity === 0 || style.visibility === "hidden" || style.display === "none"
+            || /opacity\(\s*0(?:[.%]|\s|\))/i.test(style.filter)
+            || clipCollapsesPaint
+            || (maskImage !== "none" && !maskHasVisibleStop)
+            || transformCollapsed) {
+            paintSuppressed = true;
+            break;
+          }
         }
-      }
+        return { paintSuppressed, effectiveOpacity, backgroundImageUnknown, accessibilityHidden, backgroundColor };
+      };
+      const indicatorCandidates = indicatorNodes
+        .map((node, index) => ({ node, before: beforeCandidates[index], after: afterCandidates[index] }))
+        .filter((candidate) => candidate.before !== candidate.after)
+        .map(({ node, before, after }) => ({ before, after, ...paintContext(node) }));
       const label = (active.getAttribute("aria-label") || active.textContent || active.getAttribute("name") || "")
         .replace(/\s+/g, " ").trim().slice(0, 80);
       window.__wowFocusProbeIds ||= { map: new WeakMap(), next: 0 };
@@ -3069,14 +3106,8 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
         tag: active.tagName.toLowerCase(),
         label,
         focusVisible: active.matches(":focus-visible"),
-        styleChanged: before !== after,
-        before,
-        after,
-        paintSuppressed,
-        effectiveOpacity,
-        backgroundImageUnknown,
-        accessibilityHidden,
-        backgroundColor,
+        styleChanged: indicatorCandidates.length > 0,
+        indicatorCandidates,
       };
     });
     if (!observation) continue;
@@ -3127,41 +3158,56 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
       return ratio >= 3;
     };
     const hasPaint = (value, background, opacity) => hasVisiblePaint(value) && hasContrast(value, background, opacity);
-    const hasIndicator = (observation) => {
-      if (observation.backgroundImageUnknown) return false;
-      const before = observation.before.split("|");
-      const after = observation.after.split("|");
-      const outlineGeometryChanged = after[0] !== "none"
-        && parsePx(after[1]) > 0
-        && hasPaint(after[3], observation.backgroundColor, observation.effectiveOpacity)
-        && (before[0] !== after[0] || before[1] !== after[1] || before[2] !== after[2]);
-      const shadowChanged = before[4] !== after[4]
-        && after[4] !== "none"
-        && hasPaint(after[4], observation.backgroundColor, observation.effectiveOpacity)
-        && [...after[4].matchAll(/(-?\d+(?:\.\d+)?)px/g)].some(([, value]) => Math.abs(Number.parseFloat(value)) > 0);
-      const borderGeometryChanged = [0, 1, 2, 3].some((side) => {
-        const styleChanged = after[5 + side] !== before[5 + side] && after[5 + side] !== "none";
-        const widthChanged = after[9 + side] !== before[9 + side];
-        return (styleChanged || widthChanged)
-          && parsePx(after[9 + side]) > 0
-          && hasPaint(after[13 + side], observation.backgroundColor, observation.effectiveOpacity);
-      });
-      const underlineChanged = after[17] !== before[17]
-        && after[17].split(" ").includes("underline")
-        && after[18] !== "none"
-        && after[19] !== "0px"
-        && after[19] !== "0"
-        && hasPaint(after[21], observation.backgroundColor, observation.effectiveOpacity);
-      return !observation.paintSuppressed && !observation.accessibilityHidden
-        && (outlineGeometryChanged || shadowChanged || borderGeometryChanged || underlineChanged);
+    const indicatorState = (candidate) => {
+      const before = candidate.before.split("|");
+      const after = candidate.after.split("|");
+      const indicatorChanged = (paintCheck) => {
+        const outlineGeometryChanged = after[0] !== "none"
+          && parsePx(after[1]) > 0
+          && paintCheck(after[3])
+          && (before[0] !== after[0] || before[1] !== after[1] || before[2] !== after[2]);
+        const shadowChanged = before[4] !== after[4]
+          && after[4] !== "none"
+          && paintCheck(after[4])
+          && [...after[4].matchAll(/(-?\d+(?:\.\d+)?)px/g)].some(([, value]) => Math.abs(Number.parseFloat(value)) > 0);
+        const borderGeometryChanged = [0, 1, 2, 3].some((side) => {
+          const styleChanged = after[5 + side] !== before[5 + side] && after[5 + side] !== "none";
+          const widthChanged = after[9 + side] !== before[9 + side];
+          return (styleChanged || widthChanged)
+            && parsePx(after[9 + side]) > 0
+            && paintCheck(after[13 + side]);
+        });
+        const underlineChanged = after[17] !== before[17]
+          && after[17].split(" ").includes("underline")
+          && after[18] !== "none"
+          && after[19] !== "0px"
+          && after[19] !== "0"
+          && paintCheck(after[21]);
+        return outlineGeometryChanged || shadowChanged || borderGeometryChanged || underlineChanged;
+      };
+      if (candidate.paintSuppressed || candidate.accessibilityHidden) return "missing";
+      const hasVisibleGeometry = indicatorChanged(hasVisiblePaint);
+      if (candidate.backgroundImageUnknown && hasVisibleGeometry) return "indeterminate";
+      return indicatorChanged((value) => hasPaint(value, candidate.backgroundColor, candidate.effectiveOpacity))
+        ? "present"
+        : "missing";
+    };
+    const observationState = (observation) => {
+      const states = observation.indicatorCandidates.map(indicatorState);
+      if (states.includes("present")) return "present";
+      if (states.includes("indeterminate")) return "indeterminate";
+      return "missing";
     };
     const uniqueObservations = [...new Map(observations.map((observation) => [observation.focusKey, observation])).values()];
-    const missing = uniqueObservations.filter((observation) => !hasIndicator(observation));
+    const states = uniqueObservations.map((observation) => ({ observation, state: observationState(observation) }));
+    const missing = states.filter(({ state }) => state === "missing");
+    const indeterminate = states.filter(({ state }) => state === "indeterminate");
     const uniqueTargetCount = uniqueObservations.length;
     const uncoveredCount = Math.max(0, count - uniqueTargetCount);
     evidence.push(`focus-observations:${observations.length}`);
     evidence.push(`focus-unique-targets:${uniqueTargetCount}`);
     evidence.push(`focus-missing-indicators:${missing.length}`);
+    evidence.push(`focus-indeterminate-indicators:${indeterminate.length}`);
     if (uncoveredCount) evidence.push(`focus-uncovered-controls:${uncoveredCount}`);
     if (replayTruncated) evidence.push("focus-replay-truncated:256-step-safety-bound");
     return {
@@ -3170,7 +3216,7 @@ async function runKeyboardFocusProbe(page, pageName, viewportName, pass) {
       viewport: viewportName,
       state: "keyboard-focus",
       method: "Playwright Tab replay with computed non-color focus-indicator geometry",
-      outcome: missing.length || uncoveredCount || replayTruncated ? "candidate" : "pass",
+      outcome: missing.length || uncoveredCount || replayTruncated ? "candidate" : indeterminate.length ? "blocked" : "pass",
       evidence,
     };
   }
@@ -3245,9 +3291,9 @@ async function runNovelDiscovery(browser, target) {
       state: "keyboard-focus",
       route: pageName,
       viewport: viewport.name,
-      reproduction: "Open the declared route and press Tab until the first visible interactive control.",
+      reproduction: "Open the declared route and press Tab through the visible interactive controls.",
       expected: "The focused control has a perceivable, non-color-only focus indication.",
-      actual: candidates.length ? "The focus target produced no measurable focus-style change." : "The probe could not reach a visible focus target.",
+      actual: candidates.length ? "At least one focus target produced no measurable focus indicator." : "The probe could not obtain conclusive focus-indicator evidence.",
       owner: candidates.length ? "frontend" : "evaluator",
       confirmation: {
         replays: candidates.length || blocked.length,

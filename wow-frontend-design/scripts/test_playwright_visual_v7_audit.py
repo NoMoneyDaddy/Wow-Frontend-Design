@@ -2153,6 +2153,49 @@ process.stdout.write(JSON.stringify({{
             self.assertFalse(any("右側排除樣本" in item["text"] for item in findings))
             self.assertFalse(any("左側排除樣本" in item["text"] for item in findings))
 
+    def test_focus_probe_preserves_gradient_uncertainty_and_focus_within(self) -> None:
+        source = f"""
+const {{ chromium }} = require('playwright');
+const {{ runKeyboardFocusProbe }} = require({json.dumps(str(AUDITOR))});
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const fixtures = {{
+    gradientOutline: `<style>html{{background:linear-gradient(#fff,#ddd)}}button:focus-visible{{outline:3px solid rgb(0,0,0);outline-offset:2px}}</style><button>明確框線</button>`,
+    gradientNone: `<style>html{{background:linear-gradient(#fff,#ddd)}}button:focus-visible{{outline:none}}</style><button>沒有框線</button>`,
+    solidOutline: `<style>html{{background:rgb(255,255,255)}}button:focus-visible{{outline:3px solid rgb(0,0,0);outline-offset:2px}}</style><button>明確框線</button>`,
+    solidLowContrast: `<style>html{{background:rgb(255,255,255)}}button:focus-visible{{outline:3px solid rgb(190,190,190);outline-offset:2px}}</style><button>低對比框線</button>`,
+    solidFocusWithin: `<style>html{{background:rgb(255,255,255)}}.field{{display:inline-grid;padding:16px}}.field:focus-within{{outline:3px solid rgb(0,0,0);outline-offset:2px}}textarea:focus{{outline:none}}</style><div class="field"><textarea>祖先框線</textarea></div>`,
+    pageFocusWithin: `<style>html{{background:rgb(255,255,255)}}body:focus-within{{outline:3px solid rgb(0,0,0)}}button:focus-visible{{outline:none}}</style><button>頁面框線不代表控制項</button>`,
+    groupFocusWithin: `<style>html{{background:rgb(255,255,255)}}form:focus-within{{outline:3px solid rgb(0,0,0)}}button:focus-visible{{outline:none}}</style><form><button>第一個</button><button>第二個</button></form>`,
+    broadFocusWithin: `<style>html{{background:rgb(255,255,255)}}.page{{width:600px;height:500px}}.page:focus-within{{outline:3px solid rgb(0,0,0)}}button:focus-visible{{outline:none}}</style><div class="page"><button>過大容器框線</button></div>`,
+    collapsedFocusWithin: `<style>html{{background:rgb(255,255,255)}}.field{{width:0;height:0}}.field:focus-within{{outline:3px solid rgb(0,0,0)}}button:focus-visible{{outline:none}}</style><div class="field"><button>零尺寸容器框線</button></div>`,
+  }};
+  const results = {{}};
+  for (const [name, html] of Object.entries(fixtures)) {{
+    const page = await browser.newPage();
+    await page.setContent(html);
+    results[name] = await runKeyboardFocusProbe(page, 'index.html', 'desktop', 1);
+    await page.close();
+  }}
+  await browser.close();
+  process.stdout.write(JSON.stringify(results));
+}})().catch((error) => {{ console.error(error); process.exitCode = 1; }});
+"""
+        result = self.run_node(source)
+        self.assertEqual("blocked", result["gradientOutline"]["outcome"])
+        self.assertIn("focus-missing-indicators:0", result["gradientOutline"]["evidence"])
+        self.assertIn("focus-indeterminate-indicators:1", result["gradientOutline"]["evidence"])
+        self.assertEqual("candidate", result["gradientNone"]["outcome"])
+        self.assertIn("focus-missing-indicators:1", result["gradientNone"]["evidence"])
+        self.assertIn("focus-indeterminate-indicators:0", result["gradientNone"]["evidence"])
+        self.assertEqual("pass", result["solidOutline"]["outcome"])
+        self.assertEqual("candidate", result["solidLowContrast"]["outcome"])
+        self.assertEqual("pass", result["solidFocusWithin"]["outcome"])
+        self.assertEqual("candidate", result["pageFocusWithin"]["outcome"])
+        self.assertEqual("candidate", result["groupFocusWithin"]["outcome"])
+        self.assertEqual("candidate", result["broadFocusWithin"]["outcome"])
+        self.assertEqual("candidate", result["collapsedFocusWithin"]["outcome"])
+
     def test_column_void_gate_requires_sparse_content_and_preserves_advisories(self) -> None:
         source = AUDITOR.read_text(encoding="utf-8")
         self.assertIn("const unfilledColumnAdvisories = [];", source)
