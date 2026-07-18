@@ -126,6 +126,112 @@ html, body { overflow-x: clip; }
                 self.assertTrue(item["visible_text"])
                 self.assertFalse(item["visible_primary_content"])
 
+    def test_visible_hidden_attribute_and_large_fixed_obstruction_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Obstructed</title><style>
+[hidden] { display: flex; }
+.unexpected { height: 24px; }
+.fixed-summary { position: fixed; inset: auto 0 0; min-height: 150px; background: white; z-index: 3; }
+.occluded { position: absolute; top: 900px; }
+@media (max-width: 780px) { .occluded { top: 720px; } }
+</style></head><body><main><h1>Choose a service</h1><p class="occluded">Required task content</p></main>
+<div class="unexpected" hidden>Should stay hidden</div><aside class="fixed-summary">Summary and action</aside></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            for item in receipt["results"]:
+                hazards = item["inspection"]["layout_hazards"]
+                self.assertEqual(1, hazards["hidden_attribute_visible_count"])
+                self.assertEqual(1, hazards["fixed_content_obstruction_count"])
+
+    def test_small_fixed_control_and_correctly_hidden_element_pass_layout_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Clear</title><style>
+.help { position: fixed; right: 12px; bottom: 12px; width: 48px; height: 48px; }
+</style></head><body><main><h1>Clear task</h1><p style="min-height:900px">Content</p></main>
+<div hidden>Hidden note</div><button class="help" aria-label="Help">?</button></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            for item in receipt["results"]:
+                hazards = item["inspection"]["layout_hazards"]
+                self.assertEqual(0, hazards["hidden_attribute_visible_count"])
+                self.assertEqual(0, hazards["fixed_content_obstruction_count"])
+
+    def test_transparent_portal_and_transparent_ancestor_do_not_impersonate_layout_hazards(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Transparent</title><style>
+.portal { position: fixed; inset: 0; pointer-events: none; }
+.transparent { opacity: 0; }
+.transparent [hidden] { display: block; width: 40px; height: 40px; }
+</style></head><body><main><h1>Visible task</h1><p style="min-height:900px">Content</p></main>
+<div class="portal"></div><div class="transparent" aria-hidden="true"><div hidden>Not visible</div></div></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(
+                    {"hidden_attribute_visible_count": 0, "fixed_content_obstruction_count": 0},
+                    item["inspection"]["layout_hazards"],
+                )
+
+    def test_fixed_overlay_inside_main_still_obstructs_direct_text(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Inside</title><style>
+.cover { position: fixed; inset: 0; background: white; }
+</style></head><body><main>Required direct task text<div class="cover">Blocking overlay</div></main></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(1, item["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
+    def test_opaque_rgb_fixed_overlay_is_not_mistaken_for_zero_alpha(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>RGB</title><style>
+.occluded { position: absolute; top: 900px; }
+.cover { position: fixed; inset: auto 0 0; height: 150px; background: rgb(255, 0, 0); }
+@media (max-width: 780px) { .occluded { top: 720px; } }
+</style></head><body><main><h1>Task</h1><p class="occluded">Required content</p></main><div class="cover"></div></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(1, item["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
+    def test_thin_fixed_border_and_invisible_main_text_do_not_create_obstruction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Edges</title><style>
+.hidden-copy { position: absolute; top: 720px; opacity: 0; }
+.border-only { position: fixed; inset: 0; border: 1px solid black; pointer-events: none; }
+.bar { position: fixed; inset: auto 0 0; height: 150px; background: white; }
+</style></head><body><main><h1>Visible task</h1><p class="hidden-copy">Invisible content</p></main>
+<div class="border-only"></div><div class="bar"></div></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(0, item["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
+    def test_negative_z_index_fixed_background_is_not_reported_as_obstruction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Behind</title><style>
+main { position: relative; min-height: 100vh; background: white; }
+.behind { position: fixed; inset: 0; z-index: -1; background: red; }
+</style></head><body><div class="behind"></div><main><h1>Foreground task</h1></main></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(0, item["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
     def test_noopener_popup_is_attributed_to_the_primary_page(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

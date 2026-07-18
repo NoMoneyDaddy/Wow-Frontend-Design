@@ -115,6 +115,15 @@ def compile_html_feedback(receipt: dict[str, Any]) -> dict[str, Any]:
             for rule_id in rule_ids:
                 if isinstance(rule_id, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", rule_id):
                     identifiers.append(f"axe-{rule_id}")
+        layout_hazards = inspection.get("layout_hazards") if isinstance(inspection, dict) else None
+        if isinstance(layout_hazards, dict):
+            for key, identifier in (
+                ("hidden_attribute_visible_count", "visible-hidden-attribute"),
+                ("fixed_content_obstruction_count", "fixed-content-obstruction"),
+            ):
+                value = layout_hazards.get(key)
+                if type(value) is int and value > 0:
+                    identifiers.extend([identifier] * min(value, 100))
     if not identifiers:
         identifiers = ["unclassified-1"]
     return _bounded_payload("html", identifiers)

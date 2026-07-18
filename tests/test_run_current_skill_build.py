@@ -885,7 +885,13 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "visible_primary_content": True,
                     "root_horizontal_overflow": False,
                     "counters": {"console_errors": 1},
-                    "inspection": {"axe_rule_ids": ["heading-order"]},
+                    "inspection": {
+                        "axe_rule_ids": ["heading-order"],
+                        "layout_hazards": {
+                            "hidden_attribute_visible_count": 1,
+                            "fixed_content_obstruction_count": 2,
+                        },
+                    },
                 }],
             }
             html_passed = {"status": "passed"}
@@ -899,7 +905,11 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(2, design_validator.call_count)
             trigger = manifest["repair"]["attempts"][1]["trigger"]
             self.assertEqual("html", trigger["gate"])
-            self.assertEqual(["axe-heading-order", "console-errors"], trigger["finding_ids"])
+            self.assertEqual(
+                ["axe-heading-order", "console-errors", "fixed-content-obstruction", "visible-hidden-attribute"],
+                trigger["finding_ids"],
+            )
+            self.assertEqual(2, trigger["counts"]["fixed-content-obstruction"])
             repair_prompt = json.loads(
                 (capture / "invocation-2.json").read_text(encoding="utf-8")
             )["prompt"]
