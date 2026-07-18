@@ -84,7 +84,17 @@ requirement not met by current stack → candidate/version → size/runtime/lice
 - Missing verification-only tooling may be installed automatically when the task requires the check. Respect existing pins; otherwise resolve the official latest stable non-prerelease that passes runtime compatibility, freeze its exact version for the run, isolate it from product runtime dependencies, verify the executable, record provenance, and resume. CI/benchmark/baseline runs keep their pre-frozen exact toolchain. A transient download/registry error is retryable; an offline/read-only sandbox becomes a scoped evidence limit.
 - In utility-CSS systems, verify extraction against real source and production builds. Runtime-composed classes, CMS/AI strings, icon collections, shortcuts, attributify syntax, and variants may require explicit safe lists or may be unsuitable; do not hide missing production CSS with a development-only result.
 
-## 6. Verify in the platform's own terms
+## 6. Activate project-owned lint adapters conditionally
+
+Inventory script names without executing them. Activate an adapter only after the owning package proves a pinned local binary, applicable config, and safe scoped command; otherwise record it unavailable. Start read-only, capture exact version, config, cwd, scope, parser/custom syntax/plugins, command, and output, then inspect each diagnostic before the smallest authorized repair and rerun the same gate. Never install a linter implicitly, change a lockfile for this Skill, execute or trust a script merely because its name contains `lint`, or promote static diagnostics to rendered, interaction, accessibility, or performance evidence.
+
+| Existing project evidence | Read-only adapter | Tool boundary |
+| --- | --- | --- |
+| Biome binary/config or verified project script | project command or `biome ci <scope>` | covers declared JavaScript/TypeScript/JSON and standard CSS rules; preserve Stylelint or a dialect-specific checker for SCSS, framework directives, CSS-in-JS, and project policy |
+| Stylelint binary/config or verified project script | project command or `stylelint <scoped-files> --formatter json` | use the loaded custom syntax/plugins for CSS ordering, property/value policy, custom properties, SCSS, CSS-in-JS, and framework syntax; never assume standard-CSS parsing covers a dialect |
+| ESLint binary/config or verified project script | project command or `eslint <scoped-files> --format json` without `--fix` | resolve the loaded config, parser, and plugins first; missing runtime provenance keeps the adapter unavailable |
+
+## 7. Verify in the platform's own terms
 
 - Discover commands from manifests and CI; do not invent `npm test`, a build flag, or a deployment target.
 - Run the narrowest relevant typecheck/lint/test/build, then the full project gate proportionate to risk.
