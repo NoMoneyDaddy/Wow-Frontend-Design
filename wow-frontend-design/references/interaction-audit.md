@@ -69,4 +69,3 @@ Source mapping is a pointer. Confirm the cause before editing.
 - Capture before and after at the same viewport, locale, theme, motion preference, auth state, and fixture.
 - Check DOM/accessibility state plus rendered output; neither alone is sufficient.
 - Record browser/tool/version and raw artifacts. Do not use unpinned `@latest` browser tooling in a release gate.
-- Stop after the same attempted fix fails three times. Preserve evidence and request direction instead of weakening the gate.
