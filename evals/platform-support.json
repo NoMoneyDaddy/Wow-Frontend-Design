@@ -31,15 +31,11 @@
         "wow-frontend-design/scripts/search_discovery_audit.py",
         "wow-frontend-design/scripts/source_layout_audit.py",
         "wow-frontend-design/scripts/validate_capability_status.py",
-        "wow-frontend-design/scripts/validate_dashboard_evidence.py",
         "wow-frontend-design/scripts/validate_external_sources.py",
         "wow-frontend-design/scripts/validate_platform_support.py",
         "wow-frontend-design/scripts/validate_product_cases.py",
-        "wow-frontend-design/scripts/validate_product_flow_evidence.py",
-        "wow-frontend-design/scripts/validate_product_flow_v5_evidence.py",
         "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py",
         "wow-frontend-design/scripts/validate_quality_result.py",
-        "wow-frontend-design/scripts/validate_screenshot_manifest.py",
         "wow-frontend-design/scripts/validate_site_plan.py",
         "wow-frontend-design/scripts/validate_trigger_cases.py",
         "wow-frontend-design/scripts/validate_v7_evidence.py"
@@ -87,12 +83,12 @@
       "id": "evaluator-posix-runners",
       "category": "evaluator_harness",
       "repository_status": "partially_tested",
-      "entrypoints": ["evals/run_codex_case.sh", "evals/run_claude_case.sh", "evals/run_product_flow_matrix.py", "evals/run_product_flow_evaluation.py"],
-      "requirements": ["POSIX Bash", "POSIX process groups and resource controls", "Python 3.9+; primary CI uses Python 3.14.6", "Node.js 22"],
+      "entrypoints": ["evals/run_current_skill_build.py", "evals/run_codex_case.sh", "evals/run_claude_case.sh", "evals/run_product_flow_matrix.py", "evals/run_product_flow_evaluation.py"],
+      "requirements": ["POSIX Bash", "POSIX process groups and resource controls", "Python 3.9+; primary CI uses Python 3.14.6", "Node.js 22", "Codex CLI authenticated with first-party ChatGPT", "Pinned @google/design.md, Playwright Chromium and Axe"],
       "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_applicable", "browser": "partial", "visual": "partial"},
       "source_ids": ["github-hosted-runners", "playwright-installation"],
-      "artifacts": ["evals/run_codex_case.sh", "evals/run_claude_case.sh", "evals/run_product_flow_matrix.py", "evals/run_product_flow_evaluation.py", ".github/workflows/ci.yml"],
-      "boundary": "This developer evaluator is not part of the installed Agent Skill runtime. Its Bash, process-group and resource-control assumptions intentionally exclude native Windows."
+      "artifacts": ["evals/run_current_skill_build.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "package-lock.json", "tests/test_run_current_skill_build.py", "evals/run_codex_case.sh", "evals/run_claude_case.sh", "evals/run_product_flow_matrix.py", "evals/run_product_flow_evaluation.py", ".github/workflows/ci.yml"],
+      "boundary": "These developer evaluators are not part of the installed Agent Skill runtime. The current controlled build uses exact-output isolation plus fresh Playwright/Axe replay; the harness remains POSIX-only and intentionally excludes native Windows."
     },
     {
       "id": "evaluator-windows-native",

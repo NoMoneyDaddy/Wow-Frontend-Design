@@ -2,6 +2,8 @@
 
 這些案例用來評測 `wow-frontend-design` 在不同模型上的行為，不是品質宣傳素材。Fixture validator 只證明資料結構與內部參照一致；只有實際 host/model integration run 才能證明 Skill activation 或 reference routing。
 
+`archive/` 只保存已退役 cohort 的 replay validator 與 fixture，不屬於安裝後的 Skill runtime，也不支援新的完成宣告。
+
 ## 現行 fresh-build 入口
 
 一般新專案只使用單一 current runner；v4–v7 名稱的檔案是歷史 cohort 或 evaluator research，不是需要選擇的 Skill 版本。

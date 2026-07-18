@@ -19,9 +19,9 @@ python3 wow-frontend-design/scripts/validate_platform_support.py \
 
 ## 2. 安裝後隨 Skill 提供的 Python scripts
 
-Validator 會把 `wow-frontend-design/scripts/` 內所有非測試 Python entrypoint 和 matrix 做精確比對；新增 script 卻沒有聲明 runtime profile，CI 會失敗。目前共 23 個 entrypoints：
+Validator 會把 `wow-frontend-design/scripts/` 內所有非測試 Python entrypoint 和 matrix 做精確比對；新增 script 卻沒有聲明 runtime profile，CI 會失敗。目前共 21 個 entrypoints：
 
-- 21 個 Python 3.12 standard-library core scripts。
+- 19 個 Python 3.9+ standard-library core scripts；primary CI 使用 Python 3.14.6。
 - `validate_installability.py` 在 repository-aware 模式需要 `git`。
 - `evidence_ledger.py` 只執行 caller 明示且 policy 允許的外部 command；該 command 自身的跨平台行為不由 Skill 保證。
 
@@ -29,9 +29,10 @@ Validator 會把 `wow-frontend-design/scripts/` 內所有非測試 Python entryp
 
 ## 3. Repository evaluator，不是 Skill runtime
 
-`evals/` 的 generation／browser／evidence harness 是開發者評測工具，不隨一般 Skill 任務自動執行：
+`evals/` 的 generation／browser／evidence harness 是開發者評測工具，不隨一般 Skill 任務自動執行。舊 cohort validator 與 prompt fixture 保留在 `evals/archive/`，不再複製到每次 Skill 執行：
 
-- 完整 runner 依賴 POSIX Bash、process group、resource control、Python 3.12、Node.js 22 與 pinned Playwright。
+- 正式 `build:current` runner 依賴 POSIX process group／resource control、Python 3.9+、Codex CLI、Node.js 22、pinned `@google/design.md`、Playwright Chromium 與 Axe。
+- 其他歷史 runner 另依賴 POSIX Bash；所有 evaluator 入口仍與安裝後的 Skill runtime 分離。
 - Linux 有 CI 證據；macOS 為局部開發證據。
 - Native Windows 完整 harness 本版明確不支援；portable Python scripts 不受這項限制。
 - WSL 可能滿足 POSIX 前提，但本版沒有保存 end-to-end run，因此維持 `not_run`。

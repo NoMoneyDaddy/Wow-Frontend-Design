@@ -148,9 +148,8 @@ jobs:
       - name: Validate published v6 evidence
         run: npm run validate:evidence-v6
 
-      - name: Validate current v7 preflight and fail-closed CLI
+      - name: Validate historical v7 evidence CLI
         run: |
-          npm run validate:preflight-v7
           npm run check:evidence-v7-cli
           python3 -m unittest discover -s tests -p 'test_validate_v7_evidence.py' -v
 

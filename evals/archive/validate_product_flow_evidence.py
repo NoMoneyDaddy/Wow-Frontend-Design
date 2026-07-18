@@ -7,8 +7,12 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+SCRIPT_RUNTIME = Path(__file__).resolve().parents[2] / "wow-frontend-design" / "scripts"
+sys.path.insert(0, str(SCRIPT_RUNTIME))
 
 from evidence_ledger import LedgerError, png_metadata
 

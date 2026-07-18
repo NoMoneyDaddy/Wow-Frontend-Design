@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "wow-frontend-design" / "scripts"))
+sys.path.insert(0, str(ROOT / "evals" / "archive"))
 
 import validate_screenshot_manifest
 
