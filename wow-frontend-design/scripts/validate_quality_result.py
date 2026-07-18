@@ -28,6 +28,12 @@ CRAFT_DIMENSIONS = {
     "usability-content",
     "visual-typography",
 }
+VERIFIED_CORE_CRAFT_DIMENSIONS = {
+    "concept-coherence",
+    "originality",
+    "visual-typography",
+}
+VERIFIED_CRAFT_STATUSES = {"ACCEPTABLE", "STRONG"}
 ROOT_KEYS = {
     "schema_version",
     "run_valid",
@@ -158,6 +164,7 @@ def validate_data(data: Any) -> int:
     if not isinstance(dimensions, list) or len(dimensions) != len(CRAFT_DIMENSIONS):
         raise QualityResultError("craft.dimensions must contain the complete dimension vector")
     dimension_ids: set[str] = set()
+    dimension_statuses: dict[str, str] = {}
     any_judged = False
     for index, raw_dimension in enumerate(dimensions):
         label = f"craft.dimensions[{index}]"
@@ -167,6 +174,7 @@ def validate_data(data: Any) -> int:
         status = dimension["status"]
         if status not in CRAFT_STATUSES:
             raise QualityResultError(f"{label}.status is not recognized")
+        dimension_statuses[dimension_id] = status
         evidence = _string_list(dimension["evidence"], f"{label}.evidence")
         _text(dimension["uncertainty"], f"{label}.uncertainty")
         if status != "UNVERIFIED":
@@ -193,6 +201,17 @@ def validate_data(data: Any) -> int:
         raise QualityResultError("release is not recognized")
     if root["release"] == "VERIFIED" and not derived_eligible:
         raise QualityResultError("release cannot be VERIFIED while ineligible")
+    if root["release"] == "VERIFIED":
+        insufficient_core_craft = sorted(
+            dimension_id
+            for dimension_id in VERIFIED_CORE_CRAFT_DIMENSIONS
+            if dimension_statuses[dimension_id] not in VERIFIED_CRAFT_STATUSES
+        )
+        if insufficient_core_craft:
+            raise QualityResultError(
+                "VERIFIED release requires ACCEPTABLE or STRONG core craft: "
+                f"{insufficient_core_craft}"
+            )
 
     handoff = _object(root["handoff"], HANDOFF_KEYS, "handoff")
     _text(handoff["artifact"], "handoff.artifact")
@@ -491,6 +510,30 @@ def validate_with_ledger(
         raise QualityResultError("completion validation requires an evaluator-owned evidence policy")
     if data["release"] == "VERIFIED" and policy["release_acceptance"]["decision"] != "accepted_by_evaluator":
         raise QualityResultError("VERIFIED release requires evaluator acceptance in the evidence policy")
+    if data["release"] == "VERIFIED":
+        craft_review = policy.get("craft_review")
+        if not isinstance(craft_review, dict):
+            raise QualityResultError("VERIFIED release requires an evaluator-owned craft review")
+        result_craft = data["craft"]
+        if (
+            result_craft["independent"] is not True
+            or result_craft["evaluator_id"] != craft_review.get("evaluator_id")
+            or result_craft["rubric_version"] != craft_review.get("rubric_version")
+        ):
+            raise QualityResultError("result craft reviewer/rubric does not match evaluator policy")
+        attested_dimensions = {
+            dimension["id"]: dimension for dimension in craft_review.get("dimensions", [])
+        }
+        if set(attested_dimensions) != VERIFIED_CORE_CRAFT_DIMENSIONS:
+            raise QualityResultError("evaluator craft review must attest the complete core craft floor")
+        result_dimensions = {
+            dimension["id"]: dimension for dimension in result_craft["dimensions"]
+        }
+        for dimension_id in VERIFIED_CORE_CRAFT_DIMENSIONS:
+            if result_dimensions[dimension_id] != attested_dimensions[dimension_id]:
+                raise QualityResultError(
+                    f"result craft verdict does not match evaluator policy: {dimension_id}"
+                )
 
     gates = {gate["id"]: gate for gate in data["hard_gates"]}
     effective_required_gates = set(required_gates)

@@ -12,6 +12,15 @@
     "decision": "not_accepted",
     "reason": "No evaluator release acceptance has been recorded for this example."
   },
+  "craft_review": {
+    "evaluator_id": "independent-reviewer-example",
+    "rubric_version": "wow-core-craft-v1",
+    "dimensions": [
+      {"id": "concept-coherence", "status": "ACCEPTABLE", "evidence": ["desktop-default"], "uncertainty": "One route sampled."},
+      {"id": "visual-typography", "status": "ACCEPTABLE", "evidence": ["desktop-default", "mobile-default"], "uncertainty": "No physical-device font rendering."},
+      {"id": "originality", "status": "ACCEPTABLE", "evidence": ["desktop-default"], "uncertainty": "Subjective independent review."}
+    ]
+  },
   "evidence": {
     "js-syntax": {
       "kind": "command",

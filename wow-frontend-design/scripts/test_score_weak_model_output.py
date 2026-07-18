@@ -258,6 +258,25 @@ class WeakModelScorerTests(unittest.TestCase):
         self.assertEqual([], score_weak_model_output.validate_policy(example_policy))
         self.assertEqual([], score_weak_model_output.score(result, "build", []))
 
+    def test_craft_review_rejects_nested_evidence_without_crashing(self) -> None:
+        malformed_policy = policy()
+        malformed_policy["craft_review"] = {
+            "evaluator_id": "independent-reviewer",
+            "rubric_version": "craft-v1",
+            "dimensions": [
+                {
+                    "id": "originality",
+                    "status": "ACCEPTABLE",
+                    "evidence": [["rendered-mobile"], {"label": "rendered-desktop"}],
+                    "uncertainty": "No material uncertainty.",
+                }
+            ],
+        }
+
+        failures = score_weak_model_output.validate_policy(malformed_policy)
+
+        self.assertTrue(any("evidence must be unique non-empty strings" in item for item in failures))
+
     def test_schema_version_two_is_required(self) -> None:
         result = base_result()
         result["schema_version"] = 1

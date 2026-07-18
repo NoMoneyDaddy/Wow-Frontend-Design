@@ -127,6 +127,7 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
         "run_id",
         "trust_boundary",
         "release_acceptance",
+        "craft_review",
         "evidence",
     }
     if set(policy) - allowed_root:
@@ -166,6 +167,53 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
         for field in expected_keys - {"decision"}:
             if not nonempty_string(acceptance.get(field)) or acceptance[field] != acceptance[field].strip():
                 failures.append(f"policy release_acceptance.{field} must be a trimmed non-empty string")
+    craft_review = policy.get("craft_review")
+    if craft_review is not None:
+        expected_review_keys = {"evaluator_id", "rubric_version", "dimensions"}
+        if not isinstance(craft_review, dict) or set(craft_review) != expected_review_keys:
+            failures.append("policy craft_review must contain evaluator_id, rubric_version, and dimensions")
+        else:
+            for field in ("evaluator_id", "rubric_version"):
+                if not nonempty_string(craft_review.get(field)) or craft_review[field] != craft_review[field].strip():
+                    failures.append(f"policy craft_review.{field} must be a trimmed non-empty string")
+            dimensions = craft_review.get("dimensions")
+            if not isinstance(dimensions, list) or not dimensions:
+                failures.append("policy craft_review.dimensions must be a non-empty array")
+            else:
+                seen_dimensions: set[str] = set()
+                expected_dimension_keys = {"id", "status", "evidence", "uncertainty"}
+                for index, dimension in enumerate(dimensions):
+                    label = f"policy craft_review.dimensions[{index}]"
+                    if not isinstance(dimension, dict) or set(dimension) != expected_dimension_keys:
+                        failures.append(f"{label} has an invalid shape")
+                        continue
+                    dimension_id = dimension.get("id")
+                    if (
+                        not isinstance(dimension_id, str)
+                        or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", dimension_id) is None
+                        or dimension_id in seen_dimensions
+                    ):
+                        failures.append(f"{label}.id must be unique lowercase kebab-case")
+                    else:
+                        seen_dimensions.add(dimension_id)
+                    if dimension.get("status") not in {"CONCERN", "ACCEPTABLE", "STRONG"}:
+                        failures.append(f"{label}.status must be a judged craft status")
+                    references = dimension.get("evidence")
+                    if (
+                        not isinstance(references, list)
+                        or not references
+                        or not all(
+                            isinstance(reference, str)
+                            and bool(reference.strip())
+                            and reference == reference.strip()
+                            for reference in references
+                        )
+                        or len(references) != len(set(references))
+                    ):
+                        failures.append(f"{label}.evidence must be unique non-empty strings")
+                    uncertainty = dimension.get("uncertainty")
+                    if not nonempty_string(uncertainty) or uncertainty != uncertainty.strip():
+                        failures.append(f"{label}.uncertainty must be a trimmed non-empty string")
     evidence = policy.get("evidence")
     if not isinstance(evidence, dict):
         return failures + ["policy evidence must be an object"]

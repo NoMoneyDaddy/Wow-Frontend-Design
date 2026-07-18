@@ -187,8 +187,12 @@ class QualityResultTests(unittest.TestCase):
             "evidence_items": 3,
         }
         for dimension in result["craft"]["dimensions"]:
-            dimension["status"] = "UNVERIFIED"
-            dimension["evidence"] = []
+            if dimension["id"] in validate_quality_result.VERIFIED_CORE_CRAFT_DIMENSIONS:
+                dimension["status"] = "ACCEPTABLE"
+                dimension["evidence"] = ["rendered-mobile"]
+            else:
+                dimension["status"] = "UNVERIFIED"
+                dimension["evidence"] = []
         result["handoff"]["rendered_evidence"] = {
             "status": "OBSERVED",
             "paths": ["mobile.png"],
@@ -286,7 +290,13 @@ class QualityResultTests(unittest.TestCase):
         }
         evidence["rendered-mobile"] = {
             "kind": "artifact",
-            "claim_types": ["rendered_visual", "novel-observation"],
+            "claim_types": [
+                "rendered_visual",
+                "novel-observation",
+                "craft:concept-coherence",
+                "craft:originality",
+                "craft:visual-typography",
+            ],
             "artifact_kind": "screenshot",
             "path": "mobile.png",
             "context": {
@@ -313,6 +323,15 @@ class QualityResultTests(unittest.TestCase):
                 "record": "fixture-acceptance",
                 "reason": "Fixture exercises exact policy and evidence binding.",
             },
+            "craft_review": {
+                "evaluator_id": result["craft"]["evaluator_id"],
+                "rubric_version": result["craft"]["rubric_version"],
+                "dimensions": [
+                    copy.deepcopy(dimension)
+                    for dimension in result["craft"]["dimensions"]
+                    if dimension["id"] in validate_quality_result.VERIFIED_CORE_CRAFT_DIMENSIONS
+                ],
+            },
             "evidence": evidence,
         }
         policy_path.write_text(json.dumps(policy), encoding="utf-8")
@@ -331,6 +350,54 @@ class QualityResultTests(unittest.TestCase):
                 ),
                 3,
             )
+
+    def test_verified_craft_reviewer_and_verdict_must_match_policy(self) -> None:
+        mutations = (
+            ("reviewer", lambda result: result["craft"].update(evaluator_id="builder-invented")),
+            (
+                "verdict",
+                lambda result: next(
+                    dimension
+                    for dimension in result["craft"]["dimensions"]
+                    if dimension["id"] == "originality"
+                ).update(status="STRONG"),
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                result_path, ledger, policy, workspace = self._strict_fixture(Path(directory))
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+                mutate(result)
+                result_path.write_text(json.dumps(result), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    validate_quality_result.QualityResultError,
+                    "does not match evaluator policy",
+                ):
+                    validate_quality_result.validate_with_ledger(
+                        result_path,
+                        ledger,
+                        workspace,
+                        ("novel-discovery",),
+                        policy,
+                    )
+
+    def test_verified_release_requires_evaluator_craft_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result, ledger, policy_path, workspace = self._strict_fixture(Path(directory))
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            del policy["craft_review"]
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            with self.assertRaisesRegex(
+                validate_quality_result.QualityResultError,
+                "evaluator-owned craft review",
+            ):
+                validate_quality_result.validate_with_ledger(
+                    result,
+                    ledger,
+                    workspace,
+                    ("novel-discovery",),
+                    policy_path,
+                )
 
     def test_novel_discovery_probe_evidence_must_be_evaluator_bound(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -825,6 +892,42 @@ class QualityResultTests(unittest.TestCase):
         result["coverage"]["evidence_items"] = 3
         with self.assertRaisesRegex(validate_quality_result.QualityResultError, "release cannot"):
             validate_quality_result.validate_data(result)
+
+    def test_verified_release_requires_core_craft_floor(self) -> None:
+        for dimension_id in validate_quality_result.VERIFIED_CORE_CRAFT_DIMENSIONS:
+            for status in ("CONCERN", "UNVERIFIED"):
+                with self.subTest(dimension_id=dimension_id, status=status):
+                    result = copy.deepcopy(self.example)
+                    result["release"] = "VERIFIED"
+                    dimension = next(
+                        item for item in result["craft"]["dimensions"] if item["id"] == dimension_id
+                    )
+                    dimension["status"] = status
+                    if status == "UNVERIFIED":
+                        dimension["evidence"] = []
+                    with self.assertRaisesRegex(
+                        validate_quality_result.QualityResultError,
+                        "core craft",
+                    ):
+                        validate_quality_result.validate_data(result)
+
+    def test_verified_release_accepts_acceptable_or_strong_core_craft(self) -> None:
+        for status in ("ACCEPTABLE", "STRONG"):
+            with self.subTest(status=status):
+                result = copy.deepcopy(self.example)
+                result["release"] = "VERIFIED"
+                for dimension in result["craft"]["dimensions"]:
+                    if dimension["id"] in validate_quality_result.VERIFIED_CORE_CRAFT_DIMENSIONS:
+                        dimension["status"] = status
+                self.assertEqual(validate_quality_result.validate_data(result), 3)
+
+    def test_partial_release_may_disclose_core_craft_concern(self) -> None:
+        result = copy.deepcopy(self.example)
+        dimension = next(
+            item for item in result["craft"]["dimensions"] if item["id"] == "originality"
+        )
+        dimension["status"] = "CONCERN"
+        self.assertEqual(validate_quality_result.validate_data(result), 3)
 
     def test_weighted_total_is_rejected(self) -> None:
         result = copy.deepcopy(self.example)
