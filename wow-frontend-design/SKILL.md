@@ -21,7 +21,7 @@ Create a coherent, product-derived experience through working code and rendered 
 - Safety, privacy, legal and asset rights, transaction or data integrity, accessibility, and preserved public contracts outrank novelty.
 - Ask only when the next step changes a preserved public contract, expands authority, is destructive, publishes externally, spends money, or creates another material side effect. Otherwise choose the safest reversible path and continue.
 - Match the product locale and script. Preserve `zh-Hans` when detected; use `zh-Hant` conventions for Traditional Chinese. Keep process, breakpoint, evaluator, and design-rationale language out of customer-facing copy.
-- Treat mobile as a task and interaction composition, not a shrunken desktop. Keep essential content and actions usable with keyboard input, zoom, long translations, reduced motion, slow networks, and failed data states.
+- Treat mobile as a task composition, not a shrunken desktop. Keep essential content and actions usable with keyboard, zoom, long translations, reduced motion, slow networks, and failed data states.
 - Earn every visual choice through product evidence, hierarchy, content, or interaction. No page archetype, palette, font category, type scale, radius, spacing scale, component, effect, or signature treatment is a default.
 - Never claim visual, accessibility, performance, test, lint, or build verification that was not actually run. A self-authored score is not acceptance evidence.
 - Do not add a product dependency, switch lockfile families, install globally, or mutate a lockfile solely to satisfy verification without explicit authorization. A model may keep or lower an evaluator-owned capability lane, never promote itself.
@@ -30,7 +30,7 @@ Create a coherent, product-derived experience through working code and rendered 
 
 Read the smallest sufficient context. On the initial reference pass, read this core, [creative-direction.md](references/creative-direction.md), and at most one task-specific reference. Read selected references completely. Load another only for a concrete decision or failure; possible concerns do not justify every file.
 
-- Foundation: core mobile and locale invariants apply immediately. Load [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md) on the initial pass only when that concern dominates the slice; otherwise wait for a concrete decision, failure, or public claim. Load [design-md-contract.md](references/design-md-contract.md) before writing `DESIGN.md`, [anti-ai-slop.md](references/anti-ai-slop.md) only for post-render product-specific review, and [quality-gates.md](references/quality-gates.md) when entering verification or making a completion claim.
+- Foundation: core mobile and locale invariants apply immediately. Load [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md) initially when that concern dominates. Load [design-md-contract.md](references/design-md-contract.md) before writing `DESIGN.md`, [anti-ai-slop.md](references/anti-ai-slop.md) only for post-render review, and [quality-gates.md](references/quality-gates.md) for verification or completion claims.
 - Type and text: use [typographic-layout.md](references/typographic-layout.md) for hierarchy, rhythm, wrapping, CJK, ruby, vertical text, density, or spacing; add [typography-webfonts.md](references/typography-webfonts.md) only for font selection, delivery, loading, licensing, or fallback.
 - Color and material: choose the one applicable diagnostic from [color-system-psychology.md](references/color-system-psychology.md), [visual-material-system.md](references/visual-material-system.md), or [brand-system-fidelity.md](references/brand-system-fidelity.md). Use [visual-storytelling.md](references/visual-storytelling.md) for image-first work, and [data-visualization-color.md](references/data-visualization-color.md) plus [design-token-portability.md](references/design-token-portability.md) for charts, maps, status color, or portable tokens.
 - Motion and media: use [motion-system.md](references/motion-system.md), [svg-system.md](references/svg-system.md), or [advanced-media.md](references/advanced-media.md) only after a named purpose or medium is admitted by the direction.
@@ -55,7 +55,7 @@ For a patch, freeze allowed files and behavior. Preserve every path outside that
 
 Use `DIRECT` when the outcome, mutation boundary, public contracts, and route inventory are known or safely inferable. Use `PLANNED` only when unresolved information architecture, authority, permissions, route ownership, or a public-contract decision prevents safe implementation; create only the artifact that resolves that blocker, then return to `DIRECT`.
 
-Follow the requested collaboration mode. `AUTOMATIC` chooses a safe reversible direction and continues; `CHECKPOINT-GUIDED` pauses only at a material direction or contract decision; `USER-DIRECTED` treats supplied choices as the working contract. Do not ask the user to repeat a decision already present in the brief or project.
+Follow the requested collaboration mode. `AUTOMATIC` continues safely; `CHECKPOINT-GUIDED` pauses only for a material direction or contract decision; `USER-DIRECTED` follows supplied choices. Never ask for a decision already present.
 
 ## Generation-first workflow
 
@@ -74,7 +74,7 @@ Freeze a terse working contract:
 - preserved public behavior, mutation boundary, and rollback needs;
 - what is explicit, observed, inherited, inferred, rejected, or unknown.
 
-Do not invent personas, user quotes, metrics, assets, or remote behavior. Do not generate a sitemap, journey, wireframe, alternative deck, or design system merely because such an artifact could exist.
+Do not invent personas, quotes, metrics, assets, or remote behavior. Create only artifacts needed by the task.
 
 ### 2. Representation
 
@@ -86,6 +86,8 @@ Choose the interface form from the task operation and content relationship befor
 - desktop role to mobile replacement, reorder, deferral, or interaction change;
 - one stable identity across selection, navigation, async work, visible details, summaries, and actions.
 
+When a choice depends on a named relationship, encode it in perceivable content, structure, or control rather than implicit prose. Preserve actual prerequisites and decision dependencies across viewports.
+
 Use reading, browse, comparison, master-detail, decision, evidence, table, form, or card structures only when the product operation earns them.
 
 ### 3. Direction
@@ -94,11 +96,13 @@ Derive one product-specific concept from the frozen evidence. Bind product truth
 
 A category noun alone does not earn a palette, material, font, shape, or motif. Require a more specific artifact, relationship, workflow, approved asset, or stated preference; otherwise keep that choice neutral or unresolved.
 
-Compare two, occasionally three, directions only when one material choice remains unresolved. A focused repair inherits the existing direction unless evidence proves it is the root cause.
+When evidence calls for creating or improving identity, carry it in a task-bearing structure or behavior, not only nouns, copy, palette, background, or cards. If the result is interchangeable, revise it; `none` remains valid when identity would harm the task. Treat explicit rejected directions as hard negative constraints in plan and rendered review.
+
+Compare directions only for a material unresolved choice. A focused repair inherits the direction unless it is the evidenced root cause.
 
 ### 4. System
 
-Create or extend only roles consumed by the implementation: semantic color, typography, spacing and density relationships, layout, shape, edge and depth, focus, state, and admitted motion. `none`, `inherited`, and `unknown` are valid; do not fill every category with invented tokens.
+Create only roles the implementation consumes. `none`, `inherited`, and `unknown` are valid; never fill categories with invented tokens.
 
 When implementation creates or changes a visual system, create or update repository-root `DESIGN.md` and map its roles to shared runtime tokens or primitives. Run the project-pinned clean validator immediately when available. If it is unavailable and installation is not authorized, preserve the document/runtime mapping, continue to the runnable slice, and mark document validation `UNVERIFIED`; do not install or alter the lockfile merely to unblock composition. Document lint proves syntax, not rendered fidelity. Extend the existing system instead of creating a parallel one.
 
@@ -124,14 +128,15 @@ Implement one runnable route or task before expanding architecture. Use real or 
 - default plus at least one consequential pending, error, recovery, or success state when applicable;
 - one coherent native role/state/keyboard model per control, keyboard and focus behavior, valid composite-ARIA ownership, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
 - framework, route, API, state, analytics, and business-contract preservation.
+- short headings whose rendered wraps preserve semantic units and intentional rhythm at each viewport and fallback; fix measure, type, or approved copy instead of freezing one break.
 
 Expand primitives, routes, effects, or optimization only after the slice works. Prefer semantic HTML, modern CSS, and minimal JavaScript. Do not rewrite a framework for a CSS problem.
 
 ### 6. Pressure, repair, and replay
 
-Load [quality-gates.md](references/quality-gates.md). Run project test, lint, typecheck, build, and applicable packaged checks. Before product claims, boot each changed route from the latest build in fresh desktop and mobile Playwright contexts. Controlled fresh builds require visible primary content and zero page, console, resource, undeclared HTTP/WebSocket egress, root-overflow, or Axe findings. Then verify the live slice and one bounded discovery probe not copied from an issue list.
+Load [quality-gates.md](references/quality-gates.md). Run applicable test, lint, typecheck, build, and packaged checks. Before claims, boot changed routes from the latest build in fresh desktop/mobile Playwright contexts. Controlled builds require visible primary content and zero runtime, egress, root-overflow, or Axe findings. Then run one bounded discovery probe not copied from an issue list.
 
-Pressure applicable surfaces with representative and extreme content, desktop and mobile, keyboard/focus, zoom, reduced motion, locale, slow or rejected async work, rapid repeat, selection changes, state round-trips, and custom-font/effect failure. For each candidate finding, preserve route, state, viewport, reproduction, expected and actual behavior, raw evidence, severity, and ownership. Confirm it with a second replay or nearby valid counterexample; an unreproduced candidate remains advisory.
+Pressure applicable surfaces with extreme content, desktop/mobile, keyboard/focus, zoom, reduced motion, locale, async failure, repeat actions, state round-trips, and font/effect failure. Record route, state, viewport, reproduction, expected/actual behavior, evidence, severity, and ownership. Confirm findings by replay or a nearby counterexample; otherwise keep them advisory.
 
 For each confirmed failure:
 
@@ -151,7 +156,7 @@ Skip repair when the first bounded pass is clean. Stop on a clean affected matri
 - Preserve input on invalid, offline, permission, and retry paths. Prevent duplicate submit, stale success, and late async results mutating a newly selected or navigated record. Respect IME composition.
 - Use whitespace, type, color, shape, and depth to express content relationships. Repair evidenced clipping, overflow, task obstruction, or loss of meaning; do not convert aesthetic preference into a defect code.
 - Do not infer a defect from geometry alone. Unequal columns, familiar patterns, quiet composition, or the absence of motion may be correct; require task or rendered evidence before repair.
-- Keep overlays, sticky regions, and scroll edges collision-free. Restore focus, containment, scroll, and expanded state after every exit. Essential navigation and actions must survive script or effect failure.
+- Keep overlays, sticky regions, and scroll edges collision-free. Fixed or sticky UI cannot cover, bypass, or weaken required evidence, consent, safety, or current task content; reserve its full rectangle or keep it in flow. Restore focus and scroll state after exit.
 - Use only authorized assets and fonts. Do not hotlink, invent rights, fake photography or evidence, or replace meaningful icons and media with decorative CSS placeholders.
 
 ## Verification plane and availability
@@ -177,4 +182,4 @@ Label material claims:
 
 Acceptance remains evaluator-owned. Never edit an active gate, accept a self-authored score, present an affected replay as a full matrix, or upgrade `INFERRED` or `UNVERIFIED` evidence.
 
-Report the direction, desktop/mobile behavior, changed and preserved contracts, artifact path, executed checks, fresh evidence or its absence, remaining risk, and next executable action. Keep the handoff concise.
+Report direction, desktop/mobile behavior, contract changes, artifact path, executed checks, fresh evidence, remaining risk, and next action. Keep it concise.

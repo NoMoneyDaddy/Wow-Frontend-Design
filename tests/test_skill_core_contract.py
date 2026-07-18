@@ -115,6 +115,19 @@ class SkillCoreContractTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text)
 
+    def test_rendered_craft_failure_families_are_prevented_at_generation_time(self) -> None:
+        for phrase in (
+            "encode it in perceivable content, structure, or control",
+            "actual prerequisites and decision dependencies",
+            "When evidence calls for creating or improving identity",
+            "`none` remains valid when identity would harm the task",
+            "explicit rejected directions as hard negative constraints",
+            "rendered wraps preserve semantic units and intentional rhythm",
+            "cannot cover, bypass, or weaken required evidence",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+
 
 if __name__ == "__main__":
     unittest.main()
