@@ -26,6 +26,294 @@ EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v9_form_outcome_targets_emit_v10_for_correct_and_stale_success(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "form-outcome.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<label for="correct-control">正確結果</label><input id="correct-control"><button id="correct-submit" type="button">送出正確結果</button><p id="correct-success" hidden>PRIVATE-CORRECT-SUCCESS</p><p id="correct-error" hidden>PRIVATE-CORRECT-ERROR</p>
+<label for="stale-control">殘留結果</label><input id="stale-control"><button id="stale-submit" type="button">送出殘留結果</button><p id="stale-success" hidden>PRIVATE-STALE-SUCCESS</p><p id="stale-error" hidden>PRIVATE-STALE-ERROR</p>
+</main><script>
+function bindOutcome(kind, clearSuccess) {
+  const control = document.querySelector(`#${kind}-control`);
+  const success = document.querySelector(`#${kind}-success`);
+  const error = document.querySelector(`#${kind}-error`);
+  document.querySelector(`#${kind}-submit`).addEventListener("click", () => {
+    const valid = control.value.startsWith("eval-outcome-valid-");
+    control.setAttribute("aria-invalid", valid ? "false" : "true");
+    error.hidden = valid;
+    if (valid) success.hidden = false;
+    else if (clearSuccess) success.hidden = true;
+  });
+}
+bindOutcome("correct", true);
+bindOutcome("stale", false);
+</script></body></html>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 9, "caseId": "form-outcome-case", "state": "interaction",
+                "steps": [
+                    {"id": "correct-valid-control", "action": "fill", "selector": "#correct-control", "value": "eval-outcome-valid-correct"},
+                    {"id": "correct-success", "action": "click", "selector": "#correct-submit"},
+                    {"id": "correct-invalid-control", "action": "fill", "selector": "#correct-control", "value": "eval-outcome-invalid-correct"},
+                    {"id": "correct-invalidation", "action": "press", "selector": "#correct-submit", "value": "Enter"},
+                    {"id": "stale-valid-control", "action": "fill", "selector": "#stale-control", "value": "eval-outcome-valid-stale"},
+                    {"id": "stale-success", "action": "press", "selector": "#stale-submit", "value": "Space"},
+                    {"id": "stale-invalid-control", "action": "fill", "selector": "#stale-control", "value": "eval-outcome-invalid-stale"},
+                    {"id": "stale-invalidation", "action": "click", "selector": "#stale-submit"},
+                ],
+                "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "formOutcomeTargets": [
+                    {
+                        "id": "correct-outcome", "validControlStepId": "correct-valid-control",
+                        "successStepId": "correct-success", "invalidControlStepId": "correct-invalid-control",
+                        "invalidationStepId": "correct-invalidation", "successSelector": "#correct-success",
+                        "errorSelector": "#correct-error", "outcomeSemantics": "mutually-exclusive",
+                        "normalization": "none", "settling": "reduced-motion-static", "validationMode": "custom-aria",
+                    },
+                    {
+                        "id": "stale-outcome", "validControlStepId": "stale-valid-control",
+                        "successStepId": "stale-success", "invalidControlStepId": "stale-invalid-control",
+                        "invalidationStepId": "stale-invalidation", "successSelector": "#stale-success",
+                        "errorSelector": "#stale-error", "outcomeSemantics": "mutually-exclusive",
+                        "normalization": "none", "settling": "reduced-motion-static", "validationMode": "custom-aria",
+                    },
+                ],
+            }
+            spec_path = root / "spec.json"
+            output = root / "result.json"
+            screenshot = root / "result.png"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "form-outcome-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertTrue(output.is_file(), completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertEqual(10, result["schemaVersion"])
+            coverage = result["runtime"]["formOutcomeCoverage"]
+            self.assertEqual({
+                "status", "reason", "declaredTargets", "completedTargets", "freshReplays", "claimBoundary",
+            }, set(coverage))
+            self.assertEqual("complete", coverage["status"])
+            self.assertEqual(4, coverage["freshReplays"])
+            records = {item["id"]: item for item in result["runtime"]["formOutcomeTargets"]}
+            self.assertEqual("clear", records["correct-outcome"]["status"])
+            self.assertFalse(records["correct-outcome"]["staleSuccess"])
+            self.assertEqual("confirmed", records["stale-outcome"]["status"])
+            self.assertTrue(records["stale-outcome"]["staleSuccess"])
+            self.assertEqual({"id", "status", "replays", "staleSuccess"}, set(records["correct-outcome"]))
+            self.assertIn("stale_success_after_invalid", result["runtime"]["issues"])
+            self.assertEqual("findings", result["verdict"])
+            self.assertEqual(len(spec["steps"]), len(result["runtime"]["interactions"]))
+            self.assertTrue(all(item["completed"] for item in result["runtime"]["interactions"]))
+            self.assertTrue(all(item["passed"] for item in result["runtime"]["assertions"]))
+            self.assertEqual(1, len(list(root.glob("*.png"))))
+            serialized = json.dumps(result, ensure_ascii=False)
+            for private in (
+                "#correct-control", "#correct-submit", "#correct-success", "#correct-error",
+                "#stale-control", "#stale-submit", "#stale-success", "#stale-error",
+                "eval-outcome-valid-correct", "eval-outcome-invalid-correct",
+                "eval-outcome-valid-stale", "eval-outcome-invalid-stale",
+                "PRIVATE-CORRECT-SUCCESS", "PRIVATE-CORRECT-ERROR", "PRIVATE-STALE-SUCCESS", "PRIVATE-STALE-ERROR",
+            ):
+                self.assertNotIn(private, serialized)
+
+    def test_v9_native_constraint_form_outcomes_emit_v10_for_correct_and_stale_success(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "native-form-outcome.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<form id="native-correct-form"><label for="native-correct-control">正確原生結果</label><input id="native-correct-control" required pattern="eval-outcome-valid-[a-z0-9]+(?:-[a-z0-9]+)*"><button id="native-correct-submit" type="submit">送出</button><p id="native-correct-success" hidden>PRIVATE-NATIVE-CORRECT-SUCCESS</p></form>
+<form id="native-stale-form"><label for="native-stale-control">殘留原生結果</label><input id="native-stale-control" required pattern="eval-outcome-valid-[a-z0-9]+(?:-[a-z0-9]+)*"><button id="native-stale-submit" type="submit">送出</button><p id="native-stale-success" hidden>PRIVATE-NATIVE-STALE-SUCCESS</p></form>
+</main><script>
+function bindNativeOutcome(kind, clearSuccess) {
+  const control = document.querySelector(`#native-${kind}-control`);
+  const success = document.querySelector(`#native-${kind}-success`);
+  document.querySelector(`#native-${kind}-form`).addEventListener("submit", (event) => {
+    event.preventDefault();
+    success.hidden = false;
+  });
+  if (clearSuccess) control.addEventListener("input", () => { if (!control.validity.valid) success.hidden = true; });
+}
+bindNativeOutcome("correct", true);
+bindNativeOutcome("stale", false);
+</script></body></html>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 9, "caseId": "native-form-outcome-case", "state": "interaction",
+                "steps": [
+                    {"id": "native-correct-valid", "action": "fill", "selector": "#native-correct-control", "value": "eval-outcome-valid-native-correct"},
+                    {"id": "native-correct-success", "action": "press", "selector": "#native-correct-submit", "value": "Enter"},
+                    {"id": "native-correct-invalid", "action": "fill", "selector": "#native-correct-control", "value": "eval-outcome-invalid-native-correct"},
+                    {"id": "native-correct-error", "action": "click", "selector": "#native-correct-submit"},
+                    {"id": "native-stale-valid", "action": "fill", "selector": "#native-stale-control", "value": "eval-outcome-valid-native-stale"},
+                    {"id": "native-stale-success", "action": "click", "selector": "#native-stale-submit"},
+                    {"id": "native-stale-invalid", "action": "fill", "selector": "#native-stale-control", "value": "eval-outcome-invalid-native-stale"},
+                    {"id": "native-stale-error", "action": "press", "selector": "#native-stale-submit", "value": "Space"},
+                ],
+                "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "formOutcomeTargets": [
+                    {
+                        "id": "native-correct-outcome", "validControlStepId": "native-correct-valid",
+                        "successStepId": "native-correct-success", "invalidControlStepId": "native-correct-invalid",
+                        "invalidationStepId": "native-correct-error", "successSelector": "#native-correct-success",
+                        "errorSelector": None, "outcomeSemantics": "mutually-exclusive", "normalization": "none",
+                        "settling": "reduced-motion-static", "validationMode": "native-constraint",
+                    },
+                    {
+                        "id": "native-stale-outcome", "validControlStepId": "native-stale-valid",
+                        "successStepId": "native-stale-success", "invalidControlStepId": "native-stale-invalid",
+                        "invalidationStepId": "native-stale-error", "successSelector": "#native-stale-success",
+                        "errorSelector": None, "outcomeSemantics": "mutually-exclusive", "normalization": "none",
+                        "settling": "reduced-motion-static", "validationMode": "native-constraint",
+                    },
+                ],
+            }
+            spec_path = root / "spec.json"
+            output = root / "result.json"
+            screenshot = root / "result.png"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "native-form-outcome-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertTrue(output.is_file(), completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertEqual(10, result["schemaVersion"])
+            records = {item["id"]: item for item in result["runtime"]["formOutcomeTargets"]}
+            self.assertEqual("clear", records["native-correct-outcome"]["status"], records)
+            self.assertEqual("confirmed", records["native-stale-outcome"]["status"])
+            self.assertFalse(records["native-correct-outcome"]["staleSuccess"])
+            self.assertTrue(records["native-stale-outcome"]["staleSuccess"])
+            self.assertIn("stale_success_after_invalid", result["runtime"]["issues"])
+            self.assertEqual("findings", result["verdict"])
+            self.assertTrue(all(item["completed"] for item in result["runtime"]["interactions"]))
+            self.assertEqual(1, len(list(root.glob("*.png"))))
+            serialized = json.dumps(result, ensure_ascii=False)
+            for private in (
+                "#native-correct-control", "#native-correct-submit", "#native-correct-success",
+                "#native-stale-control", "#native-stale-submit", "#native-stale-success",
+                "eval-outcome-valid-native-correct", "eval-outcome-invalid-native-correct",
+                "eval-outcome-valid-native-stale", "eval-outcome-invalid-native-stale",
+                "PRIVATE-NATIVE-CORRECT-SUCCESS", "PRIVATE-NATIVE-STALE-SUCCESS",
+            ):
+                self.assertNotIn(private, serialized)
+
+    def test_v9_form_outcome_target_contract_fails_closed(self) -> None:
+        target = {
+            "id": "primary-outcome", "validControlStepId": "valid-control", "successStepId": "show-success",
+            "invalidControlStepId": "invalid-control", "invalidationStepId": "show-error",
+            "successSelector": "#success", "errorSelector": "#error",
+            "outcomeSemantics": "mutually-exclusive", "normalization": "none",
+            "settling": "reduced-motion-static", "validationMode": "custom-aria",
+        }
+        base = {
+            "schemaVersion": 9, "caseId": "form-outcome-case", "state": "interaction",
+            "steps": [
+                {"id": "valid-control", "action": "fill", "selector": "#control", "value": "eval-outcome-valid-primary"},
+                {"id": "show-success", "action": "click", "selector": "#submit"},
+                {"id": "invalid-control", "action": "fill", "selector": "#control", "value": "eval-outcome-invalid-primary"},
+                {"id": "show-error", "action": "press", "selector": "#submit", "value": "Enter"},
+            ],
+            "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+            "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+            "formOutcomeTargets": [target],
+        }
+        invalid_variants = {
+            "non-interaction": {**base, "state": "base"},
+            "empty": {**base, "formOutcomeTargets": []},
+            "too-many": {**base, "formOutcomeTargets": [target] * 5},
+            "extra-key": {**base, "formOutcomeTargets": [{**target, "controlSelector": "#private"}]},
+            "missing-key": {**base, "formOutcomeTargets": [{key: value for key, value in target.items() if key != "settling"}]},
+            "missing-validation-mode": {**base, "formOutcomeTargets": [{key: value for key, value in target.items() if key != "validationMode"}]},
+            "bad-validation-mode": {**base, "formOutcomeTargets": [{**target, "validationMode": "custom-message"}]},
+            "custom-null-error": {**base, "formOutcomeTargets": [{**target, "errorSelector": None}]},
+            "native-string-error": {**base, "formOutcomeTargets": [{**target, "validationMode": "native-constraint"}]},
+            "bad-semantics": {**base, "formOutcomeTargets": [{**target, "outcomeSemantics": "independent"}]},
+            "bad-normalization": {**base, "formOutcomeTargets": [{**target, "normalization": "trim"}]},
+            "bad-settling": {**base, "formOutcomeTargets": [{**target, "settling": "animationend"}]},
+            "bad-id": {**base, "formOutcomeTargets": [{**target, "id": "Bad_ID"}]},
+            "duplicate-id": {**base, "formOutcomeTargets": [target, {**target}]},
+            "missing-step": {**base, "formOutcomeTargets": [{**target, "successStepId": "missing-step"}]},
+            "unordered-steps": {**base, "formOutcomeTargets": [{**target, "successStepId": "show-error", "invalidationStepId": "show-success"}]},
+            "non-consecutive-steps": {
+                **base,
+                "steps": [base["steps"][0], {"id": "middle-step", "action": "click", "selector": "#middle"}, *base["steps"][1:]],
+            },
+            "different-control": {
+                **base,
+                "steps": [*base["steps"][:2], {**base["steps"][2], "selector": "#other-control"}, base["steps"][3]],
+            },
+            "different-control-action": {
+                **base,
+                "steps": [*base["steps"][:2], {**base["steps"][2], "action": "select"}, base["steps"][3]],
+            },
+            "unsafe-valid-token": {
+                **base,
+                "steps": [{**base["steps"][0], "value": "PRIVATE-VALID"}, *base["steps"][1:]],
+            },
+            "unsafe-invalid-token": {
+                **base,
+                "steps": [*base["steps"][:2], {**base["steps"][2], "value": "eval-outcome-valid-wrong"}, base["steps"][3]],
+            },
+            "non-native-outcome-action": {
+                **base,
+                "steps": [base["steps"][0], {"id": "show-success", "action": "fill", "selector": "#submit", "value": "x"}, *base["steps"][2:]],
+            },
+            "unsupported-press-key": {
+                **base,
+                "steps": [*base["steps"][:3], {**base["steps"][3], "value": "Tab"}],
+            },
+            "duplicate-step-binding": {**base, "formOutcomeTargets": [target, {**target, "id": "other-outcome"}]},
+            "same-outcome-selector": {**base, "formOutcomeTargets": [{**target, "errorSelector": target["successSelector"]}]},
+        }
+        valid_variants = {
+            "click-and-enter": base,
+            "native-constraint": {
+                **base,
+                "formOutcomeTargets": [{**target, "validationMode": "native-constraint", "errorSelector": None}],
+            },
+            "space-and-click": {
+                **base,
+                "steps": [
+                    base["steps"][0], {"id": "show-success", "action": "press", "selector": "#submit", "value": "Space"},
+                    base["steps"][2], {"id": "show-error", "action": "click", "selector": "#submit"},
+                ],
+            },
+        }
+        source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec(process.argv[1], 'form-outcome-case', process.argv[2]); process.exit(0); }}
+catch (error) {{ process.stderr.write(error.message); process.exit(1); }}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, spec in valid_variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"valid-{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+            for label, spec in invalid_variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"invalid-{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode, completed.stderr)
+
     def test_v8_disclosure_targets_emit_v9_for_clear_and_mismatched_states(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

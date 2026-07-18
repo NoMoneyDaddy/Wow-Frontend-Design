@@ -531,6 +531,69 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
             compiler.extract_findings(mismatched)
 
+    def test_form_outcome_projection_is_confirmed_only_and_prompt_safe(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["stale_success_after_invalid"],
+            "formOutcomeTargets": [{
+                "id": "contact-form", "status": "confirmed", "replays": 2, "staleSuccess": True,
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "stale_success_after_invalid",
+            "classification": "runtime",
+            "locator": "contact-form",
+            "evidence": {"staleSuccess": True},
+        }], findings)
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("clear stale success", feedback)
+        self.assertIn("preserving the user input and existing error linkage", feedback)
+        self.assertIn("rerun the affected interaction", feedback)
+        for forbidden in ("#contact-form", "must-not-leak@example.test", "private copy", "raw evaluator error"):
+            self.assertNotIn(forbidden, feedback)
+
+        unavailable_reasons = (
+            "form_outcome_contract_unavailable", "initial_state_unavailable",
+            "success_checkpoint_unavailable", "invalid_checkpoint_unavailable",
+            "external_request_blocked", "fonts_not_ready", "state_settling_unavailable",
+            "replay_unstable", "runtime_unavailable",
+        )
+        for reason in unavailable_reasons:
+            with self.subTest(reason=reason):
+                unavailable = _result()
+                unavailable["runtime"].update({
+                    "issues": ["form_outcome_verification_unavailable"],
+                    "formOutcomeTargets": [{
+                        "id": "contact-form", "status": "unavailable", "replays": 2, "reason": reason,
+                    }],
+                })
+                with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+                    compiler.extract_findings(unavailable)
+
+        mismatched = _result()
+        mismatched["runtime"].update({
+            "issues": [],
+            "formOutcomeTargets": [{
+                "id": "contact-form", "status": "confirmed", "replays": 2, "staleSuccess": True,
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(mismatched)
+
+        leaked = _result()
+        leaked["runtime"].update({
+            "issues": ["stale_success_after_invalid"],
+            "formOutcomeTargets": [{
+                "id": "contact-form", "status": "confirmed", "replays": 2,
+                "staleSuccess": True, "selector": "#contact-form",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "evidence is inconsistent"):
+            compiler.extract_findings(leaked)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

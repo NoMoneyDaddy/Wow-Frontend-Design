@@ -301,6 +301,18 @@ DISCLOSURE_STATE_UNAVAILABLE_REASONS = {
     "action_outcome_unavailable",
     "state_settling_unavailable",
 }
+FORM_OUTCOME_CLAIM_BOUNDARY = "two fresh evaluator-controlled mutually-exclusive visual form outcome replays"
+FORM_OUTCOME_UNAVAILABLE_REASONS = {
+    "form_outcome_contract_unavailable",
+    "initial_state_unavailable",
+    "success_checkpoint_unavailable",
+    "invalid_checkpoint_unavailable",
+    "external_request_blocked",
+    "fonts_not_ready",
+    "state_settling_unavailable",
+    "replay_unstable",
+    "runtime_unavailable",
+}
 
 
 def _validate_async_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
@@ -672,6 +684,68 @@ def _validate_disclosure_state_evidence(runtime: dict[str, Any], label: str) -> 
     return confirmed > 0, unavailable > 0
 
 
+def _validate_form_outcome_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
+    """Validate v10 mutually-exclusive form outcome evidence without values or copy."""
+
+    coverage = runtime.get("formOutcomeCoverage")
+    records = runtime.get("formOutcomeTargets")
+    coverage_keys = {
+        "status", "reason", "declaredTargets", "completedTargets", "freshReplays", "claimBoundary",
+    }
+    if not isinstance(coverage, dict) or set(coverage) != coverage_keys or not isinstance(records, list):
+        raise V7EvidenceError(f"form outcome evidence schema changed for {label}")
+    if coverage.get("claimBoundary") != FORM_OUTCOME_CLAIM_BOUNDARY:
+        raise V7EvidenceError(f"form outcome claim boundary changed for {label}")
+    counts = [coverage.get(field) for field in ("declaredTargets", "completedTargets", "freshReplays")]
+    if any(type(value) is not int or value < 0 for value in counts):
+        raise V7EvidenceError(f"form outcome coverage counts are invalid for {label}")
+    declared, completed, replays = counts
+    if not 1 <= declared <= 4 or completed > declared or replays != declared * 2 or len(records) != declared:
+        raise V7EvidenceError(f"form outcome coverage bounds changed for {label}")
+    ids: set[str] = set()
+    completed_records = 0
+    confirmed = 0
+    unavailable = 0
+    for record in records:
+        if not isinstance(record, dict):
+            raise V7EvidenceError(f"form outcome record is malformed for {label}")
+        status = record.get("status")
+        expected_keys = {"id", "status", "replays", "staleSuccess"}
+        if status == "unavailable":
+            expected_keys = {"id", "status", "replays", "reason"}
+        if set(record) != expected_keys:
+            raise V7EvidenceError(f"form outcome record schema changed for {label}")
+        target_id = record.get("id")
+        if not isinstance(target_id, str) or RECORD_ID.fullmatch(target_id) is None or target_id in ids:
+            raise V7EvidenceError(f"form outcome target id is invalid or duplicated for {label}")
+        ids.add(target_id)
+        if record.get("replays") != 2:
+            raise V7EvidenceError(f"form outcome replay count is invalid for {label}")
+        if status == "unavailable":
+            if record.get("reason") not in FORM_OUTCOME_UNAVAILABLE_REASONS:
+                raise V7EvidenceError(f"form outcome unavailable reason is invalid for {label}")
+            unavailable += 1
+            continue
+        stale_success = record.get("staleSuccess")
+        if status not in {"clear", "confirmed"} or type(stale_success) is not bool:
+            raise V7EvidenceError(f"form outcome record status is invalid for {label}")
+        if (status == "confirmed") != stale_success:
+            raise V7EvidenceError(f"form outcome derivation changed for {label}")
+        completed_records += 1
+        confirmed += int(status == "confirmed")
+    if unavailable:
+        if coverage.get("status") != "unavailable" or coverage.get("reason") != "one_or_more_targets_unavailable" or completed != completed_records:
+            raise V7EvidenceError(f"form outcome unavailable coverage is inconsistent for {label}")
+    elif (
+        coverage.get("status") != "complete"
+        or coverage.get("reason") is not None
+        or completed != declared
+        or completed != completed_records
+    ):
+        raise V7EvidenceError(f"form outcome complete coverage is inconsistent for {label}")
+    return confirmed > 0, unavailable > 0
+
+
 def _validate_result(
     key: tuple[str, str, str, str, str],
     result_path: Path,
@@ -710,7 +784,7 @@ def _validate_result(
     if set(evidence) != {"schemaVersion", "identity", "input", "browser", "runtime", "typography", "verdict", "screenshot"}:
         raise V7EvidenceError(f"result root schema changed for {artifact_stem(key)}")
     result_schema = evidence.get("schemaVersion")
-    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4, 5, 6, 7, 8, 9} or identity != expected_identity:
+    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10} or identity != expected_identity:
         raise V7EvidenceError(f"result identity changed for {artifact_stem(key)}")
     if result_schema == 3 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 3 is reserved for blocked interaction evidence: {artifact_stem(key)}")
@@ -726,6 +800,8 @@ def _validate_result(
         raise V7EvidenceError(f"result schema 8 is reserved for invalid-input preservation interaction evidence: {artifact_stem(key)}")
     if result_schema == 9 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 9 is reserved for disclosure-state interaction evidence: {artifact_stem(key)}")
+    if result_schema == 10 and key[2] != "interaction":
+        raise V7EvidenceError(f"result schema 10 is reserved for mutually-exclusive form outcome interaction evidence: {artifact_stem(key)}")
     if evidence.get("verdict") not in {"clean", "findings"}:
         raise V7EvidenceError(f"result verdict is invalid for {artifact_stem(key)}")
     screenshot = evidence.get("screenshot")
@@ -786,6 +862,8 @@ def _validate_result(
         expected_runtime_keys |= {"invalidInputPreservationCoverage", "invalidInputPreservationTargets"}
     elif result_schema == 9:
         expected_runtime_keys |= {"disclosureStateCoverage", "disclosureStateTargets"}
+    elif result_schema == 10:
+        expected_runtime_keys |= {"formOutcomeCoverage", "formOutcomeTargets"}
     if not isinstance(runtime, dict) or set(runtime) != expected_runtime_keys:
         raise V7EvidenceError(f"runtime schema changed for {artifact_stem(key)}")
     if not isinstance(typography, dict) or set(typography) != {
@@ -815,6 +893,9 @@ def _validate_result(
     )
     disclosure_state_mismatch, disclosure_state_unavailable = (
         _validate_disclosure_state_evidence(runtime, artifact_stem(key)) if result_schema == 9 else (False, False)
+    )
+    stale_success_after_invalid, form_outcome_unavailable = (
+        _validate_form_outcome_evidence(runtime, artifact_stem(key)) if result_schema == 10 else (False, False)
     )
     if key[2] == "interaction" and (not runtime["interactions"] or not runtime["assertions"]):
         raise V7EvidenceError(f"interaction evidence must record at least one step and one assertion for {artifact_stem(key)}")
@@ -947,6 +1028,8 @@ def _validate_result(
         *(["invalid_input_preservation_unavailable"] if invalid_input_unavailable else []),
         *(["declared_disclosure_state_mismatch"] if disclosure_state_mismatch else []),
         *(["disclosure_state_verification_unavailable"] if disclosure_state_unavailable else []),
+        *(["stale_success_after_invalid"] if stale_success_after_invalid else []),
+        *(["form_outcome_verification_unavailable"] if form_outcome_unavailable else []),
     ]
     if runtime.get("issues") != expected_runtime_issues:
         raise V7EvidenceError(f"runtime issue derivation changed for {artifact_stem(key)}")
@@ -972,6 +1055,8 @@ def _validate_result(
         and not invalid_input_unavailable
         and not disclosure_state_mismatch
         and not disclosure_state_unavailable
+        and not stale_success_after_invalid
+        and not form_outcome_unavailable
         and assertions_pass
         and runtime["consoleErrors"] == []
         and runtime["pageErrors"] == []

@@ -83,7 +83,7 @@ P1 repair cycle 只重生 packet 中的 `variant × case_id`，再以 issue clas
 
 ```bash
 npm run eval:v7-repair-cycle -- \
-  --manifest evals/v7-pilot-manifest-20260718-disclosure-state-v22.json \
+  --manifest evals/v7-pilot-manifest-20260718-form-outcome-v23.json \
   --hidden-matrix "$RUN_ROOT/hidden-matrix.json" \
   --split development \
   --packet "$RUN_ROOT/repair-packet.json" \
@@ -106,7 +106,7 @@ P7 paired decision compiler 把 promotion ratchet 固定為唯讀、無 promotio
 
 ```bash
 npm run eval:v7-paired-decision -- \
-  --manifest evals/v7-pilot-manifest-20260718-disclosure-state-v22.json \
+  --manifest evals/v7-pilot-manifest-20260718-form-outcome-v23.json \
   --output "$DECISION_ROOT/v7-paired-decision.json" \
   --repository-root .
 ```
@@ -136,6 +136,8 @@ P16 以 input schema v7／result schema v8 驗證 evaluator-declared invalid-inp
 P17 以 input schema v8／result schema v9 驗證 evaluator-declared disclosure state synchronization。每筆 declaration 只綁既有 click 或 Enter/Space press step、`settling:"reduced-motion-static"`、唯一可見且 enabled 的 light-DOM native `<button>`（實際 role 仍為 button）與唯一 light-DOM panel；兩個 fresh context 在 action 前要求 `aria-expanded="false"` 且 panel 不可感知，action 後兩個 animation frame 要求沒有 pending/running panel animation、`aria-expanded="true"` 且 panel 可感知。可感知 probe會拒絕 `aria-hidden`、`inert`、`content-visibility:hidden`、effective opacity 0，並支援 `display:contents` 的可見 descendant。兩次都穩定 XOR mismatch 才產生 `declared_disclosure_state_mismatch`；no-op、動畫未收斂、初態契約、disabled/unsupported/shadow target、字型/runtime/external request 或 replay drift 只會阻斷 clean。P17 structural record 與 repair packet 只留 evaluator ID 與 expanded/panelVisible boolean，不帶 selector、copy 或 raw error；v1–v8 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。此 gate 依 [WAI-ARIA APG Disclosure Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/) 與 Playwright role/action semantics 建立 bounded counterexample；不要求 optional `aria-controls`，也不宣稱 animated disclosure、二次收合、全頁鍵盤、focus、APG 或 WCAG conformance。
 
 涉及 ancestor animation 或非預設 `filter`、`clip-path`、`mask-image`、`mix-blend-mode` 的 panel 會 fail closed；P17 不以簡化幾何推論完整 paint/compositing visibility。
+
+P18 以 input schema v9／result schema v10 驗證 evaluator-declared valid→success→invalid 視覺結果互斥。每筆 declaration 只綁四個相鄰且不跨 target 重用的既有 steps、同一 light-DOM native control、`normalization:"none"` 與 `settling:"reduced-motion-static"`；`custom-aria` 要求 invalid state 的 `aria-invalid=true` 與可感知非空 error，`native-constraint` 則要求 `willValidate=true` 並以 `validity.valid` 驗證成功／失敗 checkpoint，不讀瀏覽器原生錯誤文案。兩個 fresh context 都必須先見到可感知、具 bounded rendered text 的 success，再確認 invalid value 精確保留；invalid 後相同 rendered success message 仍可見，才產生 `stale_success_after_invalid`，內容已改寫則不誤判為 stale。空 outcome、hidden-only content、complex subtree paint、native validity 不成立、value 被清除、動畫／request／font／runtime 或 replay drift 都 fail closed。Result 與 repair packet 只留 evaluator ID 與 stale boolean，不帶 selector、value、copy、validity message 或 raw error；v1–v9 result exact contract不變，每個 matrix item仍只有原本一張 screenshot。Live-region／accessibility-tree precedence 在獨立反例連續失敗後已熔斷並排除於 repair authority；P18 不宣稱 screen reader、assistive technology、全表單或 WCAG conformance。
 
 ## 目前案例
 

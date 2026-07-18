@@ -740,6 +740,85 @@ class V7EvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(evidence.V7EvidenceError, "disclosure state record schema changed"):
                 evidence._validate_result(key, result, screenshot, leaked_hash, screenshot_hash, "0" * 64, "1.61.1")
 
+    def test_result_v10_requires_bounded_mutually_exclusive_form_outcome_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 10,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "submit-invalid", "action": "click", "completed": True}],
+                    "assertions": [{"id": "error-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "formOutcomeCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.FORM_OUTCOME_CLAIM_BOUNDARY},
+                    "formOutcomeTargets": [{"id": "contact-form", "status": "confirmed", "replays": 2, "staleSuccess": True}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["stale_success_after_invalid"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            unavailable_reasons = (
+                "form_outcome_contract_unavailable", "initial_state_unavailable",
+                "success_checkpoint_unavailable", "invalid_checkpoint_unavailable",
+                "external_request_blocked", "fonts_not_ready", "state_settling_unavailable",
+                "replay_unstable", "runtime_unavailable",
+            )
+            self.assertEqual(set(unavailable_reasons), evidence.FORM_OUTCOME_UNAVAILABLE_REASONS)
+            for reason in unavailable_reasons:
+                with self.subTest(reason=reason):
+                    unavailable = copy.deepcopy(payload)
+                    unavailable["runtime"]["formOutcomeCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+                    unavailable["runtime"]["formOutcomeTargets"][0] = {"id": "contact-form", "status": "unavailable", "replays": 2, "reason": reason}
+                    unavailable["runtime"]["issues"] = ["form_outcome_verification_unavailable"]
+                    result.write_text(json.dumps(unavailable), encoding="utf-8")
+                    unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+                    self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            clear = copy.deepcopy(payload)
+            clear["runtime"]["formOutcomeTargets"][0] = {"id": "contact-form", "status": "clear", "replays": 2, "staleSuccess": False}
+            clear["runtime"]["issues"] = []
+            clear["verdict"] = "clean"
+            result.write_text(json.dumps(clear), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            too_many = copy.deepcopy(payload)
+            too_many["runtime"]["formOutcomeCoverage"].update({"declaredTargets": 5, "completedTargets": 5, "freshReplays": 10})
+            too_many["runtime"]["formOutcomeTargets"] = [
+                {"id": f"contact-form-{index}", "status": "confirmed", "replays": 2, "staleSuccess": True}
+                for index in range(1, 6)
+            ]
+            result.write_text(json.dumps(too_many), encoding="utf-8")
+            too_many_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "form outcome coverage bounds changed"):
+                evidence._validate_result(key, result, screenshot, too_many_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+            leaked = copy.deepcopy(payload)
+            leaked["runtime"]["formOutcomeTargets"][0]["value"] = "must-not-leak@example.test"
+            result.write_text(json.dumps(leaked), encoding="utf-8")
+            leaked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "form outcome record schema changed"):
+                evidence._validate_result(key, result, screenshot, leaked_hash, screenshot_hash, "0" * 64, "1.61.1")
+
     def test_async_completion_evidence_requires_two_consistent_replays(self) -> None:
         runtime = {
             "asyncCoverage": {

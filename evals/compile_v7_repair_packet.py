@@ -46,6 +46,8 @@ RUNTIME_CODES = {
     "invalid_input_preservation_unavailable",
     "declared_disclosure_state_mismatch",
     "disclosure_state_verification_unavailable",
+    "stale_success_after_invalid",
+    "form_outcome_verification_unavailable",
     "external_requests",
     "focus_obscuration_verification_unavailable",
     "focused_control_obscured",
@@ -239,12 +241,15 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError("invalid input preservation verification is unavailable, not a product repair")
         if code == "disclosure_state_verification_unavailable":
             raise RepairPacketError("disclosure state verification is unavailable, not a product repair")
+        if code == "form_outcome_verification_unavailable":
+            raise RepairPacketError("form outcome verification is unavailable, not a product repair")
         if code == "stale_completion_verification_unavailable":
             raise RepairPacketError("stale completion verification is unavailable, not a product repair")
         if code in {
             "focused_control_obscured", "stale_async_completion", "declared_control_accessible_name_mismatch",
             "declared_dialog_focus_lifecycle_mismatch", "declared_invalid_feedback_unlinked", "declared_invalid_input_lost",
             "declared_disclosure_state_mismatch",
+            "stale_success_after_invalid",
         }:
             continue
         findings.append(_finding(code, "runtime", "page", {}))
@@ -481,6 +486,53 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
         raise RepairPacketError("disclosure state unavailable issue and evidence disagree")
     if unavailable_disclosures:
         raise RepairPacketError("disclosure state verification is unavailable, not a product repair")
+    form_outcome_targets = runtime.get("formOutcomeTargets", [])
+    if not isinstance(form_outcome_targets, list):
+        raise RepairPacketError("form outcome evidence is malformed")
+    form_outcome_unavailable_reasons = {
+        "form_outcome_contract_unavailable",
+        "initial_state_unavailable",
+        "success_checkpoint_unavailable",
+        "invalid_checkpoint_unavailable",
+        "external_request_blocked",
+        "fonts_not_ready",
+        "state_settling_unavailable",
+        "replay_unstable",
+        "runtime_unavailable",
+    }
+    confirmed_form_outcomes = []
+    unavailable_form_outcomes = []
+    for record in form_outcome_targets:
+        if not isinstance(record, dict):
+            raise RepairPacketError("form outcome record is malformed")
+        status = record.get("status")
+        expected_keys = {"id", "status", "replays", "staleSuccess"}
+        if status == "unavailable":
+            expected_keys = {"id", "status", "replays", "reason"}
+        if set(record) != expected_keys or record.get("replays") != 2:
+            raise RepairPacketError("form outcome evidence is inconsistent")
+        _record_id(record.get("id"), "form outcome target id")
+        if status == "unavailable":
+            if record.get("reason") not in form_outcome_unavailable_reasons:
+                raise RepairPacketError("form outcome unavailable reason is invalid")
+            unavailable_form_outcomes.append(record)
+            continue
+        stale_success = record.get("staleSuccess")
+        if status not in {"clear", "confirmed"} or type(stale_success) is not bool:
+            raise RepairPacketError("form outcome status is invalid")
+        if (status == "confirmed") != stale_success:
+            raise RepairPacketError("form outcome derivation is inconsistent")
+        if status == "confirmed":
+            confirmed_form_outcomes.append(record)
+            findings.append(_finding("stale_success_after_invalid", "runtime", record["id"], {
+                "staleSuccess": True,
+            }))
+    if ("stale_success_after_invalid" in runtime_issues) != bool(confirmed_form_outcomes):
+        raise RepairPacketError("form outcome issue and evidence disagree")
+    if ("form_outcome_verification_unavailable" in runtime_issues) != bool(unavailable_form_outcomes):
+        raise RepairPacketError("form outcome unavailable issue and evidence disagree")
+    if unavailable_form_outcomes:
+        raise RepairPacketError("form outcome verification is unavailable, not a product repair")
     async_completions = runtime.get("asyncCompletions", [])
     if not isinstance(async_completions, list):
         raise RepairPacketError("async completion evidence is malformed")
@@ -577,6 +629,11 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
+    form_outcome_repair = any(
+        finding.get("code") == "stale_success_after_invalid"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
     suffix = " Preserve passed behavior and required content;"
     if focus_repair:
         suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
@@ -596,6 +653,8 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         suffix += " for invalid input preservation, keep the invalid state and the user-entered input; clear it only after success or an explicit reset;"
     if disclosure_state_repair:
         suffix += " for disclosure state, synchronize the existing button aria-expanded state with panel visibility;"
+    if form_outcome_repair:
+        suffix += " for an invalid form state, clear stale success while preserving the user input and existing error linkage; rerun the affected interaction;"
     suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()
