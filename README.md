@@ -1,71 +1,128 @@
 <p align="center">
-  <img src="assets/wow-frontend-design-banner.svg" alt="WOW Frontend Design：跨模型、跨框架、跨語系的前端設計 Agent Skill" width="100%">
+  <img src="assets/wow-frontend-design-banner.svg" alt="WOW Frontend Design" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/NoMoneyDaddy/Wow-Frontend-Design/actions/workflows/ci.yml"><img alt="Quality workflow" src="https://github.com/NoMoneyDaddy/Wow-Frontend-Design/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/NoMoneyDaddy/Wow-Frontend-Design?style=flat-square"></a>
-  <a href="https://github.com/NoMoneyDaddy/Wow-Frontend-Design/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/NoMoneyDaddy/Wow-Frontend-Design?style=flat-square"></a>
-  <a href="https://github.com/NoMoneyDaddy/Wow-Frontend-Design/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/NoMoneyDaddy/Wow-Frontend-Design?style=flat-square"></a>
+  <a href="https://agentskills.io/specification"><img alt="Agent Skills compatible" src="https://img.shields.io/badge/Agent%20Skills-compatible-315b78?style=flat-square"></a>
 </p>
 
-<h1 align="center">WOW Frontend Design</h1>
+# WOW Frontend Design
 
-一套可攜式、production-oriented 的前端設計執行與品質閉環 Agent Skill，用來把產品需求轉成可運作、可驗證、可修正的高辨識度前端。它不是元件庫或固定美學百科；會依偵測到的框架、host、工具、裝置、語系與既有系統調整流程。繁體中文與不只縮放寬度的手機版面／互動是核心能力。可攜不等於所有模型／平台都已實測，也不保證一次生成即可上線。
+一套 current-only 的前端設計 Agent Skill：從明確產品需求直接建置、接手或局部修復可運作的 Web 介面，並以 fresh Playwright 證據、受限自修正與外部驗收維持品質邊界。
 
-Portable Agent Skill for designing, building, auditing, and refactoring distinctive, production-oriented frontends—with first-class Traditional Chinese and mobile UX. Portability is not universal empirical certification.
+它不是元件庫、固定風格 prompt 或美學百科。Skill 會先保留專案契約，再從產品任務、內容關係與既有系統推導版面、互動、排版與視覺語言；繁體中文與真正重組的 mobile UX 是一等能力。
 
-## 它解決什麼
+## 核心能力
 
-- 從空專案建立概念、設計系統、版面、互動與 production code。
-- 偵測既有專案的框架、入口、樣式、i18n、測試與風險，再做最小安全修改。
-- 建立「概念句、版面語法、色彩規則、範圍相稱的 authored distinction」；新建／大改才加入招牌時刻，局部修復不擴張範圍。
-- 手機版會重排、替換、延後或改變互動，不只把桌面欄位改成直向。
-- 內建繁中、CJK、長翻譯、RTL、字型 fallback 與 locale QA。
-- 納入 WCAG 2.2 AA、Core Web Vitals、reduced motion、鍵盤、zoom、錯誤狀態與效能驗證。
-- 模型不自報強弱：外部、分任務能力 profile 決定起始 lane；實際 schema／工具／驗證結果只能自動降級，不能自行升級。
-- 維持一份精簡核心與按需載入的直接 references；不分叉 `lite`／`full` 兩套真相，短 context host 只作明示降級 adapter。
-- 內建 motion 技術階梯、SVG 信任／嵌入／授權管線與靜態風險稽核器。
-- 驗證失敗會自動回送 AI 做 bounded 最小修正並局部重驗。受控 release runner 只有在全部 gates clean 時才發布；觸頂時保留 evaluator-owned quarantine 與失敗 receipt，不能把它改稱完成品。
-- 缺少驗證工具時，先沿用已安裝且與 lockfile 相符的工具；新增套件、修改 lockfile 或使用 evaluator cache 都必須在 caller 已授權的範圍內。未授權時保留網站產物並把受影響 claim 標為 `UNVERIFIED`，不做 global install。
+- **一套標準**：只維護 [`wow-frontend-design/SKILL.md`](wow-frontend-design/SKILL.md)，不依模型另建 lite／full 版本。
+- **三種工作模式**：greenfield 對應 `BUILD`、既有系統改造對應 `RETROFIT`、局部 patch 對應 `POLISH` 或有證據的 `REPAIR`。
+- **產品衍生設計**：辨識度必須落在任務結構、資訊關係或互動，不靠通用卡片、流行配色或裝飾堆疊。
+- **跨 viewport 排版**：處理 CJK 斷行、長文、fallback、zoom、長翻譯與 desktop／mobile 的不同任務順序。
+- **可用的核心流程**：主要操作、選取、篩選、表單、錯誤、成功與恢復狀態必須真的可運作。
+- **證據閉環**：最新 source/build → deterministic gates → bounded repair → fresh desktop/mobile Playwright → evaluator-owned acceptance。
+- **保守接手**：seeded retrofit／patch 只允許明列路徑變更；其他檔案、目錄、mode 與行為契約保持不變。
 
-## 相容與安裝
+## 快速開始
 
-本專案遵循開放的 [Agent Skills specification](https://agentskills.io/specification)，只維護 `wow-frontend-design/SKILL.md` 這一份規範性標準。Codex、Claude Code、GitHub Copilot、Gemini CLI 或自訂 wrapper 只要正確實作該標準，就應載入同一份 package；host 安裝與 discovery 仍需各自驗證。[腳本支援說明](PLATFORM_SUPPORT.md)與[一次性 runtime 快照](evals/platform-support.json)只追蹤 Python、OS、現行 evaluator 與 Playwright Chromium，不把未測模型列成 Skill 缺口。安裝路徑、5 分鐘成功流程、remote sandbox、版本 pin、更新與卸載由 [`INSTALL.md`](INSTALL.md) 單一維護。
+先預覽並固定一個已審查的 commit，再安裝到指定 host。以下示範 Codex 使用者範圍：
 
-## 使用
-
-新專案：
-
-```text
-Use $wow-frontend-design to create a premium Traditional Chinese travel journal.
-Desktop should feel editorial; mobile should use a distinct thumb-first journey.
+```bash
+PIN="$(gh api repos/NoMoneyDaddy/Wow-Frontend-Design/commits/main --jq .sha)"
+gh skill preview NoMoneyDaddy/Wow-Frontend-Design "wow-frontend-design/SKILL.md@$PIN"
+gh skill install NoMoneyDaddy/Wow-Frontend-Design wow-frontend-design/SKILL.md \
+  --agent codex --scope user --pin "$PIN"
 ```
 
-既有專案：
+重新開啟 session 後做唯讀 discovery smoke：
 
 ```text
-Use $wow-frontend-design to inspect this repository and redesign the checkout.
-Preserve routes, APIs, analytics, and the current framework. Verify mobile, errors, and zh-Hant.
+Use $wow-frontend-design to audit this repository read-only. Report the detected
+project type, mutation boundary, available verification capabilities, and exact
+evidence ceiling. Do not edit files or install tools.
 ```
 
-不確定如何描述時，只要說明產品、使用者與主要任務；skill 會推導可逆的設計方向，只在答案會實質改變範圍或架構時提問。
+> [!IMPORTANT]
+> 安裝成功不代表特定模型、browser 或平台已完成產品驗收。Host 路徑、版本 pin、更新、remote sandbox 與卸載方式請以 [`INSTALL.md`](INSTALL.md) 為準。
 
-實際流程是：檢查專案與可用能力 → 分類建置／重構／修復範圍 → 建立設計 thesis 與 `DESIGN.md` → 實作真實狀態與 mobile transformation → 驗證 → 自動修正 → 交付。一般互動工作流觸頂時可保留最佳可預覽 artifact、證據與下一個動作，標為 `PARTIALLY VERIFIED`；受控 release runner 則只保留 quarantine，發布 target 維持空白。
+## 使用方式
 
-多路由、新產品流程或資訊層級尚未收斂時，可先產生互相綁定的 `site-manifest.json` 與 `wireframe-plan.json`。它們分別描述 IA／權限／發現意圖，以及區域／內容極端值／狀態／互動／手機轉換；crawler 用的 XML Sitemap 是第三種獨立 artifact。低風險元件修補不強制 wireframe，實作需求也不能停在 wireframe。
+### 新建介面
 
-建立或變更視覺系統時，Skill 會在頁面組合前建立／更新 repository-root `DESIGN.md`。官方格式接受 quoted `oklch()`；production CSS 仍保留 sRGB fallback 與 rendered contrast 檢查。驗證器優先使用與 lockfile 相符的 `@google/design.md`；若工具不存在且未獲安裝授權，網站產物仍可繼續，但文件驗證必須標為 `UNVERIFIED`。
+```text
+Use $wow-frontend-design to build a Traditional Chinese dispatch dashboard.
+The brief, required interactions, preserved hooks, desktop task, and mobile task
+are below. Finish the runnable interface and verify it with fresh Playwright.
+```
+
+### 接手既有專案
+
+```text
+Use $wow-frontend-design to retrofit this booking flow.
+Preserve the framework, routes, API contracts, analytics, form names, and current
+business logic. Recompose mobile behavior and verify the affected states.
+```
+
+### 局部修復
+
+```text
+Use $wow-frontend-design to repair the confirmed mobile heading wrap and sticky
+focus obstruction. Modify only styles.css; preserve every other path and behavior.
+```
+
+需求至少應說明產品、主要使用者、核心任務、必要互動、不可破壞的契約，以及任何明確拒絕的方向。只有真正影響公開契約或授權邊界的缺口才需要停下詢問。
+
+## 工作流程
+
+```text
+Evidence freeze → Representation → Direction → System → Vertical slice
+               → Pressure / repair / replay → Evidence-bounded handoff
+```
+
+1. 偵測框架、入口、tokens、語系、測試與 mutation boundary。
+2. 從操作與內容關係選擇介面形式，再決定視覺方向。
+3. 建立或更新 `DESIGN.md`，只定義實作實際使用的設計角色。
+4. 先完成一條可運作的 vertical slice，再擴大路由或元件。
+5. 跑專案 gates、fresh Playwright 與一個 bounded discovery probe。
+6. 對已確認問題做最小修正並重播受影響矩陣；乾淨或觸及 fuse 就停止。
+
+## 受控 evaluator
+
+`evals/` 是本專案的 release／Darwin 評測工具，不會在一般 Skill 任務中自動執行。它需要 POSIX、Python 3.9+、Node.js、authenticated Codex CLI，以及 repository-pinned Playwright Chromium／Axe／`@google/design.md`。
+
+```bash
+npm ci
+python3 -m unittest discover -s tests -p 'test_*.py'
+
+mkdir -p /absolute/evaluator/run /absolute/evaluator/logs
+npm run build:current -- \
+  --brief /absolute/evaluator/brief.md \
+  --target /absolute/evaluator/run \
+  --log-dir /absolute/evaluator/logs
+```
+
+公開 runner 只發布 exact outputs 與 runner-owned manifest；deterministic failure 最多進入 bounded repair。截圖只針對最後一份 completed artifact，獨立 craft verdict 再由 `accept:current` 綁定 fresh receipt。
+
+> [!NOTE]
+> Static lint、Axe、HTML conformance 與 screenshot 各自只證明有限範圍；商業核准、完整 WCAG、真實裝置、跨組織 reviewer independence 與 cryptographic trust 仍是外部事實。
+
+完整命令、seeded retrofit／patch、capture receipt、quality ledger 與 acceptance contract 見 [`evals/README.md`](evals/README.md)。
+
+## 專案結構
+
+```text
+wow-frontend-design/   可安裝的 Agent Skill package
+  SKILL.md             單一規範性核心與 reference router
+  references/          按任務載入的設計與驗證知識
+  scripts/             偵測、audit、evidence 與 portability 工具
+evals/                 current build / capture / acceptance evaluator
+tests/                 contract、runner、browser 與 script 回歸測試
+```
 
 ## 文件
 
-- [安裝與 host 路徑](INSTALL.md)
-- [Agent Skills 相容性與腳本支援](PLATFORM_SUPPORT.md)
-- [資安回報政策](SECURITY.md)
-- [Skill 核心流程](wow-frontend-design/SKILL.md)
-- [評測方法與重現方式](evals/README.md)
-- [腳本 runtime 支援快照](evals/platform-support.json)
-
-## 授權
-
-[MIT](LICENSE) © 2026 奶爸 and contributors。研究來源、`NOASSERTION` 邊界與 evaluator 開發依賴見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)；上游 Skill 僅作批判性研究，不代表其文字、程式或資產已被併入本專案。
+- [`INSTALL.md`](INSTALL.md)：安裝、host discovery、pin、更新與卸載
+- [`PLATFORM_SUPPORT.md`](PLATFORM_SUPPORT.md)：package、script、OS 與 browser 支援邊界
+- [`evals/README.md`](evals/README.md)：受控建置、fresh capture 與 acceptance
+- [`SECURITY.md`](SECURITY.md)：資安問題回報
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)：研究來源與第三方聲明
