@@ -85,8 +85,25 @@ jobs:
       - name: Install pinned evaluator dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Install pinned Playwright browsers
-        run: npx --no-install playwright install chromium firefox webkit
+      - name: Install and smoke-test pinned Chromium
+        run: |
+          npx --no-install playwright install chromium
+          node - <<'NODE'
+          const { chromium } = require("playwright");
+          (async () => {
+            const browser = await chromium.launch();
+            try {
+              const page = await browser.newPage();
+              await page.setContent("<main>chromium-ready</main>");
+              if (await page.locator("main").textContent() !== "chromium-ready") process.exitCode = 1;
+            } finally {
+              await browser.close();
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
 
       - name: Validate installable Skill package
         run: python3 wow-frontend-design/scripts/validate_installability.py wow-frontend-design --repository-root .

@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -2166,16 +2167,105 @@ def _run_generation(args: argparse.Namespace, output: Path) -> int:
         raise
 
 
-def _safe_tool_root(args: argparse.Namespace) -> Path:
-    root = args.target_root.expanduser().resolve() / ".tools"
-    if root.exists() and (root.is_symlink() or not root.is_dir()):
-        raise EvaluationError(f"tool cache is unsafe: {root}")
-    root.mkdir(parents=True, exist_ok=True)
+def _evaluator_cache_base() -> Path:
+    return Path.home() / ".cache" / "wow-frontend-design" / "evaluator"
+
+
+def _safe_evaluator_cache(args: argparse.Namespace, scope: str, packages: dict[str, Any]) -> Path:
+    identity = {
+        "schema_version": 1,
+        "scope": scope,
+        "platform": {"system": platform.system(), "machine": platform.machine()},
+        "package_lock_sha256": _digest(ROOT / "package-lock.json"),
+        "packages": packages,
+    }
+    key = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    base = Path(os.path.abspath(_evaluator_cache_base().expanduser()))
+    root = base / key
+    target_root = args.target_root.expanduser().resolve()
+    for protected in (ROOT.resolve(), target_root):
+        if root == protected or root.is_relative_to(protected):
+            raise EvaluationError(f"evaluator cache must be outside repository and target roots: {root}")
+    current = Path(root.anchor)
+    trusted_platform_links = {Path("/etc"), Path("/tmp"), Path("/var")} if sys.platform == "darwin" else set()
+    for part in root.parts[1:]:
+        current /= part
+        if current.is_symlink() and current not in trusted_platform_links:
+            raise EvaluationError(f"evaluator cache crosses a symbolic link: {current}")
+    if root.exists() and not root.is_dir():
+        raise EvaluationError(f"evaluator cache is unsafe: {root}")
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(root, 0o700)
     return root
+
+
+def _tool_environment(tool_root: Path) -> dict[str, str]:
+    allowed = {
+        "COMSPEC",
+        "LANG",
+        "LC_ALL",
+        "NODE_EXTRA_CA_CERTS",
+        "PATH",
+        "PATHEXT",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "SYSTEMROOT",
+    }
+    environment = {name: value for name, value in os.environ.items() if name in allowed}
+    directories = {name: tool_root / name for name in ("home", "npm-cache", "tmp")}
+    for directory in directories.values():
+        if directory.exists() and (directory.is_symlink() or not directory.is_dir()):
+            raise EvaluationError(f"evaluator cache directory is unsafe: {directory}")
+        directory.mkdir(exist_ok=True, mode=0o700)
+    npm_configs = [tool_root / "empty-user-npmrc", tool_root / "empty-global-npmrc"]
+    for config in npm_configs:
+        if config.is_symlink() or (config.exists() and (not config.is_file() or config.stat().st_size != 0)):
+            raise EvaluationError(f"evaluator npm configuration is unsafe: {config}")
+        if not config.exists():
+            config.touch(mode=0o600)
+    environment.update(
+        {
+            "HOME": str(directories["home"]),
+            "NO_COLOR": "1",
+            "TEMP": str(directories["tmp"]),
+            "TMP": str(directories["tmp"]),
+            "TMPDIR": str(directories["tmp"]),
+            "npm_config_cache": str(directories["npm-cache"]),
+            "npm_config_globalconfig": str(npm_configs[1]),
+            "npm_config_ignore_scripts": "true",
+            "npm_config_userconfig": str(npm_configs[0]),
+        }
+    )
+    return environment
 
 
 def _write_tool_record(root: Path, record: dict[str, Any]) -> None:
     _atomic_write_json(root / "tool-resolution.json", record)
+
+
+@contextmanager
+def _cache_install_lock(root: Path, timeout_seconds: int) -> Iterator[None]:
+    lock = root / ".install-lock"
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            lock.mkdir(mode=0o700)
+            break
+        except FileExistsError:
+            if lock.is_symlink() or not lock.is_dir():
+                raise EvaluationError(f"evaluator install lock is unsafe: {lock}")
+            if time.monotonic() >= deadline:
+                raise EvaluationError(f"timed out waiting for evaluator install lock: {lock}")
+            time.sleep(0.1)
+    try:
+        yield
+    finally:
+        try:
+            lock.rmdir()
+        except FileNotFoundError:
+            pass
 
 
 def _probe_playwright(environment: dict[str, str], package_root: Path) -> dict[str, str]:
@@ -2254,8 +2344,8 @@ def _install_tool_with_retries(
 
 
 def resolve_visual_tools(args: argparse.Namespace) -> dict[str, str]:
-    tool_root = _safe_tool_root(args)
-    environment = os.environ.copy()
+    tool_root = _safe_evaluator_cache(args, "playwright", {"playwright": PLAYWRIGHT_LOCK})
+    environment = _tool_environment(tool_root)
     browsers_root = tool_root / "browsers"
     if browsers_root.exists() and (browsers_root.is_symlink() or not browsers_root.is_dir()):
         raise EvaluationError(f"browser cache is unsafe: {browsers_root}")
@@ -2265,7 +2355,7 @@ def resolve_visual_tools(args: argparse.Namespace) -> dict[str, str]:
         "schema_version": 1,
         "playwright": {
             "requested_version": PLAYWRIGHT_VERSION,
-            "install_scope": "fresh_evaluator_cache",
+            "install_scope": "content_addressed_evaluator_cache",
             "lock": dict(PLAYWRIGHT_LOCK),
             "package_lock_sha256": _digest(ROOT / "package-lock.json"),
         },
@@ -2273,33 +2363,50 @@ def resolve_visual_tools(args: argparse.Namespace) -> dict[str, str]:
     npm = shutil.which("npm")
     if npm is None:
         raise EvaluationError("npm is unavailable for integrity-bound Playwright installation")
-    package_cache = Path(tempfile.mkdtemp(prefix=f"playwright-{PLAYWRIGHT_VERSION}-", dir=tool_root))
-    for name in ("package.json", "package-lock.json"):
-        source = ROOT / name
-        destination = package_cache / name
-        if source.is_symlink() or not source.is_file():
-            raise EvaluationError(f"locked install input is missing or unsafe: {source}")
-        shutil.copyfile(source, destination)
-        os.chmod(destination, 0o600)
+    package_cache = tool_root / "playwright"
+    if package_cache.exists() and (package_cache.is_symlink() or not package_cache.is_dir()):
+        raise EvaluationError(f"Playwright package cache is unsafe: {package_cache}")
+    package_cache.mkdir(exist_ok=True, mode=0o700)
     environment["NODE_PATH"] = str(package_cache / "node_modules")
-    attempts = _install_tool_with_retries(
-        args,
-        [
-            npm,
-            "ci",
-            "--prefix",
-            str(package_cache),
-            "--ignore-scripts",
-            "--no-audit",
-            "--no-fund",
-        ],
-        environment,
-        "Playwright package",
-    )
-    probe = _probe_playwright(environment, package_cache)
+    try:
+        probe = _probe_playwright(environment, package_cache)
+    except EvaluationError:
+        with _cache_install_lock(tool_root, min(max(args.capture_timeout_seconds, 30), 1800)):
+            try:
+                probe = _probe_playwright(environment, package_cache)
+            except EvaluationError:
+                for name in ("package.json", "package-lock.json"):
+                    source = ROOT / name
+                    destination = package_cache / name
+                    if source.is_symlink() or not source.is_file() or destination.is_symlink():
+                        raise EvaluationError(f"locked install input is missing or unsafe: {source}")
+                    shutil.copyfile(source, destination)
+                    os.chmod(destination, 0o600)
+                attempts = _install_tool_with_retries(
+                    args,
+                    [
+                        npm,
+                        "ci",
+                        "--prefix",
+                        str(package_cache),
+                        "--ignore-scripts",
+                        "--no-audit",
+                        "--no-fund",
+                    ],
+                    environment,
+                    "Playwright package",
+                )
+                probe = _probe_playwright(environment, package_cache)
+                package_source = "installed_from_repository_lock"
+            else:
+                attempts = []
+                package_source = "reused_from_repository_lock"
+    else:
+        attempts = []
+        package_source = "reused_from_repository_lock"
     record["playwright"].update(
         {
-            "source": "installed_from_repository_lock",
+            "source": package_source,
             "version": probe["version"],
             "attempts": attempts,
         }
@@ -2342,9 +2449,12 @@ def resolve_visual_tools(args: argparse.Namespace) -> dict[str, str]:
 
 def _run_design_attempt(args: argparse.Namespace, generation_output: Path, design_output: Path) -> subprocess.CompletedProcess[str]:
     verify_generation_evaluator_inputs(generation_output)
-    environment = os.environ.copy()
-    environment["npm_config_cache"] = str(_safe_tool_root(args) / "npm-cache")
-    environment["npm_config_ignore_scripts"] = "true"
+    tool_root = _safe_evaluator_cache(
+        args,
+        "design-md",
+        {"@google/design.md": {"version": DESIGN_MD_VERSION}},
+    )
+    environment = _tool_environment(tool_root)
     return matrix.run_isolated(
         [
             sys.executable,
@@ -2355,7 +2465,7 @@ def _run_design_attempt(args: argparse.Namespace, generation_output: Path, desig
             "--output",
             str(design_output),
             "--tool-root",
-            str(_safe_tool_root(args) / "design-md"),
+            str(tool_root / "design-md"),
             "--timeout-seconds",
             str(min(args.lint_timeout_seconds, 300)),
         ],

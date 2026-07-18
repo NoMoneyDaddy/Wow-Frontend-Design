@@ -177,6 +177,34 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                     evaluation._run_design_attempt(args, generation, root / "design.json")
             run.assert_not_called()
 
+    def test_design_stage_uses_external_cache_without_secret_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target_root = root / "targets"
+            generation = root / "generation.json"
+            write_frozen_generation(generation)
+            args = SimpleNamespace(target_root=target_root, lint_timeout_seconds=30)
+            completed = subprocess.CompletedProcess([], 0, "", "")
+            with (
+                mock.patch.dict(
+                    evaluation.os.environ,
+                    {"OPENAI_API_KEY": "must-not-leak", "NPM_TOKEN": "must-not-leak"},
+                    clear=False,
+                ),
+                mock.patch.object(evaluation, "_evaluator_cache_base", return_value=root / "evaluator-cache"),
+                mock.patch.object(evaluation.matrix, "run_isolated", return_value=completed) as run,
+            ):
+                result = evaluation._run_design_attempt(args, generation, root / "design.json")
+            self.assertIs(completed, result)
+            command = run.call_args.args[0]
+            tool_root = Path(command[command.index("--tool-root") + 1])
+            self.assertTrue(tool_root.resolve().is_relative_to((root / "evaluator-cache").resolve()))
+            self.assertFalse((target_root / ".tools").exists())
+            environment = run.call_args.kwargs["environment"]
+            self.assertNotIn("OPENAI_API_KEY", environment)
+            self.assertNotIn("NPM_TOKEN", environment)
+            self.assertEqual(tool_root.parent / "home", Path(environment["HOME"]))
+
     def test_visual_stage_rejects_evaluator_drift_before_command(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -411,13 +439,43 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 return_value={"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(root / "unused")},
             ), mock.patch.object(
                 evaluation, "_install_tool_with_retries", return_value=[{"attempt": 1, "exit_code": 0}]
+            ), mock.patch.object(
+                evaluation, "_evaluator_cache_base", return_value=root / "evaluator-cache"
             ), mock.patch.object(evaluation.shutil, "which", return_value="/usr/bin/npm"):
                 environment = evaluation.resolve_visual_tools(args)
             self.assertIn("PATH", environment)
-            record = json.loads((root / "targets" / ".tools" / "tool-resolution.json").read_text(encoding="utf-8"))
-            self.assertEqual("installed_from_repository_lock", record["playwright"]["source"])
+            tool_records = list((root / "evaluator-cache").glob("*/tool-resolution.json"))
+            self.assertEqual(1, len(tool_records))
+            record = json.loads(tool_records[0].read_text(encoding="utf-8"))
+            self.assertEqual("reused_from_repository_lock", record["playwright"]["source"])
             self.assertEqual(evaluation.PLAYWRIGHT_LOCK["integrity"], record["playwright"]["lock"]["integrity"])
             self.assertEqual("provided", record["browser"]["source"])
+
+    def test_visual_tool_resolution_does_not_pollute_target_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target_root = root / "targets"
+            chrome = root / "chrome"
+            chrome.write_text("binary", encoding="utf-8")
+            args = SimpleNamespace(
+                target_root=target_root,
+                chrome_executable=chrome,
+                tool_install_max_attempts=3,
+                capture_timeout_seconds=30,
+                retry_delay_seconds=0,
+            )
+            with (
+                mock.patch.object(evaluation, "_evaluator_cache_base", return_value=root / "evaluator-cache", create=True),
+                mock.patch.object(
+                    evaluation,
+                    "_probe_playwright",
+                    return_value={"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(root / "unused")},
+                ),
+                mock.patch.object(evaluation, "_install_tool_with_retries", return_value=[{"attempt": 1, "exit_code": 0}]),
+                mock.patch.object(evaluation.shutil, "which", return_value="/usr/bin/npm"),
+            ):
+                evaluation.resolve_visual_tools(args)
+            self.assertFalse((target_root / ".tools").exists())
 
     def test_visual_tool_resolution_installs_missing_package_in_evaluator_cache(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -435,16 +493,24 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                 mock.patch.object(
                     evaluation,
                     "_probe_playwright",
-                    return_value={"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(browser)},
+                    side_effect=[
+                        evaluation.EvaluationError("package missing"),
+                        evaluation.EvaluationError("package missing"),
+                        {"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(browser)},
+                    ],
                 ),
                 mock.patch.object(evaluation, "_install_tool_with_retries", return_value=[{"attempt": 1, "exit_code": 0}]),
+                mock.patch.object(evaluation, "_evaluator_cache_base", return_value=root / "evaluator-cache"),
                 mock.patch.object(evaluation.shutil, "which", return_value="/usr/bin/npm"),
             ):
                 environment = evaluation.resolve_visual_tools(args)
-            self.assertIn(str(root / "targets" / ".tools"), environment["NODE_PATH"])
-            record = json.loads((root / "targets" / ".tools" / "tool-resolution.json").read_text(encoding="utf-8"))
+            self.assertIn(str(root / "evaluator-cache"), environment["NODE_PATH"])
+            tool_records = list((root / "evaluator-cache").glob("*/tool-resolution.json"))
+            self.assertEqual(1, len(tool_records))
+            record = json.loads(tool_records[0].read_text(encoding="utf-8"))
             self.assertEqual("installed_from_repository_lock", record["playwright"]["source"])
             self.assertEqual("existing", record["browser"]["source"])
+            self.assertFalse((root / "targets" / ".tools").exists())
 
     def test_visual_tool_resolution_uses_real_cli_entrypoint_for_missing_browser(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -473,21 +539,26 @@ class ProductFlowEvaluationTests(unittest.TestCase):
                     evaluation,
                     "_probe_playwright",
                     side_effect=[
+                        evaluation.EvaluationError("package missing"),
+                        evaluation.EvaluationError("package missing"),
                         {"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(missing_browser)},
                         {"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(missing_browser)},
                         {"version": evaluation.PLAYWRIGHT_VERSION, "executable": str(installed_browser)},
                     ],
                 ),
                 mock.patch.object(evaluation, "_install_tool_with_retries", side_effect=fake_install) as install,
+                mock.patch.object(evaluation, "_evaluator_cache_base", return_value=root / "evaluator-cache"),
                 mock.patch.object(evaluation.shutil, "which", return_value="/usr/bin/node"),
             ):
                 evaluation.resolve_visual_tools(args)
             browser_command = install.call_args.args[1]
             self.assertEqual(["/usr/bin/node", browser_command[1], "install", "chromium"], browser_command)
             self.assertTrue(
-                Path(browser_command[1]).resolve().is_relative_to((root / "targets" / ".tools").resolve())
+                Path(browser_command[1]).resolve().is_relative_to((root / "evaluator-cache").resolve())
             )
-            record = json.loads((root / "targets" / ".tools" / "tool-resolution.json").read_text(encoding="utf-8"))
+            tool_records = list((root / "evaluator-cache").glob("*/tool-resolution.json"))
+            self.assertEqual(1, len(tool_records))
+            record = json.loads(tool_records[0].read_text(encoding="utf-8"))
             self.assertEqual("installed", record["browser"]["source"])
 
     def test_tool_install_retries_transient_failure(self) -> None:
