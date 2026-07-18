@@ -26,6 +26,146 @@ EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v8_disclosure_targets_emit_v9_for_clear_and_mismatched_states(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "disclosure-state.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<button id="correct" aria-expanded="false">正確展開</button><section id="correct-panel" hidden>PRIVATE-CORRECT-PANEL</section>
+<button id="visual-only" aria-expanded="false">僅視覺展開</button><section id="visual-only-panel" hidden>PRIVATE-VISUAL-PANEL</section>
+<button id="aria-only" aria-expanded="false">僅語意展開</button><section id="aria-only-panel" hidden>PRIVATE-ARIA-PANEL</section>
+<button id="unavailable" aria-expanded="false">無法驗證</button><section id="unavailable-panel">PRIVATE-UNAVAILABLE-PANEL</section>
+</main><script>
+document.querySelector("#correct").addEventListener("click", () => { document.querySelector("#correct").setAttribute("aria-expanded", "true"); document.querySelector("#correct-panel").hidden = false; });
+document.querySelector("#visual-only").addEventListener("click", () => { document.querySelector("#visual-only-panel").hidden = false; });
+document.querySelector("#aria-only").addEventListener("click", () => { document.querySelector("#aria-only").setAttribute("aria-expanded", "true"); });
+</script></body></html>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 8, "caseId": "disclosure-case", "state": "interaction",
+                "steps": [
+                    {"id": "open-correct", "action": "click", "selector": "#correct"},
+                    {"id": "open-visual-only", "action": "press", "selector": "#visual-only", "value": "Enter"},
+                    {"id": "open-aria-only", "action": "press", "selector": "#aria-only", "value": "Space"},
+                    {"id": "open-unavailable", "action": "click", "selector": "#unavailable"},
+                ],
+                "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "disclosureTargets": [
+                    {"id": "correct-state", "actionStepId": "open-correct", "panelSelector": "#correct-panel", "settling": "reduced-motion-static"},
+                    {"id": "visual-only-state", "actionStepId": "open-visual-only", "panelSelector": "#visual-only-panel", "settling": "reduced-motion-static"},
+                    {"id": "aria-only-state", "actionStepId": "open-aria-only", "panelSelector": "#aria-only-panel", "settling": "reduced-motion-static"},
+                    {"id": "unavailable-state", "actionStepId": "open-unavailable", "panelSelector": "#unavailable-panel", "settling": "reduced-motion-static"},
+                ],
+            }
+            spec_path = root / "spec.json"
+            output = root / "result.json"
+            screenshot = root / "result.png"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "disclosure-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertTrue(output.is_file(), completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertEqual(9, result["schemaVersion"])
+            coverage = result["runtime"]["disclosureStateCoverage"]
+            self.assertEqual({
+                "status", "reason", "declaredTargets", "completedTargets", "freshReplays", "claimBoundary",
+            }, set(coverage))
+            self.assertEqual("unavailable", coverage["status"])
+            self.assertEqual(3, coverage["completedTargets"])
+            self.assertEqual(8, coverage["freshReplays"])
+            records = {item["id"]: item for item in result["runtime"]["disclosureStateTargets"]}
+            self.assertEqual("clear", records["correct-state"]["status"])
+            self.assertEqual("confirmed", records["visual-only-state"]["status"])
+            self.assertEqual("confirmed", records["aria-only-state"]["status"])
+            self.assertEqual("unavailable", records["unavailable-state"]["status"])
+            self.assertEqual({"id", "status", "replays", "expanded", "panelVisible"}, set(records["correct-state"]))
+            self.assertEqual({"id", "status", "replays", "reason"}, set(records["unavailable-state"]))
+            self.assertFalse(records["visual-only-state"]["expanded"])
+            self.assertTrue(records["visual-only-state"]["panelVisible"])
+            self.assertTrue(records["aria-only-state"]["expanded"])
+            self.assertFalse(records["aria-only-state"]["panelVisible"])
+            self.assertIn("declared_disclosure_state_mismatch", result["runtime"]["issues"])
+            self.assertIn("disclosure_state_verification_unavailable", result["runtime"]["issues"])
+            self.assertEqual("findings", result["verdict"])
+            self.assertEqual(len(spec["steps"]), len(result["runtime"]["interactions"]))
+            self.assertTrue(all(item["completed"] for item in result["runtime"]["interactions"]))
+            self.assertTrue(all(item["passed"] for item in result["runtime"]["assertions"]))
+            self.assertEqual(1, len(list(root.glob("*.png"))))
+            serialized = json.dumps(result, ensure_ascii=False)
+            for private in (
+                "#correct", "#visual-only", "#aria-only", "#correct-panel", "#visual-only-panel",
+                "#aria-only-panel", "#unavailable", "#unavailable-panel", "PRIVATE-CORRECT-PANEL",
+                "PRIVATE-VISUAL-PANEL", "PRIVATE-ARIA-PANEL", "PRIVATE-UNAVAILABLE-PANEL",
+            ):
+                self.assertNotIn(private, serialized)
+
+    def test_v8_disclosure_target_contract_fails_closed(self) -> None:
+        target = {"id": "correct-state", "actionStepId": "open-correct", "panelSelector": "#correct-panel", "settling": "reduced-motion-static"}
+        base = {
+            "schemaVersion": 8, "caseId": "disclosure-case", "state": "interaction",
+            "steps": [
+                {"id": "open-correct", "action": "click", "selector": "#correct"},
+                {"id": "open-other", "action": "press", "selector": "#other", "value": "Enter"},
+            ],
+            "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+            "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+            "disclosureTargets": [target],
+        }
+        other = {"id": "other-state", "actionStepId": "open-other", "panelSelector": "#other-panel", "settling": "reduced-motion-static"}
+        invalid_variants = {
+            "non-interaction": {**base, "state": "base"},
+            "empty": {**base, "disclosureTargets": []},
+            "too-many": {**base, "disclosureTargets": [target] * 9},
+            "extra-key": {**base, "disclosureTargets": [{**target, "controlSelector": "#private"}]},
+            "missing-settling": {**base, "disclosureTargets": [{key: value for key, value in target.items() if key != "settling"}]},
+            "non-static-settling": {**base, "disclosureTargets": [{**target, "settling": "animationend"}]},
+            "bad-id": {**base, "disclosureTargets": [{**target, "id": "Bad_ID"}]},
+            "duplicate-id": {**base, "disclosureTargets": [target, {**other, "id": target["id"]}]},
+            "missing-action-step": {**base, "disclosureTargets": [{**target, "actionStepId": "missing-step"}]},
+            "non-native-action": {**base, "steps": [{"id": "open-correct", "action": "fill", "selector": "#correct", "value": "x"}, *base["steps"][1:]]},
+            "unsupported-press-key": {**base, "steps": [{"id": "open-correct", "action": "press", "selector": "#correct", "value": "Tab"}, *base["steps"][1:]]},
+            "duplicate-action-binding": {**base, "disclosureTargets": [target, {**other, "actionStepId": target["actionStepId"]}]},
+        }
+        valid_variants = {
+            "click": base,
+            "press-enter": {**base, "disclosureTargets": [other]},
+            "press-space": {
+                **base,
+                "steps": [base["steps"][0], {**base["steps"][1], "value": "Space"}],
+                "disclosureTargets": [other],
+            },
+        }
+        source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec(process.argv[1], 'disclosure-case', process.argv[2]); process.exit(0); }}
+catch (error) {{ process.stderr.write(error.message); process.exit(1); }}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, spec in valid_variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"valid-{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+            for label, spec in invalid_variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"invalid-{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode, completed.stderr)
+
     def test_v7_invalid_input_preservation_emits_v8_for_preserved_and_lost_values(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

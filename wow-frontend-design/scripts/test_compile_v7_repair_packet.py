@@ -463,6 +463,74 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
             compiler.extract_findings(mismatched)
 
+    def test_disclosure_state_projection_is_confirmed_only_and_prompt_safe(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["declared_disclosure_state_mismatch"],
+            "disclosureStateTargets": [{
+                "id": "details-panel", "status": "confirmed", "replays": 2,
+                "expanded": False, "panelVisible": True,
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "declared_disclosure_state_mismatch",
+            "classification": "runtime",
+            "locator": "details-panel",
+            "evidence": {"expanded": False, "panelVisible": True},
+        }], findings)
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("synchronize the existing button aria-expanded state with panel visibility", feedback)
+        self.assertNotIn("#details-panel", feedback)
+        self.assertNotIn("private panel copy", feedback)
+        self.assertNotIn("raw evaluator error", feedback)
+
+        unavailable_reasons = (
+            "disclosure_contract_unavailable", "external_request_blocked", "replay_unstable",
+            "runtime_unavailable", "fonts_not_ready", "initial_state_unavailable",
+            "action_outcome_unavailable", "state_settling_unavailable",
+        )
+        for reason in unavailable_reasons:
+            with self.subTest(reason=reason):
+                unavailable = _result()
+                unavailable["runtime"].update({
+                    "issues": ["disclosure_state_verification_unavailable"],
+                    "disclosureStateTargets": [{
+                        "id": "details-panel", "status": "unavailable", "replays": 2,
+                        "reason": reason,
+                    }],
+                })
+                with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+                    compiler.extract_findings(unavailable)
+
+        clear = _result()
+        clear["runtime"]["disclosureStateTargets"] = [{
+            "id": "details-panel", "status": "clear", "replays": 2,
+            "expanded": True, "panelVisible": True,
+        }]
+        self.assertEqual([], compiler.extract_findings(clear))
+
+        no_outcome = _result()
+        no_outcome["runtime"]["disclosureStateTargets"] = [{
+            "id": "details-panel", "status": "clear", "replays": 2,
+            "expanded": False, "panelVisible": False,
+        }]
+        with self.assertRaisesRegex(compiler.RepairPacketError, "derivation is inconsistent"):
+            compiler.extract_findings(no_outcome)
+
+        mismatched = _result()
+        mismatched["runtime"].update({
+            "issues": [],
+            "disclosureStateTargets": [{
+                "id": "details-panel", "status": "confirmed", "replays": 2,
+                "expanded": True, "panelVisible": False,
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(mismatched)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

@@ -44,6 +44,8 @@ RUNTIME_CODES = {
     "invalid_feedback_verification_unavailable",
     "declared_invalid_input_lost",
     "invalid_input_preservation_unavailable",
+    "declared_disclosure_state_mismatch",
+    "disclosure_state_verification_unavailable",
     "external_requests",
     "focus_obscuration_verification_unavailable",
     "focused_control_obscured",
@@ -235,11 +237,14 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError("invalid feedback verification is unavailable, not a product repair")
         if code == "invalid_input_preservation_unavailable":
             raise RepairPacketError("invalid input preservation verification is unavailable, not a product repair")
+        if code == "disclosure_state_verification_unavailable":
+            raise RepairPacketError("disclosure state verification is unavailable, not a product repair")
         if code == "stale_completion_verification_unavailable":
             raise RepairPacketError("stale completion verification is unavailable, not a product repair")
         if code in {
             "focused_control_obscured", "stale_async_completion", "declared_control_accessible_name_mismatch",
             "declared_dialog_focus_lifecycle_mismatch", "declared_invalid_feedback_unlinked", "declared_invalid_input_lost",
+            "declared_disclosure_state_mismatch",
         }:
             continue
         findings.append(_finding(code, "runtime", "page", {}))
@@ -429,6 +434,53 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
         raise RepairPacketError("invalid input preservation unavailable issue and evidence disagree")
     if unavailable_invalid_input:
         raise RepairPacketError("invalid input preservation verification is unavailable, not a product repair")
+    disclosure_state_targets = runtime.get("disclosureStateTargets", [])
+    if not isinstance(disclosure_state_targets, list):
+        raise RepairPacketError("disclosure state evidence is malformed")
+    disclosure_unavailable_reasons = {
+        "disclosure_contract_unavailable",
+        "external_request_blocked",
+        "replay_unstable",
+        "runtime_unavailable",
+        "fonts_not_ready",
+        "initial_state_unavailable",
+        "action_outcome_unavailable",
+        "state_settling_unavailable",
+    }
+    confirmed_disclosures = []
+    unavailable_disclosures = []
+    for record in disclosure_state_targets:
+        if not isinstance(record, dict):
+            raise RepairPacketError("disclosure state record is malformed")
+        status = record.get("status")
+        expected_keys = {"id", "status", "replays", "expanded", "panelVisible"}
+        if status == "unavailable":
+            expected_keys = {"id", "status", "replays", "reason"}
+        if set(record) != expected_keys or record.get("replays") != 2:
+            raise RepairPacketError("disclosure state evidence is inconsistent")
+        _record_id(record.get("id"), "disclosure state target id")
+        if status == "unavailable":
+            if record.get("reason") not in disclosure_unavailable_reasons:
+                raise RepairPacketError("disclosure state unavailable reason is invalid")
+            unavailable_disclosures.append(record)
+            continue
+        expanded = record.get("expanded")
+        panel_visible = record.get("panelVisible")
+        if status not in {"clear", "confirmed"} or type(expanded) is not bool or type(panel_visible) is not bool:
+            raise RepairPacketError("disclosure state status is invalid")
+        if not (expanded or panel_visible) or (status == "confirmed") != (expanded != panel_visible):
+            raise RepairPacketError("disclosure state derivation is inconsistent")
+        if status == "confirmed":
+            confirmed_disclosures.append(record)
+            findings.append(_finding("declared_disclosure_state_mismatch", "runtime", record["id"], {
+                "expanded": expanded, "panelVisible": panel_visible,
+            }))
+    if ("declared_disclosure_state_mismatch" in runtime_issues) != bool(confirmed_disclosures):
+        raise RepairPacketError("disclosure state issue and evidence disagree")
+    if ("disclosure_state_verification_unavailable" in runtime_issues) != bool(unavailable_disclosures):
+        raise RepairPacketError("disclosure state unavailable issue and evidence disagree")
+    if unavailable_disclosures:
+        raise RepairPacketError("disclosure state verification is unavailable, not a product repair")
     async_completions = runtime.get("asyncCompletions", [])
     if not isinstance(async_completions, list):
         raise RepairPacketError("async completion evidence is malformed")
@@ -520,6 +572,11 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
+    disclosure_state_repair = any(
+        finding.get("code") == "declared_disclosure_state_mismatch"
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
     suffix = " Preserve passed behavior and required content;"
     if focus_repair:
         suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
@@ -537,6 +594,8 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         suffix += " for invalid feedback, preserve visible error and input, keep aria-invalid=true in the invalid state, retain the existing error stable id, and link it with aria-describedby or aria-errormessage;"
     if invalid_input_preservation_repair:
         suffix += " for invalid input preservation, keep the invalid state and the user-entered input; clear it only after success or an explicit reset;"
+    if disclosure_state_repair:
+        suffix += " for disclosure state, synchronize the existing button aria-expanded state with panel visibility;"
     suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()
