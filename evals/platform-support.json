@@ -1,19 +1,19 @@
 {
   "schema_version": 2,
-  "snapshot_at": "2026-07-16",
-  "semantics": "Agent Skills package compatibility is validated against the open specification and is not split by model brand. This matrix tracks only installed Python scripts, repository evaluator runtimes and mainstream browser backends. A configured or documented runtime is not promoted until repository-owned evidence for that exact check exists. Official source coordinates remain frozen at 2026-07-16; the local artifact inventory was updated on 2026-07-18 after repository tests moved outside the installed Skill.",
+  "snapshot_at": "2026-07-18",
+  "semantics": "This current-only matrix separates Agent Skills package compatibility from installed scripts, CI, the controlled build evaluator and its Playwright Chromium smoke. A configured runtime is never promoted beyond repository-owned evidence for the exact listed check.",
   "source_snapshot": "wow-frontend-design/references/platform-support-sources.json",
   "targets": [
     {
       "id": "package-agent-skills-standard",
       "category": "package",
-      "repository_status": "tested_in_ci",
+      "repository_status": "partially_tested",
       "entrypoints": ["wow-frontend-design/SKILL.md"],
-      "requirements": ["Agent Skills specification", "Python 3.9+ validator; primary CI uses Python 3.14.6"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "not_run", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
+      "requirements": ["Agent Skills specification", "Python 3.9+ package validator; primary CI uses Python 3.14.6"],
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["agent-skills-specification"],
       "artifacts": ["wow-frontend-design/SKILL.md", "wow-frontend-design/agents/openai.yaml", "wow-frontend-design/scripts/validate_installability.py", ".github/workflows/ci.yml"],
-      "boundary": "This proves the checked package structure and repository contracts only. It does not prove that every host UI, model or tool combination has loaded or executed the Skill."
+      "boundary": "This proves the checked package structure and repository contracts only; it does not prove that every host UI, model or tool combination loaded or executed the Skill."
     },
     {
       "id": "script-portable-python-core",
@@ -30,32 +30,29 @@
         "wow-frontend-design/scripts/score_weak_model_output.py",
         "wow-frontend-design/scripts/search_discovery_audit.py",
         "wow-frontend-design/scripts/source_layout_audit.py",
-        "wow-frontend-design/scripts/validate_capability_status.py",
         "wow-frontend-design/scripts/validate_external_sources.py",
         "wow-frontend-design/scripts/validate_platform_support.py",
         "wow-frontend-design/scripts/validate_product_cases.py",
-        "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py",
         "wow-frontend-design/scripts/validate_quality_result.py",
         "wow-frontend-design/scripts/validate_site_plan.py",
-        "wow-frontend-design/scripts/validate_trigger_cases.py",
-        "wow-frontend-design/scripts/validate_v7_evidence.py"
+        "wow-frontend-design/scripts/validate_trigger_cases.py"
       ],
       "requirements": ["Python 3.9+ standard library; primary CI uses Python 3.14.6", "Writable caller-authorized output only when a script explicitly produces an artifact"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["github-actions-python", "github-hosted-runners"],
-      "artifacts": [".github/workflows/ci.yml", "wow-frontend-design/scripts/capture_runtime_profile.py", "tests/test_capture_runtime_profile.py"],
-      "boundary": "The complete Python suite passed in Linux CI and a local macOS development environment. The configured Windows smoke remains unverified until its remote job completes."
+      "artifacts": [".github/workflows/ci.yml", "tests/test_capture_runtime_profile.py", "tests/test_validate_platform_support.py"],
+      "boundary": "The current Python suite passed in the local macOS checkout; configured Linux, macOS CI and Windows lanes remain not_run until a completed job for this exact revision is preserved."
     },
     {
       "id": "script-git-installability",
       "category": "installed_script",
       "repository_status": "partially_tested",
       "entrypoints": ["wow-frontend-design/scripts/validate_installability.py"],
-      "requirements": ["Python 3.9+; primary CI uses Python 3.14.6", "Git command for ignored-file checks when a repository root is supplied"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
+      "requirements": ["Python 3.9+; primary CI uses Python 3.14.6", "Git command only for repository-aware ignored-file checks"],
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["agent-skills-specification", "github-actions-python"],
       "artifacts": ["wow-frontend-design/scripts/validate_installability.py", "tests/test_validate_installability.py", ".github/workflows/ci.yml"],
-      "boundary": "Git is an explicit optional runtime dependency for repository-aware ignored-file checks. A successful package check does not prove host discovery or execution."
+      "boundary": "Git is an explicit optional dependency for repository-aware ignored-file checks; a successful package check does not prove host discovery, invocation or task execution."
     },
     {
       "id": "script-command-evidence-ledger",
@@ -63,10 +60,10 @@
       "repository_status": "partially_tested",
       "entrypoints": ["wow-frontend-design/scripts/evidence_ledger.py"],
       "requirements": ["Python 3.9+; primary CI uses Python 3.14.6", "Caller-authorized external command", "Evaluator-owned artifact directory"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["github-actions-python", "github-hosted-runners"],
       "artifacts": ["wow-frontend-design/scripts/evidence_ledger.py", "tests/test_evidence_ledger.py", "tests/test_evidence_workflow_smoke.py"],
-      "boundary": "The ledger can invoke only the exact caller-supplied command within its policy boundary. External command portability and side effects remain the caller's responsibility."
+      "boundary": "The ledger invokes only the exact caller-supplied command inside its policy boundary; command portability and side effects remain the caller's responsibility."
     },
     {
       "id": "ci-portable-python-matrix",
@@ -74,87 +71,32 @@
       "repository_status": "partially_tested",
       "entrypoints": [".github/workflows/ci.yml"],
       "requirements": ["GitHub-hosted runner", "Python 3.14.6", "Checked-out repository"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "partial", "macos": "not_run", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["github-actions-python", "github-hosted-runners"],
       "artifacts": [".github/workflows/ci.yml", "wow-frontend-design/scripts/capture_runtime_profile.py", "tests/test_capture_runtime_profile.py"],
-      "boundary": "The three-runner matrix now targets Python 3.14.6, but configuration is not execution evidence. Prior Linux evidence used the previous lane; the new Linux lane is partial, while macOS and Windows remain not_run until completed jobs are preserved."
+      "boundary": "The workflow configures three operating-system lanes, but configuration is not execution evidence; each remote lane remains limited to its preserved completed job."
     },
     {
       "id": "evaluator-posix-runners",
       "category": "evaluator_harness",
       "repository_status": "partially_tested",
-      "entrypoints": ["evals/run_current_skill_build.py", "evals/run_codex_case.sh", "evals/run_claude_case.sh", "evals/run_product_flow_matrix.py", "evals/run_product_flow_evaluation.py"],
-      "requirements": ["POSIX Bash", "POSIX process groups and resource controls", "Python 3.9+; primary CI uses Python 3.14.6", "Node.js 22", "Codex CLI authenticated with first-party ChatGPT", "Pinned @google/design.md, Playwright Chromium and Axe"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_applicable", "browser": "partial", "visual": "partial"},
+      "entrypoints": ["evals/run_current_skill_build.py"],
+      "requirements": ["POSIX process groups and resource controls", "Python 3.9+", "Node.js 22", "Authenticated Codex CLI", "Pinned @google/design.md, Playwright Chromium and Axe"],
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_supported", "browser": "passed", "visual": "not_run"},
       "source_ids": ["github-hosted-runners", "playwright-installation"],
-      "artifacts": ["evals/run_current_skill_build.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "package-lock.json", "tests/test_run_current_skill_build.py", "evals/run_codex_case.sh", "evals/run_claude_case.sh", "evals/run_product_flow_matrix.py", "evals/run_product_flow_evaluation.py", ".github/workflows/ci.yml"],
-      "boundary": "These developer evaluators are not part of the installed Agent Skill runtime. The current controlled build uses exact-output isolation plus fresh Playwright/Axe replay; the harness remains POSIX-only and intentionally excludes native Windows."
-    },
-    {
-      "id": "evaluator-windows-native",
-      "category": "evaluator_harness",
-      "repository_status": "not_supported",
-      "entrypoints": ["evals/run_codex_case.sh", "evals/run_claude_case.sh"],
-      "requirements": ["Native Windows replacement for POSIX Bash and resource controls is not implemented"],
-      "checks": {"static": "not_applicable", "unit": "not_applicable", "linux": "not_applicable", "macos": "not_applicable", "windows": "not_supported", "browser": "not_applicable", "visual": "not_applicable"},
-      "source_ids": ["github-hosted-runners"],
-      "artifacts": ["evals/run_codex_case.sh", "evals/run_claude_case.sh", "PLATFORM_SUPPORT.md"],
-      "boundary": "Native Windows may run the portable installed Python scripts, but the complete POSIX generation and evidence harness is explicitly unsupported in this version."
-    },
-    {
-      "id": "evaluator-windows-wsl",
-      "category": "evaluator_harness",
-      "repository_status": "not_tested",
-      "entrypoints": ["evals/run_codex_case.sh", "evals/run_claude_case.sh"],
-      "requirements": ["Windows Subsystem for Linux", "POSIX dependencies installed inside WSL"],
-      "checks": {"static": "not_applicable", "unit": "not_applicable", "linux": "not_applicable", "macos": "not_applicable", "windows": "not_run", "browser": "not_run", "visual": "not_run"},
-      "source_ids": ["github-hosted-runners", "playwright-installation"],
-      "artifacts": ["evals/run_codex_case.sh", "evals/run_claude_case.sh", "PLATFORM_SUPPORT.md"],
-      "boundary": "WSL may satisfy POSIX assumptions, but no repository-owned end-to-end generation, browser or visual run has been preserved for this version."
+      "artifacts": ["evals/run_current_skill_build.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "tests/test_run_current_skill_build.py", ".github/workflows/ci.yml"],
+      "boundary": "The controlled evaluator is outside the installed Skill runtime, is intentionally POSIX-only, and proves only its exact-output, repair and deterministic browser-smoke contracts."
     },
     {
       "id": "browser-chromium-evaluator",
       "category": "browser_backend",
-      "repository_status": "browser_observed",
-      "entrypoints": ["evals/playwright_visual_v6_audit.cjs"],
-      "requirements": ["Node.js 22", "Pinned Playwright", "Pinned Playwright Chromium"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "passed", "visual": "passed"},
+      "repository_status": "partially_tested",
+      "entrypoints": ["evals/playwright_html_smoke.cjs"],
+      "requirements": ["Node.js 22", "Pinned Playwright", "Pinned Playwright Chromium", "Pinned @axe-core/playwright"],
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "passed", "visual": "not_run"},
       "source_ids": ["playwright-installation", "playwright-browsers"],
-      "artifacts": ["package-lock.json", "evals/playwright_visual_v6_audit.cjs", "evals/product-flow-v6-visual-results.json", "assets/product-flow-v6"],
-      "boundary": "Observed evidence is limited to the pinned Playwright Chromium revision, frozen routes, states and device profiles. It does not certify other browser engines or physical devices."
-    },
-    {
-      "id": "browser-chrome-edge-channels",
-      "category": "browser_backend",
-      "repository_status": "not_tested",
-      "entrypoints": ["evals/playwright_visual_v6_audit.cjs"],
-      "requirements": ["Locally installed branded Chrome or Edge channel", "Matching Playwright support"],
-      "checks": {"static": "not_applicable", "unit": "not_applicable", "linux": "not_run", "macos": "not_run", "windows": "not_run", "browser": "not_run", "visual": "not_run"},
-      "source_ids": ["playwright-browsers"],
-      "artifacts": ["evals/playwright_visual_v6_audit.cjs", "PLATFORM_SUPPORT.md"],
-      "boundary": "Passing bundled Chromium does not prove branded stable, beta or enterprise Chrome and Edge channels. No channel-specific repository evidence is published."
-    },
-    {
-      "id": "browser-firefox-evaluator",
-      "category": "browser_backend",
-      "repository_status": "not_tested",
-      "entrypoints": ["evals/playwright_visual_v6_audit.cjs"],
-      "requirements": ["Pinned Playwright Firefox"],
-      "checks": {"static": "not_applicable", "unit": "not_applicable", "linux": "not_run", "macos": "not_run", "windows": "not_run", "browser": "not_run", "visual": "not_run"},
-      "source_ids": ["playwright-installation", "playwright-browsers"],
-      "artifacts": ["evals/playwright_visual_v6_audit.cjs", "PLATFORM_SUPPORT.md"],
-      "boundary": "Playwright exposes a Firefox engine, but this repository has not preserved a Firefox browser or visual evaluation for the current Skill version."
-    },
-    {
-      "id": "browser-webkit-evaluator",
-      "category": "browser_backend",
-      "repository_status": "not_tested",
-      "entrypoints": ["evals/playwright_visual_v6_audit.cjs"],
-      "requirements": ["Pinned Playwright WebKit"],
-      "checks": {"static": "not_applicable", "unit": "not_applicable", "linux": "not_run", "macos": "not_run", "windows": "not_run", "browser": "not_run", "visual": "not_run"},
-      "source_ids": ["playwright-installation", "playwright-browsers"],
-      "artifacts": ["evals/playwright_visual_v6_audit.cjs", "PLATFORM_SUPPORT.md"],
-      "boundary": "Playwright WebKit is a useful engine target but is not physical Safari. No WebKit browser or visual evidence is published for this version."
+      "artifacts": ["package-lock.json", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "tests/test_playwright_html_smoke.py", "tests/test_browser_egress_controls.py"],
+      "boundary": "Observed evidence is limited to deterministic visible-content, runtime, network, overflow and Axe smoke in the pinned Chromium revision; it is not independent visual-craft review or physical-device evidence."
     }
   ]
 }

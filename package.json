@@ -9,30 +9,12 @@
   },
   "scripts": {
     "build:current": "python3 evals/run_current_skill_build.py",
-    "check:dashboard-audit": "node --check evals/playwright_dashboard_audit.cjs",
-    "audit:dashboards": "node evals/playwright_dashboard_audit.cjs",
-    "audit:html": "node evals/run_vnu.cjs",
-    "audit:visual-v5": "node evals/playwright_visual_v5_audit.cjs",
-    "audit:visual-v6": "node evals/playwright_visual_v6_audit.cjs",
-    "audit:visual-v7-a1": "node evals/playwright_v7_a1_audit.cjs",
-    "validate:evidence-v6": "python3 wow-frontend-design/scripts/validate_product_flow_v6_evidence.py evals/product-flow-v6-visual-results.json --repository-root .",
-    "check:evidence-v7-cli": "python3 wow-frontend-design/scripts/validate_v7_evidence.py --help",
-    "validate:evidence-v7": "python3 wow-frontend-design/scripts/validate_v7_evidence.py",
-    "eval:product-flow": "python3 evals/run_product_flow_evaluation.py",
-    "eval:v7-repair-packet": "python3 evals/compile_v7_repair_packet.py",
-    "eval:v7-repair-cycle": "python3 evals/run_v7_repair_cycle.py",
-    "eval:v7-paired-decision": "python3 evals/compile_v7_paired_decision.py",
-    "eval:v7-breakpoints": "node evals/playwright_v7_breakpoint_probe.cjs",
-    "eval:v7-motion": "node evals/playwright_v7_motion_probe.cjs",
-    "eval:v7-visual": "python3 evals/run_v7_visual_matrix.py",
-    "eval:v7-case": "python3 evals/run_v7_codex_case.py",
-    "capture:showcase": "node evals/capture_showcase.cjs"
+    "audit:html": "node evals/run_vnu.cjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
     "@chenglou/pretext": "0.0.8",
     "@google/design.md": "0.3.0",
-    "culori": "4.0.2",
     "playwright": "1.61.1",
     "vnu-jar": "26.7.16"
   }

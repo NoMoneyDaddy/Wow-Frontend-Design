@@ -38,5 +38,7 @@ Document only shared components earned by repeated product behavior, including t
 
 - Do add only project-derived tokens that are consumed by the runtime.
 - Do preserve `none`, `inherited`, and `unknown` when the product evidence does not justify a new visual decision.
+- Do retain a rejected direction only when it is likely to recur; record the product-specific evidence, reason, and scope.
 - Don't fork the design system per page or breakpoint.
+- Don't turn a project rejection into a global style blacklist.
 - Don't treat this token-free template as a palette, type scale, spacing scale, shape recipe, or component inventory.

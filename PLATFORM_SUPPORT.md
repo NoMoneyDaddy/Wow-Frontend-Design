@@ -1,52 +1,44 @@
 # Agent Skills 相容性與腳本支援
 
-本專案把「Skill package 相容性」和「repository 腳本可執行性」分開。模型品牌不是相容性維度；只要 host 正確實作 [Agent Skills specification](https://agentskills.io/specification)，就應依同一份 `SKILL.md` 與相對 references 載入。Host 的安裝路徑與操作介面差異另見 [`INSTALL.md`](INSTALL.md)，不維護逐模型支援表。
+本專案只維護一份規範性 Skill：`wow-frontend-design/SKILL.md`。模型品牌不是相容性維度；host 只要正確實作 [Agent Skills specification](https://agentskills.io/specification)，就應載入同一份 package。Host 安裝與 discovery 差異見 [`INSTALL.md`](INSTALL.md)。
 
-機器可讀的 runtime 快照位於 [`evals/platform-support.json`](evals/platform-support.json)，官方來源座標位於 [`platform-support-sources.json`](wow-frontend-design/references/platform-support-sources.json)。這是本版快照，沒有自動或預定的下次查核日期。
-
-查詢未完成、失敗或明確不支援的 runtime cell：
+機器可讀快照位於 [`evals/platform-support.json`](evals/platform-support.json)，官方來源座標位於 [`platform-support-sources.json`](wow-frontend-design/references/platform-support-sources.json)。查詢未完成或不支援的 cell：
 
 ```bash
 python3 wow-frontend-design/scripts/validate_platform_support.py \
   evals/platform-support.json --repository-root . --report
 ```
 
-## 1. Agent Skills package
+## Package
 
-- `SKILL.md` frontmatter、名稱、相對 references、scripts、license 與 UI metadata 由 installability／Skill validator 檢查。
-- Package 合法不代表某個 host 已安裝或當次 session 已 discovery；這是 host 整合問題，不是模型支援問題。
-- 不在 Skill 內依 `GPT`、`Claude`、`Gemini`、`mini`、`Haiku`、`Opus` 等名稱分支。模型路由只屬於外部 evaluator 的品質／成本策略。
+- `SKILL.md` frontmatter、相對 references、scripts、license 與 UI metadata 由 installability validator 檢查。
+- Package 合法不代表某個 host 已 discovery，也不代表某個模型已完成產品任務。
+- 不在 Skill 內依模型品牌或大小分叉規則；模型只屬外部 evaluator 參數。
 
-## 2. 安裝後隨 Skill 提供的 Python scripts
+## 安裝後 scripts
 
-Validator 會把 `wow-frontend-design/scripts/` 內所有非測試 Python entrypoint 和 matrix 做精確比對；新增 script 卻沒有聲明 runtime profile，CI 會失敗。目前共 21 個 entrypoints：
+現行 package 有 18 個非測試 Python entrypoints：
 
-- 19 個 Python 3.9+ standard-library core scripts；primary CI 使用 Python 3.14.6。
-- `validate_installability.py` 在 repository-aware 模式需要 `git`。
-- `evidence_ledger.py` 只執行 caller 明示且 policy 允許的外部 command；該 command 自身的跨平台行為不由 Skill 保證。
+- 16 個 Python 3.9+ standard-library core scripts；primary CI 使用 Python 3.14.6。
+- `validate_installability.py` 的 repository-aware 模式需要 `git`。
+- `evidence_ledger.py` 只執行 caller 明示且 policy 允許的 command；command 自身的可攜性與副作用不由 Skill 保證。
 
-目前完整 Python 測試在 Linux CI 通過；macOS 有本機開發證據但尚未形成等價 CI artifact。Ubuntu／macOS／Windows 的 portable contract smoke 已配置，macOS 與 Windows 在遠端 jobs 完成前維持 `not_run`。
+現行完整 Python suite 已在本機 macOS checkout 通過。Ubuntu、macOS、Windows portable smoke 已配置，但本 revision 尚未保存完成的遠端 job，因此三個 CI cell 都維持 `not_run`。
 
-## 3. Repository evaluator，不是 Skill runtime
+## 現行 evaluator
 
-`evals/` 的 generation／browser／evidence harness 是開發者評測工具，不隨一般 Skill 任務自動執行。舊 cohort validator 與 prompt fixture 保留在 `evals/archive/`，不再複製到每次 Skill 執行：
+`evals/` 不隨一般 Skill 任務自動執行。唯一受控建置入口是 `npm run build:current`，其依賴：
 
-- 正式 `build:current` runner 依賴 POSIX process group／resource control、Python 3.9+、Codex CLI、Node.js 22、pinned `@google/design.md`、Playwright Chromium 與 Axe。
-- 其他歷史 runner 另依賴 POSIX Bash；所有 evaluator 入口仍與安裝後的 Skill runtime 分離。
-- Linux 有 CI 證據；macOS 為局部開發證據。
-- Native Windows 完整 harness 本版明確不支援；portable Python scripts 不受這項限制。
-- WSL 可能滿足 POSIX 前提，但本版沒有保存 end-to-end run，因此維持 `not_run`。
+- POSIX process groups 與 resource controls；
+- Python 3.9+、Node.js 22、authenticated Codex CLI；
+- pinned `@google/design.md`、Playwright Chromium 與 Axe。
 
-## 4. 主流 browser backend
+Runner 以 exact-output staging、fresh Playwright context、deterministic finding、bounded repair packet、收斂 fuse 與原子發布維持證據邊界。現行 unit 與 browser smoke 在本機 macOS 通過；Linux 遠端 job 尚未保存，native Windows 完整 runner 明確不支援，但 portable Skill scripts 不受這項限制。
 
-- Pinned Playwright Chromium：已有 v6 browser／visual 證據。
-- Branded Chrome／Edge channels、Playwright Firefox、Playwright WebKit：列入主流檢查範圍，但本版尚未實跑。
-- Playwright WebKit 不等於實體 Safari；browser mobile emulation 也不等於實體 iOS／Android。實體裝置不列入本版支援承諾。
+## Browser
 
-## 5. Remote／sandbox 行為
+Pinned Playwright Chromium 已有本機 macOS 的現行 runtime、network、visible-content、root-overflow 與 Axe smoke evidence。`visual` 維持 `not_run`：這不是 screenshot acceptance、獨立美感審查、完整 WCAG conformance、branded Chrome／Edge、Firefox、WebKit、實體 Safari 或實體手機證據。
 
-執行前只探測實際能力：可讀／可寫 root、Python、必要 command、network、browser 與 screenshot。缺 browser 或 network 時，安全的 static／implementation 工作可以繼續，但相關 rendered claim 必須標成 `UNVERIFIED`。
+每次完成宣告必須來自最新 source/build 與 fresh context。缺 browser 或 network 時，安全的 static／implementation 工作可以繼續，但受影響的 rendered claim 必須標為 `UNVERIFIED`。
 
-`scripts/capture_runtime_profile.py` 只記錄安全的 OS／Python 欄位與 caller declarations；不讀 hostname、username、home、IP、完整 environment，也不自行執行 command 或 network probe。Caller 宣告的 Node／browser／font profile 必須再綁定 setup log、lockfile 或 browser report，不能單獨升級成通過證據。
-
-只重試可恢復錯誤。持續輸出可在 hard ceiling 內延長 inactivity deadline；permission、security、unsupported runtime 或 deterministic policy failure 必須先有明確修復方式。
+`capture_runtime_profile.py` 只記錄 bounded OS／Python 欄位與 caller declarations；不讀 hostname、username、home、IP 或完整 environment，也不自行執行 command／network probe。Caller 宣告的 Node、browser 或 font profile 必須再綁定 setup log、lockfile 或 browser receipt。

@@ -160,26 +160,28 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         environment: dict[str, str],
         *,
         hard_seconds: int = 5,
-        model: str = "gpt-5.4-mini",
+        model: str | None = "gpt-5.6-sol",
+        reasoning_effort: str | None = "high",
         outputs: tuple[str, ...] | None = None,
         log_dir: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
         selected_log_dir = log_dir or Path(environment["CODEX_HOME"]).parent / "logs"
         selected_log_dir.mkdir(exist_ok=True)
         command = [
-                sys.executable,
-                str(RUNNER),
-                "--brief",
-                str(brief),
-                "--target",
-                str(target),
-                "--log-dir",
-                str(selected_log_dir),
-                "--model",
-                model,
-                "--hard-seconds",
-                str(hard_seconds),
-            ]
+            sys.executable,
+            str(RUNNER),
+            "--brief",
+            str(brief),
+            "--target",
+            str(target),
+            "--log-dir",
+            str(selected_log_dir),
+        ]
+        if model is not None:
+            command.extend(("--model", model))
+        if reasoning_effort is not None:
+            command.extend(("--reasoning-effort", reasoning_effort))
+        command.extend(("--hard-seconds", str(hard_seconds)))
         for output in outputs or ():
             command.extend(("--output", output))
         return subprocess.run(
@@ -204,6 +206,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual("gpt-5.4-test", manifest["model"]["requested_identifier"])
+            self.assertEqual("high", manifest["model"]["requested_reasoning_effort"])
             self.assertEqual("not_observed", manifest["model"]["resolution_status"])
             self.assertIsNone(manifest["model"]["resolved_backend_snapshot"])
             self.assertEqual(["DESIGN.md", "index.html"], [item["path"] for item in manifest["outputs"]])
@@ -250,6 +253,26 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("execution_passed", receipt["status"])
             self.assertEqual("publication_pending", receipt["classification"])
             self.assertEqual(manifest["execution"]["trace"], receipt["logs"]["trace"])
+
+    def test_current_cli_defaults_to_sol_with_high_reasoning(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            completed = self.invoke(
+                brief,
+                target,
+                environment,
+                model=None,
+                reasoning_effort=None,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual("gpt-5.6-sol", manifest["model"]["requested_identifier"])
+            self.assertEqual("high", manifest["model"]["requested_reasoning_effort"])
+            invocation = json.loads((capture / "invocation.json").read_text(encoding="utf-8"))
+            model_index = invocation["args"].index("--model")
+            self.assertEqual("gpt-5.6-sol", invocation["args"][model_index + 1])
+            self.assertIn('model_reasoning_effort="high"', invocation["args"])
 
     def test_repeated_output_contract_drives_prompt_validation_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

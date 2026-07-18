@@ -19,7 +19,7 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
 
-from codex_isolated_build_core import DEFAULT_MODEL, ExecutionSpec, RunnerError, execute_isolated
+from codex_isolated_build_core import ExecutionSpec, RunnerError, execute_isolated
 from current_skill_repair import (
     MAX_REPAIR_ROUNDS,
     build_repair_prompt,
@@ -38,6 +38,8 @@ EXPECTED_OUTPUTS = ("DESIGN.md", "index.html")
 BRIEF_LIMIT = 128 * 1024
 FILE_LIMIT = 1_048_576
 LOG_STEM = "current-skill-build"
+CURRENT_DEFAULT_MODEL = "gpt-5.6-sol"
+CURRENT_DEFAULT_REASONING_EFFORT = "high"
 
 
 def _module(name: str, path: Path) -> Any:
@@ -121,6 +123,7 @@ def build_prompt(brief: str, outputs: tuple[str, ...]) -> str:
         "Run one controlled fresh frontend build. Activate and follow $wow-frontend-design from the isolated "
         f"skill snapshot. Create exactly these {len(outputs)} files in the current directory: {output_list}. "
         "Create no other files or directories except parent directories required by that exact list.\n"
+        "Every HTML output must be non-empty strict UTF-8 and contain <!doctype html>, <html>, <main>, and </html>.\n"
         "Do not use shell commands, subagents, apps, plugins, MCP, browser, computer, image generation, web "
         "search, network access, or tool suggestions. Use file-change tools only. Do not read or write outside "
         "the current directory and do not inspect authentication, environment, configuration, or other skills.\n"
@@ -415,6 +418,7 @@ def _receipt(
     brief_bytes: bytes,
     prompt: str,
     model: str,
+    reasoning_effort: str,
     stdout_log: Path,
     stderr_log: Path,
     execution: dict[str, Any] | None,
@@ -436,6 +440,7 @@ def _receipt(
         "classification": classification,
         "model": {
             "requested_identifier": model,
+            "requested_reasoning_effort": reasoning_effort,
             "resolution_status": "not_observed",
             "resolved_backend_snapshot": None,
         },
@@ -599,7 +604,8 @@ def run(
     brief: Path,
     target: Path,
     *,
-    model: str = DEFAULT_MODEL,
+    model: str = CURRENT_DEFAULT_MODEL,
+    reasoning_effort: str = CURRENT_DEFAULT_REASONING_EFFORT,
     hard_seconds: int = 1800,
     inactivity_seconds: int | None = None,
     outputs: list[str] | tuple[str, ...] | None = None,
@@ -683,6 +689,7 @@ def run(
                     skill_name="wow-frontend-design",
                     prompt=repair_prompt,
                     model=model,
+                    reasoning_effort=reasoning_effort,
                     hard_seconds=hard_seconds,
                     inactivity_seconds=inactivity_seconds,
                 )
@@ -727,6 +734,7 @@ def run(
                 skill_name="wow-frontend-design",
                 prompt=prompt,
                 model=model,
+                reasoning_effort=reasoning_effort,
                 hard_seconds=hard_seconds,
                 inactivity_seconds=inactivity_seconds,
             )
@@ -840,6 +848,7 @@ def run(
             brief_bytes=brief_bytes,
             prompt=active_prompt,
             model=model,
+            reasoning_effort=reasoning_effort,
             stdout_log=active_stdout_log,
             stderr_log=active_stderr_log,
             execution=execution,
@@ -897,6 +906,7 @@ def run(
                 brief_bytes=brief_bytes,
                 prompt=active_prompt,
                 model=model,
+                reasoning_effort=reasoning_effort,
                 stdout_log=active_stdout_log,
                 stderr_log=active_stderr_log,
                 execution=execution,
@@ -927,7 +937,12 @@ def main() -> int:
     parser.add_argument("--brief", required=True, type=Path)
     parser.add_argument("--target", required=True, type=Path)
     parser.add_argument("--log-dir", required=True, type=Path)
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--model", default=CURRENT_DEFAULT_MODEL)
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("low", "medium", "high", "xhigh"),
+        default=CURRENT_DEFAULT_REASONING_EFFORT,
+    )
     parser.add_argument("--hard-seconds", type=int, default=1800)
     parser.add_argument("--inactivity-seconds", type=int)
     parser.add_argument("--max-repair-rounds", type=int, default=MAX_REPAIR_ROUNDS)
@@ -938,6 +953,7 @@ def main() -> int:
             args.brief,
             args.target,
             model=args.model,
+            reasoning_effort=args.reasoning_effort,
             hard_seconds=args.hard_seconds,
             inactivity_seconds=args.inactivity_seconds,
             outputs=args.output,

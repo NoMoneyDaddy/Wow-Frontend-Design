@@ -35,6 +35,7 @@ Keep the trace proportional:
 - merge decisions that share one source and one validation boundary;
 - an inherited convention needs no entry unless this task changes, rejects, or depends on it materially;
 - a focused repair records only the affected system decision and the evidence for preserving or changing it;
+- retain a rejected direction only when product evidence makes recurrence likely; name its scope and reason, and never promote it into a cross-project blacklist;
 - page-only information architecture, flow, and interaction state remain in the brief, site/wireframe plan, interaction manifest, and tests unless they establish a reusable visual-system rule;
 - a rationale explains intent but does not prove implementation, browser behavior, accessibility, product fit, or aesthetic quality.
 

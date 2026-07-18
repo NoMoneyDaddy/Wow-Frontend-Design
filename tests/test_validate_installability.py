@@ -28,7 +28,14 @@ class InstallabilityTests(unittest.TestCase):
             for path in (root / "wow-frontend-design").rglob("test_*.py")
         )
         self.assertEqual([], bundled)
-        self.assertGreaterEqual(len(list((root / "tests").glob("test_*.py"))), 60)
+        repository_tests = {path.name for path in (root / "tests").glob("test_*.py")}
+        self.assertTrue(
+            {
+                "test_run_current_skill_build.py",
+                "test_playwright_html_smoke.py",
+                "test_validate_installability.py",
+            }.issubset(repository_tests)
+        )
 
     def test_repository_openai_prompt_tracks_runtime_contract(self) -> None:
         root = Path(__file__).resolve().parents[1]

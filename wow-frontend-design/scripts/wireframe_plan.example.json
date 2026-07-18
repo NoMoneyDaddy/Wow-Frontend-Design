@@ -2,11 +2,11 @@
   "schema_version": 1,
   "plan_id": "harbor-operations-wireframe-v1",
   "manifest_id": "harbor-operations-v1",
-  "manifest_sha256": "c74d6076a55778ac3108229d83bd4ec3d29de707fc304086158eb68c69039771",
+  "manifest_sha256": "152578c57a610e1f0594f13faaa3908f58d35a8617fe31b1dc15045e84e211e5",
   "readiness": "implementation_ready",
   "fidelity": "wireflow",
   "evidence_boundary": {"status": "planning_only", "self_certified": false},
-  "evidence_refs": ["fixture:site-planning-brief", "fixture:product-dashboard-brief"],
+  "evidence_refs": ["fixture:site-planning-brief", "fixture:harbor-operations-requirements"],
   "flows": [
     {
       "id": "discover-service-and-enter",
@@ -134,7 +134,7 @@
       },
       "navigation_targets": ["home-zh-hant"],
       "unknowns": ["正式權限矩陣與同步 API 契約尚未提供"],
-      "claims": [{"claim": "手機卡片比壓縮資料表更易掃描", "status": "UNVERIFIED", "evidence_ref": "fixture:product-dashboard-brief"}]
+      "claims": [{"claim": "手機卡片比壓縮資料表更易掃描", "status": "UNVERIFIED", "evidence_ref": "fixture:harbor-operations-requirements"}]
     }
   ]
 }

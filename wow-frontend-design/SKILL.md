@@ -1,7 +1,7 @@
 ---
 name: wow-frontend-design
 description: >-
-  Plan, design, build, audit, repair, or refactor distinctive production-oriented web frontends as an integrated product manager, UX designer, UI designer, and frontend engineer. Use for new websites or existing projects: product UI, landing pages, portfolios, dashboards, commerce, design systems, visual redesigns, responsive UX, Traditional Chinese localization and typography, accessibility, motion, creative direction, UI polish, controlled frontend refactoring, or anti-generic frontend work. Supports automatic, checkpoint-guided, or user-directed delivery; adapts to detected frameworks and available tools while keeping verification evidence-bounded.
+  Design, build, audit, repair, or refactor distinctive web frontends. Use for new or existing product UI, sites, responsive UX, Traditional Chinese typography, accessibility, motion, creative direction, UI polish, or controlled refactoring. Adapts to detected framework and tools; keeps verification evidence-bounded.
 license: MIT
 metadata:
   author: NoMoneyDaddy
@@ -41,11 +41,13 @@ Read the smallest sufficient context. On the initial reference pass, read this c
 - Review: use [design-exploration.md](references/design-exploration.md) for a material unresolved comparison, [interaction-audit.md](references/interaction-audit.md) for stateful behavior, [visual-regression-evidence.md](references/visual-regression-evidence.md) for baselines, and [award-quality-lens.md](references/award-quality-lens.md) only when the brief explicitly requests that lens.
 - Maintenance: use [curated-skill-integration.md](references/curated-skill-integration.md) for bounded external-method integration, [behavioral-design-evidence.md](references/behavioral-design-evidence.md) for perception or conversion research, and [research-validation-loop.md](references/research-validation-loop.md), [github-skill-research.md](references/github-skill-research.md), or [ui-skills-ecosystem.md](references/ui-skills-ecosystem.md) only while maintaining this Skill.
 
-`quality-gates.md` is a verification dependency, not mandatory ideation context. Capability references are loaded only after an actual capability boundary is observed. Detailed typography, color, material, motion, and media references diagnose a decision or failure; they do not supply a house style.
+Load `quality-gates.md` only for verification. Capability and design references diagnose observed boundaries or decisions; they do not supply a house style.
 
 ## Choose the operating lane
 
 Classify the requested mutation as `AUDIT`, `BUILD`, `RETROFIT`, `POLISH`, or `REPAIR`. For an existing product, preserve declared behavior and choose the smallest sufficient depth: surface, system, composition, experience, or architecture.
+
+`POLISH` and `REPAIR` inherit existing tokens, fonts, motion vocabulary, and shared primitives. Change a global value only when explicitly authorized for that system depth or product/fresh evidence shows it owns the requested outcome or a failure. Stay within the authorized depth; never broaden a local task for a preferred style.
 
 `AUDIT` is read-only: report evidence and suspected ownership without modifying project files or exercising external side effects.
 
@@ -88,7 +90,9 @@ Continuous reading, browse, comparison, master-detail, focused decision, immersi
 
 Derive one product-specific concept from the frozen evidence. Bind product truth to a perceptible behavior and user outcome. For `BUILD`, broad `RETROFIT`, or a new direction, choose the minimum sufficient identity-bearing decision and state why it would misfit an unrelated product. Identity may live in the information model, workflow, composition, content cadence, type, material, imagery, or interaction; `none` is valid when extra salience would compete with trust, scanning, accessibility, or performance.
 
-Record an evidence-backed rejection only when the brief, existing product, or a material unresolved choice provides one. Compare two, occasionally three, directions only when one material choice remains unresolved. A focused repair inherits the existing direction unless evidence proves it is the root cause.
+A category noun alone does not earn a palette, material, font, shape, or motif. Require a more specific artifact, relationship, workflow, approved asset, or stated preference; otherwise keep that choice neutral or unresolved.
+
+Compare two, occasionally three, directions only when one material choice remains unresolved. A focused repair inherits the existing direction unless evidence proves it is the root cause.
 
 ### 4. System
 

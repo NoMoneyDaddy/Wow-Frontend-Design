@@ -47,7 +47,7 @@
       },
       "state_triggers": ["remote_data", "auth_guard", "mutation", "overlay"],
       "redirect_to": null,
-      "evidence": {"status": "provided", "sources": ["fixture:product-dashboard-brief"]}
+      "evidence": {"status": "provided", "sources": ["fixture:harbor-operations-requirements"]}
     }
   ]
 }

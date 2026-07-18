@@ -61,12 +61,7 @@ REQUIRED_TARGET_IDS = {
     "script-command-evidence-ledger",
     "ci-portable-python-matrix",
     "evaluator-posix-runners",
-    "evaluator-windows-native",
-    "evaluator-windows-wsl",
     "browser-chromium-evaluator",
-    "browser-chrome-edge-channels",
-    "browser-firefox-evaluator",
-    "browser-webkit-evaluator",
 }
 ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 

@@ -53,6 +53,7 @@ class ExecutionSpec(NamedTuple):
     model: str = DEFAULT_MODEL
     hard_seconds: int = 1800
     inactivity_seconds: int | None = None
+    reasoning_effort: str | None = None
 
 
 class RunnerError(ValueError):
@@ -81,6 +82,12 @@ def _validate_model(model: str) -> str:
     ):
         raise RunnerError("model must be a bounded identifier")
     return model
+
+
+def _validate_reasoning_effort(value: str | None) -> str | None:
+    if value is not None and value not in {"low", "medium", "high", "xhigh"}:
+        raise RunnerError("reasoning effort must be one of low, medium, high, or xhigh")
+    return value
 
 
 def _tree_records(source: Path) -> list[dict[str, Any]]:
@@ -451,6 +458,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
         raise RunnerError("execute_isolated requires an ExecutionSpec")
     initial_fingerprint = _execution_paths(spec)
     model = _validate_model(spec.model)
+    reasoning_effort = _validate_reasoning_effort(spec.reasoning_effort)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", spec.skill_name):
         raise RunnerError("skill name must be a bounded identifier")
     if type(spec.hard_seconds) is not int or not 1 <= spec.hard_seconds <= 14_400:
@@ -512,11 +520,15 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             f"shell_environment_policy.set={{PATH={shell_path},HOME={shell_home}}}",
             "-c",
             'model_reasoning_summary="none"',
+        ]
+        if reasoning_effort is not None:
+            command.extend(("-c", f'model_reasoning_effort="{reasoning_effort}"'))
+        command.extend([
             "--color",
             "never",
             "--json",
             "-",
-        ]
+        ])
         exit_code, reason, progress_events = _run_codex(
             command,
             spec.prompt,
@@ -545,12 +557,15 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
         if source_after != provenance["skill"] or installed_after != provenance["skill"]:
             raise RunnerError("skill snapshot provenance drifted during execution")
         _assert_file_tool_records(tool_before)
+        model_record = {
+            "requested_identifier": model,
+            "resolution_status": "not_observed",
+            "resolved_backend_snapshot": None,
+        }
+        if reasoning_effort is not None:
+            model_record["requested_reasoning_effort"] = reasoning_effort
         return {
-            "model": {
-                "requested_identifier": model,
-                "resolution_status": "not_observed",
-                "resolved_backend_snapshot": None,
-            },
+            "model": model_record,
             "prompt": {"bytes": len(prompt_bytes), "sha256": _digest_bytes(prompt_bytes)},
             "skill_snapshot": provenance["skill"],
             "configured_isolation": {

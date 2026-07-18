@@ -102,6 +102,19 @@ setTimeout(() => {
                 self.assertGreater(item["counters"]["unexpected_pages"], 0)
                 self.assertTrue(item["root_horizontal_overflow"])
 
+    def test_clipped_body_content_does_not_impersonate_root_scroll_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Rail</title><style>
+html, body { overflow-x: clip; }
+.rail { max-width: 100%; overflow-x: auto; }
+.track { width: 720px; }
+</style></head><body><main><h1>Rail</h1><div class="rail"><div class="track">Scrollable child</div></div></main></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            self.assertTrue(all(not item["root_horizontal_overflow"] for item in receipt["results"]))
+
     def test_text_outside_empty_main_does_not_satisfy_primary_content(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

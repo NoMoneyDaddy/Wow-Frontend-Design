@@ -161,8 +161,11 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             return Array.from(main.querySelectorAll("img,svg,canvas,video,audio,input,select,textarea,button"))
               .some(visible);
           })(),
-          root_horizontal_overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)
-            > document.documentElement.clientWidth + 1,
+          root_horizontal_overflow: (() => {
+            // CSSOM View defines scrollingElement as the element that scrolls the document.
+            const rootScroller = document.scrollingElement || document.documentElement;
+            return rootScroller.scrollWidth > rootScroller.clientWidth + 1;
+          })(),
         })).catch(() => ({ visible_text: false, visible_primary_content: false, root_horizontal_overflow: false })) : {
           visible_text: false,
           visible_primary_content: false,
