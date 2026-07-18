@@ -10,6 +10,7 @@
   "scripts": {
     "check:dashboard-audit": "node --check evals/playwright_dashboard_audit.cjs",
     "audit:dashboards": "node evals/playwright_dashboard_audit.cjs",
+    "audit:html": "node evals/run_vnu.cjs",
     "audit:visual-v5": "node evals/playwright_visual_v5_audit.cjs",
     "audit:visual-v6": "node evals/playwright_visual_v6_audit.cjs",
     "audit:visual-v7-a1": "node evals/playwright_v7_a1_audit.cjs",
@@ -32,6 +33,7 @@
     "@chenglou/pretext": "0.0.8",
     "@google/design.md": "0.3.0",
     "culori": "4.0.2",
-    "playwright": "1.61.1"
+    "playwright": "1.61.1",
+    "vnu-jar": "26.7.16"
   }
 }
