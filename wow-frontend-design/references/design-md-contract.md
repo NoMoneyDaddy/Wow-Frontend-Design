@@ -63,7 +63,7 @@ Zero is not exempt from dimension syntax: write `letterSpacing: "0em"`, `rounded
 
 Use only these component sub-tokens: `backgroundColor`, `textColor`, `typography`, `rounded`, `padding`, `size`, `height`, and `width`. Express hover, active, pressed, or other variants as separately named component entries. Put borders, shadows, blur, tracking rules, responsive transformations, and other unsupported details in the Markdown body instead of inventing YAML properties. If component tokens add no value, omit `components` rather than creating invalid fields.
 
-Define `colors.primary` whenever colors exist. Reference defined colors from components when components exist. Remove genuinely unused tokens instead of accepting avoidable orphan warnings. Never copy the values from `assets/DESIGN.template.md`; it is a syntax example, not a default brand.
+Define `colors.primary` whenever colors exist. Reference defined colors from components when components exist. Remove genuinely unused tokens instead of accepting avoidable orphan warnings. `assets/DESIGN.template.md` intentionally contains no visual token values: derive every role and relationship from product evidence, then add only project-owned values that the runtime consumes. For an inapplicable shape, depth, or component system, record `none`; for an existing system that remains authoritative, record `inherited` and identify its source instead of inventing a replacement.
 
 Quote the entire YAML scalar when a value contains commas, colons, `#`, braces, or a CSS font stack. For example, write `fontFamily: "SF Mono, Monaco, monospace"`; do not quote only the first family. YAML parsing warnings are contract failures even when the linter can recover.
 

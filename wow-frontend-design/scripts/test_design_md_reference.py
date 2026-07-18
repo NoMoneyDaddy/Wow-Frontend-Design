@@ -12,6 +12,7 @@ REFERENCE = (
     / "references"
     / "design-md-contract.md"
 )
+TEMPLATE = Path(__file__).resolve().parents[1] / "assets" / "DESIGN.template.md"
 
 
 class DesignMdReferenceTests(unittest.TestCase):
@@ -47,6 +48,28 @@ class DesignMdReferenceTests(unittest.TestCase):
         self.assertIn("site/wireframe plan, interaction manifest, and tests", self.trace)
         self.assertIn("does not prove implementation, browser behavior, accessibility, product fit, or aesthetic quality", self.trace)
         self.assertIn("The pinned DESIGN.md linter validates supported syntax; it does not validate trace truth", self.trace)
+
+
+class DesignMdTemplateTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.template = TEMPLATE.read_text(encoding="utf-8")
+        cls.frontmatter = cls.template.split("---", 2)[1]
+
+    def test_template_has_no_portable_visual_defaults(self) -> None:
+        for token_group in ("colors:", "typography:", "rounded:", "spacing:", "components:"):
+            with self.subTest(token_group=token_group):
+                self.assertNotIn(token_group, self.frontmatter)
+        for legacy_default in ("#1A1C1E", "#F7F5F2", "system-ui", "48px", "16px", "button-primary", "base-surface"):
+            with self.subTest(legacy_default=legacy_default):
+                self.assertNotIn(legacy_default, self.template)
+
+    def test_optional_systems_allow_none_or_inherited(self) -> None:
+        for heading in ("## Elevation & Depth", "## Shapes", "## Components"):
+            section = self.template.split(heading, 1)[1].split("\n## ", 1)[0]
+            with self.subTest(heading=heading):
+                self.assertIn("`none`", section)
+                self.assertIn("`inherited`", section)
 
 
 if __name__ == "__main__":
