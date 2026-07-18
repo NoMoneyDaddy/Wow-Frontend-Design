@@ -177,6 +177,8 @@ Establish semantic color, type, spacing, layout, shape, depth, and motion roles;
 
 Use realistic content and implement applicable default, hover, focus, active, disabled, loading, empty, partial, error, permission, offline, and success states. Verify state round-trips: later invalid input clears stale success, and every overlay exit restores scroll, focus, containment, and expanded state.
 
+Bind every record-scoped title, metadata, media/evidence, annotation, stage/progress, control, and async result to one stable selected-record identity. A selection or navigation change must keep visible state coherent: update available regions together and replace delayed ones with a loading state bound to the new record, or label a deliberately independent scope. Stale prior-record evidence, truncated identity, or clipped progress is a hard failure.
+
 ### 5. Compose desktop, mobile, and language deliberately
 
 - Give each major task region a clear focal anchor, reading/action path, and content-bearing role. Decorative tracks must not squeeze or displace the task.
@@ -208,6 +210,7 @@ Before evaluator handoff, run a source-level counterexample preflight even when 
 - Inspect every title, intro, and prose container together with its parent track. Remove narrow Latin-`ch` caps, accidental one-character final title lines, secondary badges that steal the primary title track, empty/decorative peer tracks, or fixed measures that strand most available inline space without a task-bearing peer; when readable line length is intentional, size/center the containing surface instead of leaving the text at roughly half its parent track. Keep ordinary text on natural browser wrapping.
 - Enumerate `fixed`/`sticky` elements by scroll edge and ancestor. Default dense multi-column content to normal flow; if more than one layer can occupy the same edge, prove non-overlap at scroll start/middle/end or demote the lower-priority layer to static before handoff.
 - Query required state/root evaluator hooks. A unique state hook must resolve once; repeated-record hooks need stable record identities. Replay the required invalid → repaired → next-state transition with a deterministic local check when the allowed tools permit it.
+- Trace every record/route selection control through a non-default item and compare its stable identity across the title, metadata, evidence/media, annotations, stage/progress, actions, and async result; also switch once while work is pending when the public contract permits it. One changed heading is not a successful selection when another record-bound region remains stale, contradictory, or clipped.
 - Treat the brief as the public automation contract: implement every named hook exactly, but never invent a value, ID, slot, or state attribute that the brief did not require. Preflight each required control through its semantic input and observable result, not a styling wrapper or hidden implementation detail.
 - Check short command labels as atomic controls: keep ordinary one-line labels from shrinking or wrapping, and recompose the surrounding action group when space is insufficient. Check product/UI paragraphs at a readable rendered leading—roughly `1.5` or higher is a starting comparison for normal Traditional Chinese body sizes, not a universal threshold—and never use display-tight leading on multi-line body copy.
 
