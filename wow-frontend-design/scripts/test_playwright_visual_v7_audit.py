@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+import functools
+import http.server
 import json
 import subprocess
+import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -2092,6 +2096,62 @@ process.stdout.write(JSON.stringify({{
         self.assertIn("font_evidence_unavailable", result["fontUnavailable"])
         self.assertIn("font_evidence_unavailable", result["fontUnavailableWithMismatch"])
         self.assertNotIn("declared_primary_font_not_rendered", result["fontUnavailableWithMismatch"])
+
+    def test_underfilled_prose_gate_is_horizontal_only(self) -> None:
+        class QuietHandler(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, _format: str, *args: object) -> None:
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            screenshots = root / "screenshots"
+            screenshots.mkdir()
+            report_path = root / "report.json"
+            (root / "index.html").write_text(
+                """<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><title>軸向測試</title>
+<style>body{margin:0}main{width:700px}.owner{width:700px}.probe{width:175px;margin:0;font-size:16px;line-height:1.6}.vertical{writing-mode:vertical-rl;height:420px}.sideways-rl{writing-mode:sideways-rl;height:420px}.sideways-lr{writing-mode:sideways-lr;height:420px}</style>
+</head><body><h1>排版軸向測試</h1><main>
+<div class="owner"><p class="probe">橫排判定樣本需要保留既有寬軌使用率偵測，這段繁體中文內容足夠長且沒有任務型右側同層元素。</p></div>
+<div class="owner"><p class="probe vertical">直排排除樣本不應把實體寬度誤認為行內軸使用率，這段繁體中文內容同樣足夠長且容器幾何相同。</p></div>
+<div class="owner"><p class="probe sideways-rl">右側排除樣本使用側向行內軸，不應按實體寬度產生橫排寬軌使用率問題，且內容長度足以接受檢查。</p></div>
+<div class="owner"><p class="probe sideways-lr">左側排除樣本使用側向行內軸，不應按實體寬度產生橫排寬軌使用率問題，且內容長度足以接受檢查。</p></div>
+</main></body></html>""",
+                encoding="utf-8",
+            )
+            handler = functools.partial(QuietHandler, directory=str(root))
+            server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                completed = subprocess.run(
+                    [
+                        "node", str(AUDITOR), "--output", str(report_path),
+                        "--artifact-dir", str(screenshots), "--target",
+                        f"type-foundry-specimen-v6:axis=http://127.0.0.1:{server.server_port}/",
+                    ],
+                    cwd=ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                    timeout=60,
+                )
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+            if completed.returncode != 0:
+                self.fail(completed.stderr)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            desktop = next(
+                result for result in report["results"]
+                if result["viewport"] == "desktop" and result["state"] == "base"
+            )
+            findings = desktop["bodyFlow"]["underfilledProseBlocks"]
+            self.assertTrue(any("橫排判定樣本" in item["text"] for item in findings))
+            self.assertFalse(any("直排排除樣本" in item["text"] for item in findings))
+            self.assertFalse(any("右側排除樣本" in item["text"] for item in findings))
+            self.assertFalse(any("左側排除樣本" in item["text"] for item in findings))
 
     def test_column_void_gate_requires_sparse_content_and_preserves_advisories(self) -> None:
         source = AUDITOR.read_text(encoding="utf-8")

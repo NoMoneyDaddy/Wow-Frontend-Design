@@ -3833,6 +3833,8 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
       .filter((node) => node.textContent.trim().length >= 40)
       .map((node) => {
         const container = flowContainer(node);
+        const style = getComputedStyle(node);
+        if (!style.writingMode.startsWith("horizontal")) return null;
         const rect = node.getBoundingClientRect();
         const containerRect = container?.getBoundingClientRect() || rect;
         const text = node.textContent.trim().replace(/\s+/g, " ");
@@ -3847,7 +3849,7 @@ async function auditPage(browser, options, target, pageName, viewport, state = "
           hasTaskPeer: hasTaskBearingRightPeer(node, container),
         };
       })
-      .filter((item) => item.cjkDominant && item.containerWidth >= 560 && item.trackRatio < 0.6
+      .filter((item) => item && item.cjkDominant && item.containerWidth >= 560 && item.trackRatio < 0.6
         && item.unusedInline > 220 && !item.hasTaskPeer)
       .slice(0, 20);
     const bodyFlow = { forcedLineBreaks: renderedForcedLineBreaks, nonWrappingProse, underfilledProseBlocks };
