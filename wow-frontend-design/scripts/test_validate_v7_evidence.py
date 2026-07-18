@@ -496,6 +496,58 @@ class V7EvidenceTests(unittest.TestCase):
                 evidence._validate_result(key, result, screenshot, tampered_hash, screenshot_hash, "0" * 64, "1.61.1")
 
 
+    def test_result_v6_requires_bounded_dialog_focus_lifecycle_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 6,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "open-dialog", "action": "click", "completed": True}],
+                    "assertions": [{"id": "dialog-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "dialogFocusCoverage": {"status": "complete", "reason": None, "declaredLifecycles": 1, "completedLifecycles": 1, "freshReplays": 2, "claimBoundary": evidence.DIALOG_FOCUS_CLAIM_BOUNDARY},
+                    "dialogFocusLifecycles": [{"id": "account-dialog", "status": "confirmed", "replays": 2, "openFocus": False, "returnFocus": True}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_dialog_focus_lifecycle_mismatch"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            unavailable = copy.deepcopy(payload)
+            unavailable["runtime"]["dialogFocusCoverage"].update({"status": "unavailable", "reason": "one_or_more_lifecycles_unavailable", "completedLifecycles": 0})
+            unavailable["runtime"]["dialogFocusLifecycles"][0] = {"id": "account-dialog", "status": "unavailable", "replays": 2, "reason": "dialog_contract_unavailable"}
+            unavailable["runtime"]["issues"] = ["dialog_focus_verification_unavailable"]
+            result.write_text(json.dumps(unavailable), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            forged = copy.deepcopy(payload)
+            forged["runtime"]["dialogFocusLifecycles"][0]["openFocus"] = True
+            forged["runtime"]["dialogFocusLifecycles"][0]["returnFocus"] = True
+            forged["runtime"]["dialogFocusLifecycles"][0]["status"] = "clear"
+            forged["runtime"]["issues"] = []
+            forged["verdict"] = "clean"
+            result.write_text(json.dumps(forged), encoding="utf-8")
+            forged_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, forged_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
     def test_async_completion_evidence_requires_two_consistent_replays(self) -> None:
         runtime = {
             "asyncCoverage": {

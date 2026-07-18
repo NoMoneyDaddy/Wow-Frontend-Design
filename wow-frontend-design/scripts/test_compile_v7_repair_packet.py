@@ -330,6 +330,50 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
             compiler.extract_findings(mismatched)
 
+    def test_dialog_focus_lifecycle_projection_is_phase_specific_and_fail_closed(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["declared_dialog_focus_lifecycle_mismatch"],
+            "dialogFocusLifecycles": [{
+                "id": "account-dialog", "status": "confirmed", "replays": 2,
+                "openFocus": False, "returnFocus": True,
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "declared_dialog_focus_lifecycle_mismatch",
+            "classification": "runtime",
+            "locator": "account-dialog",
+            "evidence": {"openFocus": False, "returnFocus": True},
+        }], findings)
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("opening the dialog, move focus to its declared dialog descendant", feedback)
+        self.assertNotIn("closing the dialog, restore focus", feedback)
+
+        unavailable = _result()
+        unavailable["runtime"].update({
+            "issues": ["dialog_focus_verification_unavailable"],
+            "dialogFocusLifecycles": [{
+                "id": "account-dialog", "status": "unavailable", "replays": 2,
+                "reason": "dialog_contract_unavailable",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+            compiler.extract_findings(unavailable)
+
+        mismatched = _result()
+        mismatched["runtime"].update({
+            "issues": [],
+            "dialogFocusLifecycles": [{
+                "id": "account-dialog", "status": "confirmed", "replays": 2,
+                "openFocus": True, "returnFocus": False,
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(mismatched)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

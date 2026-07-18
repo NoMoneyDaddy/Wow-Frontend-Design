@@ -36,6 +36,7 @@ SUPPORT_DEPENDENCY_PATHS = (
     "evals/v7_a1_typography_metrics.cjs",
     "evals/v7_focus_obscuration.cjs",
     "evals/v7_accessible_name.cjs",
+    "evals/v7_dialog_focus.cjs",
     "evals/v7_stale_completion.cjs",
 )
 

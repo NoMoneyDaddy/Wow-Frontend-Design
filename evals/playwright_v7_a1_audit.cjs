@@ -8,6 +8,7 @@ const { chromium, firefox, webkit } = require("playwright");
 const { auditV7A1Typography, validateSpecs } = require("./v7_a1_typography_metrics.cjs");
 const { auditFocusedControls } = require("./v7_focus_obscuration.cjs");
 const { auditAccessibleNames } = require("./v7_accessible_name.cjs");
+const { auditDialogFocusLifecycles } = require("./v7_dialog_focus.cjs");
 const { QUIESCENCE_MS, runStaleCompletionReplay, validateAsyncCompletion } = require("./v7_stale_completion.cjs");
 
 const MAX_JSON_BYTES = 1024 * 1024;
@@ -178,6 +179,46 @@ function validateAccessibleNameTargets(accessibleNameTargets, focusTargets) {
   return targets;
 }
 
+function validateDialogFocusLifecycles(lifecycles, steps) {
+  if (!Array.isArray(lifecycles) || lifecycles.length < 1 || lifecycles.length > 4) {
+    fail("spec dialogFocusLifecycles must contain 1..4 entries");
+  }
+  const stepById = new Map(steps.map((step, index) => [step.id, { step, index }]));
+  const ids = new Set();
+  const openStepIds = new Set();
+  const closeStepIds = new Set();
+  const dialogSelectors = new Set();
+  for (const [index, lifecycle] of lifecycles.entries()) {
+    if (!lifecycle || typeof lifecycle !== "object" || Array.isArray(lifecycle)
+        || Object.keys(lifecycle).sort().join("|")
+          !== "closeStepId|dialogSelector|id|openFocusSelector|openStepId|returnFocusSelector") {
+      fail(`dialogFocusLifecycles[${index}] has an invalid contract`);
+    }
+    if (typeof lifecycle.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lifecycle.id)
+        || ids.has(lifecycle.id)) {
+      fail(`dialogFocusLifecycles[${index}].id is invalid or duplicated`);
+    }
+    ids.add(lifecycle.id);
+    for (const field of ["dialogSelector", "openFocusSelector", "returnFocusSelector"]) {
+      boundedString(lifecycle[field], `dialogFocusLifecycles[${index}].${field}`, 300);
+    }
+    const open = stepById.get(lifecycle.openStepId);
+    const close = stepById.get(lifecycle.closeStepId);
+    if (!open || !close || !["click", "press"].includes(open.step.action)
+        || !["click", "press"].includes(close.step.action) || open.index >= close.index) {
+      fail(`dialogFocusLifecycles[${index}] step binding is invalid`);
+    }
+    if (openStepIds.has(lifecycle.openStepId) || closeStepIds.has(lifecycle.closeStepId)
+        || dialogSelectors.has(lifecycle.dialogSelector)) {
+      fail(`dialogFocusLifecycles[${index}] step or dialog binding is duplicated`);
+    }
+    openStepIds.add(lifecycle.openStepId);
+    closeStepIds.add(lifecycle.closeStepId);
+    dialogSelectors.add(lifecycle.dialogSelector);
+  }
+  return lifecycles;
+}
+
 function loadSpec(file, expectedCase, expectedState) {
   const absolute = regularInput(file, "spec");
   let data;
@@ -191,6 +232,7 @@ function loadSpec(file, expectedCase, expectedState) {
     2: ["assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
     3: ["assertions", "asyncCompletion", "caseId", "schemaVersion", "state", "steps", "targets"],
     4: ["accessibleNameTargets", "assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
+    5: ["assertions", "caseId", "dialogFocusLifecycles", "schemaVersion", "state", "steps", "targets"],
   };
   const expectedKeys = data && typeof data === "object" && !Array.isArray(data) ? rootKeys[data.schemaVersion] : null;
   if (!expectedKeys || Object.keys(data).sort().join("|") !== expectedKeys.sort().join("|")) {
@@ -220,6 +262,10 @@ function loadSpec(file, expectedCase, expectedState) {
     if (data.state !== "interaction") fail("spec schema 4 is reserved for interaction state");
     data.focusTargets = validateFocusTargets(data.focusTargets, data.steps);
     data.accessibleNameTargets = validateAccessibleNameTargets(data.accessibleNameTargets, data.focusTargets);
+  }
+  if (data.schemaVersion === 5) {
+    if (data.state !== "interaction") fail("spec schema 5 is reserved for interaction state");
+    data.dialogFocusLifecycles = validateDialogFocusLifecycles(data.dialogFocusLifecycles, data.steps);
   }
   return { absolute, data };
 }
@@ -441,6 +487,9 @@ async function main() {
   const accessibleNameEvidence = spec.data.schemaVersion === 4
     ? await auditAccessibleNames(browser, url, contextOptions, spec.data)
     : null;
+  const dialogFocusEvidence = spec.data.schemaVersion === 5
+    ? await auditDialogFocusLifecycles(browser, url, contextOptions, spec.data)
+    : null;
   let asyncEvidence = null;
   let mainAsyncReplay = null;
   if (spec.data.schemaVersion === 3) {
@@ -459,6 +508,7 @@ async function main() {
   const blockedStepId = spec.data.steps.find((step) => confirmedClickStepIds.has(step.id))?.id || null;
   const resultSchemaVersion = spec.data.schemaVersion === 3 ? 4
     : spec.data.schemaVersion === 4 ? 5
+      : spec.data.schemaVersion === 5 ? 6
       : blockedStepId === null ? spec.data.schemaVersion : 3;
   const resultFocusEvidence = resultSchemaVersion === 3 ? {
     focusCoverage: focusEvidence.focusCoverage,
@@ -493,6 +543,12 @@ async function main() {
   const accessibleNameUnavailable = accessibleNameEvidence?.accessibleNameControls.some(
     (control) => control.status === "unavailable",
   ) || false;
+  const dialogFocusMismatch = dialogFocusEvidence?.dialogFocusLifecycles.some(
+    (lifecycle) => lifecycle.status === "confirmed",
+  ) || false;
+  const dialogFocusUnavailable = dialogFocusEvidence?.dialogFocusLifecycles.some(
+    (lifecycle) => lifecycle.status === "unavailable",
+  ) || false;
   const staleCompletion = asyncEvidence?.asyncCompletions.some((item) => item.status === "confirmed") || false;
   const staleCompletionUnavailable = asyncEvidence?.asyncCompletions.some((item) => item.status === "unavailable") || false;
   await page.screenshot({ path: screenshot, fullPage, animations: "disabled" });
@@ -522,6 +578,7 @@ async function main() {
       } : {}),
       ...(spec.data.schemaVersion === 3 ? asyncEvidence : {}),
       ...(spec.data.schemaVersion === 4 ? accessibleNameEvidence : {}),
+      ...(spec.data.schemaVersion === 5 ? dialogFocusEvidence : {}),
       eventCounts: { consoleErrors: consoleErrorCount, pageErrors: pageErrorCount, externalRequests: externalRequestCount },
       issues: [
         ...(horizontalOverflow ? ["page_horizontal_overflow"] : []),
@@ -533,6 +590,8 @@ async function main() {
         ...(staleCompletionUnavailable ? ["stale_completion_verification_unavailable"] : []),
         ...(accessibleNameMismatch ? ["declared_control_accessible_name_mismatch"] : []),
         ...(accessibleNameUnavailable ? ["accessible_name_verification_unavailable"] : []),
+        ...(dialogFocusMismatch ? ["declared_dialog_focus_lifecycle_mismatch"] : []),
+        ...(dialogFocusUnavailable ? ["dialog_focus_verification_unavailable"] : []),
       ],
     },
     typography,
@@ -540,6 +599,7 @@ async function main() {
       && !focusVerificationUnavailable
       && !staleCompletion && !staleCompletionUnavailable
       && !accessibleNameMismatch && !accessibleNameUnavailable
+      && !dialogFocusMismatch && !dialogFocusUnavailable
       && assertions.every((item) => item.passed)
       && consoleErrors.length === 0 && pageErrors.length === 0 && externalRequests.length === 0
       && typography.issues.length === 0 ? "clean" : "findings",

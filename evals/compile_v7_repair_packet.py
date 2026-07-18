@@ -38,6 +38,8 @@ TYPOGRAPHY_CODES = {
 RUNTIME_CODES = {
     "accessible_name_verification_unavailable",
     "declared_control_accessible_name_mismatch",
+    "declared_dialog_focus_lifecycle_mismatch",
+    "dialog_focus_verification_unavailable",
     "external_requests",
     "focus_obscuration_verification_unavailable",
     "focused_control_obscured",
@@ -223,9 +225,14 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
             raise RepairPacketError("focus obscuration verification is unavailable, not a product repair")
         if code == "accessible_name_verification_unavailable":
             raise RepairPacketError("accessible name verification is unavailable, not a product repair")
+        if code == "dialog_focus_verification_unavailable":
+            raise RepairPacketError("dialog focus verification is unavailable, not a product repair")
         if code == "stale_completion_verification_unavailable":
             raise RepairPacketError("stale completion verification is unavailable, not a product repair")
-        if code in {"focused_control_obscured", "stale_async_completion", "declared_control_accessible_name_mismatch"}:
+        if code in {
+            "focused_control_obscured", "stale_async_completion", "declared_control_accessible_name_mismatch",
+            "declared_dialog_focus_lifecycle_mismatch",
+        }:
             continue
         findings.append(_finding(code, "runtime", "page", {}))
     focused_controls = runtime.get("focusedControls", [])
@@ -287,6 +294,47 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
         raise RepairPacketError("accessible name unavailable issue and evidence disagree")
     if unavailable_accessible_names:
         raise RepairPacketError("accessible name verification is unavailable, not a product repair")
+    dialog_focus_lifecycles = runtime.get("dialogFocusLifecycles", [])
+    if not isinstance(dialog_focus_lifecycles, list):
+        raise RepairPacketError("dialog focus lifecycle evidence is malformed")
+    dialog_focus_unavailable_reasons = {
+        "dialog_contract_unavailable",
+        "external_request_blocked",
+        "replay_unstable",
+        "runtime_unavailable",
+    }
+    confirmed_dialog_focus = []
+    unavailable_dialog_focus = []
+    for record in dialog_focus_lifecycles:
+        if not isinstance(record, dict):
+            raise RepairPacketError("dialog focus lifecycle record is malformed")
+        status = record.get("status")
+        expected_keys = {"id", "status", "replays", "openFocus", "returnFocus"}
+        if status == "unavailable":
+            expected_keys = {"id", "status", "replays", "reason"}
+        if set(record) != expected_keys or record.get("replays") != 2:
+            raise RepairPacketError("dialog focus lifecycle evidence is inconsistent")
+        _record_id(record.get("id"), "dialog focus lifecycle id")
+        if status == "unavailable":
+            if record.get("reason") not in dialog_focus_unavailable_reasons:
+                raise RepairPacketError("dialog focus unavailable reason is invalid")
+            unavailable_dialog_focus.append(record)
+            continue
+        if status not in {"clear", "confirmed"} or type(record.get("openFocus")) is not bool or type(record.get("returnFocus")) is not bool:
+            raise RepairPacketError("dialog focus lifecycle status is invalid")
+        if (status == "clear") != (record["openFocus"] and record["returnFocus"]):
+            raise RepairPacketError("dialog focus lifecycle derivation is inconsistent")
+        if status == "confirmed":
+            confirmed_dialog_focus.append(record)
+            findings.append(_finding("declared_dialog_focus_lifecycle_mismatch", "runtime", record["id"], {
+                "openFocus": record["openFocus"], "returnFocus": record["returnFocus"],
+            }))
+    if ("declared_dialog_focus_lifecycle_mismatch" in runtime_issues) != bool(confirmed_dialog_focus):
+        raise RepairPacketError("dialog focus issue and evidence disagree")
+    if ("dialog_focus_verification_unavailable" in runtime_issues) != bool(unavailable_dialog_focus):
+        raise RepairPacketError("dialog focus unavailable issue and evidence disagree")
+    if unavailable_dialog_focus:
+        raise RepairPacketError("dialog focus verification is unavailable, not a product repair")
     async_completions = runtime.get("asyncCompletions", [])
     if not isinstance(async_completions, list):
         raise RepairPacketError("async completion evidence is malformed")
@@ -356,6 +404,18 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         for occurrence in occurrences
         for finding in occurrence["findings"]
     )
+    dialog_open_repair = any(
+        finding.get("code") == "declared_dialog_focus_lifecycle_mismatch"
+        and finding.get("evidence", {}).get("openFocus") is False
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
+    dialog_return_repair = any(
+        finding.get("code") == "declared_dialog_focus_lifecycle_mismatch"
+        and finding.get("evidence", {}).get("returnFocus") is False
+        for occurrence in occurrences
+        for finding in occurrence["findings"]
+    )
     suffix = " Preserve passed behavior and required content;"
     if focus_repair:
         suffix += " for focus obscuration, preserve the control and reserve space or reposition the affected fixed/sticky layer;"
@@ -365,6 +425,10 @@ def _feedback(occurrences: list[dict[str, Any]], total: int) -> str:
         suffix += " for stale completion, preserve the latest declared user intent and prevent an older completion from overwriting newer state;"
     if accessible_name_repair:
         suffix += " for declared-control accessible-name mismatch, preserve visible copy and make the computed name match by correcting the existing native or ARIA naming source;"
+    if dialog_open_repair:
+        suffix += " when opening the dialog, move focus to its declared dialog descendant;"
+    if dialog_return_repair:
+        suffix += " when closing the dialog, restore focus to the declared workflow target;"
     suffix += " change only affected composition; do not edit the evaluator."
     message = f"REPAIR REQUIRED: {total} validated finding(s)."
     seen: set[str] = set()

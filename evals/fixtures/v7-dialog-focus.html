@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head><meta charset="utf-8"><title>dialog focus fixture</title></head>
+  <body>
+    <button id="open-dialog">Open secret dialog</button>
+    <button id="outside-focus">Outside secret target</button>
+    <button id="wrong-return">Wrong return target</button>
+    <div id="shadow-host"></div>
+    <section id="dialog" role="dialog" aria-modal="true" hidden>
+      <h2 id="dialog-title">Secret dialog title</h2>
+      <button id="first-focus">First secret action</button>
+      <button id="second-focus">Second secret action</button>
+      <input id="middle-field">
+      <button id="close-dialog">Close secret dialog</button>
+    </section>
+    <script>
+      const mode = new URL(location.href).searchParams.get("mode") || "clear";
+      const dialog = document.querySelector("#dialog");
+      const shadow = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
+      shadow.innerHTML = '<button id="shadow-return">Secret shadow return</button>';
+      if (mode === "invalid-role") dialog.setAttribute("role", "alertdialog");
+      if (mode === "invalid-modal") dialog.setAttribute("aria-modal", "false");
+      if (mode === "hidden-target") document.querySelector("#first-focus").hidden = true;
+      if (mode === "external") {
+        const image = document.createElement("img");
+        image.src = "https://external.invalid/dialog-fixture.png";
+        document.body.append(image);
+      }
+      document.querySelector("#open-dialog").addEventListener("click", () => {
+        dialog.hidden = false;
+        if (mode === "open-mismatch") document.querySelector("#second-focus").focus();
+        else if (mode === "title-focus") {
+          document.querySelector("#dialog-title").setAttribute("tabindex", "-1");
+          document.querySelector("#dialog-title").focus();
+        }
+        else if (mode === "invalid-descendant") document.querySelector("#outside-focus").focus();
+        else if (mode !== "hidden-target") document.querySelector("#first-focus").focus();
+      });
+      document.querySelector("#close-dialog").addEventListener("click", () => {
+        if (mode === "detached") dialog.remove();
+        else if (mode !== "not-closed") dialog.hidden = true;
+        if (mode === "return-mismatch") document.querySelector("#wrong-return").focus();
+        else if (mode === "shadow-return") shadow.querySelector("#shadow-return").focus();
+        else document.querySelector("#open-dialog").focus();
+      });
+    </script>
+  </body>
+</html>

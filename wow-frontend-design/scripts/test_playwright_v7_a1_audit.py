@@ -26,6 +26,123 @@ EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v5_dialog_focus_lifecycle_emits_v6_for_clear_and_confirmed_replays(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "dialog-focus.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<button id="open">PRIVATE-OPEN-COPY</button><button id="outside">PRIVATE-OUTSIDE-COPY</button>
+<section id="dialog" role="dialog" aria-modal="true" hidden><input id="inside"><button id="close">PRIVATE-CLOSE-COPY</button></section>
+</main><script>
+const mode = new URL(location.href).searchParams.get("mode") || "correct";
+const open = document.querySelector("#open"); const close = document.querySelector("#close");
+const dialog = document.querySelector("#dialog"); const inside = document.querySelector("#inside");
+const outside = document.querySelector("#outside");
+open.addEventListener("click", () => { dialog.hidden = false; (mode === "open-outside" ? outside : inside).focus(); });
+close.addEventListener("click", () => { dialog.hidden = true; (mode === "return-wrong" ? outside : open).focus(); });
+</script></body></html>""", encoding="utf-8")
+            lifecycle = {
+                "id": "profile-dialog-focus", "dialogSelector": "#dialog", "openStepId": "open-dialog",
+                "openFocusSelector": "#inside", "closeStepId": "close-dialog", "returnFocusSelector": "#open",
+            }
+            spec = {
+                "schemaVersion": 5, "caseId": "dialog-focus-case", "state": "interaction",
+                "steps": [
+                    {"id": "open-dialog", "action": "click", "selector": "#open"},
+                    {"id": "close-dialog", "action": "click", "selector": "#close"},
+                ],
+                "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "dialogFocusLifecycles": [lifecycle],
+            }
+            spec_path = root / "spec.json"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            for mode, expected_status, expected_exit in (
+                ("correct", "clear", 0),
+                ("open-outside", "confirmed", 2),
+                ("return-wrong", "confirmed", 2),
+            ):
+                with self.subTest(mode=mode):
+                    output = root / f"{mode}.json"
+                    screenshot = root / f"{mode}.png"
+                    completed = subprocess.run([
+                        "node", str(AUDITOR), "--url", f"{page.as_uri()}?mode={mode}", "--variant", "candidate",
+                        "--case-id", "dialog-focus-case", "--state", "interaction", "--profile", "desktop",
+                        "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                        "--output", str(output),
+                    ], cwd=ROOT, text=True, capture_output=True)
+                    self.assertTrue(output.is_file(), completed.stderr)
+                    result = json.loads(output.read_text(encoding="utf-8"))
+                    self.assertEqual(expected_exit, completed.returncode, completed.stderr)
+                    self.assertEqual(6, result["schemaVersion"])
+                    self.assertIn("dialogFocusCoverage", result["runtime"])
+                    record = result["runtime"]["dialogFocusLifecycles"][0]
+                    self.assertEqual(expected_status, record["status"])
+                    self.assertEqual(2, record["replays"])
+                    self.assertEqual([
+                        {"id": "open-dialog", "action": "click", "completed": True},
+                        {"id": "close-dialog", "action": "click", "completed": True},
+                    ], result["runtime"]["interactions"])
+                    self.assertTrue(all(item["passed"] for item in result["runtime"]["assertions"]))
+                    if expected_status == "clear":
+                        self.assertNotIn("declared_dialog_focus_lifecycle_mismatch", result["runtime"]["issues"])
+                    else:
+                        self.assertIn("declared_dialog_focus_lifecycle_mismatch", result["runtime"]["issues"])
+                    self.assertEqual(1, len(list(root.glob(f"{mode}.png"))))
+                    serialized = json.dumps(result, ensure_ascii=False)
+                    for private in (
+                        "#dialog", "#open", "#inside", "#close",
+                        "PRIVATE-OPEN-COPY", "PRIVATE-OUTSIDE-COPY", "PRIVATE-CLOSE-COPY",
+                    ):
+                        self.assertNotIn(private, serialized)
+
+    def test_v5_dialog_focus_lifecycle_contract_fails_closed(self) -> None:
+        lifecycle = {
+            "id": "profile-dialog-focus", "dialogSelector": "#dialog", "openStepId": "open-dialog",
+            "openFocusSelector": "#inside", "closeStepId": "close-dialog", "returnFocusSelector": "#open",
+        }
+        base = {
+            "schemaVersion": 5, "caseId": "dialog-focus-case", "state": "interaction",
+            "steps": [
+                {"id": "open-dialog", "action": "click", "selector": "#open"},
+                {"id": "close-dialog", "action": "click", "selector": "#close"},
+            ],
+            "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+            "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+            "dialogFocusLifecycles": [lifecycle],
+        }
+        variants = {
+            "non-interaction": {**base, "state": "base"},
+            "empty": {**base, "dialogFocusLifecycles": []},
+            "too-many": {**base, "dialogFocusLifecycles": [lifecycle] * 5},
+            "extra-key": {**base, "dialogFocusLifecycles": [{**lifecycle, "name": "PRIVATE-EXTRA"}]},
+            "bad-id": {**base, "dialogFocusLifecycles": [{**lifecycle, "id": "Bad_ID"}]},
+            "duplicate-id": {**base, "dialogFocusLifecycles": [lifecycle, {**lifecycle, "openStepId": "close-dialog", "closeStepId": "open-dialog"}]},
+            "missing-open-step": {**base, "dialogFocusLifecycles": [{**lifecycle, "openStepId": "missing-step"}]},
+            "non-click-open": {**base, "steps": [{"id": "open-dialog", "action": "fill", "selector": "#open", "value": "value"}, base["steps"][1]]},
+            "non-click-close": {**base, "steps": [base["steps"][0], {"id": "close-dialog", "action": "fill", "selector": "#close", "value": "value"}]},
+            "open-after-close": {**base, "dialogFocusLifecycles": [{**lifecycle, "openStepId": "close-dialog", "closeStepId": "open-dialog"}]},
+            "duplicate-step-mapping": {**base, "dialogFocusLifecycles": [lifecycle, {**lifecycle, "id": "other-dialog-focus"}]},
+            "bad-dialog-selector": {**base, "dialogFocusLifecycles": [{**lifecycle, "dialogSelector": ""}]},
+            "bad-open-focus-selector": {**base, "dialogFocusLifecycles": [{**lifecycle, "openFocusSelector": ""}]},
+        }
+        source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec(process.argv[1], 'dialog-focus-case', process.argv[2]); process.exit(0); }}
+catch (error) {{ process.stderr.write(error.message); process.exit(1); }}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, spec in variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode, completed.stderr)
+
     def test_v4_accessible_name_targets_emit_v5_with_focus_evidence_and_no_private_copy(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
