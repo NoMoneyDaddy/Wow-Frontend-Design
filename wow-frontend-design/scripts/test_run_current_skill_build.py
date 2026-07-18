@@ -26,7 +26,7 @@ SPEC.loader.exec_module(core)
 sys.path.insert(0, str(ROOT / "evals"))
 import run_current_skill_build as policy  # noqa: E402
 
-SAFE_HTML = "<!doctype html><html><head><title>Test</title></head><body><main>Test</main></body></html>"
+SAFE_HTML = "<!doctype html><html lang=\"en\"><head><title>Test</title></head><body><main><h1>Test</h1></main></body></html>"
 SAFE_DESIGN = "---\nversion: alpha\nname: Runner Test\n---\n# Runner Test\n"
 
 
@@ -86,6 +86,8 @@ if mode == "output-symlink":
     (stage / "index.html").symlink_to(stage / "DESIGN.md")
 elif mode == "oversized-output":
     (stage / "index.html").write_bytes({SAFE_HTML.encode()!r} + b"x" * 1048577)
+elif mode == "page-error":
+    (stage / "index.html").write_text({SAFE_HTML.replace('</main>', '<script>throw new Error("broken boot")</script></main>')!r}, encoding="utf-8")
 else:
     (stage / "index.html").write_text({SAFE_HTML!r}, encoding="utf-8")
 if mode == "extra-output":
@@ -224,6 +226,9 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertFalse((capture / "npx-environment.json").exists())
             self.assertEqual("@google/design.md", manifest["design_md_gate"]["tool"]["package"])
             self.assertEqual("0.3.0", manifest["design_md_gate"]["tool"]["version"])
+            self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
+            self.assertEqual("playwright", manifest["html_smoke_gate"]["tool"]["package"])
+            self.assertEqual("@axe-core/playwright", manifest["html_smoke_gate"]["tool"]["accessibility_package"])
             receipt = json.loads(
                 (root / "logs" / "current-skill-build.execution.json").read_text(encoding="utf-8")
             )
@@ -444,6 +449,110 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 self.assertEqual(
                     hashlib.sha256((quarantine / record["path"]).read_bytes()).hexdigest(), record["sha256"]
                 )
+
+    def test_html_boot_error_is_rejected_and_quarantined_before_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root, "page-error")
+            completed = self.invoke(brief, target, environment)
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("html_smoke_rejection", completed.stderr)
+            self.assertEqual([], list(target.iterdir()))
+            log_dir = root / "logs"
+            gate_path = log_dir / "current-skill-build.html-smoke.json"
+            gate = json.loads(gate_path.read_text(encoding="utf-8"))
+            self.assertEqual("rejected", gate["status"])
+            self.assertGreaterEqual(
+                sum(item["counters"]["page_errors"] for item in gate["results"]),
+                2,
+            )
+            quarantine = log_dir / "current-skill-build.quarantine"
+            self.assertEqual({"DESIGN.md", "index.html"}, {path.name for path in quarantine.iterdir()})
+            receipt = json.loads(
+                (log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("html_smoke_rejection", receipt["classification"])
+            self.assertNotIn("broken boot", json.dumps(receipt))
+
+    def test_html_smoke_infrastructure_failure_preserves_quarantine(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy,
+                "_run_html_smoke",
+                side_effect=policy.RunnerError("HTML Playwright smoke gate infrastructure failure"),
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual([], list(target.iterdir()))
+            quarantine = log_dir / "current-skill-build.quarantine"
+            self.assertEqual({"DESIGN.md", "index.html"}, {path.name for path in quarantine.iterdir()})
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertEqual(
+                {"DESIGN.md", "index.html"},
+                {item["path"] for item in receipt["html_smoke_unavailable"]["quarantine"]["outputs"]},
+            )
+
+    def test_html_smoke_timeout_terminates_the_process_group(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            process = mock.Mock(pid=321, returncode=None)
+            process.communicate.side_effect = [
+                subprocess.TimeoutExpired(cmd="node", timeout=1),
+                ("", ""),
+                ("", ""),
+            ]
+            with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
+                policy.os, "killpg"
+            ) as killpg, self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._run_html_smoke(stage, ("DESIGN.md", "index.html"), 1)
+            self.assertEqual(
+                [mock.call(321, policy.signal.SIGTERM), mock.call(321, policy.signal.SIGKILL)],
+                killpg.call_args_list,
+            )
+
+    def test_process_group_timeout_removes_a_real_descendant(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pid_file = root / "child.pid"
+            helper = root / "helper.py"
+            helper.write_text(
+                "import pathlib, subprocess, sys, time\n"
+                "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+                "pathlib.Path(sys.argv[1]).write_text(str(child.pid), encoding='utf-8')\n"
+                "time.sleep(60)\n",
+                encoding="utf-8",
+            )
+            process = subprocess.Popen(
+                [sys.executable, str(helper), str(pid_file)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+            deadline = time.monotonic() + 2
+            while not pid_file.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(pid_file.exists())
+            child_pid = int(pid_file.read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._communicate_process_group(process, 0.05)
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                status = subprocess.run(
+                    ["ps", "-p", str(child_pid), "-o", "stat="],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if status.returncode != 0 or status.stdout.strip().startswith("Z"):
+                    break
+                time.sleep(0.02)
+            else:
+                self.fail("validator descendant survived process-group timeout cleanup")
 
     def test_manifest_proves_ephemeral_current_skill_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

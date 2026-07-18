@@ -24,6 +24,8 @@ VISUAL_AUDITORS = {
 }
 DASHBOARD_AUDITOR = ROOT / "evals" / "playwright_dashboard_audit.cjs"
 CAPTURE_SHOWCASE = ROOT / "evals" / "capture_showcase.cjs"
+CURRENT_SMOKE = ROOT / "evals" / "playwright_html_smoke.cjs"
+BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
 
 
 @contextmanager
@@ -256,8 +258,29 @@ document.documentElement.dataset.theme=localStorage.getItem('wow-theme');
         self.assertIn(blocked_url, completed.stderr)
         self.assertIn(blocked_url.replace("http://", "ws://", 1), completed.stderr)
 
+    def test_current_smoke_blocks_http_websocket_and_popup_egress(self) -> None:
+        with record_requests() as (blocked_url, requests), tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            (stage / "index.html").write_text(popup_page(blocked_url), encoding="utf-8")
+            completed = subprocess.run(
+                ["node", str(CURRENT_SMOKE), str(stage), '["index.html"]', '["index.html"]'],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=30,
+            )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual([], requests, "current smoke allowed cross-origin traffic")
+        receipt = json.loads(completed.stdout)
+        self.assertEqual("rejected", receipt["status"])
+        for result in receipt["results"]:
+            self.assertGreater(result["counters"]["blocked_external_requests"], 0)
+            self.assertGreater(result["counters"]["blocked_websockets"], 0)
+
     def test_all_auditors_block_service_workers(self) -> None:
-        for source in (*VISUAL_AUDITORS.values(), DASHBOARD_AUDITOR, CAPTURE_SHOWCASE):
+        for source in (*VISUAL_AUDITORS.values(), DASHBOARD_AUDITOR, CAPTURE_SHOWCASE, BROWSER_RUNTIME):
             with self.subTest(source=source.name):
                 self.assertIn('serviceWorkers: "block"', source.read_text(encoding="utf-8"))
 

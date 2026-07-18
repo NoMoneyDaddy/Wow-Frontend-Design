@@ -28,7 +28,7 @@ Create a coherent, product-derived experience through working code and rendered 
 
 ## Route references progressively
 
-Read the smallest sufficient context. On the initial reference pass, read this core, [creative-direction.md](references/creative-direction.md), and at most one task-specific reference. Read a selected reference completely. Load another only when the corresponding workflow stage reaches a concrete decision or failure; a list of possible concerns is not a reason to load every file.
+Read the smallest sufficient context. On the initial reference pass, read this core, [creative-direction.md](references/creative-direction.md), and at most one task-specific reference. Read selected references completely. Load another only for a concrete decision or failure; possible concerns do not justify every file.
 
 - Foundation: core mobile and locale invariants apply immediately. Load [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md) on the initial pass only when that concern dominates the slice; otherwise wait for a concrete decision, failure, or public claim. Load [design-md-contract.md](references/design-md-contract.md) before writing `DESIGN.md`, [anti-ai-slop.md](references/anti-ai-slop.md) only for post-render product-specific review, and [quality-gates.md](references/quality-gates.md) when entering verification or making a completion claim.
 - Type and text: use [typographic-layout.md](references/typographic-layout.md) for hierarchy, rhythm, wrapping, CJK, ruby, vertical text, density, or spacing; add [typography-webfonts.md](references/typography-webfonts.md) only for font selection, delivery, loading, licensing, or fallback.
@@ -110,20 +110,20 @@ Then use `Overview`, `Colors`, `Typography`, `Layout`, `Elevation & Depth`, `Sha
 
 ### 5. Vertical slice
 
-Implement one runnable representative route or task path before expanding architecture. Use real project content or clearly labelled fixtures. The slice must prove together:
+Implement one runnable route or task before expanding architecture. Use real or labelled content. Together prove:
 
 - the task representation and primary content/action order;
 - the product-derived direction and system;
 - the supported viewports, including a real mobile transformation when viewport UI is in scope;
 - default plus at least one consequential pending, error, recovery, or success state when applicable;
-- keyboard and focus behavior, one coherent native role/state/keyboard model per control, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
+- one coherent native role/state/keyboard model per control, keyboard and focus behavior, valid composite-ARIA ownership, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
 - framework, route, API, state, analytics, and business-contract preservation.
 
-Only after the slice works should shared primitives, components, routes, effects, and optimization expand. Prefer semantic HTML, modern CSS, and the smallest sufficient JavaScript or framework surface. Do not rewrite a framework for a CSS-level problem.
+Expand shared primitives, routes, effects, and optimization only after the slice works. Prefer semantic HTML, modern CSS, and the smallest sufficient JavaScript. Do not rewrite a framework for a CSS problem.
 
 ### 6. Pressure, repair, and replay
 
-Load [quality-gates.md](references/quality-gates.md). Run project test, lint, typecheck, and build gates plus applicable packaged checks. Then verify the live slice against the declared contract and one bounded discovery probe not copied from an existing issue list.
+Load [quality-gates.md](references/quality-gates.md). Run project test, lint, typecheck, build, and applicable packaged checks. Before product claims, boot each changed route from the latest build in fresh desktop and mobile Playwright contexts. Controlled fresh builds require visible primary content and zero page, console, resource, undeclared HTTP/WebSocket egress, root-overflow, or Axe findings. Then verify the live slice and one bounded discovery probe not copied from an issue list.
 
 Pressure applicable surfaces with representative and extreme content, desktop and mobile, keyboard/focus, zoom, reduced motion, locale, slow or rejected async work, rapid repeat, selection changes, state round-trips, and custom-font/effect failure. For each candidate finding, preserve route, state, viewport, reproduction, expected and actual behavior, raw evidence, severity, and ownership. Confirm it with a second replay or nearby valid counterexample; an unreproduced candidate remains advisory.
 

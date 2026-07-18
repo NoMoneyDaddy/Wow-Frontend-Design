@@ -10,7 +10,9 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -23,6 +25,8 @@ from codex_isolated_build_core import DEFAULT_MODEL, ExecutionSpec, RunnerError,
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_SOURCE = ROOT / "wow-frontend-design"
 DESIGN_VALIDATOR = ROOT / "evals" / "validate_design_md_clean.py"
+HTML_SMOKE_VALIDATOR = ROOT / "evals" / "playwright_html_smoke.cjs"
+BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
 EXPECTED_OUTPUTS = ("DESIGN.md", "index.html")
 BRIEF_LIMIT = 128 * 1024
 FILE_LIMIT = 1_048_576
@@ -173,9 +177,139 @@ def _run_design_validator(design: Path, timeout: int) -> dict[str, Any]:
     return receipt
 
 
+def _communicate_process_group(
+    process: subprocess.Popen[str], timeout: int | float
+) -> tuple[str, str]:
+    try:
+        return process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except OSError:
+            pass
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except OSError:
+                pass
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure") from error
+    except BaseException:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        try:
+            process.communicate(timeout=2)
+        except BaseException:
+            process.kill()
+            process.communicate()
+        raise
+
+
+def _run_html_smoke(stage: Path, outputs: tuple[str, ...], timeout: int) -> dict[str, Any]:
+    html_outputs = [name for name in outputs if name.casefold().endswith(".html")]
+    node_raw = shutil.which("node", path=design_policy.SYSTEM_PATH)
+    if not node_raw:
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    try:
+        node = Path(node_raw).resolve(strict=True)
+        validator = HTML_SMOKE_VALIDATOR.resolve(strict=True)
+        lockfile = ROOT / "package-lock.json"
+        package_json = ROOT / "node_modules" / "playwright" / "package.json"
+        axe_package_json = ROOT / "node_modules" / "@axe-core" / "playwright" / "package.json"
+        lock = json.loads(lockfile.read_text(encoding="utf-8"))
+        installed = json.loads(package_json.read_text(encoding="utf-8"))
+        axe_installed = json.loads(axe_package_json.read_text(encoding="utf-8"))
+        locked = lock.get("packages", {}).get("node_modules/playwright", {})
+        axe_locked = lock.get("packages", {}).get("node_modules/@axe-core/playwright", {})
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure") from error
+    version = locked.get("version") if isinstance(locked, dict) else None
+    axe_version = axe_locked.get("version") if isinstance(axe_locked, dict) else None
+    if (
+        not node.is_file()
+        or not os.access(node, os.X_OK)
+        or not validator.is_file()
+        or not package_json.is_file()
+        or not isinstance(version, str)
+        or installed.get("name") != "playwright"
+        or installed.get("version") != version
+        or not isinstance(axe_version, str)
+        or axe_installed.get("name") != "@axe-core/playwright"
+        or axe_installed.get("version") != axe_version
+    ):
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    environment = {"PATH": design_policy.SYSTEM_PATH, "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
+    for name in ("HOME", "PLAYWRIGHT_BROWSERS_PATH", "TMPDIR"):
+        if name in os.environ:
+            environment[name] = os.environ[name]
+    try:
+        process = subprocess.Popen(
+            [str(node), str(validator), str(stage), json.dumps(html_outputs), json.dumps(list(outputs))],
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        stdout, _stderr = _communicate_process_group(process, timeout)
+    except OSError as error:
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure") from error
+    try:
+        receipt = json.loads(stdout)
+    except json.JSONDecodeError as error:
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure") from error
+    expected = {(name, profile) for name in html_outputs for profile in ("desktop", "mobile")}
+    results = receipt.get("results")
+    tool = receipt.get("tool")
+    if not isinstance(results, list) or not isinstance(tool, dict):
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    observed = {
+        (record.get("page"), record.get("profile"))
+        for record in results
+        if isinstance(record, dict)
+    }
+    if (
+        process.returncode != 0
+        or receipt.get("schema_version") != 1
+        or receipt.get("status") not in {"passed", "rejected"}
+        or tool.get("package") != "playwright"
+        or tool.get("version") != version
+        or len(results) != len(expected)
+        or observed != expected
+    ):
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    tool.update(
+        {
+            "lockfile_sha256": _digest(lockfile),
+            "package_json_sha256": _digest(package_json),
+            "accessibility_package": "@axe-core/playwright",
+            "accessibility_version": axe_version,
+            "accessibility_package_json_sha256": _digest(axe_package_json),
+            "node_sha256": _digest(node),
+        }
+    )
+    return receipt
+
+
 def _wrapper_tool_records() -> dict[str, Any]:
     records: dict[str, Any] = {}
-    for name, path in (("current_policy", Path(__file__).resolve()), ("design_validator", DESIGN_VALIDATOR)):
+    for name, path in (
+        ("current_policy", Path(__file__).resolve()),
+        ("design_validator", DESIGN_VALIDATOR),
+        ("html_smoke_validator", HTML_SMOKE_VALIDATOR),
+        ("browser_runtime", BROWSER_RUNTIME),
+    ):
         info = path.stat()
         records[name] = {
             "bytes": info.st_size,
@@ -199,7 +333,7 @@ def _target_unchanged(target: Path, identity: tuple[int, int]) -> None:
         raise RunnerError("target changed before publish")
 
 
-def _log_paths(log_dir: Path, target: Path) -> tuple[Path, Path, Path, Path, Path]:
+def _log_paths(log_dir: Path, target: Path) -> tuple[Path, Path, Path, Path, Path, Path]:
     if not log_dir.is_absolute():
         raise RunnerError("log directory must be an absolute real directory")
     try:
@@ -218,6 +352,7 @@ def _log_paths(log_dir: Path, target: Path) -> tuple[Path, Path, Path, Path, Pat
         log_dir / f"{LOG_STEM}.stderr.txt",
         log_dir / f"{LOG_STEM}.execution.json",
         log_dir / f"{LOG_STEM}.design-gate.json",
+        log_dir / f"{LOG_STEM}.html-smoke.json",
         log_dir / f"{LOG_STEM}.quarantine",
     )
     if any(path.exists() or path.is_symlink() for path in paths):
@@ -236,6 +371,8 @@ def _classification(error: BaseException, execution: dict[str, Any] | None) -> s
     message = str(error)
     if "trace" in message.casefold():
         return "trace_policy_rejection"
+    if "HTML Playwright smoke gate rejected" in message:
+        return "html_smoke_rejection"
     if "DESIGN.md clean gate" in message:
         return "design_gate_rejection"
     if any(
@@ -257,6 +394,8 @@ def _receipt(
     stderr_log: Path,
     execution: dict[str, Any] | None,
     design_rejection: dict[str, Any] | None = None,
+    html_smoke_rejection: dict[str, Any] | None = None,
+    html_smoke_unavailable: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     logs = {}
     for name, path in (("trace", stdout_log), ("stderr", stderr_log)):
@@ -285,6 +424,10 @@ def _receipt(
         )
     if design_rejection is not None:
         payload["design_rejection"] = design_rejection
+    if html_smoke_rejection is not None:
+        payload["html_smoke_rejection"] = html_smoke_rejection
+    if html_smoke_unavailable is not None:
+        payload["html_smoke_unavailable"] = html_smoke_unavailable
     return payload
 
 
@@ -350,7 +493,7 @@ def run(
     if not 1 <= len(brief_bytes) <= BRIEF_LIMIT or "\x00" in brief_text:
         raise RunnerError("brief must be bounded UTF-8 text without NUL")
     prompt = build_prompt(brief_text, output_names)
-    stdout_log, stderr_log, receipt_path, design_gate_path, quarantine_path = _log_paths(log_dir, target)
+    stdout_log, stderr_log, receipt_path, design_gate_path, html_smoke_path, quarantine_path = _log_paths(log_dir, target)
     wrapper_tools = _wrapper_tool_records()
     work_root = Path(tempfile.mkdtemp(prefix="wow-current-build-")).resolve()
     stage = work_root / "stage"
@@ -358,6 +501,8 @@ def run(
     publish = Path(tempfile.mkdtemp(prefix=f".{target.name}.publish-", dir=target.parent))
     execution: dict[str, Any] | None = None
     design_rejection: dict[str, Any] | None = None
+    html_smoke_rejection: dict[str, Any] | None = None
+    html_smoke_unavailable: dict[str, Any] | None = None
     work_root_cleaned = False
     committed = False
     try:
@@ -394,6 +539,34 @@ def run(
             raise RunnerError("DESIGN.md clean gate rejected output")
         if design_gate.get("status") != "passed":
             raise RunnerError("DESIGN.md clean gate returned an invalid status")
+        try:
+            html_smoke_gate = _run_html_smoke(stage, output_names, min(120, max(15, hard_seconds)))
+        except RunnerError:
+            html_smoke_unavailable = {
+                "quarantine": _quarantine_outputs(
+                    log_dir,
+                    quarantine_path,
+                    stage,
+                    output_names,
+                    output_records,
+                )
+            }
+            raise
+        if _validate_outputs(stage, output_names) != output_records:
+            raise RunnerError("output content or mode drifted during HTML smoke validation")
+        if html_smoke_gate.get("status") == "rejected":
+            gate_record = _write_json_exclusive(html_smoke_path, html_smoke_gate)
+            quarantine_record = _quarantine_outputs(
+                log_dir,
+                quarantine_path,
+                stage,
+                output_names,
+                output_records,
+            )
+            html_smoke_rejection = {"gate_receipt": gate_record, "quarantine": quarantine_record}
+            raise RunnerError("HTML Playwright smoke gate rejected output")
+        if html_smoke_gate.get("status") != "passed":
+            raise RunnerError("HTML Playwright smoke gate returned an invalid status")
         if _wrapper_tool_records() != wrapper_tools:
             raise RunnerError("current policy tool provenance drifted during execution")
         for name in output_names:
@@ -422,6 +595,7 @@ def run(
             "trace_observed": execution["trace_observed"],
             "execution": execution["execution"],
             "design_md_gate": design_gate,
+            "html_smoke_gate": html_smoke_gate,
             "tools": {**execution["tools"], **wrapper_tools},
             "outputs": output_records,
         }
@@ -457,6 +631,8 @@ def run(
             stderr_log=stderr_log,
             execution=execution,
             design_rejection=design_rejection,
+            html_smoke_rejection=html_smoke_rejection,
+            html_smoke_unavailable=html_smoke_unavailable,
         )
         try:
             _write_json_exclusive(receipt_path, failure)
@@ -497,6 +673,7 @@ def main() -> int:
         if not re.match(
             r"^(?:completed|generation_exit_nonzero|hard_timeout|inactivity_timeout|resource_quota|"
             r"trace_policy_rejection|design_gate_rejection|output_contract_rejection|"
+            r"html_smoke_rejection|"
             r"execution_infrastructure_failure);",
             message,
         ):
