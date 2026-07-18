@@ -10,6 +10,7 @@ const { auditFocusedControls } = require("./v7_focus_obscuration.cjs");
 const { auditAccessibleNames } = require("./v7_accessible_name.cjs");
 const { auditDialogFocusLifecycles } = require("./v7_dialog_focus.cjs");
 const { auditInvalidFeedbackTargets } = require("./v7_invalid_feedback.cjs");
+const { auditInvalidInputPreservationTargets, validateInvalidInputPreservationTargets } = require("./v7_invalid_input_preservation.cjs");
 const { QUIESCENCE_MS, runStaleCompletionReplay, validateAsyncCompletion } = require("./v7_stale_completion.cjs");
 
 const MAX_JSON_BYTES = 1024 * 1024;
@@ -268,6 +269,7 @@ function loadSpec(file, expectedCase, expectedState) {
     4: ["accessibleNameTargets", "assertions", "caseId", "focusTargets", "schemaVersion", "state", "steps", "targets"],
     5: ["assertions", "caseId", "dialogFocusLifecycles", "schemaVersion", "state", "steps", "targets"],
     6: ["assertions", "caseId", "invalidFeedbackTargets", "schemaVersion", "state", "steps", "targets"],
+    7: ["assertions", "caseId", "invalidInputPreservationTargets", "schemaVersion", "state", "steps", "targets"],
   };
   const expectedKeys = data && typeof data === "object" && !Array.isArray(data) ? rootKeys[data.schemaVersion] : null;
   if (!expectedKeys || Object.keys(data).sort().join("|") !== expectedKeys.sort().join("|")) {
@@ -305,6 +307,12 @@ function loadSpec(file, expectedCase, expectedState) {
   if (data.schemaVersion === 6) {
     if (data.state !== "interaction") fail("spec schema 6 is reserved for interaction state");
     data.invalidFeedbackTargets = validateInvalidFeedbackTargets(data.invalidFeedbackTargets, data.steps);
+  }
+  if (data.schemaVersion === 7) {
+    if (data.state !== "interaction") fail("spec schema 7 is reserved for interaction state");
+    data.invalidInputPreservationTargets = validateInvalidInputPreservationTargets(
+      data.invalidInputPreservationTargets, data.steps,
+    );
   }
   return { absolute, data };
 }
@@ -532,6 +540,9 @@ async function main() {
   const invalidFeedbackEvidence = spec.data.schemaVersion === 6
     ? await auditInvalidFeedbackTargets(browser, url, contextOptions, spec.data)
     : null;
+  const invalidInputPreservationEvidence = spec.data.schemaVersion === 7
+    ? await auditInvalidInputPreservationTargets(browser, url, contextOptions, spec.data)
+    : null;
   let asyncEvidence = null;
   let mainAsyncReplay = null;
   if (spec.data.schemaVersion === 3) {
@@ -550,8 +561,9 @@ async function main() {
   const blockedStepId = spec.data.steps.find((step) => confirmedClickStepIds.has(step.id))?.id || null;
   const resultSchemaVersion = spec.data.schemaVersion === 3 ? 4
     : spec.data.schemaVersion === 4 ? 5
-      : spec.data.schemaVersion === 5 ? 6
+        : spec.data.schemaVersion === 5 ? 6
         : spec.data.schemaVersion === 6 ? 7
+          : spec.data.schemaVersion === 7 ? 8
       : blockedStepId === null ? spec.data.schemaVersion : 3;
   const resultFocusEvidence = resultSchemaVersion === 3 ? {
     focusCoverage: focusEvidence.focusCoverage,
@@ -598,6 +610,12 @@ async function main() {
   const invalidFeedbackUnavailable = invalidFeedbackEvidence?.invalidFeedbackTargets.some(
     (target) => target.status === "unavailable",
   ) || false;
+  const invalidInputLost = invalidInputPreservationEvidence?.records.some(
+    (target) => target.status === "confirmed",
+  ) || false;
+  const invalidInputPreservationUnavailable = invalidInputPreservationEvidence?.records.some(
+    (target) => target.status === "unavailable",
+  ) || false;
   const staleCompletion = asyncEvidence?.asyncCompletions.some((item) => item.status === "confirmed") || false;
   const staleCompletionUnavailable = asyncEvidence?.asyncCompletions.some((item) => item.status === "unavailable") || false;
   await page.screenshot({ path: screenshot, fullPage, animations: "disabled" });
@@ -629,6 +647,10 @@ async function main() {
       ...(spec.data.schemaVersion === 4 ? accessibleNameEvidence : {}),
       ...(spec.data.schemaVersion === 5 ? dialogFocusEvidence : {}),
       ...(spec.data.schemaVersion === 6 ? invalidFeedbackEvidence : {}),
+      ...(spec.data.schemaVersion === 7 ? {
+        invalidInputPreservationCoverage: invalidInputPreservationEvidence.coverage,
+        invalidInputPreservationTargets: invalidInputPreservationEvidence.records,
+      } : {}),
       eventCounts: { consoleErrors: consoleErrorCount, pageErrors: pageErrorCount, externalRequests: externalRequestCount },
       issues: [
         ...(horizontalOverflow ? ["page_horizontal_overflow"] : []),
@@ -644,6 +666,8 @@ async function main() {
         ...(dialogFocusUnavailable ? ["dialog_focus_verification_unavailable"] : []),
         ...(invalidFeedbackUnlinked ? ["declared_invalid_feedback_unlinked"] : []),
         ...(invalidFeedbackUnavailable ? ["invalid_feedback_verification_unavailable"] : []),
+        ...(invalidInputLost ? ["declared_invalid_input_lost"] : []),
+        ...(invalidInputPreservationUnavailable ? ["invalid_input_preservation_unavailable"] : []),
       ],
     },
     typography,
@@ -653,6 +677,7 @@ async function main() {
       && !accessibleNameMismatch && !accessibleNameUnavailable
       && !dialogFocusMismatch && !dialogFocusUnavailable
       && !invalidFeedbackUnlinked && !invalidFeedbackUnavailable
+      && !invalidInputLost && !invalidInputPreservationUnavailable
       && assertions.every((item) => item.passed)
       && consoleErrors.length === 0 && pageErrors.length === 0 && externalRequests.length === 0
       && typography.issues.length === 0 ? "clean" : "findings",

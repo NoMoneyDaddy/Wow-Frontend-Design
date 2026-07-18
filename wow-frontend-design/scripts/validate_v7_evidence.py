@@ -280,6 +280,16 @@ INVALID_FEEDBACK_UNAVAILABLE_REASONS = {
     "replay_unstable",
     "runtime_unavailable",
 }
+INVALID_INPUT_PRESERVATION_CLAIM_BOUNDARY = "two fresh evaluator-controlled invalid-input preservation replays"
+INVALID_INPUT_PRESERVATION_UNAVAILABLE_REASONS = {
+    "preservation_contract_unavailable",
+    "external_request_blocked",
+    "replay_unstable",
+    "runtime_unavailable",
+}
+INVALID_INPUT_NATIVE_KINDS = {
+    "input-text", "input-search", "input-email", "input-tel", "input-url", "input-number", "textarea", "select-one",
+}
 
 
 def _validate_async_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
@@ -526,6 +536,68 @@ def _validate_invalid_feedback_evidence(runtime: dict[str, Any], label: str) -> 
     return confirmed > 0, unavailable > 0
 
 
+def _validate_invalid_input_preservation_evidence(runtime: dict[str, Any], label: str) -> tuple[bool, bool]:
+    """Validate v8 invalid-input preservation evidence without user-entered values."""
+
+    coverage = runtime.get("invalidInputPreservationCoverage")
+    records = runtime.get("invalidInputPreservationTargets")
+    coverage_keys = {
+        "status", "reason", "declaredTargets", "completedTargets", "freshReplays", "claimBoundary",
+    }
+    if not isinstance(coverage, dict) or set(coverage) != coverage_keys or not isinstance(records, list):
+        raise V7EvidenceError(f"invalid input preservation evidence schema changed for {label}")
+    if coverage.get("claimBoundary") != INVALID_INPUT_PRESERVATION_CLAIM_BOUNDARY:
+        raise V7EvidenceError(f"invalid input preservation claim boundary changed for {label}")
+    counts = [coverage.get(field) for field in ("declaredTargets", "completedTargets", "freshReplays")]
+    if any(type(value) is not int or value < 0 for value in counts):
+        raise V7EvidenceError(f"invalid input preservation coverage counts are invalid for {label}")
+    declared, completed, replays = counts
+    if not 1 <= declared <= 8 or completed > declared or replays != declared * 2 or len(records) != declared:
+        raise V7EvidenceError(f"invalid input preservation coverage bounds changed for {label}")
+    ids: set[str] = set()
+    completed_records = 0
+    confirmed = 0
+    unavailable = 0
+    for record in records:
+        if not isinstance(record, dict):
+            raise V7EvidenceError(f"invalid input preservation record is malformed for {label}")
+        status = record.get("status")
+        expected_keys = {"id", "status", "replays", "nativeKind", "retained"}
+        if status == "unavailable":
+            expected_keys = {"id", "status", "replays", "reason"}
+        if set(record) != expected_keys:
+            raise V7EvidenceError(f"invalid input preservation record schema changed for {label}")
+        target_id = record.get("id")
+        if not isinstance(target_id, str) or RECORD_ID.fullmatch(target_id) is None or target_id in ids:
+            raise V7EvidenceError(f"invalid input preservation target id is invalid or duplicated for {label}")
+        ids.add(target_id)
+        if record.get("replays") != 2:
+            raise V7EvidenceError(f"invalid input preservation replay count is invalid for {label}")
+        if status == "unavailable":
+            if record.get("reason") not in INVALID_INPUT_PRESERVATION_UNAVAILABLE_REASONS:
+                raise V7EvidenceError(f"invalid input preservation unavailable reason is invalid for {label}")
+            unavailable += 1
+            continue
+        if status not in {"clear", "confirmed"} or record.get("nativeKind") not in INVALID_INPUT_NATIVE_KINDS:
+            raise V7EvidenceError(f"invalid input preservation record status is invalid for {label}")
+        retained = record.get("retained")
+        if type(retained) is not bool or (status == "confirmed") != (retained is False):
+            raise V7EvidenceError(f"invalid input preservation derivation changed for {label}")
+        completed_records += 1
+        confirmed += int(status == "confirmed")
+    if unavailable:
+        if coverage.get("status") != "unavailable" or coverage.get("reason") != "one_or_more_targets_unavailable" or completed != completed_records:
+            raise V7EvidenceError(f"invalid input preservation unavailable coverage is inconsistent for {label}")
+    elif (
+        coverage.get("status") != "complete"
+        or coverage.get("reason") is not None
+        or completed != declared
+        or completed != completed_records
+    ):
+        raise V7EvidenceError(f"invalid input preservation complete coverage is inconsistent for {label}")
+    return confirmed > 0, unavailable > 0
+
+
 def _validate_result(
     key: tuple[str, str, str, str, str],
     result_path: Path,
@@ -564,7 +636,7 @@ def _validate_result(
     if set(evidence) != {"schemaVersion", "identity", "input", "browser", "runtime", "typography", "verdict", "screenshot"}:
         raise V7EvidenceError(f"result root schema changed for {artifact_stem(key)}")
     result_schema = evidence.get("schemaVersion")
-    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4, 5, 6, 7} or identity != expected_identity:
+    if type(result_schema) is not int or result_schema not in {1, 2, 3, 4, 5, 6, 7, 8} or identity != expected_identity:
         raise V7EvidenceError(f"result identity changed for {artifact_stem(key)}")
     if result_schema == 3 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 3 is reserved for blocked interaction evidence: {artifact_stem(key)}")
@@ -576,6 +648,8 @@ def _validate_result(
         raise V7EvidenceError(f"result schema 6 is reserved for dialog-focus interaction evidence: {artifact_stem(key)}")
     if result_schema == 7 and key[2] != "interaction":
         raise V7EvidenceError(f"result schema 7 is reserved for invalid-feedback interaction evidence: {artifact_stem(key)}")
+    if result_schema == 8 and key[2] != "interaction":
+        raise V7EvidenceError(f"result schema 8 is reserved for invalid-input preservation interaction evidence: {artifact_stem(key)}")
     if evidence.get("verdict") not in {"clean", "findings"}:
         raise V7EvidenceError(f"result verdict is invalid for {artifact_stem(key)}")
     screenshot = evidence.get("screenshot")
@@ -632,6 +706,8 @@ def _validate_result(
         expected_runtime_keys |= {"dialogFocusCoverage", "dialogFocusLifecycles"}
     elif result_schema == 7:
         expected_runtime_keys |= {"invalidFeedbackCoverage", "invalidFeedbackTargets"}
+    elif result_schema == 8:
+        expected_runtime_keys |= {"invalidInputPreservationCoverage", "invalidInputPreservationTargets"}
     if not isinstance(runtime, dict) or set(runtime) != expected_runtime_keys:
         raise V7EvidenceError(f"runtime schema changed for {artifact_stem(key)}")
     if not isinstance(typography, dict) or set(typography) != {
@@ -655,6 +731,9 @@ def _validate_result(
     )
     invalid_feedback_unlinked, invalid_feedback_unavailable = (
         _validate_invalid_feedback_evidence(runtime, artifact_stem(key)) if result_schema == 7 else (False, False)
+    )
+    invalid_input_lost, invalid_input_unavailable = (
+        _validate_invalid_input_preservation_evidence(runtime, artifact_stem(key)) if result_schema == 8 else (False, False)
     )
     if key[2] == "interaction" and (not runtime["interactions"] or not runtime["assertions"]):
         raise V7EvidenceError(f"interaction evidence must record at least one step and one assertion for {artifact_stem(key)}")
@@ -783,6 +862,8 @@ def _validate_result(
         *(["dialog_focus_verification_unavailable"] if dialog_focus_unavailable else []),
         *(["declared_invalid_feedback_unlinked"] if invalid_feedback_unlinked else []),
         *(["invalid_feedback_verification_unavailable"] if invalid_feedback_unavailable else []),
+        *(["declared_invalid_input_lost"] if invalid_input_lost else []),
+        *(["invalid_input_preservation_unavailable"] if invalid_input_unavailable else []),
     ]
     if runtime.get("issues") != expected_runtime_issues:
         raise V7EvidenceError(f"runtime issue derivation changed for {artifact_stem(key)}")
@@ -804,6 +885,8 @@ def _validate_result(
         and not dialog_focus_unavailable
         and not invalid_feedback_unlinked
         and not invalid_feedback_unavailable
+        and not invalid_input_lost
+        and not invalid_input_unavailable
         and assertions_pass
         and runtime["consoleErrors"] == []
         and runtime["pageErrors"] == []

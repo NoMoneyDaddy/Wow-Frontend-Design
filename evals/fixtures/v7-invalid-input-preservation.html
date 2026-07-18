@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head><meta charset="utf-8"><title>invalid input preservation fixture</title></head>
+  <body>
+    <div id="control-slot"><input id="control" type="text"></div>
+    <button id="invalidate">Validate private input</button>
+    <script>
+      const mode = new URL(location.href).searchParams.get("mode") || "retained";
+      const slot = document.querySelector("#control-slot");
+      let control = document.querySelector("#control");
+      if (mode === "textarea") {
+        const replacement = document.createElement("textarea");
+        replacement.id = "control";
+        control.replaceWith(replacement);
+        control = replacement;
+      } else if (mode === "select" || mode === "select-label" || mode === "multiple-select") {
+        const replacement = document.createElement("select");
+        replacement.id = "control";
+        replacement.multiple = mode === "multiple-select";
+        replacement.innerHTML = '<option value="eval-preserve-one">One</option><option value="eval-preserve-option">eval-preserve-label</option>';
+        control.replaceWith(replacement);
+        control = replacement;
+      } else if (mode === "unsupported") control.type = "password";
+      else if (mode === "shadow") {
+        const host = document.createElement("div");
+        slot.replaceChildren(host);
+        host.attachShadow({ mode: "open" }).append(control);
+      }
+      if (mode === "hidden") control.hidden = true;
+      if (mode === "duplicate") {
+        const duplicate = control.cloneNode();
+        slot.append(duplicate);
+      }
+      if (mode === "external") {
+        const image = document.createElement("img");
+        image.src = "https://external.invalid/preservation-fixture.png";
+        document.body.append(image);
+      }
+      if (mode === "initially-invalid") control.setAttribute("aria-invalid", "true");
+      document.querySelector("#invalidate").addEventListener("click", () => {
+        control.setAttribute("aria-invalid", mode === "invalid-false" ? "false" : "true");
+        if (mode === "lost") control.value = "";
+      });
+    </script>
+  </body>
+</html>

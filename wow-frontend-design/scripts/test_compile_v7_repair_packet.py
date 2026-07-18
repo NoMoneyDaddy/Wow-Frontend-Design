@@ -418,6 +418,51 @@ class V7RepairPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
             compiler.extract_findings(mismatched)
 
+    def test_invalid_input_preservation_projection_is_confirmed_only_and_prompt_safe(self) -> None:
+        result = _result()
+        result["runtime"].update({
+            "issues": ["declared_invalid_input_lost"],
+            "invalidInputPreservationTargets": [{
+                "id": "email-field", "status": "confirmed", "replays": 2,
+                "nativeKind": "select-one", "retained": False,
+            }],
+        })
+        findings = compiler.extract_findings(result)
+        self.assertEqual([{
+            "code": "declared_invalid_input_lost",
+            "classification": "runtime",
+            "locator": "email-field",
+            "evidence": {"nativeKind": "select-one", "retained": False},
+        }], findings)
+        feedback = compiler._feedback([{
+            "state": "interaction", "profile": "mobile", "engine": "chromium", "findings": findings,
+        }], 1)
+        self.assertIn("keep the invalid state and the user-entered input", feedback)
+        self.assertIn("only after success or an explicit reset", feedback)
+        self.assertNotIn("must-not-leak@example.test", feedback)
+        self.assertNotIn("#email-field", feedback)
+
+        unavailable = _result()
+        unavailable["runtime"].update({
+            "issues": ["invalid_input_preservation_unavailable"],
+            "invalidInputPreservationTargets": [{
+                "id": "email-field", "status": "unavailable", "replays": 2, "reason": "preservation_contract_unavailable",
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "not a product repair"):
+            compiler.extract_findings(unavailable)
+
+        mismatched = _result()
+        mismatched["runtime"].update({
+            "issues": [],
+            "invalidInputPreservationTargets": [{
+                "id": "email-field", "status": "confirmed", "replays": 2,
+                "nativeKind": "input-email", "retained": False,
+            }],
+        })
+        with self.assertRaisesRegex(compiler.RepairPacketError, "issue and evidence disagree"):
+            compiler.extract_findings(mismatched)
+
     def test_blocked_interaction_projects_only_the_confirmed_focus_repair(self) -> None:
         result = _result()
         result["runtime"].update({

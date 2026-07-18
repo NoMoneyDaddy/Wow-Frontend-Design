@@ -26,6 +26,112 @@ EVIDENCE_SPEC.loader.exec_module(evidence_validator)
 
 
 class PlaywrightV7A1AuditTests(unittest.TestCase):
+    def test_v7_invalid_input_preservation_emits_v8_for_preserved_and_lost_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            page = root / "invalid-input-preservation.html"
+            page.write_text("""<!doctype html><html lang="zh-Hant"><body><main id="owner"><h1 id="heading">完整標題資料</h1>
+<label for="preserved-input">保留欄位</label><input id="preserved-input"><button id="preserved-invalidate">驗證保留</button>
+<label for="lost-input">遺失欄位</label><input id="lost-input"><button id="lost-invalidate">驗證遺失</button>
+</main><script>
+document.querySelector("#preserved-invalidate").addEventListener("click", () => document.querySelector("#preserved-input").setAttribute("aria-invalid", "true"));
+document.querySelector("#lost-invalidate").addEventListener("click", () => { const input = document.querySelector("#lost-input"); input.setAttribute("aria-invalid", "true"); input.value = ""; });
+</script></body></html>""", encoding="utf-8")
+            spec = {
+                "schemaVersion": 7, "caseId": "invalid-input-case", "state": "interaction",
+                "steps": [
+                    {"id": "fill-preserved", "action": "fill", "selector": "#preserved-input", "value": "eval-preserve-first"},
+                    {"id": "invalidate-preserved", "action": "click", "selector": "#preserved-invalidate"},
+                    {"id": "fill-lost", "action": "fill", "selector": "#lost-input", "value": "eval-preserve-second"},
+                    {"id": "invalidate-lost", "action": "press", "selector": "#lost-invalidate", "value": "Enter"},
+                ],
+                "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+                "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+                "invalidInputPreservationTargets": [
+                    {"id": "preserved-value", "controlStepId": "fill-preserved", "invalidationStepId": "invalidate-preserved", "normalization": "none"},
+                    {"id": "lost-value", "controlStepId": "fill-lost", "invalidationStepId": "invalidate-lost", "normalization": "none"},
+                ],
+            }
+            spec_path = root / "spec.json"
+            output = root / "result.json"
+            screenshot = root / "result.png"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run([
+                "node", str(AUDITOR), "--url", page.as_uri(), "--variant", "candidate",
+                "--case-id", "invalid-input-case", "--state", "interaction", "--profile", "desktop",
+                "--engine", "chromium", "--spec", str(spec_path), "--screenshot", str(screenshot),
+                "--output", str(output),
+            ], cwd=ROOT, text=True, capture_output=True)
+            self.assertTrue(output.is_file(), completed.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, completed.returncode, completed.stderr)
+            self.assertEqual(8, result["schemaVersion"])
+            self.assertIn("invalidInputPreservationCoverage", result["runtime"])
+            records = {item["id"]: item for item in result["runtime"]["invalidInputPreservationTargets"]}
+            self.assertEqual("clear", records["preserved-value"]["status"])
+            self.assertEqual("confirmed", records["lost-value"]["status"])
+            self.assertEqual({"id", "status", "replays", "nativeKind", "retained"}, set(records["preserved-value"]))
+            self.assertIn("declared_invalid_input_lost", result["runtime"]["issues"])
+            self.assertEqual(len(spec["steps"]), len(result["runtime"]["interactions"]))
+            self.assertTrue(all(item["completed"] for item in result["runtime"]["interactions"]))
+            self.assertTrue(all(item["passed"] for item in result["runtime"]["assertions"]))
+            self.assertEqual(1, len(list(root.glob("*.png"))))
+            serialized = json.dumps(result, ensure_ascii=False)
+            for private in (
+                "#preserved-input", "#lost-input", "#preserved-invalidate", "#lost-invalidate",
+                "eval-preserve-first", "eval-preserve-second",
+            ):
+                self.assertNotIn(private, serialized)
+
+    def test_v7_invalid_input_preservation_contract_fails_closed(self) -> None:
+        target = {"id": "preserved-value", "controlStepId": "fill-preserved", "invalidationStepId": "invalidate-preserved", "normalization": "none"}
+        base = {
+            "schemaVersion": 7, "caseId": "invalid-input-case", "state": "interaction",
+            "steps": [
+                {"id": "fill-preserved", "action": "fill", "selector": "#preserved-input", "value": "eval-preserve-first"},
+                {"id": "invalidate-preserved", "action": "click", "selector": "#preserved-invalidate"},
+                {"id": "fill-other", "action": "select", "selector": "#other-select", "value": "eval-preserve-option"},
+                {"id": "invalidate-other", "action": "press", "selector": "#other-invalidate", "value": "Enter"},
+            ],
+            "assertions": [{"id": "heading-visible", "type": "visible", "selector": "#heading"}],
+            "targets": [{"id": "heading", "selector": "#heading", "ownerSelector": "#owner", "role": "heading", "mode": "product"}],
+            "invalidInputPreservationTargets": [target],
+        }
+        other = {"id": "other-value", "controlStepId": "fill-other", "invalidationStepId": "invalidate-other", "normalization": "none"}
+        variants = {
+            "non-interaction": {**base, "state": "base"},
+            "empty": {**base, "invalidInputPreservationTargets": []},
+            "too-many": {**base, "invalidInputPreservationTargets": [target] * 9},
+            "extra-key": {**base, "invalidInputPreservationTargets": [{**target, "selector": "#private"}]},
+            "normalization-not-none": {**base, "invalidInputPreservationTargets": [{**target, "normalization": "formatter"}]},
+            "bad-id": {**base, "invalidInputPreservationTargets": [{**target, "id": "Bad_ID"}]},
+            "duplicate-id": {**base, "invalidInputPreservationTargets": [target, {**other, "id": target["id"]}]},
+            "missing-control-step": {**base, "invalidInputPreservationTargets": [{**target, "controlStepId": "missing-step"}]},
+            "non-fill-select-control": {**base, "steps": [{"id": "fill-preserved", "action": "click", "selector": "#preserved-input"}, *base["steps"][1:]]},
+            "unsafe-control-value": {**base, "steps": [{**base["steps"][0], "value": "PRIVATE-PRESERVED-VALUE"}, *base["steps"][1:]]},
+            "missing-invalidation-step": {**base, "invalidInputPreservationTargets": [{**target, "invalidationStepId": "missing-step"}]},
+            "non-click-press-invalidation": {**base, "steps": [base["steps"][0], {"id": "invalidate-preserved", "action": "fill", "selector": "#preserved-invalidate", "value": "x"}, *base["steps"][2:]]},
+            "reversed-order": {**base, "invalidInputPreservationTargets": [{**target, "controlStepId": "invalidate-preserved", "invalidationStepId": "fill-preserved"}]},
+            "not-adjacent": {**base, "steps": [base["steps"][0], {"id": "middle-step", "action": "click", "selector": "#middle"}, base["steps"][1], *base["steps"][2:]]},
+            "duplicate-control-binding": {**base, "invalidInputPreservationTargets": [target, {**other, "controlStepId": "fill-preserved"}]},
+        }
+        source = f"""
+const {{ loadSpec }} = require({json.dumps(str(AUDITOR))});
+try {{ loadSpec(process.argv[1], 'invalid-input-case', process.argv[2]); process.exit(0); }}
+catch (error) {{ process.stderr.write(error.message); process.exit(1); }}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, spec in variants.items():
+                with self.subTest(label=label):
+                    spec_path = root / f"{label}.json"
+                    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+                    completed = subprocess.run(
+                        ["node", "-e", source, str(spec_path), spec["state"]],
+                        cwd=ROOT, text=True, capture_output=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode, completed.stderr)
+
     def test_v6_invalid_feedback_targets_emit_v7_for_linked_and_unlinked_errors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
