@@ -144,12 +144,14 @@ Before component markup, record one composition proof for each representative ro
 ```text
 frame/state → F1 dominant anchor → F2 counterweight/support
 → reading/action path → dense/quiet transition → anchored grid break, if earned
+→ representative/sparse/dense content pressure → track/representation response
 → mobile equivalent → explicit failure signal
 ```
 
 - Derive `F1` from the top task or most valuable content. Use scale, position, contrast, density, and whitespace so an independent reviewer can find it without accent color. `F2` must support, compare with, or deliberately counterweight `F1`; it is not a second arbitrary hero.
 - Give every major region a place in the reading/action path. Focused flows may have one primary next action; dashboards, documentation, and multi-workspace products may preserve several grouped actions. Do not invent one global CTA.
 - Name one real density or pacing transition. Repeated units must remain comparable; unique content should use sequence instead of a fake equal grid. Important content may escape a generic container when safe.
+- Pressure-test each task-bearing major region with representative, sparse, and dense reachable content. Recompose its track or representation when sparse content becomes stranded in an oversized surface or dense content obscures the reading/action path; while preserving required content and equivalent access, reduce, combine, summarize, disclose, or show an earned overview instead of adding filler or decoration. Quiet space remains valid when it deliberately shapes reading around an anchored task region and does not detach required context or action; geometry alone is not a failure.
 - Break alignment only from a visible anchor. A task-appropriate single column is valid; asymmetry, F/Z patterns, and a fixed number of regions are never quotas.
 
 After the first runnable slice and before color/effect polish, compare matched desktop and mobile frames with the same content. Blur, inspect in grayscale, and disable optional effects. Recompose the representation, order, track sizes, or grouping when `F1`/`F2` order disappears, major regions become equal in width/density/silhouette without a task reason, a grid break has no anchor, the page has no density shift, or mobile loses the reading/action path. Do not attempt to repair a failed composition proof by changing palette, adding shadows, increasing radius, or adding motion.
