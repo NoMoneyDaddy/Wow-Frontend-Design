@@ -13,7 +13,7 @@ npm run build:current -- \
   --log-dir /absolute/private-log-directory
 ```
 
-Runner 以目前 `wow-frontend-design` snapshot 生成 caller 宣告的 exact product outputs，依序通過 pinned `DESIGN.md`、fresh desktop/mobile Playwright 與 Axe gate；可修 finding 最多自修兩輪，每輪完整重驗。只有 clean candidate 會原子發布。Target 另含 runner-owned `run-manifest.json`，不屬於 model 可寫的 product output set；私有 trace、stderr、完整 gate rejection 與 quarantine 留在 `--log-dir`。Target 與 log directory 必須是既存、真實、互不包含的絕對路徑，target 起始為空。
+Runner 以目前 `wow-frontend-design` snapshot 生成 caller 宣告的 exact product outputs，依序通過 pinned `DESIGN.md`、fresh desktop/mobile Playwright 與 Axe gate；可修 finding 最多自修兩輪，每輪完整重驗。只有 clean candidate 會原子發布。Target 另含 runner-owned `run-manifest.json`，不屬於 model 可寫的 product output set，也是成功發布的 terminal receipt。私有 execution receipt 在原子替換前固定為 `publication_pending`；若最後的 target identity check／replace 失敗，另寫 `current-skill-build.publication-failure.json`，不覆寫先前 provenance。Trace、stderr、完整 gate rejection 與 quarantine 留在 `--log-dir`。Target 與 log directory 必須是既存、真實、互不包含的絕對路徑，target 起始為空。
 
 ## 歷史發布的 v6 自修復 cohort
 

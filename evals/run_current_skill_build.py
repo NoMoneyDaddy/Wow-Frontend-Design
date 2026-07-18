@@ -64,6 +64,10 @@ def _digest_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def _json_bytes(payload: dict[str, Any]) -> bytes:
+    return (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
 def _regular_absolute_file(path: Path, label: str, maximum: int) -> Path:
     if not path.is_absolute():
         raise RunnerError(f"{label} must be an absolute path")
@@ -343,7 +347,7 @@ def _target_unchanged(target: Path, identity: tuple[int, int]) -> None:
 
 def _log_paths(
     log_dir: Path, target: Path
-) -> tuple[Path, Path, Path, Path, Path, Path, tuple[tuple[Path, Path], ...]]:
+) -> tuple[Path, Path, Path, Path, Path, Path, Path, tuple[tuple[Path, Path], ...]]:
     if not log_dir.is_absolute():
         raise RunnerError("log directory must be an absolute real directory")
     try:
@@ -361,6 +365,7 @@ def _log_paths(
         log_dir / f"{LOG_STEM}.trace.jsonl",
         log_dir / f"{LOG_STEM}.stderr.txt",
         log_dir / f"{LOG_STEM}.execution.json",
+        log_dir / f"{LOG_STEM}.publication-failure.json",
         log_dir / f"{LOG_STEM}.design-gate.json",
         log_dir / f"{LOG_STEM}.html-smoke.json",
         log_dir / f"{LOG_STEM}.quarantine",
@@ -464,13 +469,58 @@ def _receipt(
 
 
 def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
-    encoded = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    encoded = _json_bytes(payload)
     with path.open("xb") as handle:
         path.chmod(0o600)
         handle.write(encoded)
         handle.flush()
         os.fsync(handle.fileno())
     return {"path": path.name, "bytes": len(encoded), "sha256": _digest_bytes(encoded)}
+
+
+def _publication_failure_receipt(
+    execution_receipt: Path, expected_receipt: dict[str, Any]
+) -> dict[str, Any]:
+    receipt_record: dict[str, Any] = {"path": execution_receipt.name, "state": "missing"}
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            execution_receipt,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+        )
+        receipt_record["state"] = "invalid"
+        info = os.fstat(descriptor)
+        if stat.S_ISREG(info.st_mode):
+            receipt_record["bytes"] = info.st_size
+            if info.st_size <= expected_receipt["bytes"]:
+                with os.fdopen(descriptor, "rb", closefd=False) as handle:
+                    observed = handle.read(expected_receipt["bytes"] + 1)
+                observed_hash = _digest_bytes(observed)
+                receipt_record["bytes"] = len(observed)
+                receipt_record["sha256"] = observed_hash
+                if (
+                    len(observed) == expected_receipt["bytes"]
+                    and observed_hash == expected_receipt["sha256"]
+                ):
+                    receipt_record["bytes"] = len(observed)
+                    receipt_record["state"] = "publication_pending"
+    except FileNotFoundError:
+        pass
+    except OSError:
+        receipt_record["state"] = "invalid"
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+    return {
+        "schema_version": 1,
+        "status": "failed",
+        "classification": "publication_failed",
+        "runner_outputs_published": False,
+        "execution_receipt": receipt_record,
+    }
 
 
 def _quarantine_outputs(
@@ -573,6 +623,7 @@ def run(
         stdout_log,
         stderr_log,
         receipt_path,
+        publication_failure_path,
         design_gate_path,
         html_smoke_path,
         quarantine_path,
@@ -597,6 +648,8 @@ def run(
     active_prompt = prompt
     work_root_cleaned = False
     committed = False
+    publication_prepared = False
+    expected_execution_receipt: dict[str, Any] | None = None
 
     def repair_summary() -> dict[str, Any] | None:
         if repair_rounds == 0:
@@ -793,6 +846,12 @@ def run(
             repair=repair_summary(),
             policy_tools=wrapper_tools,
         )
+        encoded_success = _json_bytes(success)
+        expected_execution_receipt = {
+            "bytes": len(encoded_success),
+            "sha256": _digest_bytes(encoded_success),
+        }
+        publication_prepared = True
         _write_json_exclusive(receipt_path, success)
         shutil.rmtree(work_root, ignore_errors=True)
         work_root_cleaned = True
@@ -822,27 +881,37 @@ def run(
             except (OSError, RunnerError):
                 pass
         classification = _classification(error, execution)
-        failure = _receipt(
-            status="failed",
-            classification=classification,
-            brief_bytes=brief_bytes,
-            prompt=active_prompt,
-            model=model,
-            stdout_log=active_stdout_log,
-            stderr_log=active_stderr_log,
-            execution=execution,
-            design_rejection=design_rejection,
-            html_smoke_rejection=html_smoke_rejection,
-            html_smoke_unavailable=html_smoke_unavailable,
-            repair=repair_summary(),
-            repair_failure=repair_failure,
-            failure_artifact=failure_artifact,
-            policy_tools=wrapper_tools,
-        )
-        try:
-            _write_json_exclusive(receipt_path, failure)
-        except OSError:
-            pass
+        if publication_prepared:
+            assert expected_execution_receipt is not None
+            try:
+                _write_json_exclusive(
+                    publication_failure_path,
+                    _publication_failure_receipt(receipt_path, expected_execution_receipt),
+                )
+            except OSError:
+                pass
+        else:
+            failure = _receipt(
+                status="failed",
+                classification=classification,
+                brief_bytes=brief_bytes,
+                prompt=active_prompt,
+                model=model,
+                stdout_log=active_stdout_log,
+                stderr_log=active_stderr_log,
+                execution=execution,
+                design_rejection=design_rejection,
+                html_smoke_rejection=html_smoke_rejection,
+                html_smoke_unavailable=html_smoke_unavailable,
+                repair=repair_summary(),
+                repair_failure=repair_failure,
+                failure_artifact=failure_artifact,
+                policy_tools=wrapper_tools,
+            )
+            try:
+                _write_json_exclusive(receipt_path, failure)
+            except OSError:
+                pass
         raise RunnerError(
             f"{classification}; logs={active_stdout_log.name},{active_stderr_log.name},{receipt_path.name}"
         ) from error

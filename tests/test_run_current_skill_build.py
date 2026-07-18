@@ -367,6 +367,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             serialized = json.dumps(receipt)
             self.assertEqual("failed", receipt["status"])
             self.assertEqual("generation_exit_nonzero", receipt["classification"])
+            self.assertFalse((log_dir / "current-skill-build.publication-failure.json").exists())
             self.assertFalse((log_dir / "current-skill-build.quarantine").exists())
             self.assertFalse((log_dir / "current-skill-build.design-gate.json").exists())
             self.assertNotIn("UNIQUE-BRIEF-CONTENT", serialized)
@@ -858,6 +859,77 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual("execution_passed", receipt["status"])
             self.assertEqual("publication_pending", receipt["classification"])
+            publication = json.loads(
+                (root / "logs" / "current-skill-build.publication-failure.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual("failed", publication["status"])
+            self.assertEqual("publication_failed", publication["classification"])
+            self.assertFalse(publication["runner_outputs_published"])
+            self.assertEqual("publication_pending", publication["execution_receipt"]["state"])
+            self.assertEqual(
+                hashlib.sha256((root / "logs" / "current-skill-build.execution.json").read_bytes()).hexdigest(),
+                publication["execution_receipt"]["sha256"],
+            )
+
+    def test_publication_failure_does_not_rebuild_execution_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            (root / "logs").mkdir()
+            real_receipt = policy._receipt
+            receipt_calls = 0
+
+            def receipt(**kwargs: object) -> dict[str, object]:
+                nonlocal receipt_calls
+                receipt_calls += 1
+                if receipt_calls > 1:
+                    raise AssertionError("publication failure rebuilt execution receipt")
+                return real_receipt(**kwargs)
+
+            def gate(_: Path, **__: object) -> dict[str, object]:
+                (target / "racer-owned.txt").write_text("preserve", encoding="utf-8")
+                return {"status": "passed"}
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", side_effect=gate
+            ), mock.patch.object(policy, "_receipt", side_effect=receipt), self.assertRaisesRegex(
+                policy.RunnerError, "execution_infrastructure_failure"
+            ):
+                policy.run(brief, target, hard_seconds=5, log_dir=root / "logs")
+            self.assertEqual(1, receipt_calls)
+            self.assertTrue((root / "logs" / "current-skill-build.publication-failure.json").is_file())
+
+    def test_execution_receipt_collision_is_not_trusted_as_runner_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            real_write = policy._write_json_exclusive
+            injected = b'{"status":"execution_passed","classification":"publication_pending"}\n'
+
+            def collide(path: Path, payload: dict[str, object]) -> dict[str, object]:
+                if path.name == "current-skill-build.execution.json":
+                    path.write_bytes(injected)
+                    raise FileExistsError("receipt collision")
+                return real_write(path, payload)
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy, "_write_json_exclusive", side_effect=collide
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            publication = json.loads(
+                (log_dir / "current-skill-build.publication-failure.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual([], list(target.iterdir()))
+            self.assertEqual("invalid", publication["execution_receipt"]["state"])
+            self.assertEqual(len(injected), publication["execution_receipt"]["bytes"])
+            self.assertEqual(
+                hashlib.sha256(injected).hexdigest(),
+                publication["execution_receipt"]["sha256"],
+            )
 
     def test_success_receipt_write_failure_keeps_target_empty(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -870,6 +942,35 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             ), self.assertRaises(policy.RunnerError):
                 policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
             self.assertEqual([], list(target.iterdir()))
+
+    def test_post_write_receipt_failure_records_publication_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            real_write = policy._write_json_exclusive
+
+            def write_then_fail(path: Path, payload: dict[str, object]) -> dict[str, object]:
+                record = real_write(path, payload)
+                if path.name == "current-skill-build.execution.json":
+                    raise OSError("post-fsync failure")
+                return record
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy, "_write_json_exclusive", side_effect=write_then_fail
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual([], list(target.iterdir()))
+            execution_path = log_dir / "current-skill-build.execution.json"
+            publication = json.loads(
+                (log_dir / "current-skill-build.publication-failure.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("publication_pending", publication["execution_receipt"]["state"])
+            self.assertEqual(
+                hashlib.sha256(execution_path.read_bytes()).hexdigest(),
+                publication["execution_receipt"]["sha256"],
+            )
 
     def test_successful_replace_is_the_last_fallible_policy_operation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -902,6 +1003,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 manifest = policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
             self.assertEqual("completed", manifest["status"])
             self.assertEqual(["receipt", "target_check", "replace"], events)
+            self.assertFalse((log_dir / "current-skill-build.publication-failure.json").exists())
 
     def test_public_execute_isolated_retains_caller_stage_and_returns_generic_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
