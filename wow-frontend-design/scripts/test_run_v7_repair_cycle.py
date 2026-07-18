@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -74,7 +76,7 @@ class V7RepairCycleTests(unittest.TestCase):
             full_calls.append((dict(staged), number))
             return {
                 "packet": {"status": "clean", "targets": []},
-                "receipt": {"round": number},
+                "receipt": {"mode": "full", "round": number},
                 "verified_targets": {},
             }
 
@@ -142,7 +144,7 @@ class V7RepairCycleTests(unittest.TestCase):
             capture_narrow=lambda *_args: {"targets": [], "packet": {"status": "clean"}, "receipt": {}},
             run_full=lambda _staged, number: {
                 "packet": full_packets[number - 1],
-                "receipt": {"round": number},
+                "receipt": {"mode": "full", "round": number},
                 "verified_targets": {},
             },
             promote=lambda staged, _verified: promoted.append(dict(staged)) or {"status": "promoted"},
@@ -404,6 +406,53 @@ class V7RepairCycleTests(unittest.TestCase):
         self.assertEqual(["case-one", "case-two"], captured)
         self.assertEqual(0, result["full_runs"])
         self.assertEqual(1, result["verification_runs"])
+
+    def test_unspecified_verification_scope_fails_closed_without_full_claim(self) -> None:
+        target = _target()
+        receipts = []
+        promotions = []
+
+        with self.assertRaisesRegex(cycle.V7RepairCycleError, "verification mode"):
+            cycle.execute_cycle(
+                _packet(target),
+                generate=lambda *_args: {"root": "/tmp/repaired", "receipt": {}},
+                capture_narrow=lambda *_args: {
+                    "targets": [],
+                    "packet": {"status": "clean"},
+                    "receipt": {},
+                },
+                run_full=lambda *_args: {
+                    "packet": {"status": "clean"},
+                    "receipt": {},
+                    "verified_targets": {},
+                },
+                promote=lambda *_args: promotions.append(True),
+                write_receipt=receipts.append,
+            )
+        self.assertEqual([], promotions)
+        self.assertNotIn("full_clean", [item["status"] for item in receipts])
+
+    def test_cli_omits_full_claim_when_only_affected_verification_ran(self) -> None:
+        result = {"verification_runs": 1, "full_runs": 0}
+        output = io.StringIO()
+        argv = [
+            "run_v7_repair_cycle.py",
+            "--manifest", "manifest.json",
+            "--hidden-matrix", "hidden.json",
+            "--split", "development",
+            "--packet", "packet.json",
+            "--source-ledger", "ledger.json",
+            "--source-result-dir", "results",
+            "--source-screenshot-dir", "screenshots",
+            "--brief-map", "briefs.json",
+            "--work-root", "work",
+            "--log-dir", "logs",
+            "--output", "output.json",
+        ]
+        with mock.patch.object(cycle.sys, "argv", argv), mock.patch.object(cycle, "run", return_value=result):
+            with redirect_stdout(output):
+                self.assertEqual(0, cycle.main())
+        self.assertEqual("v7 repair cycle completed: 1 verification pass(es)\n", output.getvalue())
 
     def test_promotion_failure_rolls_back_all_canonical_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

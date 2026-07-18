@@ -593,7 +593,10 @@ def execute_cycle(
                 "error": str(error)[:500],
             })
             raise
-        verification_mode = full.get("receipt", {}).get("mode", "full")
+        full_receipt = full.get("receipt")
+        if not isinstance(full_receipt, dict) or full_receipt.get("mode") not in {"affected", "full"}:
+            raise V7RepairCycleError("verification mode must explicitly be affected or full")
+        verification_mode = full_receipt["mode"]
         if verification_mode == "full":
             full_runs += 1
         write_receipt({
@@ -1068,7 +1071,7 @@ def run(args: Namespace) -> dict[str, Any]:
             },
         }
 
-    def run_full(staged: dict[tuple[str, str], Path], verification_number: int) -> dict[str, Any]:
+    def verify_affected(staged: dict[tuple[str, str], Path], verification_number: int) -> dict[str, Any]:
         _require_support_contract(support_contract_path, repository_root, support_contract_sha256)
         if _digest(hidden_path) != hidden_sha256:
             raise V7RepairCycleError("hidden matrix drifted before affected verification")
@@ -1199,7 +1202,7 @@ def run(args: Namespace) -> dict[str, Any]:
         packet,
         generate=generate,
         capture_narrow=capture_narrow,
-        run_full=run_full,
+        run_full=verify_affected,
         promote=promote,
         write_receipt=write_receipt,
         rank_source=rank_source,
@@ -1252,10 +1255,10 @@ def main() -> int:
     ) as error:
         print(f"v7 repair cycle failed: {error}", file=sys.stderr)
         return 1
-    print(
-        "v7 repair cycle completed: "
-        f"{result['verification_runs']} verification pass(es), {result['full_runs']} full run(s)"
-    )
+    summary = f"v7 repair cycle completed: {result['verification_runs']} verification pass(es)"
+    if result["full_runs"]:
+        summary += f", {result['full_runs']} full run(s)"
+    print(summary)
     return 0
 
 
