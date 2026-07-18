@@ -44,10 +44,10 @@ jobs:
 
       - name: Run portable contract tests
         run: |
-          python -m unittest discover -s wow-frontend-design/scripts -p "test_capture_runtime_profile.py" -v
-          python -m unittest discover -s wow-frontend-design/scripts -p "test_validate_installability.py" -v
-          python -m unittest discover -s wow-frontend-design/scripts -p "test_validate_platform_support.py" -v
-          python -m unittest discover -s wow-frontend-design/scripts -p "test_validate_capability_status.py" -v
+          python -m unittest discover -s tests -p "test_capture_runtime_profile.py" -v
+          python -m unittest discover -s tests -p "test_validate_installability.py" -v
+          python -m unittest discover -s tests -p "test_validate_platform_support.py" -v
+          python -m unittest discover -s tests -p "test_validate_capability_status.py" -v
 
   validate:
     runs-on: ubuntu-latest
@@ -121,7 +121,7 @@ jobs:
           fi
 
       - name: Run unit tests
-        run: python3 -m unittest discover -s wow-frontend-design/scripts -p 'test_*.py' -v
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: Validate trigger fixtures
         run: python3 wow-frontend-design/scripts/validate_trigger_cases.py evals/trigger_cases.json --references wow-frontend-design/references
@@ -152,7 +152,7 @@ jobs:
         run: |
           npm run validate:preflight-v7
           npm run check:evidence-v7-cli
-          python3 -m unittest discover -s wow-frontend-design/scripts -p 'test_validate_v7_evidence.py' -v
+          python3 -m unittest discover -s tests -p 'test_validate_v7_evidence.py' -v
 
       - name: Check showcase JavaScript
         run: |

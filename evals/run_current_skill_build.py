@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one isolated fresh build using the repository's current frontend-design skill."""
+"""Build exact product outputs plus a runner-owned manifest with the current Skill."""
 
 from __future__ import annotations
 
@@ -353,8 +353,8 @@ def _log_paths(
         raise RunnerError("log directory must be an absolute real directory") from error
     if not stat.S_ISDIR(info.st_mode) or log_dir.is_symlink() or canonical != log_dir:
         raise RunnerError("log directory must be an absolute real directory")
-    if log_dir == target or target in log_dir.parents:
-        raise RunnerError("log directory must be outside the publish target")
+    if log_dir == target or target in log_dir.parents or log_dir in target.parents:
+        raise RunnerError("log directory and publish target must not contain one another")
     if log_dir == ROOT or ROOT in log_dir.parents or log_dir == SKILL_SOURCE or SKILL_SOURCE in log_dir.parents:
         raise RunnerError("log directory must be outside repository-sensitive paths")
     base_paths = (

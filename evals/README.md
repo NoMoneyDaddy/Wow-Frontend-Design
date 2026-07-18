@@ -2,7 +2,20 @@
 
 這些案例用來評測 `wow-frontend-design` 在不同模型上的行為，不是品質宣傳素材。Fixture validator 只證明資料結構與內部參照一致；只有實際 host/model integration run 才能證明 Skill activation 或 reference routing。
 
-## 目前發布的 v6 自修復 cohort
+## 現行 fresh-build 入口
+
+一般新專案只使用單一 current runner；v4–v7 名稱的檔案是歷史 cohort 或 evaluator research，不是需要選擇的 Skill 版本。
+
+```bash
+npm run build:current -- \
+  --brief /absolute/path/brief.md \
+  --target /absolute/empty-target \
+  --log-dir /absolute/private-log-directory
+```
+
+Runner 以目前 `wow-frontend-design` snapshot 生成 caller 宣告的 exact product outputs，依序通過 pinned `DESIGN.md`、fresh desktop/mobile Playwright 與 Axe gate；可修 finding 最多自修兩輪，每輪完整重驗。只有 clean candidate 會原子發布。Target 另含 runner-owned `run-manifest.json`，不屬於 model 可寫的 product output set；私有 trace、stderr、完整 gate rejection 與 quarantine 留在 `--log-dir`。Target 與 log directory 必須是既存、真實、互不包含的絕對路徑，target 起始為空。
+
+## 歷史發布的 v6 自修復 cohort
 
 固定只使用 `gpt-5.4-mini`，涵蓋 8 個互相錯開的產品、12 routes 與 4 個裝置 profiles。這是 development/regression closure，不是 held-out validation：同一 cohort 曾參與 Skill／evaluator 修正與候選選擇。初始 generation 最終 8/8 完成；最新 Skill 再依繁中排版、hierarchy、locale 與 layout 診斷修正全部 8 案。後續三輪 Darwin 候選共產生 192 張截圖，但最終仍有 6 案 findings，因劣於基準而未晉級。修正 evaluator 公開契約後，人工檢閱再找到兩個中文標題孤字，補上逐行 gate 並完成兩輪全矩陣。官方 `DESIGN.md` verifier 8/8 clean，最終 64/64 PNG 通過尺寸、DPR、hash、auditor 與 inventory 完整性檢查；deterministic visual、runtime、network、body-flow、heading-flow、layout-flow 與 locale-flow findings 都是 0。
 

@@ -1,34 +1,34 @@
 {
   "schema_version": 1,
-  "snapshot_at": "2026-07-16",
+  "snapshot_at": "2026-07-18",
   "semantics": "Status describes repository evidence, not marketing scope. The validator proves schema, fixed inventory and artifact-path integrity only; semantic truth remains human-reviewed and each boundary controls the claim.",
   "capabilities": [
     {
       "id": "skill-package",
       "status": "tested_in_repo",
       "claim": "Agent Skills directory, frontmatter, routed references and OpenAI UI metadata are present.",
-      "artifacts": ["wow-frontend-design/SKILL.md", "wow-frontend-design/agents/openai.yaml", "wow-frontend-design/LICENSE", "wow-frontend-design/scripts/validate_installability.py", "wow-frontend-design/scripts/test_validate_installability.py"],
+      "artifacts": ["wow-frontend-design/SKILL.md", "wow-frontend-design/agents/openai.yaml", "wow-frontend-design/LICENSE", "wow-frontend-design/scripts/validate_installability.py", "tests/test_validate_installability.py"],
       "boundary": "Local skill-creator and installability validation passed at this snapshot; host discovery still requires installation in that host and is not inferred from file validity."
     },
     {
       "id": "deterministic-weak-model-guardrails",
       "status": "tested_in_repo",
       "claim": "Project scan, task-specific external model routing, one-way runtime downgrade, evidence ledger, scorer, fail-closed schemas and the published v6 evidence-integrity gate have automated tests.",
-      "artifacts": ["wow-frontend-design/references/model-routing.md", "wow-frontend-design/scripts/project_scan.py", "wow-frontend-design/scripts/model_profile.example.json", "wow-frontend-design/scripts/route_model.py", "wow-frontend-design/scripts/test_route_model.py", "wow-frontend-design/scripts/runtime_events.example.json", "wow-frontend-design/scripts/runtime_downgrade.py", "wow-frontend-design/scripts/test_runtime_downgrade.py", "wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/score_weak_model_output.py", "wow-frontend-design/scripts/test_evidence_workflow_smoke.py", "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py", "wow-frontend-design/scripts/test_validate_product_flow_v6_evidence.py"],
+      "artifacts": ["wow-frontend-design/references/model-routing.md", "wow-frontend-design/scripts/project_scan.py", "wow-frontend-design/scripts/model_profile.example.json", "wow-frontend-design/scripts/route_model.py", "tests/test_route_model.py", "wow-frontend-design/scripts/runtime_events.example.json", "wow-frontend-design/scripts/runtime_downgrade.py", "tests/test_runtime_downgrade.py", "wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/score_weak_model_output.py", "tests/test_evidence_workflow_smoke.py", "wow-frontend-design/scripts/validate_product_flow_v6_evidence.py", "tests/test_validate_product_flow_v6_evidence.py"],
       "boundary": "Passing unit and evidence-integrity tests verifies encoded routing and downgrade invariants only; it does not establish a universal strong/weak ordering, predict unseen tasks, make a model truthful or prove visual capability."
     },
     {
       "id": "structured-site-planning",
       "status": "tested_in_repo",
       "claim": "IA manifests, end-to-end user flows, responsive wireframe plans and local XML sitemaps have fail-closed cross-artifact validation and hostile tests.",
-      "artifacts": ["wow-frontend-design/references/site-planning-wireframes.md", "wow-frontend-design/scripts/site_manifest.schema.json", "wow-frontend-design/scripts/wireframe_plan.schema.json", "wow-frontend-design/scripts/validate_site_plan.py", "wow-frontend-design/scripts/test_validate_site_plan.py"],
+      "artifacts": ["wow-frontend-design/references/site-planning-wireframes.md", "wow-frontend-design/scripts/site_manifest.schema.json", "wow-frontend-design/scripts/wireframe_plan.schema.json", "wow-frontend-design/scripts/validate_site_plan.py", "tests/test_validate_site_plan.py"],
       "boundary": "Passing schemas and hostile tests proves the encoded planning invariants only; it does not prove research validity, usability, visual quality, production behavior, indexing or ranking."
     },
     {
       "id": "external-research-supply-chain",
       "status": "tested_in_repo",
       "claim": "External GitHub research coordinates are pinned to full revisions with reviewed license labels and safe relative paths; registry and installer guidance rejects mutable sources, path escape, symlink escape, missing hashes, non-transactional promotion and unexplained invisible Unicode.",
-      "artifacts": ["wow-frontend-design/references/external-sources.lock.json", "wow-frontend-design/references/curated-skill-integration.md", "wow-frontend-design/references/github-skill-research.md", "wow-frontend-design/scripts/validate_external_sources.py", "wow-frontend-design/scripts/test_validate_external_sources.py"],
+      "artifacts": ["wow-frontend-design/references/external-sources.lock.json", "wow-frontend-design/references/curated-skill-integration.md", "wow-frontend-design/references/github-skill-research.md", "wow-frontend-design/scripts/validate_external_sources.py", "tests/test_validate_external_sources.py"],
       "boundary": "The local validator proves lock structure and path syntax only. It does not re-fetch repositories, certify every upstream claim, scan an installed tree, or replace per-file license and security review before code or assets are copied or executed."
     },
     {
@@ -70,7 +70,7 @@
       "id": "platform-environment-matrix",
       "status": "tested_in_repo",
       "claim": "A frozen one-version matrix classifies every installed non-test Python entrypoint and separates package, CI, POSIX evaluator, operating-system and mainstream browser-backend evidence.",
-      "artifacts": [".github/workflows/ci.yml", "PLATFORM_SUPPORT.md", "evals/platform-support.json", "wow-frontend-design/references/platform-support-sources.json", "wow-frontend-design/references/research-validation-loop.md", "wow-frontend-design/scripts/capture_runtime_profile.py", "wow-frontend-design/scripts/test_capture_runtime_profile.py", "wow-frontend-design/scripts/validate_platform_support.py", "wow-frontend-design/scripts/test_validate_platform_support.py"],
+      "artifacts": [".github/workflows/ci.yml", "PLATFORM_SUPPORT.md", "evals/platform-support.json", "wow-frontend-design/references/platform-support-sources.json", "wow-frontend-design/references/research-validation-loop.md", "wow-frontend-design/scripts/capture_runtime_profile.py", "tests/test_capture_runtime_profile.py", "wow-frontend-design/scripts/validate_platform_support.py", "tests/test_validate_platform_support.py"],
       "boundary": "Validation proves a fixed script inventory, approved official source coordinates, runtime-stage vocabulary and safe artifact paths only. Runtime-profile fields supplied by the caller are declarations, and configured CI is not completed-run evidence. The system does not certify model brands, re-fetch mutable pages, test unrun cells or schedule a future recheck."
     },
     {
@@ -112,7 +112,7 @@
       "id": "search-aeo-geo",
       "status": "static_audit_only",
       "claim": "SEO/AEO/GEO guidance and an advisory HTML scanner cover metadata, crawl policy and truthful structured data.",
-      "artifacts": ["wow-frontend-design/references/search-discovery.md", "wow-frontend-design/scripts/search_discovery_audit.py", "wow-frontend-design/scripts/test_search_discovery_audit.py"],
+      "artifacts": ["wow-frontend-design/references/search-discovery.md", "wow-frontend-design/scripts/search_discovery_audit.py", "tests/test_search_discovery_audit.py"],
       "boundary": "Static signals cannot guarantee deployment HTTP behavior, indexing, ranking, rich results, AI answer inclusion or citation."
     },
     {

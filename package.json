@@ -8,6 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "build:current": "python3 evals/run_current_skill_build.py",
     "check:dashboard-audit": "node --check evals/playwright_dashboard_audit.cjs",
     "audit:dashboards": "node evals/playwright_dashboard_audit.cjs",
     "audit:html": "node evals/run_vnu.cjs",

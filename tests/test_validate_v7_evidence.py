@@ -1,0 +1,904 @@
+#!/usr/bin/env python3
+"""Focused contract tests for the v7 evidence inventory."""
+
+from __future__ import annotations
+
+import copy
+import importlib.util
+import hashlib
+import contextlib
+import io
+import json
+import struct
+import tempfile
+import unittest
+import zlib
+from pathlib import Path
+from unittest import mock
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MODULE = ROOT / "wow-frontend-design" / "scripts" / "validate_v7_evidence.py"
+SPEC = importlib.util.spec_from_file_location("validate_v7_evidence", MODULE)
+assert SPEC and SPEC.loader
+evidence = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(evidence)
+
+
+class V7EvidenceTests(unittest.TestCase):
+    @staticmethod
+    def png(width: int = 1440, height: int = 1000) -> bytes:
+        def chunk(name: bytes, body: bytes) -> bytes:
+            return struct.pack(">I", len(body)) + name + body + struct.pack(">I", zlib.crc32(name + body) & 0xFFFFFFFF)
+
+        header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+        row = b"\x00" + b"\x00\x00\x00\xff" * width
+        pixels = zlib.compress(row * height)
+        return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", pixels) + chunk(b"IEND", b"")
+
+    def manifest(self, count: int) -> dict[str, object]:
+        cases = [
+            {"id": f"case-{index}", "required_states": ["base", "interaction"]}
+            for index in range(1, count + 1)
+        ]
+        return {"splits": {"development": cases}}
+
+    def test_each_case_requires_thirty_variant_screenshots(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(2), "development")
+        self.assertEqual(60, len(inventory))
+        self.assertEqual(30, len([item for item in inventory if item[1] == "case-1"]))
+
+    def test_fast_gate_requires_exact_development_inventory(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(2), "development", "fast")
+        self.assertEqual(16, len(inventory))
+        self.assertEqual({"accepted", "candidate"}, {item[0] for item in inventory})
+        self.assertEqual({"base", "interaction"}, {item[2] for item in inventory})
+        self.assertEqual({"desktop", "mobile"}, {item[3] for item in inventory})
+        self.assertEqual({"chromium"}, {item[4] for item in inventory})
+
+    def test_unknown_gate_fails_closed(self) -> None:
+        with self.assertRaisesRegex(evidence.V7EvidenceError, "unknown visual gate"):
+            evidence.expected_inventory(self.manifest(2), "development", "partial")
+
+    def test_cli_without_required_arguments_fails_closed(self) -> None:
+        with mock.patch("sys.argv", [str(MODULE)]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as raised:
+                evidence.main()
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_validator_rejects_mixed_gate_before_artifact_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text("{}", encoding="utf-8")
+            ledger_path = root / "ledger.json"
+            ledger_path.write_text("{}", encoding="utf-8")
+            result_dir = root / "results"
+            screenshot_dir = root / "screenshots"
+            result_dir.mkdir()
+            screenshot_dir.mkdir()
+            manifest = self.manifest(2)
+            ledger = {
+                "schema_version": 1,
+                "cohort_manifest": {
+                    "path": "manifest.json",
+                    "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                },
+                "split": "development",
+                "gate": "fast",
+                "status": "completed",
+                "variants": list(evidence.VARIANTS),
+                "expected_count": 16,
+                "hidden_matrix_sha256": "0" * 64,
+                "input_inventory_sha256": "0" * 64,
+                "attempts": [],
+            }
+            with (
+                mock.patch.object(evidence.preflight, "validate_manifest"),
+                mock.patch.object(evidence, "_load", side_effect=[manifest, ledger]),
+                self.assertRaisesRegex(evidence.V7EvidenceError, "gate does not match"),
+            ):
+                evidence.validate(
+                    manifest_path,
+                    ledger_path,
+                    result_dir,
+                    screenshot_dir,
+                    root,
+                    "full",
+                )
+
+    def test_base_uses_six_chromium_profiles(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(1), "development")
+        accepted_base = [item for item in inventory if item[0] == "accepted" and item[2] == "base"]
+        self.assertEqual(6, len(accepted_base))
+        self.assertEqual({"chromium"}, {item[4] for item in accepted_base})
+        self.assertEqual(set(evidence.BASE_PROFILES), {item[3] for item in accepted_base})
+
+    def test_interaction_uses_three_profiles_and_engines(self) -> None:
+        inventory = evidence.expected_inventory(self.manifest(1), "development")
+        accepted = [item for item in inventory if item[0] == "accepted" and item[2] == "interaction"]
+        self.assertEqual(9, len(accepted))
+        self.assertEqual(set(evidence.PARITY_PROFILES), {item[3] for item in accepted})
+        self.assertEqual(set(evidence.PARITY_ENGINES), {item[4] for item in accepted})
+
+    def test_missing_required_state_fails_closed(self) -> None:
+        manifest = self.manifest(1)
+        manifest["splits"]["development"][0]["required_states"] = ["base", "hover"]
+        with self.assertRaisesRegex(evidence.V7EvidenceError, "base and interaction"):
+            evidence.expected_inventory(manifest, "development")
+
+    def test_real_decoded_png_and_matching_result_are_accepted(self) -> None:
+        with self.subTest("full PNG decode"), tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "base", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 1,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "base", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {
+                    "playwright": "1.61.1",
+                    "engineVersion": "test",
+                    "profile": {
+                        "width": 1440,
+                        "height": 1000,
+                        "hasTouch": False,
+                        "isMobile": False,
+                        "deviceScaleFactor": 1,
+                        "fullMobileEmulation": False,
+                        "userAgent": "test",
+                    },
+                },
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [],
+                    "assertions": [],
+                    "consoleErrors": [],
+                    "pageErrors": [],
+                    "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000},
+                    "devicePixelArea": 1440000,
+                    "horizontalOverflow": False,
+                    "eventOverflow": False,
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": [],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "clean",
+                "screenshot": {
+                    "path": screenshot.name,
+                    "fullPage": True,
+                    "width": 1440,
+                    "height": 1000,
+                    "bytes": screenshot.stat().st_size,
+                    "sha256": screenshot_hash,
+                },
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "clean",
+                evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"),
+            )
+            boolean_schema = copy.deepcopy(payload)
+            boolean_schema["schemaVersion"] = True
+            result.write_text(json.dumps(boolean_schema), encoding="utf-8")
+            boolean_schema_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "result identity changed"):
+                evidence._validate_result(
+                    key, result, screenshot, boolean_schema_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            unavailable_focus = copy.deepcopy(payload)
+            unavailable_focus["schemaVersion"] = 2
+            unavailable_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "unavailable",
+                    "reason": "focus_targets_not_declared",
+                    "declaredTargets": 0,
+                    "completedTargets": 0,
+                    "freshReplays": 0,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [],
+            })
+            result.write_text(json.dumps(unavailable_focus), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "at least one target"):
+                evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1")
+            unavailable_focus = copy.deepcopy(payload)
+            unavailable_focus["schemaVersion"] = 2
+            unavailable_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "unavailable",
+                    "reason": "one_or_more_targets_unavailable",
+                    "declaredTargets": 1,
+                    "completedTargets": 0,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "unavailable",
+                    "fullyObscured": False,
+                    "replays": 2,
+                    "reason": "external_request_blocked",
+                }],
+                "issues": ["focus_obscuration_verification_unavailable"],
+            })
+            unavailable_focus["verdict"] = "findings"
+            result.write_text(json.dumps(unavailable_focus), encoding="utf-8")
+            unavailable_focus_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(
+                    key, result, screenshot, unavailable_focus_hash, screenshot_hash, "0" * 64, "1.61.1",
+                ),
+            )
+            clear_focus = copy.deepcopy(payload)
+            clear_focus["schemaVersion"] = 2
+            clear_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "complete",
+                    "reason": None,
+                    "declaredTargets": 1,
+                    "completedTargets": 1,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "clear",
+                    "fullyObscured": False,
+                    "replays": 2,
+                    "occluderCount": 1,
+                    "targetArea": 2400,
+                    "coveredArea": 1200,
+                }],
+            })
+            result.write_text(json.dumps(clear_focus), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "clean",
+                evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"),
+            )
+            forged_clear = copy.deepcopy(clear_focus)
+            forged_clear["runtime"]["focusedControls"][0]["coveredArea"] = 2400
+            result.write_text(json.dumps(forged_clear), encoding="utf-8")
+            forged_clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "clear focused control is fully covered"):
+                evidence._validate_result(key, result, screenshot, forged_clear_hash, screenshot_hash, "0" * 64, "1.61.1")
+            obscured_focus = copy.deepcopy(payload)
+            obscured_focus["schemaVersion"] = 2
+            obscured_focus["runtime"].update({
+                "focusCoverage": {
+                    "status": "complete",
+                    "reason": None,
+                    "declaredTargets": 1,
+                    "completedTargets": 1,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "role": "primary-action",
+                    "status": "confirmed",
+                    "fullyObscured": True,
+                    "replays": 2,
+                    "occluderCount": 1,
+                    "targetArea": 2400,
+                    "coveredArea": 2400,
+                }],
+                "issues": ["focused_control_obscured"],
+            })
+            obscured_focus["verdict"] = "findings"
+            result.write_text(json.dumps(obscured_focus), encoding="utf-8")
+            obscured_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(key, result, screenshot, obscured_hash, screenshot_hash, "0" * 64, "1.61.1"),
+            )
+            forged_focus = copy.deepcopy(obscured_focus)
+            forged_focus["runtime"]["focusedControls"][0]["coveredArea"] = 1200
+            result.write_text(json.dumps(forged_focus), encoding="utf-8")
+            forged_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "not fully covered"):
+                evidence._validate_result(key, result, screenshot, forged_hash, screenshot_hash, "0" * 64, "1.61.1")
+            interaction_key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            payload["identity"]["state"] = "interaction"
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            empty_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "interaction evidence must record"):
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    empty_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                )
+            payload["runtime"]["interactions"] = [{"id": "open-dialog", "action": "click", "completed": True}]
+            payload["runtime"]["assertions"] = [{"id": "dialog-visible", "type": "visible", "count": 1, "passed": True}]
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            passing_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "clean",
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    passing_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                ),
+            )
+            blocked_interaction = copy.deepcopy(payload)
+            blocked_interaction["schemaVersion"] = 3
+            blocked_interaction["runtime"].update({
+                "interactions": [
+                    {"id": "prepare-form", "action": "fill", "completed": True},
+                    {
+                        "id": "open-dialog",
+                        "action": "click",
+                        "completed": False,
+                        "reason": "focused_control_obscured",
+                    },
+                    {
+                        "id": "confirm-dialog",
+                        "action": "press",
+                        "completed": False,
+                        "reason": "prior_step_not_completed",
+                    },
+                ],
+                "assertions": [{
+                    "id": "dialog-visible",
+                    "type": "visible",
+                    "evaluated": False,
+                    "reason": "interaction_state_unavailable",
+                }],
+                "focusCoverage": {
+                    "status": "complete",
+                    "reason": None,
+                    "declaredTargets": 1,
+                    "completedTargets": 1,
+                    "freshReplays": 2,
+                    "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY,
+                },
+                "focusedControls": [{
+                    "id": "primary-submit",
+                    "stepId": "open-dialog",
+                    "role": "primary-action",
+                    "status": "confirmed",
+                    "fullyObscured": True,
+                    "replays": 2,
+                    "occluderCount": 1,
+                    "targetArea": 2400,
+                    "coveredArea": 2400,
+                }],
+                "issues": ["focused_control_obscured"],
+            })
+            blocked_interaction["verdict"] = "findings"
+            result.write_text(json.dumps(blocked_interaction), encoding="utf-8")
+            blocked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    blocked_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                ),
+            )
+            wrong_step = copy.deepcopy(blocked_interaction)
+            wrong_step["runtime"]["focusedControls"][0]["stepId"] = "different-step"
+            result.write_text(json.dumps(wrong_step), encoding="utf-8")
+            wrong_step_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "not bound"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, wrong_step_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            wrong_role = copy.deepcopy(blocked_interaction)
+            wrong_role["runtime"]["focusedControls"][0]["role"] = "form-control"
+            result.write_text(json.dumps(wrong_role), encoding="utf-8")
+            wrong_role_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "not bound"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, wrong_role_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            skipped_earlier_block = copy.deepcopy(blocked_interaction)
+            skipped_earlier_block["runtime"]["interactions"][0] = {
+                "id": "first-confirmed-click", "action": "click", "completed": True,
+            }
+            skipped_earlier_block["runtime"]["focusCoverage"].update({
+                "declaredTargets": 2, "completedTargets": 2, "freshReplays": 4,
+            })
+            skipped_earlier_block["runtime"]["focusedControls"].insert(0, {
+                "id": "first-primary-action",
+                "stepId": "first-confirmed-click",
+                "role": "primary-action",
+                "status": "confirmed",
+                "fullyObscured": True,
+                "replays": 2,
+                "occluderCount": 1,
+                "targetArea": 2400,
+                "coveredArea": 2400,
+            })
+            result.write_text(json.dumps(skipped_earlier_block), encoding="utf-8")
+            skipped_earlier_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "confirmed obscured click"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, skipped_earlier_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            completed_after_block = copy.deepcopy(blocked_interaction)
+            completed_after_block["runtime"]["interactions"][2] = {
+                "id": "confirm-dialog", "action": "press", "completed": True,
+            }
+            result.write_text(json.dumps(completed_after_block), encoding="utf-8")
+            completed_after_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "after a blocked step"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, completed_after_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            evaluated_assertion = copy.deepcopy(blocked_interaction)
+            evaluated_assertion["runtime"]["assertions"][0]["evaluated"] = True
+            result.write_text(json.dumps(evaluated_assertion), encoding="utf-8")
+            evaluated_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "unevaluated assertion"):
+                evidence._validate_result(
+                    interaction_key, result, screenshot, evaluated_hash, screenshot_hash, "0" * 64, "1.61.1",
+                )
+            payload["runtime"]["assertions"][0]["passed"] = False
+            payload["verdict"] = "findings"
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            failing_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual(
+                "findings",
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    failing_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                ),
+            )
+            payload["runtime"]["interactions"][0]["completed"] = False
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            malformed_interaction_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "interaction step evidence is malformed"):
+                evidence._validate_result(
+                    interaction_key,
+                    result,
+                    screenshot,
+                    malformed_interaction_hash,
+                    screenshot_hash,
+                    "0" * 64,
+                    "1.61.1",
+                )
+            payload["identity"]["state"] = "base"
+            payload["runtime"]["interactions"] = []
+            payload["runtime"]["assertions"] = []
+            payload["verdict"] = "clean"
+            payload["typography"]["issues"] = [{"code": "tampered-finding"}]
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            tampered_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "verdict does not match"):
+                evidence._validate_result(key, result, screenshot, tampered_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+
+    def test_result_v6_requires_bounded_dialog_focus_lifecycle_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 6,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "open-dialog", "action": "click", "completed": True}],
+                    "assertions": [{"id": "dialog-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "dialogFocusCoverage": {"status": "complete", "reason": None, "declaredLifecycles": 1, "completedLifecycles": 1, "freshReplays": 2, "claimBoundary": evidence.DIALOG_FOCUS_CLAIM_BOUNDARY},
+                    "dialogFocusLifecycles": [{"id": "account-dialog", "status": "confirmed", "replays": 2, "openFocus": False, "returnFocus": True}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_dialog_focus_lifecycle_mismatch"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            unavailable = copy.deepcopy(payload)
+            unavailable["runtime"]["dialogFocusCoverage"].update({"status": "unavailable", "reason": "one_or_more_lifecycles_unavailable", "completedLifecycles": 0})
+            unavailable["runtime"]["dialogFocusLifecycles"][0] = {"id": "account-dialog", "status": "unavailable", "replays": 2, "reason": "dialog_contract_unavailable"}
+            unavailable["runtime"]["issues"] = ["dialog_focus_verification_unavailable"]
+            result.write_text(json.dumps(unavailable), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            forged = copy.deepcopy(payload)
+            forged["runtime"]["dialogFocusLifecycles"][0]["openFocus"] = True
+            forged["runtime"]["dialogFocusLifecycles"][0]["returnFocus"] = True
+            forged["runtime"]["dialogFocusLifecycles"][0]["status"] = "clear"
+            forged["runtime"]["issues"] = []
+            forged["verdict"] = "clean"
+            result.write_text(json.dumps(forged), encoding="utf-8")
+            forged_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, forged_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+    def test_result_v7_requires_bounded_invalid_feedback_linkage_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 7,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "submit-form", "action": "click", "completed": True}],
+                    "assertions": [{"id": "feedback-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "invalidFeedbackCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.INVALID_FEEDBACK_CLAIM_BOUNDARY},
+                    "invalidFeedbackTargets": [{"id": "email-field", "status": "confirmed", "replays": 2, "relation": "missing"}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_invalid_feedback_unlinked"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            unavailable = copy.deepcopy(payload)
+            unavailable["runtime"]["invalidFeedbackCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+            unavailable["runtime"]["invalidFeedbackTargets"][0] = {"id": "email-field", "status": "unavailable", "replays": 2, "reason": "feedback_contract_unavailable"}
+            unavailable["runtime"]["issues"] = ["invalid_feedback_verification_unavailable"]
+            result.write_text(json.dumps(unavailable), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            clear = copy.deepcopy(payload)
+            clear["runtime"]["invalidFeedbackTargets"][0] = {"id": "email-field", "status": "clear", "replays": 2, "relation": "describedby"}
+            clear["runtime"]["issues"] = []
+            clear["verdict"] = "clean"
+            result.write_text(json.dumps(clear), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            leaked = copy.deepcopy(payload)
+            leaked["runtime"]["invalidFeedbackTargets"][0]["selector"] = "#email-field"
+            result.write_text(json.dumps(leaked), encoding="utf-8")
+            leaked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "invalid feedback record schema changed"):
+                evidence._validate_result(key, result, screenshot, leaked_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+    def test_result_v8_requires_bounded_invalid_input_preservation_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 8,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "submit-form", "action": "click", "completed": True}],
+                    "assertions": [{"id": "feedback-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "invalidInputPreservationCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.INVALID_INPUT_PRESERVATION_CLAIM_BOUNDARY},
+                    "invalidInputPreservationTargets": [{"id": "email-field", "status": "confirmed", "replays": 2, "nativeKind": "input-email", "retained": False}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_invalid_input_lost"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            unavailable = copy.deepcopy(payload)
+            unavailable["runtime"]["invalidInputPreservationCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+            unavailable["runtime"]["invalidInputPreservationTargets"][0] = {"id": "email-field", "status": "unavailable", "replays": 2, "reason": "preservation_contract_unavailable"}
+            unavailable["runtime"]["issues"] = ["invalid_input_preservation_unavailable"]
+            result.write_text(json.dumps(unavailable), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            clear = copy.deepcopy(payload)
+            clear["runtime"]["invalidInputPreservationTargets"][0] = {"id": "email-field", "status": "clear", "replays": 2, "nativeKind": "select-one", "retained": True}
+            clear["runtime"]["issues"] = []
+            clear["verdict"] = "clean"
+            result.write_text(json.dumps(clear), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            leaked = copy.deepcopy(payload)
+            leaked["runtime"]["invalidInputPreservationTargets"][0]["value"] = "must-not-leak@example.test"
+            result.write_text(json.dumps(leaked), encoding="utf-8")
+            leaked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "invalid input preservation record schema changed"):
+                evidence._validate_result(key, result, screenshot, leaked_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+    def test_result_v9_requires_bounded_disclosure_state_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 9,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "open-details", "action": "click", "completed": True}],
+                    "assertions": [{"id": "details-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "disclosureStateCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.DISCLOSURE_STATE_CLAIM_BOUNDARY},
+                    "disclosureStateTargets": [{"id": "details-panel", "status": "confirmed", "replays": 2, "expanded": False, "panelVisible": True}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_disclosure_state_mismatch"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            unavailable_reasons = (
+                "disclosure_contract_unavailable", "external_request_blocked", "replay_unstable",
+                "runtime_unavailable", "fonts_not_ready", "initial_state_unavailable",
+                "action_outcome_unavailable", "state_settling_unavailable",
+            )
+            self.assertEqual(set(unavailable_reasons), evidence.DISCLOSURE_STATE_UNAVAILABLE_REASONS)
+            for reason in unavailable_reasons:
+                with self.subTest(reason=reason):
+                    unavailable = copy.deepcopy(payload)
+                    unavailable["runtime"]["disclosureStateCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+                    unavailable["runtime"]["disclosureStateTargets"][0] = {"id": "details-panel", "status": "unavailable", "replays": 2, "reason": reason}
+                    unavailable["runtime"]["issues"] = ["disclosure_state_verification_unavailable"]
+                    result.write_text(json.dumps(unavailable), encoding="utf-8")
+                    unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+                    self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            clear = copy.deepcopy(payload)
+            clear["runtime"]["disclosureStateTargets"][0] = {"id": "details-panel", "status": "clear", "replays": 2, "expanded": True, "panelVisible": True}
+            clear["runtime"]["issues"] = []
+            clear["verdict"] = "clean"
+            result.write_text(json.dumps(clear), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            no_outcome = copy.deepcopy(clear)
+            no_outcome["runtime"]["disclosureStateTargets"][0].update({"expanded": False, "panelVisible": False})
+            result.write_text(json.dumps(no_outcome), encoding="utf-8")
+            no_outcome_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "disclosure state derivation changed"):
+                evidence._validate_result(key, result, screenshot, no_outcome_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+            leaked = copy.deepcopy(payload)
+            leaked["runtime"]["disclosureStateTargets"][0]["selector"] = "#details-panel"
+            result.write_text(json.dumps(leaked), encoding="utf-8")
+            leaked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "disclosure state record schema changed"):
+                evidence._validate_result(key, result, screenshot, leaked_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+    def test_result_v10_requires_bounded_mutually_exclusive_form_outcome_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 10,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "submit-invalid", "action": "click", "completed": True}],
+                    "assertions": [{"id": "error-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "formOutcomeCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.FORM_OUTCOME_CLAIM_BOUNDARY},
+                    "formOutcomeTargets": [{"id": "contact-form", "status": "confirmed", "replays": 2, "staleSuccess": True}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["stale_success_after_invalid"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            unavailable_reasons = (
+                "form_outcome_contract_unavailable", "initial_state_unavailable",
+                "success_checkpoint_unavailable", "invalid_checkpoint_unavailable",
+                "external_request_blocked", "fonts_not_ready", "state_settling_unavailable",
+                "replay_unstable", "runtime_unavailable",
+            )
+            self.assertEqual(set(unavailable_reasons), evidence.FORM_OUTCOME_UNAVAILABLE_REASONS)
+            for reason in unavailable_reasons:
+                with self.subTest(reason=reason):
+                    unavailable = copy.deepcopy(payload)
+                    unavailable["runtime"]["formOutcomeCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+                    unavailable["runtime"]["formOutcomeTargets"][0] = {"id": "contact-form", "status": "unavailable", "replays": 2, "reason": reason}
+                    unavailable["runtime"]["issues"] = ["form_outcome_verification_unavailable"]
+                    result.write_text(json.dumps(unavailable), encoding="utf-8")
+                    unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+                    self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            clear = copy.deepcopy(payload)
+            clear["runtime"]["formOutcomeTargets"][0] = {"id": "contact-form", "status": "clear", "replays": 2, "staleSuccess": False}
+            clear["runtime"]["issues"] = []
+            clear["verdict"] = "clean"
+            result.write_text(json.dumps(clear), encoding="utf-8")
+            clear_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("clean", evidence._validate_result(key, result, screenshot, clear_hash, screenshot_hash, "0" * 64, "1.61.1"))
+
+            too_many = copy.deepcopy(payload)
+            too_many["runtime"]["formOutcomeCoverage"].update({"declaredTargets": 5, "completedTargets": 5, "freshReplays": 10})
+            too_many["runtime"]["formOutcomeTargets"] = [
+                {"id": f"contact-form-{index}", "status": "confirmed", "replays": 2, "staleSuccess": True}
+                for index in range(1, 6)
+            ]
+            result.write_text(json.dumps(too_many), encoding="utf-8")
+            too_many_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "form outcome coverage bounds changed"):
+                evidence._validate_result(key, result, screenshot, too_many_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+            leaked = copy.deepcopy(payload)
+            leaked["runtime"]["formOutcomeTargets"][0]["value"] = "must-not-leak@example.test"
+            result.write_text(json.dumps(leaked), encoding="utf-8")
+            leaked_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "form outcome record schema changed"):
+                evidence._validate_result(key, result, screenshot, leaked_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+    def test_async_completion_evidence_requires_two_consistent_replays(self) -> None:
+        runtime = {
+            "asyncCoverage": {
+                "status": "complete", "reason": None, "declaredActions": 1,
+                "completedActions": 1, "mainReplays": 1, "freshReplays": 1,
+                "claimBoundary": evidence.ASYNC_CLAIM_BOUNDARY,
+            },
+            "asyncCompletions": [{
+                "id": "old-item-completion", "requestId": "old-item-request",
+                "initiationStepId": "start-load", "pendingPredicateId": "load-pending",
+                "interruptionStepId": "switch-identity",
+                "freshnessPredicateIds": ["new-identity", "old-success-hidden", "new-content"],
+                "status": "confirmed", "staleCompletion": True,
+                "mainReplay": "stale", "freshReplay": "stale",
+                "reason": "stale_completion_reassigned",
+            }],
+        }
+        self.assertEqual((True, False), evidence._validate_async_evidence(runtime, "fixture"))
+        forged = copy.deepcopy(runtime)
+        forged["asyncCompletions"][0]["freshReplay"] = "fresh"
+        with self.assertRaisesRegex(evidence.V7EvidenceError, "derivation"):
+            evidence._validate_async_evidence(forged, "fixture")
+        unavailable = copy.deepcopy(runtime)
+        unavailable["asyncCoverage"].update({"status": "unavailable", "reason": "replay_unstable", "completedActions": 0})
+        unavailable["asyncCompletions"][0].update({
+            "status": "unavailable", "staleCompletion": False, "freshReplay": "fresh", "reason": "replay_unstable",
+        })
+        self.assertEqual((False, True), evidence._validate_async_evidence(unavailable, "fixture"))
+
+    def test_result_v5_requires_bounded_accessible_name_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key = ("accepted", "case-one", "interaction", "desktop", "chromium")
+            screenshot = root / f"{evidence.artifact_stem(key)}.png"
+            screenshot.write_bytes(self.png())
+            screenshot_hash = hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            result = root / f"{evidence.artifact_stem(key)}.json"
+            payload = {
+                "schemaVersion": 5,
+                "identity": {"variant": "accepted", "caseId": "case-one", "state": "interaction", "profile": "desktop", "engine": "chromium"},
+                "input": {"scheme": "file", "route": "index.html", "specSha256": "0" * 64},
+                "browser": {"playwright": "1.61.1", "engineVersion": "test", "profile": {
+                    "width": 1440, "height": 1000, "hasTouch": False, "isMobile": False,
+                    "deviceScaleFactor": 1, "fullMobileEmulation": False, "userAgent": "test",
+                }},
+                "runtime": {
+                    "fontsReady": True,
+                    "interactions": [{"id": "open-form", "action": "click", "completed": True}],
+                    "assertions": [{"id": "form-visible", "type": "visible", "count": 1, "passed": True}],
+                    "consoleErrors": [], "pageErrors": [], "externalRequests": [],
+                    "pageBounds": {"width": 1440, "height": 1000}, "devicePixelArea": 1440000,
+                    "horizontalOverflow": False, "eventOverflow": False,
+                    "focusCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.FOCUS_CLAIM_BOUNDARY},
+                    "focusedControls": [{"id": "form-field", "role": "form-control", "status": "clear", "fullyObscured": False, "replays": 2, "occluderCount": 0, "targetArea": 1200, "coveredArea": 0}],
+                    "accessibleNameCoverage": {"status": "complete", "reason": None, "declaredTargets": 1, "completedTargets": 1, "freshReplays": 2, "claimBoundary": evidence.ACCESSIBLE_NAME_CLAIM_BOUNDARY},
+                    "accessibleNameControls": [{"id": "account-search", "role": "searchbox", "status": "confirmed", "replays": 2}],
+                    "eventCounts": {"consoleErrors": 0, "pageErrors": 0, "externalRequests": 0},
+                    "issues": ["declared_control_accessible_name_mismatch"],
+                },
+                "typography": {"schemaVersion": 1, "issues": [], "observations": [], "targets": [], "environment": {}},
+                "verdict": "findings",
+                "screenshot": {"path": screenshot.name, "fullPage": True, "width": 1440, "height": 1000, "bytes": screenshot.stat().st_size, "sha256": screenshot_hash},
+            }
+            result.write_text(json.dumps(payload), encoding="utf-8")
+            result_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, result_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            unavailable = copy.deepcopy(payload)
+            unavailable["runtime"]["accessibleNameCoverage"].update({"status": "unavailable", "reason": "one_or_more_targets_unavailable", "completedTargets": 0})
+            unavailable["runtime"]["accessibleNameControls"][0] = {"id": "account-search", "role": "searchbox", "status": "unavailable", "replays": 2, "reason": "accessibility_tree_unavailable"}
+            unavailable["runtime"]["issues"] = ["accessible_name_verification_unavailable"]
+            result.write_text(json.dumps(unavailable), encoding="utf-8")
+            unavailable_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            self.assertEqual("findings", evidence._validate_result(key, result, screenshot, unavailable_hash, screenshot_hash, "0" * 64, "1.61.1"))
+            forged = copy.deepcopy(payload)
+            forged["runtime"]["accessibleNameControls"][0]["name"] = "must-not-appear"
+            result.write_text(json.dumps(forged), encoding="utf-8")
+            forged_hash = hashlib.sha256(result.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(evidence.V7EvidenceError, "accessible name control record schema"):
+                evidence._validate_result(key, result, screenshot, forged_hash, screenshot_hash, "0" * 64, "1.61.1")
+
+
+if __name__ == "__main__":
+    unittest.main()

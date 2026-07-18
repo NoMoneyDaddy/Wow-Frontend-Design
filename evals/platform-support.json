@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "snapshot_at": "2026-07-16",
-  "semantics": "Agent Skills package compatibility is validated against the open specification and is not split by model brand. This matrix tracks only installed Python scripts, repository evaluator runtimes and mainstream browser backends. A configured or documented runtime is not promoted until repository-owned evidence for that exact check exists.",
+  "semantics": "Agent Skills package compatibility is validated against the open specification and is not split by model brand. This matrix tracks only installed Python scripts, repository evaluator runtimes and mainstream browser backends. A configured or documented runtime is not promoted until repository-owned evidence for that exact check exists. Official source coordinates remain frozen at 2026-07-16; the local artifact inventory was updated on 2026-07-18 after repository tests moved outside the installed Skill.",
   "source_snapshot": "wow-frontend-design/references/platform-support-sources.json",
   "targets": [
     {
@@ -47,7 +47,7 @@
       "requirements": ["Python 3.9+ standard library; primary CI uses Python 3.14.6", "Writable caller-authorized output only when a script explicitly produces an artifact"],
       "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["github-actions-python", "github-hosted-runners"],
-      "artifacts": [".github/workflows/ci.yml", "wow-frontend-design/scripts/capture_runtime_profile.py", "wow-frontend-design/scripts/test_capture_runtime_profile.py"],
+      "artifacts": [".github/workflows/ci.yml", "wow-frontend-design/scripts/capture_runtime_profile.py", "tests/test_capture_runtime_profile.py"],
       "boundary": "The complete Python suite passed in Linux CI and a local macOS development environment. The configured Windows smoke remains unverified until its remote job completes."
     },
     {
@@ -58,7 +58,7 @@
       "requirements": ["Python 3.9+; primary CI uses Python 3.14.6", "Git command for ignored-file checks when a repository root is supplied"],
       "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["agent-skills-specification", "github-actions-python"],
-      "artifacts": ["wow-frontend-design/scripts/validate_installability.py", "wow-frontend-design/scripts/test_validate_installability.py", ".github/workflows/ci.yml"],
+      "artifacts": ["wow-frontend-design/scripts/validate_installability.py", "tests/test_validate_installability.py", ".github/workflows/ci.yml"],
       "boundary": "Git is an explicit optional runtime dependency for repository-aware ignored-file checks. A successful package check does not prove host discovery or execution."
     },
     {
@@ -69,7 +69,7 @@
       "requirements": ["Python 3.9+; primary CI uses Python 3.14.6", "Caller-authorized external command", "Evaluator-owned artifact directory"],
       "checks": {"static": "passed", "unit": "passed", "linux": "passed", "macos": "partial", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["github-actions-python", "github-hosted-runners"],
-      "artifacts": ["wow-frontend-design/scripts/evidence_ledger.py", "wow-frontend-design/scripts/test_evidence_ledger.py", "wow-frontend-design/scripts/test_evidence_workflow_smoke.py"],
+      "artifacts": ["wow-frontend-design/scripts/evidence_ledger.py", "tests/test_evidence_ledger.py", "tests/test_evidence_workflow_smoke.py"],
       "boundary": "The ledger can invoke only the exact caller-supplied command within its policy boundary. External command portability and side effects remain the caller's responsibility."
     },
     {
@@ -80,7 +80,7 @@
       "requirements": ["GitHub-hosted runner", "Python 3.14.6", "Checked-out repository"],
       "checks": {"static": "passed", "unit": "passed", "linux": "partial", "macos": "not_run", "windows": "not_run", "browser": "not_applicable", "visual": "not_applicable"},
       "source_ids": ["github-actions-python", "github-hosted-runners"],
-      "artifacts": [".github/workflows/ci.yml", "wow-frontend-design/scripts/capture_runtime_profile.py", "wow-frontend-design/scripts/test_capture_runtime_profile.py"],
+      "artifacts": [".github/workflows/ci.yml", "wow-frontend-design/scripts/capture_runtime_profile.py", "tests/test_capture_runtime_profile.py"],
       "boundary": "The three-runner matrix now targets Python 3.14.6, but configuration is not execution evidence. Prior Linux evidence used the previous lane; the new Linux lane is partial, while macOS and Windows remain not_run until completed jobs are preserved."
     },
     {
