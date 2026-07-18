@@ -147,5 +147,7 @@ jobs:
           python3 -m py_compile evals/current_skill_repair.py
           python3 -m py_compile evals/validate_design_md_clean.py
           python3 -m py_compile evals/validate_codex_log_policy.py
+          python3 -m py_compile evals/validate_current_craft_acceptance.py
           node --check evals/playwright_html_smoke.cjs
           node --check evals/playwright_browser_runtime.cjs
+          node --check evals/capture_current_visual_evidence.cjs

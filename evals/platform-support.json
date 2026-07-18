@@ -84,19 +84,19 @@
       "requirements": ["POSIX process groups and resource controls", "Python 3.9+", "Node.js 22", "Authenticated Codex CLI", "Pinned @google/design.md, Playwright Chromium and Axe"],
       "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_supported", "browser": "passed", "visual": "not_run"},
       "source_ids": ["github-hosted-runners", "playwright-installation"],
-      "artifacts": ["evals/run_current_skill_build.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "tests/test_run_current_skill_build.py", ".github/workflows/ci.yml"],
-      "boundary": "The controlled evaluator is outside the installed Skill runtime, is intentionally POSIX-only, and proves only its exact-output, repair and deterministic browser-smoke contracts."
+      "artifacts": ["evals/run_current_skill_build.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/validate_current_craft_acceptance.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "evals/capture_current_visual_evidence.cjs", "tests/test_run_current_skill_build.py", "tests/test_validate_current_craft_acceptance.py", ".github/workflows/ci.yml"],
+      "boundary": "The controlled evaluator is outside the installed Skill runtime, is intentionally POSIX-only, and proves exact-output, bounded repair, deterministic smoke and provenance binding only; evaluator independence and commercial approval remain external facts."
     },
     {
       "id": "browser-chromium-evaluator",
       "category": "browser_backend",
       "repository_status": "partially_tested",
-      "entrypoints": ["evals/playwright_html_smoke.cjs"],
+      "entrypoints": ["evals/playwright_html_smoke.cjs", "evals/capture_current_visual_evidence.cjs"],
       "requirements": ["Node.js 22", "Pinned Playwright", "Pinned Playwright Chromium", "Pinned @axe-core/playwright"],
-      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "passed", "visual": "not_run"},
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "passed", "visual": "passed"},
       "source_ids": ["playwright-installation", "playwright-browsers"],
-      "artifacts": ["package-lock.json", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "tests/test_playwright_html_smoke.py", "tests/test_browser_egress_controls.py"],
-      "boundary": "Observed evidence is limited to deterministic visible-content, runtime, network, overflow and Axe smoke in the pinned Chromium revision; it is not independent visual-craft review or physical-device evidence."
+      "artifacts": ["package-lock.json", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "evals/capture_current_visual_evidence.cjs", "tests/test_playwright_html_smoke.py", "tests/test_capture_current_visual_evidence.py", "tests/test_browser_egress_controls.py"],
+      "boundary": "Observed evidence covers deterministic smoke and fresh viewport PNG capture mechanics in the pinned Chromium revision; it does not prove independent craft judgment, user outcomes, physical devices or commercial release."
     }
   ]
 }

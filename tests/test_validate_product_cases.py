@@ -52,6 +52,15 @@ class ProductCaseTests(unittest.TestCase):
         with self.assertRaises(validate_product_cases.ProductCaseError):
             self.validate_copy(data)
 
+    def test_coverage_fixture_rejects_execution_and_held_out_payloads(self) -> None:
+        forbidden_fields = ("brief", "capture_plan", "craft_result", "screenshots")
+        for field in forbidden_fields:
+            with self.subTest(field=field):
+                data = deepcopy(self.data)
+                data["cases"][0][field] = {} if field != "screenshots" else []
+                with self.assertRaises(validate_product_cases.ProductCaseError):
+                    self.validate_copy(data)
+
 
 if __name__ == "__main__":
     unittest.main()

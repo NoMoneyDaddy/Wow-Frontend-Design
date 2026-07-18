@@ -232,14 +232,20 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "computer_use",
                     "image_generation",
                     "plugins",
-                    "shell_tool",
                     "skill_mcp_dependency_install",
                     "tool_call_mcp_elicitation",
                     "tool_suggest",
                 ],
                 disabled,
             )
-            self.assertIn("sandbox_workspace_write.network_access=false", invocation["args"])
+            self.assertIn('approval_policy="never"', invocation["args"])
+            self.assertIn('default_permissions="workspace"', invocation["args"])
+            self.assertIn(
+                'permissions.workspace.filesystem={":minimal"="read",":workspace_roots"={"."="write"}}',
+                invocation["args"],
+            )
+            self.assertIn("permissions.workspace.network={enabled=false}", invocation["args"])
+            self.assertNotIn("--sandbox", invocation["args"])
             self.assertFalse((capture / "npx-environment.json").exists())
             self.assertEqual("@google/design.md", manifest["design_md_gate"]["tool"]["package"])
             self.assertEqual("0.3.0", manifest["design_md_gate"]["tool"]["version"])
@@ -1057,6 +1063,14 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(3, receipt["execution"]["inactivity_timeout_seconds"])
             self.assertTrue(receipt["trace_observed"]["successful_terminal_event"])
             self.assertFalse(receipt["configured_isolation"]["sandbox_network"])
+            self.assertTrue(receipt["configured_isolation"]["shell_tool_available"])
+            self.assertFalse(receipt["configured_isolation"]["shell_commands_allowed_by_contract"])
+            self.assertFalse(receipt["configured_isolation"]["shell_command_prevention"])
+            self.assertEqual(
+                "post_execution_trace_rejection",
+                receipt["configured_isolation"]["shell_command_acceptance"],
+            )
+            self.assertEqual(0, receipt["trace_observed"]["command_event_count"])
             self.assertIsNone(receipt["model"]["resolved_backend_snapshot"])
             skill_md = next(
                 record for record in receipt["skill_snapshot"]["inventory"] if record["path"] == "SKILL.md"

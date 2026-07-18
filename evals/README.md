@@ -30,6 +30,38 @@ Runner 會：
 
 Current runner 的 `status: completed` 只表示 exact-output、`DESIGN.md` clean 與 deterministic HTML/Chromium/Axe smoke 通過；它不等於 screenshot acceptance、novel discovery、獨立 craft review、完整 release matrix 或商業上線核准。需要這些 claim 時，caller 必須提供獨立的 fresh Playwright evidence plane，否則維持 `UNVERIFIED`。
 
+## Fresh 視覺證據與獨立 craft acceptance
+
+截圖不進 build／repair loop。只對最後一份 `status: completed` 的 current build 執行一次：每個 HTML output 固定擷取 `1440×1000` 桌機與 `390×844` 手機 viewport，各用 fresh BrowserContext。這避免中間輪次、舊圖或另一份 source 冒充本次證據。
+
+真正的 validation／test case 必須放在 evaluator-owned root，不能 commit 到 authoring repository。repo 內的 `current-craft-case.example.json` 只是 schema 範例；`product_cases.json` 仍只做公開 coverage，不是 held-out prompt。case 一旦把具體 feedback 回流 authoring，就視為 development data，不再稱為 held-out。
+
+```bash
+npm run capture:current -- \
+  /absolute/evaluator-root/workspace \
+  /absolute/evaluator-root/case.json \
+  /absolute/evaluator-root/evidence-run-001
+```
+
+Capture command 會拒絕既存 evidence directory，capture 前後重驗 `run-manifest.json` 與所有 output hashes，並在失敗時移除本輪 partial cohort。成功後只留下本次 viewport PNG 與 `capture-receipt.json`；receipt 綁定 case、brief、Skill tree、manifest、outputs、Playwright/Chromium 與每張 PNG 的 hash、尺寸、viewport、locale、state。
+
+獨立 reviewer 仍使用現有 `quality_result.json`、evaluator-owned `policy.json` 與 `ledger.json`，不新增第二套分數。完成 reviewer verdict 與 ledger 後，用 current acceptance wrapper 收口：
+
+```bash
+npm run accept:current -- \
+  /absolute/evaluator-root/workspace/quality-result.json \
+  --ledger /absolute/evaluator-root/ledger.json \
+  --policy /absolute/evaluator-root/policy.json \
+  --workspace-root /absolute/evaluator-root/workspace \
+  --case /absolute/evaluator-root/case.json \
+  --capture-receipt /absolute/evaluator-root/evidence-run-001/capture-receipt.json \
+  --run-manifest /absolute/evaluator-root/workspace/run-manifest.json
+```
+
+`VERIFIED` 必須同時符合既有 deterministic／novel-discovery gates、evaluator release acceptance、完整核心 craft floor，且三個核心 craft 維度都實際引用本次所有 fresh screenshots。Reviewer 只取得 frozen brief、當次 receipt、screenshots 與 evaluator-owned policy；不取得模型 arm、舊圖或前次分數。回流只報 aggregate failure family，避免污染 validation/test partition。
+
+信任邊界仍是 unsigned evaluator contract，不是密碼學證明。`independent: true` 只有在 reviewer 與 policy 實際位於 model write scope 外、且 builder 完成後才啟動時才可信。
+
 ## 現行檔案邊界
 
 - `run_current_skill_build.py`：公開 CLI、repair loop、原子發布與 receipt。
@@ -38,6 +70,8 @@ Current runner 的 `status: completed` 只表示 exact-output、`DESIGN.md` clea
 - `validate_design_md_clean.py`：pinned `@google/design.md` clean 驗證包裝。
 - `playwright_html_smoke.cjs`：fresh Chromium/Axe acceptance smoke。
 - `playwright_browser_runtime.cjs`：共用 Playwright network、popup、Service Worker 與 lifecycle policy。
+- `capture_current_visual_evidence.cjs`：final-only fresh 桌機／手機證據與 provenance receipt。
+- `validate_current_craft_acceptance.py`：把現有 craft policy／ledger 綁回 frozen case、current manifest 與 fresh capture set。
 - `validate_codex_log_policy.py`：bounded stdout/stderr 與敏感輸出政策。
 - `product_cases.json`、`trigger_cases.json`：通用產品與 trigger fixtures，不是已發布成果。
 - `platform-support.json`：現行 package、script、runner 與 browser 的 evidence-bounded 支援快照。
@@ -74,6 +108,8 @@ python3 wow-frontend-design/scripts/validate_installability.py wow-frontend-desi
 python3 wow-frontend-design/scripts/validate_platform_support.py evals/platform-support.json --repository-root .
 python3 wow-frontend-design/scripts/validate_trigger_cases.py evals/trigger_cases.json --references wow-frontend-design/references
 python3 wow-frontend-design/scripts/validate_product_cases.py evals/product_cases.json
+node --check evals/capture_current_visual_evidence.cjs
+python3 -m py_compile evals/validate_current_craft_acceptance.py
 ```
 
 `npm run audit:html -- <path>` 是可選的 pinned Nu HTML Checker；它只提供 markup conformance signal，不證明視覺、互動、可及性或商業品質。

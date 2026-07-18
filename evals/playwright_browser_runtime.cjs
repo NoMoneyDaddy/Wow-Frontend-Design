@@ -80,11 +80,14 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
     browserVersion = browser.version();
     for (const relativePage of pages) {
       for (const profile of profiles) {
-        const context = await browser.newContext({
+        const contextOptions = {
           viewport: profile.viewport,
           reducedMotion: profile.reducedMotion,
           serviceWorkers: "block",
-        });
+        };
+        if (profile.locale) contextOptions.locale = profile.locale;
+        if (profile.dpr) contextOptions.deviceScaleFactor = profile.dpr;
+        const context = await browser.newContext(contextOptions);
         const counters = {
           page_errors: 0,
           console_errors: 0,
@@ -171,7 +174,9 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           visible_primary_content: false,
           root_horizontal_overflow: false,
         };
-        const inspection = navigation === "passed" && inspectPage ? await inspectPage(page) : {};
+        const inspection = navigation === "passed" && inspectPage
+          ? await inspectPage(page, { relativePage, profile })
+          : {};
         results.push({
           page: relativePage,
           profile: profile.name,

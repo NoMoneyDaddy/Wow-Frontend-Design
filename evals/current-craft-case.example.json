@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "case_id": "synthetic-example-not-held-out",
+  "run_id": "replace-with-unique-run-id",
+  "partition": "validation",
+  "brief": {
+    "bytes": 1,
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "capture_plan": {
+    "locale": "zh-Hant",
+    "state": "default",
+    "pages": "all_html_outputs",
+    "wait_condition": "load+fonts+two-raf+300ms+two-raf",
+    "profiles": [
+      {
+        "name": "desktop-default",
+        "viewport": {"width": 1440, "height": 1000},
+        "reducedMotion": "no-preference",
+        "dpr": 1
+      },
+      {
+        "name": "mobile-default",
+        "viewport": {"width": 390, "height": 844},
+        "reducedMotion": "reduce",
+        "dpr": 1
+      }
+    ]
+  },
+  "craft": {
+    "rubric_version": "wow-core-craft-v1",
+    "required_dimensions": ["concept-coherence", "originality", "visual-typography"],
+    "feedback_policy": "aggregate-failure-families-only"
+  }
+}
