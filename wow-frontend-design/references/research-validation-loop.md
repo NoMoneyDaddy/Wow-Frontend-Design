@@ -66,6 +66,14 @@ Every fix needs:
 
 Run the narrow regression first, then the complete suite. The loop is automatic: the user must not relay diagnostics or restart the Skill between attempts. Three identical failed repair attempts trigger the workflow fuse; preserve the best working artifact, screenshots, and evidence, then hand off `PARTIALLY VERIFIED` with the next executable action rather than guessing indefinitely or returning an empty rejection.
 
+## Control system growth
+
+Do not add a checker, schema field, screenshot, dependency, or universal rule merely because another edge case is imaginable. First show a reproducible defect, why the existing instruction or lowest reliable gate cannot express it, a valid counterexample, and the measured context/runtime/maintenance cost. Prefer clarifying a mother rule, fixing a false-positive boundary, or reusing one browser primitive over adding a parallel mechanism. A candidate that adds more surface than distinct claim coverage must replace or consolidate existing surface; otherwise reject it.
+
+Freeze one scope-proportionate discovery pass before execution, including its routes, states, viewports, interactions, and cap. Stop a product loop after the acceptance contract passes once and that bounded pass has no open reproducible finding. A new ordinary finding outside the frozen pass queues for a separately authorized round instead of silently expanding the current loop. A reproducible safety, data-integrity, primary-task, or accessibility hard-gate finding immediately limits the affected claim to `PARTIALLY VERIFIED` or `UNVERIFIED`; preserve its evidence and open one explicitly bounded repair round.
+
+A Skill round has three exits. Promote only when the candidate passes affected evidence plus every applicable release/held-out gate. Reject and roll back to best-so-far when an affected hard gate regresses or the bounded hypothesis fails. Preserve `PARTIALLY VERIFIED` or `UNVERIFIED` when required infrastructure remains unavailable after its bounded retry. Fire the no-gain fuse when two consecutive Skill candidates with the same failure key improve neither the lexicographic hard-gate vector nor distinct claim coverage while context/runtime/maintenance cost stays level or grows; retain best-so-far and stop. Passing evidence is a convergence signal, not an invitation to invent another probe.
+
 ## Promote research cautiously
 
 Prefer current standards, official platform/framework documentation, systematic reviews, and original peer-reviewed work. Record revision/date, applicable population/platform, outcome, limitations, and license. Community Skills and popular repositories are design hypotheses and implementation examples, not authority or permission to copy.

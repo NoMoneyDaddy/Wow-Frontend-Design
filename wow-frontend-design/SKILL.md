@@ -144,6 +144,8 @@ For a run that lasts longer than one normal response interval, send low-noise pr
 
 ### 2. Form the thesis and visual contract
 
+Treat the rules below as decision invariants, never as a visual recipe. Re-derive representation, composition, type, color/material, interaction, and responsive transformation from each brief; no page archetype, palette, font category, radius, effect, or signature treatment is a default.
+
 Before implementation, record terse working decisions:
 
 1. audience/context and access needs;
@@ -152,7 +154,7 @@ Before implementation, record terse working decisions:
 4. top task, content order, and primary action;
 5. layout/type/shape/material/image grammar;
 6. semantic color roles, gamut/fallback, appearances, and evidence boundary;
-7. one scope-proportionate authored distinction or identity to preserve;
+7. the minimum sufficient authored identity to create, preserve, improve, or deliberately omit;
 8. mobile reorder/replacement/deferral/thumb-reach transformation.
 
 Use real brand/product evidence; do not infer demographics or copy a reference. Compare two, occasionally three, directions only when a material choice is unresolved. Focused repairs inherit the existing direction.
@@ -173,7 +175,7 @@ Use realistic content and implement applicable default, hover, focus, active, di
 
 ### 5. Compose desktop, mobile, and language deliberately
 
-- Give each major task region one focal anchor, reading/action path, and content-bearing role. Decorative tracks must not squeeze or displace the task.
+- Give each major task region a clear focal anchor, reading/action path, and content-bearing role. Decorative tracks must not squeeze or displace the task.
 - Define a small role-based type ladder—metadata, UI/body, component title, section/dialog title, page/display title—and map equivalent components to shared tokens. Semantic heading rank and visual role are related but not identical; verify their rendered distinction instead of assigning arbitrary sizes per element.
 - Choose continuous reading, comparison, browse, master-detail, focused decision, or immersive evidence from the content operation—not from a template catalogue.
 - Use whitespace to express grouping. Unexplained voids, stranded copy, underfilled wide headers/cards, long skinny text, and empty tracks after a state change are repair signals.
@@ -188,17 +190,9 @@ Use realistic content and implement applicable default, hover, focus, active, di
 
 ### 6. Add distinction, then refine
 
-For a new build or broad redesign, derive a scope-proportionate authored distinction from the product's nouns, verbs, states, content, and constraints; do not satisfy this section with a generic “memorable” effect. The distinction may live in the information model, workflow, content cadence, typographic or spatial composition, material or illustration grammar, or interaction. Record `create`, `preserve`, `improve`, or `none`, the target and evidence, its user/task job, why it would not fit an unrelated product, and the restraint reason when the mode is `none`. Prefer `none` over unearned decoration when evidence is insufficient or added salience would compete with scanning, trust, safety, accessibility, or performance. For repair/polish, use `preserve` by default and `improve` only when it solves an observed defect; never create an effect merely to meet an identity quota. Select effects; never apply every treatment to every component. Record role → job → area → dependency/tier → fallback → forbidden contexts → evidence. Hollow type, blur, glow, grain, blend, continuous motion, SVG, Lottie, Canvas, and WebGL are opt-in; essential copy/actions remain solid and available without them.
+For a new build or broad redesign, derive only the minimum sufficient authored identity from the product's nouns, verbs, states, content, and constraints. Record `create`, `preserve`, `improve`, or `none`, its evidence and task job, why it would not fit an unrelated product, and the restraint reason for `none`. Identity may live in the information model, workflow, content cadence, typographic or spatial composition, material or illustration grammar, or interaction; it is not a required signature effect. For repair/polish, `preserve` by default and `improve` only when it solves an observed defect. Prefer `none` when added salience would compete with scanning, trust, safety, accessibility, or performance.
 
-Use the smallest sufficient tier and provide reduced/failure/static results, interruption, cleanup, off-screen pause, and bounded cost. Never inline untrusted SVG; optimization is not sanitization.
-
-Refine in three passes:
-
-1. hierarchy/comprehension: order, task, semantics, legibility, contrast, states;
-2. identity/craft: product truth, typography, spacing, material, icons, motion;
-3. mobile/resilience: transformation, touch, locales, zoom, failures, performance.
-
-Record the important finding and repair from each pass. Run the anti-generic evidence gates; do not turn them into novelty quotas.
+Use only effects earned by that identity, keep essential copy and actions available without them, and provide the reduced, failed, interrupted, off-screen, and static outcomes required by the routed media references. Run the three-pass review in [quality-gates.md](references/quality-gates.md), record its material evidence and repairs, and keep anti-generic checks as product-fit gates rather than novelty quotas.
 
 ### 7. Verify, repair, and hand off
 

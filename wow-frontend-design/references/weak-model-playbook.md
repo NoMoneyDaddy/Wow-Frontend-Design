@@ -49,18 +49,18 @@ Do these in order and write one short answer for each:
 2. **Task**: what is the one most important action?
 3. **Proof**: what content makes the promise credible?
 4. **Feeling**: choose two compatible adjectives and one rejected adjective.
-5. **Grammar**: choose one primary grammar below; add one compatible secondary only when the content requires a named behavior the primary lacks.
+5. **Grammar**: derive the representation and composition from the dominant content operation; use the families below only as prompts, and add another axis only for a named content need.
 6. **Color rule**: state where chroma may appear.
 7. **Type roles**: choose display, reading, and functional behavior.
 8. **Mobile change**: name the major regions that reorder, replace, condense, or defer; do not force changes where the same composition genuinely fits.
-9. **Authored distinction**: for BUILD/broad redesign choose one product-specific memorable moment; for focused repair/polish state the existing identity to preserve or the smallest distinction to improve.
+9. **Authored identity**: record `create`, `preserve`, `improve`, or `none`; create a memorable behavior only when product evidence gives it a task job, and record the restraint reason for `none`.
 10. **Evidence**: list commands and rendered states to verify.
 
 Do not write components until all ten have answers.
 
-## 3. Choose one grammar
+## 3. Derive a grammar
 
-Pick by content, not personal taste.
+Start from the dominant content operation, not personal taste. The families below are diagnostic examples, not a catalogue or required vocabulary; use, combine, rename, or ignore them only where product evidence supports the result.
 
 ### Editorial narrative
 
@@ -122,7 +122,7 @@ Use for immersive products, games, destinations, installations, or conceptual la
 - Signature: navigate, orbit, reveal, or change perspective.
 - Avoid: scroll-jacking, mystery navigation, and inaccessible canvas-only content.
 
-If none fits, choose the grammar closest to the dominant content and customize one axis. Do not combine more than two grammars.
+If none fits, name a product-specific grammar instead of forcing the nearest family. Combine only the axes needed to make the content operation and task legible.
 
 ## 4. Fill the design contract
 

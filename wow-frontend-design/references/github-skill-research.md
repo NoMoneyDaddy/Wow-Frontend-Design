@@ -163,7 +163,7 @@ Adopted architecture: keep one canonical Skill core with triggers, invariants, r
 1. Product truth, top task, audience context, and real assets precede style.
 2. If changing only the product name leaves the thesis intact, redesign it.
 3. Structural marks such as `01/02/03` require a real sequence or index meaning.
-4. For new builds or broad redesigns, concentrate expressive risk in one product-specific signature; focused repair preserves identity and scope.
+4. For new builds or broad redesigns, derive the minimum sufficient identity from product evidence; use a signature only when it has a task job, and allow `none` when restraint better protects the product. Focused repair preserves identity and scope.
 5. Resolve conflicts in this order: user safety, security, privacy, legal/rights, and data/transaction integrity → accessibility and essential task completion → interaction correctness and resilience → performance → visual novelty. Escalate rather than trade away a higher-order constraint.
 6. Product/platform tables are prompts for reasoning, never stereotype lookup.
 7. Breakpoints come from content failure, not device names.

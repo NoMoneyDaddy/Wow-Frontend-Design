@@ -30,12 +30,12 @@ Write one short line for each item. Then freeze the answers.
 2. Top task: the single most important completion.
 3. Proof: which real content/evidence makes the promise credible?
 4. Feel: two compatible adjectives; one adjective to reject.
-5. Grammar: choose one—editorial narrative, precision instrument, material craft, archive/index, kinetic type, or spatial exhibition. Add at most one secondary grammar for a named content need.
+5. Grammar: derive the representation and composition from the content operation and task. Editorial narrative, precision instrument, material craft, archive/index, kinetic type, and spatial exhibition are examples, not a required catalogue; add a secondary grammar only for a named content need.
 6. Color: semantic roles, lightness ladder, chroma budget, supported appearances, non-color state cues, and any psychology claim status (`SUPPORTED | HYPOTHESIS | REJECTED | UNKNOWN`).
 7. Type: display, reading, functional/numeric roles; system fallback; long-locale behavior.
 8. Brand: label every source `explicit`, `observed`, `inferred`, or `unknown`; preserve the stable brand system and keep temporary campaign styling separate.
 9. Mobile: name what reorders, replaces, condenses, defers, becomes sticky, or changes interaction. “Stack everything” is not a mobile plan.
-10. Authored distinction and proof: BUILD/broad redesign gets one product-specific behavior; focused repair preserves or minimally improves existing identity. List exact external checks; do not claim they ran.
+10. Authored identity and proof: record `create`, `preserve`, `improve`, or `none`. BUILD/broad redesign creates a product-specific behavior only when evidence gives it a task job; `none` records the restraint reason. Focused repair preserves or minimally improves existing identity. List exact external checks; do not claim they ran.
 
 If changing the product name leaves evidence, grammar, composition, interaction, and distinction intact, the direction is generic. Derive it again from the product's real noun, verb, audience, material, or data.
 

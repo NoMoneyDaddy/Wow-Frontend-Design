@@ -87,7 +87,7 @@ product meaning → target role → semantic job → visual priority
 → affected area/count → fallback → contrast/input/motion cost → rendered evidence
 ```
 
-- Default to one signature effect and only the supporting effects needed to make it coherent. Repeating a special effect on every component destroys hierarchy and raises fallback cost.
+- When a signature effect is earned, concentrate it and use only the support needed to make it coherent. No effect is the valid default; repeating a special effect on every component destroys hierarchy and raises fallback cost.
 - Permit an effect only when its target role and job are named. A border may group, separate, show state, or express material; hollow display type may create one editorial/technical signature. “Looks premium” is not a job.
 - Keep body prose, form labels/values, errors, warnings, legal terms, prices, transaction data, and ordinary buttons solid and immediately readable.
 - Treat decorative `0.5px` hairlines as optical experiments only after target DPR/zoom inspection; never let them carry essential state or boundary meaning.

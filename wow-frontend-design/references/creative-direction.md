@@ -66,7 +66,7 @@ If a major decision cannot be traced to product meaning, audience need, user pre
 
 ## 3. Generate directions
 
-For an empty build or broad redesign without an approved direction, generate only enough alternatives to resolve a named choice—normally two, sometimes three—and make them differ in more than palette. For focused repair or polish, derive one direction from the existing system instead of expanding scope. An audit reports the existing direction and risks; it does not invent alternatives unless comparison was explicitly requested. When alternatives are in scope, first freeze the known brand, language, core-content, workflow, accessibility, safety, and technical invariants. Give each alternative a different product hypothesis for the named choice, then change the smallest coherent axis set that makes the hypothesis observable. At least one changed axis must materially alter hierarchy, content representation, or task behavior; add dependent axes only when evidence makes them necessary. Record changed axis → product basis → expected task/layout consequence → validation method. Palette-only restyling, effect-only novelty, unrelated axis churn, and a preselected style-label bundle do not count. Possible axes include:
+For an empty build or broad redesign without an approved direction, generate only enough alternatives to resolve a named choice—normally two, sometimes three—and make them differ in more than palette. For focused repair or polish, derive one direction from the existing system instead of expanding scope. An audit reports the existing direction and risks; it does not invent alternatives unless comparison was explicitly requested. When alternatives are in scope, first freeze the known brand, language, core-content, workflow, accessibility, safety, and technical invariants. Give each alternative a different product hypothesis for the named choice, then change the smallest coherent axis set that makes the hypothesis observable. At least one changed axis must materially alter hierarchy, content representation, or task behavior; add dependent axes only when evidence makes them necessary. Record changed axis → product basis → expected task/layout consequence → validation method. Palette-only restyling, effect-only novelty, unrelated axis churn, and a preselected style-label bundle do not count. The following axes are prompts for product-derived reasoning, never a catalogue, required vocabulary, or bundle to copy:
 
 - composition: axial, editorial, modular, radial, spatial, dense, sparse;
 - typography: expressive serif, grotesk, humanist, mono, variable, CJK-led;
@@ -156,9 +156,9 @@ After the first runnable slice and before color/effect polish, compare matched d
 
 ## 6. Create or preserve authored distinction
 
-Use a new signature for empty builds and broad redesigns. For focused repair, audit, or polish, name the existing identity to preserve and add no new effect unless it directly solves the scoped problem.
+For empty builds and broad redesigns, decide whether identity is best carried by the information model, workflow, composition, content cadence, material, illustration, or an authored behavior. Create a new signature only when product evidence gives it a user/task job; `none` is valid when added salience would reduce scanning, trust, safety, accessibility, or performance. For focused repair, audit, or polish, name the existing identity to preserve and add no new effect unless it directly solves the scoped problem.
 
-Derive the moment from the product noun or verb:
+When an authored behavior is earned, derive it from the product noun or verb:
 
 | Product truth | Possible authored behavior |
 | --- | --- |
