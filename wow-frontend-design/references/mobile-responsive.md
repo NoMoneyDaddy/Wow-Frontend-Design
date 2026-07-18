@@ -23,6 +23,8 @@ Answer:
 - Which desktop comparison becomes a stepper, tabs, disclosure, or focused detail?
 - What can be deferred without hiding the product's value?
 
+Define first-viewport task priority at the representative mobile height, not a fixed must-fit quota. When current context, a blocking permission/trust state, and the next action can coexist without compressing or truncating required content, prove that combination before secondary evidence. At large text/zoom, in a long locale, or on a short landscape viewport, keep required safety and consent content intact and place the next action directly after it, discoverable, reachable, and unobscured. Source order alone does not pass when a full desktop region displaces those needs; reduce or defer the secondary region behind a truthful, discoverable disclosure, sheet, focused detail, or route.
+
 Do not begin with breakpoints. Begin with task order.
 
 ## 2. Write a transformation table
@@ -39,7 +41,7 @@ Create this before implementing responsive CSS:
 
 Every major region needs an explicit answer. “Stack” is not an answer unless the reading order and interaction remain optimal.
 
-Keep one logical record and state source across responsive modes. A desktop table and mobile card may look different, but hidden duplicate DOM copies must not create repeated IDs, evaluator hooks, accessible identities, stale state, or two independently focusable controls. Prefer one semantic record recomposed by CSS; when distinct templates are necessary, render only the active template and prove state and focus parity in both directions.
+Keep one logical record and state source across responsive modes. A desktop table and mobile card may look different, but hidden duplicate DOM copies must not create repeated IDs, evaluator hooks, accessible identities, stale state, or two independently focusable controls. Share data, state, action, and accessible meaning—not necessarily one DOM composition. Recompose one semantic structure with CSS only while its representation, disclosure, and task path remain optimal; when the mobile task sequence or representation materially differs, render only the active composition from the same state/view model and prove state and focus parity in both directions.
 
 Repeat the transformation table for reachable states, not only the default page. At minimum cross the affected viewport with `default`, `open/expanded`, `filtered`, `validation/error`, and `success/confirmation` when those states exist. A page that becomes mobile-safe only before interaction is not responsive.
 
