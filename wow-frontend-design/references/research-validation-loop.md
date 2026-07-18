@@ -123,6 +123,12 @@ Do not modify the accepted Skill merely because this research sounds plausible. 
 - Measure context/token cost and reference routing after adding guidance.
 - Do not let a better benchmark score justify worse maintainability, accessibility, or design convergence.
 
+### Cross-output convergence telemetry
+
+`scripts/cross_output_template_audit.cjs` is evaluator-only advisory telemetry for two or more independently generated outputs in the same frozen cohort. Compare only matched surface, viewport, and state observations across different cases. Its normalized structure and representation signals deliberately exclude copy, brand color, font identity, and asset source.
+
+`cross_output_template_candidate` and `near_cross_output_template_candidate` are review candidates, never product findings, release blockers, or proof of interchangeability. Confirm a concern through product evidence and paired rendered review; a match does not prove a defect, and a non-match does not prove originality. If consecutive frozen cohorts produce only manual false positives, disable the candidate instead of adding similarity weights, palette rules, or novelty thresholds.
+
 ## Validation-gated Skill optimization
 
 Treat a Skill edit as a candidate, not an improvement claim:

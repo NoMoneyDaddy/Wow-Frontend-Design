@@ -40,7 +40,7 @@ route/state → top user task → required first-understood region → cue used
 
 Visual convergence means independently generated outputs repeatedly collapse onto interchangeable structures, copy, effects or interaction patterns without product evidence. It is an output-diversity and product-fit problem—not a cognitive law and not proof that a familiar pattern is bad.
 
-Use [anti-ai-slop.md](anti-ai-slop.md) for product-swap, representation, silhouette and earned-region gates. Test convergence with fixed briefs, retained raw outputs, anonymized rendered states and an independent reviewer. A different palette, random asymmetry or forced novelty does not count as product-specific distinction; one model pair or one judge cannot establish a general anti-slop effect.
+Use [anti-ai-slop.md](anti-ai-slop.md) only for the post-render product-swap and earned-region review. Representation belongs to [component-composition.md](component-composition.md); blur, grayscale, and silhouette remain bounded craft diagnostics here and in the applicable visual review. Test convergence with fixed briefs, retained raw outputs, anonymized rendered states, and an independent reviewer. A different palette, random asymmetry, or forced novelty does not count as product-specific distinction; one model pair or one judge cannot establish a general anti-slop effect.
 
 ## 3. Cognitive load, memory and choice
 

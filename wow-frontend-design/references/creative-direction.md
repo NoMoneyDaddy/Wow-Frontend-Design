@@ -1,190 +1,98 @@
 # Creative direction
 
-Use this reference to turn content and product strategy into an authored visual system.
+Use this reference to turn product evidence into one specific, implementable direction. It owns the concept and minimum authored identity, not the technical recipes for typography, color, material, components, or motion.
 
 ## Contents
 
-1. Extract meaning
-2. Adapt to audience, task, and preference
-3. Generate directions
-4. Define the visual grammar
-5. Compose with hierarchy
-6. Create or preserve authored distinction
-7. Avoid convergence
+1. Freeze product evidence
+2. Form the direction
+3. Compare only when a decision is unresolved
+4. Create, preserve, improve, or omit authored identity
+5. Prove the direction in a runnable slice
 
-## 1. Extract meaning
+## 1. Freeze product evidence
 
-Answer from evidence before choosing a style:
+Answer from available evidence before naming a direction:
 
-- Who is this for, and what must they accomplish?
-- What should the experience feel like: trusted, urgent, intimate, rigorous, playful, ceremonial, rebellious, calm?
-- What content is uniquely valuable: product detail, data, people, place, process, collection, chronology, comparison?
-- What must be remembered ten minutes later?
-- What existing brand equity must remain recognizable?
+- Who is trying to accomplish what, in which context, with what consequence if the task fails?
+- Which content, data relationship, artifact, process, place, or product behavior is uniquely valuable?
+- What should remain understood or remembered after the task?
+- Which existing brand, workflow, language, and product expectations must remain recognizable?
+- Which preferences or rejections did the user state, and which choices remain genuinely open?
+- Which accessibility, safety, performance, rights, device, and implementation constraints bound the result?
 
-For existing brands, classify every source and rule as `explicit`, `observed`, `inferred`, or `unknown`. A screenshot, campaign, legacy route, competitor, or locale variant is not proof of a system invariant. Use [brand-system-fidelity.md](brand-system-fidelity.md) for the extraction and campaign boundary.
+For an existing product, classify each source or claimed invariant as `explicit`, `observed`, `inherited`, `inferred`, or `unknown`. A screenshot, campaign, legacy route, competitor, or locale variant is evidence of that instance, not proof of a universal system rule. Use [brand-system-fidelity.md](brand-system-fidelity.md) when extracting an existing brand or separating a campaign from the durable system.
 
-Compress the answer into a concept sentence:
+Do not infer visual taste, ability, income, gender, age, or culture from demographics. Prefer supplied research, first-party content, approved assets, product behavior, analytics with known scope, and explicit assumptions that the user can correct.
 
-> `[Product truth] expressed through [visual/interaction behavior], so [audience outcome].`
+Translate a preference into its underlying intent and expected product consequence instead of copying the referenced implementation. Preserve the intent only while it remains compatible with task success, readability, accessibility, performance, safety, and established brand evidence.
 
-Good: “A conservation archive reveals repaired layers instead of hiding them, so visitors feel the care behind every artifact.”
-
-Weak: “A modern, clean site with bold colors and smooth animations.”
-
-## 2. Adapt to audience, task, and preference
-
-Map evidence to design behavior before choosing a style:
-
-| Context signal | Likely design response |
-| --- | --- |
-| High-stakes, infrequent task | Explicit steps, visible status, restrained motion, recovery and trust evidence |
-| Expert, repeated workflow | Higher information density, keyboard paths, stable placement, shortcuts and customization |
-| New or low-literacy audience | Familiar patterns, plain language, progressive disclosure, strong feedback |
-| Exploratory story or cultural content | Editorial pacing, rich media, spatial discovery with clear orientation |
-| Transaction or comparison | Comparable attributes, price/terms clarity, persistent decision context, error prevention |
-| Operational data | Precise hierarchy, compact numerics, state color rules, fast scan and filtering |
-| Community or user content | Identity, provenance, safety/moderation states, resilient unknown content lengths |
-| Mobile/interrupted context | Shorter decision path, thumb reach, resumable state, lower rendering cost |
-
-Use this as a reasoning aid, not a stereotype table. Do not infer visual taste, ability, income, gender, age, or culture from demographics. Prefer user research, supplied references, product evidence, analytics, or explicit assumptions that can be corrected.
-
-Translate preferences into attributes:
-
-- “I like this site” → identify its density, type contrast, pacing, geometry, imagery, and motion—not its exact composition.
-- “Make it premium” → ask or infer which kind: quiet precision, material craft, editorial authority, exclusivity, or high-touch service.
-- “Make it young” → reject the stereotype; identify energy, participation, speed, humor, or subculture evidence instead.
-- Conflicting preferences → preserve the underlying intent while protecting readability, task success, accessibility, performance, and brand consistency.
-
-Create a trace before implementation. Treat behavioral/design research as a hypothesis with a transfer assumption; use [behavioral-design-evidence.md](behavioral-design-evidence.md) when a claim invokes psychology, persuasion, attention or conversion:
+Keep one compact trace:
 
 ```text
-Evidence / stated preference → design decision → affected component → validation method
+source and status → observation → direction decision → affected route/state → proof required
 ```
 
-If a major decision cannot be traced to product meaning, audience need, user preference, or a verified constraint, simplify or remove it.
+Treat design or behavioral research as a hypothesis with a transfer assumption. Use [behavioral-design-evidence.md](behavioral-design-evidence.md) when a claim invokes psychology, persuasion, attention, or conversion. If a material decision has no trace to product meaning, audience need, stated preference, preserved identity, or verified constraint, simplify it or leave it unresolved.
 
-## 3. Generate directions
+## 2. Form the direction
 
-For an empty build or broad redesign without an approved direction, generate only enough alternatives to resolve a named choice—normally two, sometimes three—and make them differ in more than palette. For focused repair or polish, derive one direction from the existing system instead of expanding scope. An audit reports the existing direction and risks; it does not invent alternatives unless comparison was explicitly requested. When alternatives are in scope, first freeze the known brand, language, core-content, workflow, accessibility, safety, and technical invariants. Give each alternative a different product hypothesis for the named choice, then change the smallest coherent axis set that makes the hypothesis observable. At least one changed axis must materially alter hierarchy, content representation, or task behavior; add dependent axes only when evidence makes them necessary. Record changed axis → product basis → expected task/layout consequence → validation method. Palette-only restyling, effect-only novelty, unrelated axis churn, and a preselected style-label bundle do not count. The following axes are prompts for product-derived reasoning, never a catalogue, required vocabulary, or bundle to copy:
-
-- composition: axial, editorial, modular, radial, spatial, dense, sparse;
-- typography: expressive serif, grotesk, humanist, mono, variable, CJK-led;
-- geometry: sharp, cut, soft, stamped, ruled, irregular, continuous;
-- material: paper, glass, ink, fabric, light, metal, cartographic, screen-native;
-- imagery: documentary, macro, diagrammatic, generative, typographic, data-led;
-- motion: inertial, stepped, elastic, mechanical, cinematic, scroll-linked, state-driven;
-- interaction: browse, compare, construct, reveal, tune, trace, collect, navigate.
-
-Reject a direction that violates a frozen invariant or fails an essential task, accessibility, safety, or feasibility boundary; a distinctiveness score cannot offset a blocker. Score each remaining direction 1–5:
-
-| Criterion | Question |
-| --- | --- |
-| Product fit | Does it clarify the product and top task? |
-| Distinctiveness | Would the layout still be recognizable in grayscale? |
-| Usability | Is the reading and action path obvious? |
-| Accessibility | Can it survive contrast, zoom, keyboard, and reduced motion? |
-| Feasibility | Can it be built and verified within scope? |
-
-Choose the highest evidence-backed direction. Combine directions only when their rules are compatible.
-
-If the brief explicitly asks for award quality or an immersive brand/portfolio experience, use [award-quality-lens.md](award-quality-lens.md) only after choosing a product-fit direction. Do not start from an award-gallery trope and reverse-engineer a product around it.
-
-## 4. Define the visual grammar
-
-### Color
-
-Give color a job. Define roles such as canvas, surface, ink, muted ink, action, status, selection, data series, and focus. Add one sentence that controls chroma, for example:
-
-- “Vermilion appears only when the user can act.”
-- “Color encodes time; older records lose saturation.”
-- “Product materials carry color; interface chrome remains neutral.”
-
-Check contrast on actual layered and moving backgrounds, not token pairs alone. Use color plus text, shape, or position for status.
-
-Use [color-system-psychology.md](color-system-psychology.md) for the semantic appearance matrix, rendered contrast, and evidence boundary for color-emotion or conversion claims. A named mood is a creative direction; it is not proof that a hue causes that emotion or behavior.
-
-### Typography
-
-Assign roles before font families:
-
-- display voice: identity and emotional register;
-- reading voice: body clarity across target scripts;
-- functional voice: controls, data, labels, and compact UI;
-- numeric behavior: tabular, proportional, slashed zero, units.
-
-One family may fill all roles if its range is strong. Verify the exact weights and glyph coverage. Do not simulate unavailable bold or italic. Avoid tiny uppercase Latin labels as a universal hierarchy device, especially in CJK interfaces.
-
-### Shape and depth
-
-Choose one geometry family and a small number of exceptions. Radius is not decoration; relate it to product character and component scale. Prefer borders, tonal separation, overlap, or whitespace before defaulting to large shadows.
-
-For a system spanning borders, type, component states, light, material, effects, and motion, freeze the craft rules in [visual-material-system.md](visual-material-system.md) before styling individual components.
-
-### Texture and imagery
-
-Choose imagery that carries evidence or atmosphere. Set crop, aspect ratio, color treatment, caption, and loading behavior. Decorative texture must remain subtle at different pixel densities and never reduce text contrast.
-
-### Motion
-
-Define:
-
-- entry behavior;
-- state-change behavior;
-- navigation behavior;
-- signature behavior;
-- reduced-motion equivalent.
-
-Reuse a small duration and easing vocabulary. Motion should explain causality, preserve orientation, or create emphasis. It must not hold content hostage.
-
-## 5. Compose with hierarchy
-
-Before component markup, record one composition proof for each representative route/state in working notes or the `Layout` section of `DESIGN.md`, never in product copy:
+Compress the evidence into one working concept:
 
 ```text
-frame/state → F1 dominant anchor → F2 counterweight/support
-→ reading/action path → dense/quiet transition → anchored grid break, if earned
-→ representative/sparse/dense content pressure → track/representation response
-→ mobile equivalent → explicit failure signal
+product truth → perceptible behavior → user outcome
 ```
 
-- Derive `F1` from the top task or most valuable content. Use scale, position, contrast, density, and whitespace so an independent reviewer can find it without accent color. `F2` must support, compare with, or deliberately counterweight `F1`; it is not a second arbitrary hero.
-- Give every major region a place in the reading/action path. Focused flows may have one primary next action; dashboards, documentation, and multi-workspace products may preserve several grouped actions. Do not invent one global CTA.
-- Name one real density or pacing transition. Repeated units must remain comparable; unique content should use sequence instead of a fake equal grid. Important content may escape a generic container when safe.
-- Pressure-test each task-bearing major region with representative, sparse, and dense reachable content. Recompose its track or representation when sparse content becomes stranded in an oversized surface or dense content obscures the reading/action path; while preserving required content and equivalent access, reduce, combine, summarize, disclose, or show an earned overview instead of adding filler or decoration. Quiet space remains valid when it deliberately shapes reading around an anchored task region and does not detach required context or action; geometry alone is not a failure.
-- Break alignment only from a visible anchor. A task-appropriate single column is valid; asymmetry, F/Z patterns, and a fixed number of regions are never quotas.
+The product truth must name something supported by the evidence. The perceptible behavior describes what the experience makes clear or possible; it is not a style label, effect, palette, font category, layout archetype, or motion preset. The outcome must relate to the user's task or understanding rather than a claim that the interface feels polished.
 
-After the first runnable slice and before color/effect polish, compare matched desktop and mobile frames with the same content. Blur, inspect in grayscale, and disable optional effects. Recompose the representation, order, track sizes, or grouping when `F1`/`F2` order disappears, major regions become equal in width/density/silhouette without a task reason, a grid break has no anchor, the page has no density shift, or mobile loses the reading/action path. Do not attempt to repair a failed composition proof by changing palette, adding shadows, increasing radius, or adding motion.
+Use the task representation and content order established by the core workflow or [component-composition.md](component-composition.md). Creative direction may strengthen their meaning, emphasis, and identity, but must not replace a correct task surface merely to appear unusual.
 
-## 6. Create or preserve authored distinction
+Name why the direction belongs to this product. Test the identity-bearing decision by removing the product name, logo, and accent color: if the same rationale remains equally defensible for an unrelated product, return to the evidence instead of adding novelty. Familiar patterns remain valid when the task, platform, accessibility, or existing system earns them.
 
-For empty builds and broad redesigns, decide whether identity is best carried by the information model, workflow, composition, content cadence, material, illustration, or an authored behavior. Create a new signature only when product evidence gives it a user/task job; `none` is valid when added salience would reduce scanning, trust, safety, accessibility, or performance. For focused repair, audit, or polish, name the existing identity to preserve and add no new effect unless it directly solves the scoped problem.
+Record an evidence-backed rejection only when the brief, existing product, or a material unresolved choice provides one. Do not invent a disliked trope or visual opposite merely to complete the record.
 
-When an authored behavior is earned, derive it from the product noun or verb:
+## 3. Compare only when a decision is unresolved
 
-| Product truth | Possible authored behavior |
-| --- | --- |
-| layers / history | peel, restore, compare, trace |
-| precision / instruments | tune, calibrate, measure, align |
-| collection / archive | index, reveal provenance, spatial browse |
-| collaboration / voices | converge, harmonize, annotate, hand off |
-| growth / ecosystem | branch, cluster, react, propagate |
-| movement / journey | route, orbit, progress, change perspective |
+An empty build or broad redesign may compare two, occasionally three, directions only when a named material choice remains unresolved. Focused repair and polish inherit the existing direction unless evidence shows that direction is the root cause. An audit describes the current direction and risks; it does not invent alternatives unless comparison was requested.
 
-When a signature is in scope, define its static state first. Then add interaction. Ensure a user can understand the meaning without discovering the effect.
+Before comparison, freeze the product truth, top task, required content and states, brand and language invariants, accessibility and safety needs, preserved contracts, and implementation boundary. Each candidate must express a different product hypothesis for the unresolved choice and state:
 
-## 7. Avoid convergence
+```text
+hypothesis → product evidence → observable task/content consequence → implementation impact → proof
+```
 
-Apply the evidence boundary and deterministic gates in [anti-ai-slop.md](anti-ai-slop.md). “Avoid convergence” does not mean forcing novelty: familiar patterns stay when task, platform, accessibility, or existing-brand evidence earns them.
+Candidates do not differ merely because their colors, effects, or labels differ. Reject any candidate that violates a frozen invariant or essential task, access, safety, rights, performance, or feasibility boundary. Choose the candidate best supported by the declared outcome and evidence; do not convert subjective judgment into a numeric quality score. Combine candidates only when their rules and consequences remain coherent.
 
-Before finalizing, compare the design against common defaults:
+If the brief explicitly requests award-quality, immersive, campaign, or jury-oriented review, apply [award-quality-lens.md](award-quality-lens.md) only after selecting a product-fit direction. That lens cannot supply the product truth or override a blocker.
 
-- Could the logo and copy be swapped with another startup unchanged?
-- Is the identity only a font plus accent color?
-- Is the hero the only distinctive section?
-- Do all cards, buttons, and images share one arbitrary radius?
-- Does motion repeat the same fade-up everywhere?
-- Is mobile simply desktop in one column?
-- Did convenience choose the layout instead of content?
+## 4. Create, preserve, improve, or omit authored identity
 
-Treat each “yes” as a hypothesis, not a quota. Revise when the repeated defaults make the product interchangeable or weaken its task; keep a familiar pattern when product evidence, convention, or accessibility justifies it.
+Record the identity decision as `create`, `preserve`, `improve`, or `none`, with its evidence and task job. Name the primary place where identity is carried without selecting from a style menu. Supporting decisions should reinforce that source rather than compete to become separate signatures.
+
+- For an empty build or broad redesign, create only the minimum distinction the evidence earns.
+- For retrofit, preserve established identity and improve only the part that blocks the requested outcome.
+- For focused repair, audit, or polish, preserve by default and introduce no unrelated signature.
+- Use `none` when extra salience would compete with scanning, trust, safety, accessibility, performance, or the existing system.
+
+An authored behavior is optional. Admit one only when a product noun, verb, state, or relationship gives it a user or task job. Define the complete static state first, keep the meaning understandable without discovering the behavior, and route implementation, interruption, fallback, and reduced-motion details to the applicable technical reference.
+
+## 5. Prove the direction in a runnable slice
+
+Before implementation, keep a terse direction record:
+
+```text
+concept → evidence locators → preserved invariants → identity decision
+→ affected route/state → expected task/content consequence → failure signal
+```
+
+The first representative slice must make the concept observable through real or clearly labelled content, the actual task representation, and the minimum system roles needed to render it. It must also preserve a useful static result and the mobile task transformation required by the core workflow. Do not delay a runnable slice to complete a direction deck or fill unused design-system categories.
+
+After rendering, review the direction rather than a checklist of fashionable traits:
+
+- Can a reviewer trace the identity-bearing decision to the recorded product evidence?
+- Does it improve the intended task, content understanding, or preserved recognition?
+- Does the rationale still depend on this product when name, logo, and accent color are removed?
+- Does the direction remain understandable when optional effects are absent?
+- Did implementation preserve the frozen contracts and avoid inventing unsupported product truth?
+
+If the slice does not support the concept, revise the unsupported decision or return to the evidence. Do not repair a weak direction by adding decoration. Apply [anti-ai-slop.md](anti-ai-slop.md) only as the post-render product-specific review defined by the core workflow.

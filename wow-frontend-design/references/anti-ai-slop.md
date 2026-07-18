@@ -1,124 +1,30 @@
-# Anti-AI-slop contract
+# Product-specific post-render review
 
-Use this contract during BUILD, broad RETROFIT, and any request for distinctive, premium, memorable, or award-level frontend work. It prevents interchangeable output without turning novelty into a quota.
+Use this reference only after a runnable interface has been rendered. It reviews whether the visible result is supported by product evidence; it does not choose a direction, prescribe a style, replace task-specific quality gates, or award originality.
 
 ## Boundary
 
-`AI slop` means output whose form, content, interaction, or confidence is not earned by the product evidence. It includes interchangeable defaults, content-free decoration, fabricated proof, dead demo interactions, and self-certified quality.
+An anti-slop finding is a visible claim, region, or overall concept whose product relevance cannot be explained from available evidence. Interchangeability is a review signal, not a defect by itself.
 
-Familiar patterns are allowed when they are the clearest task-appropriate pattern, follow the existing design system, or reduce accessibility and platform risk. Do not replace a correct table, native control, or conventional checkout merely to look unusual. Distinction is proportional to scope: a focused repair may preserve identity instead of inventing one.
+Familiar patterns are allowed when they clearly support the task, preserve an existing system, or reduce accessibility, platform, learning, or implementation risk. Conventional structure may be the correct product-specific choice. Do not demand novelty, ban a technique, count stylistic devices, or require a signature effect.
 
-Never use a mechanical quota such as “no gradients,” “exactly three asymmetries,” or “every page needs a signature effect.” Those rules create a different kind of sameness.
+Judge only the rendered product surface and the evidence available for that surface. Route component, interaction, responsive, motion, accessibility, security, and implementation defects to their owning references and gates.
 
-## Decision record
+## Review
 
-For every suspicious default or proposed signature, record one terse row:
+Apply these checks to representative rendered routes and states:
 
-```text
-signal → product/task evidence → keep or replace → affected region/state → proof still required
-```
-
-Missing product evidence means remove or simplify the effect. Existing-system evidence may justify keeping a familiar pattern.
-
-## Seven failure classes
-
-### 1. Content and provenance
-
-- vague headlines that could name any product;
-- invented metrics, clients, testimonials, prices, people, awards, availability, or social proof;
-- a local demo that claims an email, payment, upload, save, sync, or support ticket succeeded remotely;
-- copy that explains the design, breakpoint, evaluator, or anti-slop strategy to customers;
-- plausible-sounding facts that have no source or explicit placeholder label.
-
-### 2. Information architecture and surface mismatch
-
-- landing-page anatomy forced onto dashboards, settings, editors, checkout, support, or data tools;
-- every route becoming `hero → feature cards → CTA`;
-- a gallery, card grid, carousel, or bento used where comparison, scanning, sequence, or bulk action requires a table, list, timeline, tree, or form;
-- decoration receiving more hierarchy than the primary task or current state.
-- a large `aria-hidden`/decorative track with no evidence, status, interaction, navigation, verified identity, or necessary-atmosphere role squeezing the real task; CSS/div art and empty illustration frames do not count as product evidence.
-
-### 3. Composition defaults
-
-- every region having the same width, spacing, radius, shadow, and density;
-- all information placed in floating rounded cards or pills;
-- equal three-column grids regardless of content weight;
-- the hero carrying the only visible identity while the rest collapses into a component-library demo;
-- desktop compressed or stacked into mobile without changing priority, disclosure, navigation, density, or input behavior.
-
-### 4. Visual defaults
-
-- unearned purple/blue glow, gradient text, glass panels, blobs, noise, faux chrome, or generic black-and-gold “luxury” styling;
-- mixed icon families, emoji used as product icons, arbitrary radii, and shadows with conflicting light directions;
-- decorative uppercase microcopy applied mechanically to CJK;
-- too many simultaneous type, color, material, border, texture, and lighting effects;
-- imagery or empty gradient boxes presented as factual product evidence.
-
-### 5. Motion defaults
-
-- every element fading upward on scroll;
-- smooth-scroll hijacking, custom cursors, marquee, parallax, tilt, preloader, shader, or globe without a named product job;
-- motion without trigger, interruption, cleanup, reduced-motion result, touch equivalent, or static fallback;
-- continuous work with no visibility pause or bounded resource cost.
-
-### 6. Interaction and state defaults
-
-- dead filters, controls that only change their own styling, unreachable errors, or retry that repeats the same state;
-- success that remains after later invalid input, or contradictory visible and announced state;
-- overlays without background isolation, scroll lock, focus containment, Escape, and reliable focus return;
-- storing only a DOM node for focus return when re-render can replace it; store a stable trigger identity and resolve the live element on close;
-- mobile interactions that still depend on hover, precision pointing, wide comparison, or desktop side panels.
-
-### 7. Verification and code-generation defaults
-
-- “verified,” “accessible,” “responsive,” “zero errors,” or a score without matching evaluator evidence;
-- source keywords or a screenshot used as proof of behavior they cannot establish;
-- giant generated components, duplicated markup, unexplained dependencies, or a specialized runtime for a trivial effect;
-- the implementation model editing its gate, grading itself, or converting missing evidence into a pass.
-
-## Deterministic gates
-
-Run these in order. A failure blocks polish until it is repaired.
-
-1. **Truth gate** — Mark each material fact `official`, `observed`, `inferred`, `placeholder`, or `unknown`. Remove fabricated proof and describe client-only outcomes honestly.
-2. **Task-surface gate** — Name the primary noun and verb. Confirm that the chosen surface supports them; a product dashboard must not inherit landing-page anatomy by default.
-3. **Product-swap gate** — Mentally swap the product name, logo, and accent color. If the concept and most copy still fit an unrelated product, derive the design again from product evidence.
-4. **Representation gate** — For every card/grid/carousel and dedicated visual track, name why it is better than list, table, form, timeline, tree, open composition, or a background treatment for this content and task. A large visual must also name its information/task role and asset provenance.
-5. **Silhouette gate** — Inspect grayscale and region silhouette. The reading order, task hierarchy, and density shifts must survive without accent color or decorative effects.
-6. **Earned-region gate** — Trace each distinctive region to a product noun, verb, material, dataset, cultural context, or verified brand invariant. Remove signatures with no trace.
-7. **Mobile-transformation gate** — Record what mobile reorders, replaces, defers, condenses, or moves into thumb reach. “Stack” alone is not a transformation.
-8. **State-roundtrip gate** — Exercise A→B→A, valid→success→invalid, an actually reachable failure, and a retry that changes or recovers state. Label simulated/local-only results.
-9. **Effect and dependency gate** — Give every effect and dependency one job, lifecycle, fallback, and cost boundary. Prefer the smallest runtime that does the job.
-10. **Evidence-ceiling gate** — A claim cannot exceed the strongest independent evidence. Static inspection cannot prove rendered, browser, touch, assistive-technology, or formal-conformance behavior.
-
-### Optional cross-output convergence telemetry
-
-When an evaluator owns two or more outputs from the same model/run cohort, it may collect a rendered macro fingerprint with `scripts/cross_output_template_audit.cjs` and compare only matching surface, viewport, and state observations across different `caseId` values. The fingerprint excludes copy, brand color, font identity, and asset source; it retains landmark order, normalized major-region geometry, flow/grid structure, radius buckets, and a representation histogram. Same-product routes are not cross-output candidates, and sharing a table, form, or other primitive is not enough when the region graph differs.
-
-The sidecar reports `cross_output_template_candidate` for an exact normalized fingerprint match. It may also report `near_cross_output_template_candidate` when the exact fingerprints differ but their bounded dominant projection remains the same: landmark roles/depth, flow/display, grid-track count and broad balance, region role/representation/display, coarse visual row/column, and representation histogram. This catches spacing, radius, and small track-ratio edits that merely disguise one structure while keeping major visual order and task weighting distinct. The projection contains no similarity score or tunable novelty threshold.
-
-Treat both codes as advisories that require product-evidence review and paired blind renders; they do not change the existing visual report, `visualIssues`, repair authority, release eligibility, or completion verdict. A categorical match does not prove a defect, and a non-match does not prove originality or design quality. If two consecutive frozen cohorts yield only manual false positives and no reproducible, product-evidenced concern, disable the near-template candidate rather than adding weights, palette rules, or more thresholds.
-
-## Weak-model repair order
-
-Do not ask a weak model to “make it less generic” in one subjective step. Repair in this fixed order:
-
-1. semantics, truth, and provenance;
-2. task-surface match and information architecture;
-3. composition hierarchy and representation choice;
-4. brand fidelity, typography, material, and authored distinction;
-5. real mobile transformation;
-6. motion and progressive enhancement;
-7. independent browser evidence and honest handoff.
-
-After each step, re-run only its named gate. Preserve raw output for before/after comparison. A remake produced with a changed skill revision is remediation evidence, not a controlled same-context model ranking.
+1. **Truth** — Identify material visible facts, proof, assets, and claimed outcomes. Confirm that each is official, observed, explicitly supplied, clearly labelled as a placeholder, or honestly described as local/simulated. Unsupported plausibility is a finding.
+2. **Product swap** — Mentally replace the product name, logo, and accent color. If the concept, hierarchy, and material copy still imply the same unrelated product, record a candidate. Confirm it only when product evidence supports a more specific alternative; a familiar task-appropriate pattern is not a failure.
+3. **Earned region** — For each identity-bearing or attention-dominant region, identify the product noun, verb, content relationship, dataset, authorized asset, cultural context, or verified brand invariant it expresses. A region with no product job is a finding when it competes with or distorts the task; quiet or conventional regions need no novelty justification.
+4. **Evidence ceiling** — Limit every review claim to the strongest available evidence. Source inspection cannot establish a rendered result, a screenshot cannot prove interaction, and this review cannot prove usability, accessibility conformance, brand fidelity, originality, award quality, or production readiness.
 
 ## Review result
 
-Report concrete findings, not a universal taste score:
+Report only confirmed findings and unresolved candidates:
 
 ```text
-class → affected route/state → product evidence → user impact → smallest repair → proof status
+finding or candidate → route/state/viewport → product evidence or gap → user impact → smallest owning repair → proof status
 ```
 
-Independent human or rendered review remains necessary for subjective craft. Passing this contract means the output avoided known convergence and truth failures; it does not prove originality, brand fidelity, usability, accessibility, award quality, or production readiness.
+Keep the result concise. Do not produce a taste score or a generation decision record. A clean result means only that this bounded post-render review found no evidenced truth or product-specificity failure.
