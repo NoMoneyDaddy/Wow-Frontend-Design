@@ -1,6 +1,6 @@
 interface:
   display_name: "WOW Frontend Design"
-  short_description: "整合 PM、UX、UI 與前端，建置、接手或重構網站"
-  default_prompt: "使用 $wow-frontend-design 作為整合式 PM、UX、UI 與前端工程流程。需求與授權邊界明確時直接完成可執行成品，不停在計畫；只在新的重大副作用或公開契約變更前停等。驗證同時執行 CONTRACT 與 DISCOVERY，主動確認新問題；瀏覽器互動與截圖只使用 project-pinned Playwright，禁止 Computer Use。將確定問題做最小修正、窄 gate 與受影響矩陣重測，未證明項目標為 UNVERIFIED。只要求稽核時維持唯讀。"
+  short_description: "從產品需求建置、接手、修復並驗證具辨識度的商業前端介面"
+  default_prompt: "使用 $wow-frontend-design 依既有契約完成這個前端需求，產出可執行成品，並以 fresh Playwright 證據與 bounded repair 驗證後交付。"
 policy:
   allow_implicit_invocation: true

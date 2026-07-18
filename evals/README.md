@@ -11,10 +11,27 @@ npm run build:current -- \
   --brief /absolute/path/brief.md \
   --target /absolute/path/output \
   --log-dir /absolute/path/logs \
+  --output DESIGN.md \
   --output index.html
 ```
 
-預設執行模型是 `gpt-5.6-sol`，reasoning effort 是 `high`。可用 `--model` 與 `--reasoning-effort low|medium|high|xhigh` 明示覆寫；receipt 只記錄請求值，不把它當成服務端已履行或品質已通過的證明。
+預設 forward-test builder 是 `gpt-5.4-mini`，reasoning effort 是 `high`。可用 `--model` 與 `--reasoning-effort low|medium|high|xhigh` 明示覆寫；receipt 只記錄請求值，不把它當成服務端已履行或品質已通過的證明。
+
+Greenfield 沿用上方命令。Retrofit 或 patch 使用 evaluator-owned、位於 repository／log／target 之外的小型 frozen seed，並明列唯一可變路徑；seed 其餘檔案必須逐 byte 與 mode 保持不變：
+
+```bash
+npm run build:current -- \
+  --brief /absolute/evaluator-root/brief.md \
+  --target /absolute/evaluator-root/output \
+  --log-dir /absolute/evaluator-root/logs \
+  --case-mode retrofit \
+  --seed-root /absolute/evaluator-root/frozen-project \
+  --allow-change styles.css
+```
+
+`--case-mode patch` 使用相同契約，並必須用 `--patch-lane polish|repair` 明示它是受限呈現調整（`POLISH`）或有證據的缺陷修復（`REPAIR`），不建立平行 lane。Retrofit／patch 必須提供 seed 與至少一個 `--allow-change`；任何未授權修改、刪除、重新命名、新增路徑、file／directory mode 漂移、空目錄遺失、seed 漂移或輸出集合漂移都會拒絕發布。Manifest 只保存 mode、實際 Skill lane、seed file/directory hashes 或 modes 與 observed mutation，不保存外部絕對路徑或 brief 內容。
+
+Runner 不開放 shell 讀檔。小型 seed 會在 hash 重驗後，以最多 256 KiB 的 strict UTF-8 untrusted JSON 放入初始 prompt；每次 repair 另以最多 512 KiB 的當前 output snapshot 提供最小修正所需內容。檔案內的 instruction-like text 一律視為資料，retrofit／patch 的 repair prompt 也會重申原 mutation allowlist；超出 context quota 會 fail closed，不會改成開放 shell 或截斷內容。
 
 Runner 會：
 
@@ -23,7 +40,7 @@ Runner 會：
 3. 以 process group、hard deadline、inactivity deadline、輸出 byte budget 與 exact-output inventory 約束執行。
 4. 驗證 Codex log policy、輸出路徑與 `DESIGN.md` clean contract。
 5. 對 HTML 以 fresh Playwright Chromium context 執行可見內容、console、resource、網路邊界、root overflow 與 Axe smoke。
-6. 將 deterministic failure 壓成 bounded repair packet，讓同一模型與 reasoning effort 做最小修正；每輪只重驗受影響面。
+6. 將 deterministic failure 壓成 bounded repair packet，連同 hash-verified current output snapshot 交給同一模型與 reasoning effort 做最小修正；每輪只重驗受影響面。
 7. 只有全部 release gates clean 時，才以原子 rename 發布 staged artifact，並寫入 runner-owned `run-manifest.json` 與 evaluator receipt。若 repair fuse 觸頂，則把最後一個已驗證 checkpoint 移到 evaluator-owned quarantine、保持 target 空白並回傳失敗 receipt；quarantine 不是可發布成品。
 
 若獨立 Playwright evaluator 不可用，Skill 可以繼續交付 runnable artifact，但相關 rendered claim 必須是 `UNVERIFIED`。模型自己的截圖、分數或完成宣告不能取代 evaluator receipt。

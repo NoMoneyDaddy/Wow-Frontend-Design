@@ -93,6 +93,15 @@ class SkillCoreContractTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text)
+        for mapping in (
+            "greenfield request maps to `BUILD`",
+            "existing-system redesign maps to `RETROFIT`",
+            "user-described patch maps to `POLISH`",
+            "or `REPAIR` when evidence identifies a defect",
+            "Preserve every path outside that allowlist",
+        ):
+            with self.subTest(mapping=mapping):
+                self.assertIn(mapping, self.text)
 
     def test_mobile_accessibility_and_repair_contracts_remain_explicit(self) -> None:
         for phrase in (

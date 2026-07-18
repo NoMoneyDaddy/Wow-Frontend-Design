@@ -41,13 +41,15 @@ Read the smallest sufficient context. On the initial reference pass, read this c
 - Review: use [design-exploration.md](references/design-exploration.md) for a material unresolved comparison, [interaction-audit.md](references/interaction-audit.md) for stateful behavior, [visual-regression-evidence.md](references/visual-regression-evidence.md) for baselines, and [award-quality-lens.md](references/award-quality-lens.md) only when the brief explicitly requests that lens.
 - Maintenance: use [curated-skill-integration.md](references/curated-skill-integration.md) for bounded external-method integration, [behavioral-design-evidence.md](references/behavioral-design-evidence.md) for perception or conversion research, and [research-validation-loop.md](references/research-validation-loop.md), [github-skill-research.md](references/github-skill-research.md), or [ui-skills-ecosystem.md](references/ui-skills-ecosystem.md) only while maintaining this Skill.
 
-Load `quality-gates.md` only for verification. Capability and design references diagnose observed boundaries or decisions; they do not supply a house style.
-
 ## Choose the operating lane
 
 Classify the requested mutation as `AUDIT`, `BUILD`, `RETROFIT`, `POLISH`, or `REPAIR`. For an existing product, preserve declared behavior and choose the smallest sufficient depth: surface, system, composition, experience, or architecture.
 
+Use one vocabulary: a greenfield request maps to `BUILD`; an existing-system redesign maps to `RETROFIT`; a user-described patch maps to `POLISH` for bounded presentation work, or `REPAIR` when evidence identifies a defect. Never add parallel lanes.
+
 `POLISH` and `REPAIR` inherit existing tokens, fonts, motion vocabulary, and shared primitives. Change a global value only when explicitly authorized for that system depth or product/fresh evidence shows it owns the requested outcome or a failure. Stay within the authorized depth; never broaden a local task for a preferred style.
+
+For a patch, freeze allowed files and behavior. Preserve every path outside that allowlist. If a wider change is required, stop for that contract decision.
 
 `AUDIT` is read-only: report evidence and suspected ownership without modifying project files or exercising external side effects.
 
@@ -84,7 +86,7 @@ Choose the interface form from the task operation and content relationship befor
 - desktop role to mobile replacement, reorder, deferral, or interaction change;
 - one stable identity across selection, navigation, async work, visible details, summaries, and actions.
 
-Continuous reading, browse, comparison, master-detail, focused decision, immersive evidence, tables, forms, and cards are possible outcomes, not presets. Select only what the product operation earns.
+Use reading, browse, comparison, master-detail, decision, evidence, table, form, or card structures only when the product operation earns them.
 
 ### 3. Direction
 
@@ -123,7 +125,7 @@ Implement one runnable route or task before expanding architecture. Use real or 
 - one coherent native role/state/keyboard model per control, keyboard and focus behavior, valid composite-ARIA ownership, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
 - framework, route, API, state, analytics, and business-contract preservation.
 
-Expand shared primitives, routes, effects, and optimization only after the slice works. Prefer semantic HTML, modern CSS, and the smallest sufficient JavaScript. Do not rewrite a framework for a CSS problem.
+Expand primitives, routes, effects, or optimization only after the slice works. Prefer semantic HTML, modern CSS, and minimal JavaScript. Do not rewrite a framework for a CSS problem.
 
 ### 6. Pressure, repair, and replay
 
@@ -175,4 +177,4 @@ Label material claims:
 
 Acceptance remains evaluator-owned. Never edit an active gate, accept a self-authored score, present an affected replay as a full matrix, or upgrade `INFERRED` or `UNVERIFIED` evidence.
 
-Report the direction and product evidence, meaningful desktop/mobile behavior, files and public behavior changed or preserved, artifact or launch path, checks actually run, fresh evidence paths or the reason unavailable, and remaining risk with the next executable action. Keep the handoff concise; let the implementation carry the design argument.
+Report the direction, desktop/mobile behavior, changed and preserved contracts, artifact path, executed checks, fresh evidence or its absence, remaining risk, and next executable action. Keep the handoff concise.

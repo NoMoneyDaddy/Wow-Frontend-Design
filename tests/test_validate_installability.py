@@ -43,17 +43,15 @@ class InstallabilityTests(unittest.TestCase):
             encoding="utf-8"
         )
         for signal in (
-            "直接完成可執行成品",
-            "CONTRACT",
-            "DISCOVERY",
-            "project-pinned Playwright",
-            "禁止 Computer Use",
-            "最小修正",
-            "UNVERIFIED",
-            "維持唯讀",
+            "$wow-frontend-design",
+            "產出可執行成品",
+            "fresh Playwright",
+            "bounded repair",
         ):
             with self.subTest(signal=signal):
                 self.assertIn(signal, prompt)
+        self.assertNotIn("CONTRACT", prompt)
+        self.assertNotIn("DISCOVERY", prompt)
         self.assertNotIn("必要時先確認方向與重構深度", prompt)
 
     def test_escaping_link_is_rejected(self) -> None:
