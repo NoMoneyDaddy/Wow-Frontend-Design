@@ -33,6 +33,10 @@ from current_skill_repair import (
     build_repair_prompt,
     compile_design_feedback,
     compile_html_feedback,
+    compile_repair_state,
+    repair_state_digest,
+    repair_state_strictly_progressed,
+    repair_state_stop_reason,
 )
 
 
@@ -1353,7 +1357,9 @@ def run(
     repair_failure: dict[str, Any] | None = None
     failure_artifact: dict[str, Any] | None = None
     attempts: list[dict[str, Any]] = []
+    repair_state_history: list[dict[str, Any]] = []
     repair_rounds = 0
+    repair_stop_reason: str | None = None
     active_stdout_log = stdout_log
     active_stderr_log = stderr_log
     active_prompt = prompt
@@ -1365,11 +1371,14 @@ def run(
     def repair_summary() -> dict[str, Any] | None:
         if repair_rounds == 0:
             return None
-        return {
+        summary = {
             "max_rounds": max_repair_rounds,
             "rounds_used": repair_rounds,
             "attempts": attempts,
         }
+        if repair_stop_reason is not None:
+            summary["stop_reason"] = repair_stop_reason
+        return summary
 
     def validate_candidate() -> list[dict[str, Any]]:
         records = _validate_outputs(
@@ -1493,10 +1502,17 @@ def run(
                 if repair_rounds < max_repair_rounds:
                     try:
                         feedback = compile_design_feedback(design_gate)
+                        repair_state = compile_repair_state("design", design_gate)
                     except ValueError as error:
                         raise RunnerError("DESIGN.md repair feedback infrastructure failure") from error
-                    output_records = perform_repair(feedback, output_records)
-                    continue
+                    stop_reason = repair_state_stop_reason(repair_state_history, repair_state, repair_rounds)
+                    if stop_reason is None:
+                        repair_state_history.append(repair_state)
+                        output_records = perform_repair(feedback, output_records)
+                        continue
+                    repair_stop_reason = stop_reason
+                else:
+                    repair_stop_reason = "round_limit"
                 gate_record = _write_json_exclusive(design_gate_path, design_gate)
                 quarantine_record = _quarantine_outputs(
                     log_dir,
@@ -1536,10 +1552,17 @@ def run(
                 if repair_rounds < max_repair_rounds:
                     try:
                         feedback = compile_html_feedback(html_smoke_gate, browser_contract_data)
+                        repair_state = compile_repair_state("html", html_smoke_gate, browser_contract_data)
                     except ValueError as error:
                         raise RunnerError("HTML repair feedback infrastructure failure") from error
-                    output_records = perform_repair(feedback, output_records)
-                    continue
+                    stop_reason = repair_state_stop_reason(repair_state_history, repair_state, repair_rounds)
+                    if stop_reason is None:
+                        repair_state_history.append(repair_state)
+                        output_records = perform_repair(feedback, output_records)
+                        continue
+                    repair_stop_reason = stop_reason
+                else:
+                    repair_stop_reason = "round_limit"
                 gate_record = _write_json_exclusive(html_smoke_path, html_smoke_gate)
                 quarantine_record = _quarantine_outputs(
                     log_dir,

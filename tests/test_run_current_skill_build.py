@@ -768,17 +768,240 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             completed = self.invoke(brief, target, environment, browser_contract=contract)
             self.assertNotEqual(0, completed.returncode)
             self.assertIn("html_smoke_rejection", completed.stderr)
-            self.assertEqual("3", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
             self.assertEqual([], list(target.iterdir()))
             log_dir = root / "logs"
             self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())
             receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
             self.assertEqual("html_smoke_rejection", receipt["classification"])
-            self.assertEqual(2, receipt["repair"]["rounds_used"])
-            self.assertEqual(3, len(receipt["repair"]["attempts"]))
+            self.assertEqual(1, receipt["repair"]["rounds_used"])
+            self.assertEqual(2, len(receipt["repair"]["attempts"]))
+            self.assertEqual("repeated_failure", receipt["repair"]["stop_reason"])
             self.assertEqual(1, receipt["browser_contract"]["schema_version"])
             self.assertEqual(hashlib.sha256(contract.read_bytes()).hexdigest(), receipt["browser_contract"]["sha256"])
             self.assertNotIn("#primary", json.dumps(receipt))
+
+    def test_distinct_contract_frontiers_unlock_bounded_third_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            case_id = "desktop-progressive-task"
+            steps = [
+                {
+                    "id": f"stage-{index}",
+                    "action": "assert",
+                    "selector": "#primary",
+                    "expect": "visible",
+                }
+                for index in range(1, 4)
+            ]
+            contract = (root / "browser-contract.json").resolve()
+            contract.write_text(json.dumps({
+                "schema_version": 2,
+                "cases": [{
+                    "id": case_id,
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": steps,
+                }],
+            }), encoding="utf-8")
+
+            def rejected(step_index: int) -> dict[str, Any]:
+                finding_id = f"contract-{case_id}-stage-{step_index + 1}"
+                return {
+                    "status": "rejected",
+                    "results": [{
+                        "status": "rejected",
+                        "profile": "desktop",
+                        "navigation": "passed",
+                        "visible_main": True,
+                        "visible_text": True,
+                        "visible_primary_content": True,
+                        "root_horizontal_overflow": False,
+                        "counters": {},
+                        "inspection": {
+                            "axe_rule_ids": [],
+                            "layout_hazards": {},
+                            "browser_contract": {
+                                "case_id": case_id,
+                                "status": "rejected",
+                                "finding_ids": [finding_id],
+                                "failures": [{
+                                    "finding_id": finding_id,
+                                    "reason": "assertion-not-satisfied",
+                                }],
+                                "steps_executed": step_index + 1,
+                            },
+                        },
+                    }],
+                }
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value={"status": "passed", "findings": []}
+            ), mock.patch.object(
+                policy, "_run_html_smoke", side_effect=[rejected(0), rejected(1), rejected(2), {"status": "passed"}]
+            ):
+                manifest = policy.run(
+                    brief,
+                    target,
+                    hard_seconds=5,
+                    log_dir=log_dir,
+                    browser_contract=contract,
+                )
+
+            self.assertEqual("4", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual(3, manifest["repair"]["rounds_used"])
+            self.assertEqual(4, len(manifest["repair"]["attempts"]))
+            self.assertNotIn("stop_reason", manifest["repair"])
+
+    def test_html_repair_that_regresses_design_stops_immediately(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            design_passed = {"status": "passed", "findings": []}
+            design_rejected = {"status": "rejected", "findings": [{"message": "missing YAML"}]}
+            html_rejected = {
+                "status": "rejected",
+                "results": [{
+                    "status": "rejected",
+                    "navigation": "passed",
+                    "visible_main": True,
+                    "visible_text": True,
+                    "visible_primary_content": True,
+                    "root_horizontal_overflow": False,
+                    "counters": {"console_errors": 1},
+                    "inspection": {"axe_rule_ids": [], "layout_hazards": {}},
+                }],
+            }
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", side_effect=[design_passed, design_rejected]
+            ), mock.patch.object(policy, "_run_html_smoke", return_value=html_rejected), self.assertRaisesRegex(
+                policy.RunnerError, "design_gate_rejection"
+            ):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("gate_regression", receipt["repair"]["stop_reason"])
+            self.assertEqual(1, receipt["repair"]["rounds_used"])
+            self.assertEqual([], list(target.iterdir()))
+
+    def test_repair_state_requires_pareto_progress_for_bonus_round(self) -> None:
+        first = {
+            "gate": "html",
+            "counts": {},
+            "cases": {
+                "desktop": {"frontier": 1, "reason_rank": 1, "failures": 1},
+                "mobile": {"frontier": 1, "reason_rank": 1, "failures": 1},
+            },
+        }
+        later = {
+            "gate": "html",
+            "counts": {},
+            "cases": {
+                "desktop": {"frontier": 4, "reason_rank": 1, "failures": 1},
+                "mobile": {"frontier": 3, "reason_rank": 1, "failures": 1},
+            },
+        }
+        regression = {
+            "gate": "html",
+            "counts": {},
+            "cases": {
+                "desktop": {"frontier": 4, "reason_rank": 1, "failures": 1},
+                "mobile": {"frontier": 0, "reason_rank": 1, "failures": 1},
+            },
+        }
+
+        self.assertTrue(policy.repair_state_strictly_progressed(first, later))
+        self.assertFalse(policy.repair_state_strictly_progressed(first, regression))
+        failure_growth = {
+            "gate": "html",
+            "counts": {},
+            "cases": {
+                "desktop": {"frontier": 2, "reason_rank": 1, "failures": 5},
+                "mobile": {"frontier": 2, "reason_rank": 1, "failures": 1},
+            },
+        }
+        self.assertFalse(policy.repair_state_strictly_progressed(first, failure_growth))
+        self.assertEqual("repeated_failure", policy.repair_state_stop_reason([first], first, 1))
+        self.assertEqual("failure_cycle", policy.repair_state_stop_reason([first, later], first, 2))
+        self.assertEqual(
+            "gate_regression",
+            policy.repair_state_stop_reason(
+                [{"gate": "html", "counts": {}, "cases": {}}],
+                {"gate": "design", "counts": {"missing-yaml": 1}},
+                1,
+            ),
+        )
+        self.assertIsNone(policy.repair_state_stop_reason([first], later, 2))
+        self.assertEqual("no_strict_progress", policy.repair_state_stop_reason([later], regression, 2))
+
+        generic_before = {"gate": "html", "counts": {"console-errors": 2}, "cases": {}}
+        generic_better = {"gate": "html", "counts": {"console-errors": 1}, "cases": {}}
+        generic_worse = {"gate": "html", "counts": {"console-errors": 1, "page-errors": 1}, "cases": {}}
+        self.assertTrue(policy.repair_state_strictly_progressed(generic_before, generic_better))
+        self.assertFalse(policy.repair_state_strictly_progressed(generic_before, generic_worse))
+        self.assertTrue(policy.repair_state_strictly_progressed(
+            {"gate": "design", "counts": {"missing-yaml": 1}},
+            {"gate": "html", "counts": {}, "cases": {}},
+        ))
+        self.assertFalse(policy.repair_state_strictly_progressed(
+            {"gate": "html", "counts": {}, "cases": {}},
+            {"gate": "design", "counts": {"missing-yaml": 1}},
+        ))
+
+    def test_repair_state_uses_full_order_independent_receipt_beyond_feedback_quota(self) -> None:
+        rule_ids = [f"rule-{index:02d}" for index in range(24)]
+
+        def receipt(ids: list[str]) -> dict[str, Any]:
+            return {
+                "status": "rejected",
+                "results": [{
+                    "status": "rejected",
+                    "navigation": "passed",
+                    "visible_main": True,
+                    "visible_text": True,
+                    "visible_primary_content": True,
+                    "root_horizontal_overflow": False,
+                    "counters": {},
+                    "inspection": {"axe_rule_ids": ids, "layout_hazards": {}},
+                }],
+            }
+
+        forward = receipt(rule_ids)
+        reverse = receipt(list(reversed(rule_ids)))
+        feedback = policy.compile_html_feedback(forward)
+        forward_state = policy.compile_repair_state("html", forward)
+        reverse_state = policy.compile_repair_state("html", reverse)
+
+        self.assertTrue(feedback["truncated"])
+        self.assertEqual(16, len(feedback["finding_ids"]))
+        self.assertEqual(24, len(forward_state["counts"]))
+        self.assertEqual(forward_state, reverse_state)
+        self.assertEqual(
+            policy.repair_state_digest(forward_state),
+            policy.repair_state_digest(reverse_state),
+        )
+
+        alias_a = {
+            "gate": "html", "counts": {},
+            "cases": {"desktop": {
+                "frontier": 0, "reason_rank": 1, "failures": 2,
+                "atoms": [[0, "assertion-not-satisfied"], [1, "assertion-not-satisfied"]],
+            }},
+        }
+        alias_b = {
+            "gate": "html", "counts": {},
+            "cases": {"desktop": {
+                "frontier": 0, "reason_rank": 1, "failures": 2,
+                "atoms": [[0, "assertion-not-satisfied"], [2, "assertion-not-satisfied"]],
+            }},
+        }
+        self.assertNotEqual(policy.repair_state_digest(alias_a), policy.repair_state_digest(alias_b))
 
     def test_browser_contract_provenance_drift_is_rejected_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1810,14 +2033,14 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertNotIn("PRIVATE orphan token detail", serialized)
             self.assertNotIn(SAFE_DESIGN, serialized)
             self.assertNotIn(str(root), serialized)
-            self.assertEqual("3", (root / "capture" / "invocation-count.txt").read_text(encoding="utf-8"))
-            for attempt in (2, 3):
-                repair_invocation = json.loads(
-                    (root / "capture" / f"invocation-{attempt}.json").read_text(encoding="utf-8")
-                )
-                self.assertNotIn("PRIVATE orphan token detail", repair_invocation["prompt"])
-                self.assertNotIn("UNIQUE-BRIEF-CONTENT", repair_invocation["prompt"])
-                self.assertIn("orphan-token", repair_invocation["prompt"])
+            self.assertEqual("2", (root / "capture" / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual("repeated_failure", receipt["repair"]["stop_reason"])
+            repair_invocation = json.loads(
+                (root / "capture" / "invocation-2.json").read_text(encoding="utf-8")
+            )
+            self.assertNotIn("PRIVATE orphan token detail", repair_invocation["prompt"])
+            self.assertNotIn("UNIQUE-BRIEF-CONTENT", repair_invocation["prompt"])
+            self.assertIn("orphan-token", repair_invocation["prompt"])
             self.assertEqual(
                 hashlib.sha256(gate_path.read_bytes()).hexdigest(),
                 receipt["design_rejection"]["gate_receipt"]["sha256"],
