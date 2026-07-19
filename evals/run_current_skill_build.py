@@ -802,6 +802,20 @@ def _run_html_smoke(
             steps_executed = observed_case.get("steps_executed")
             contract_steps = expected_case["steps"]
             status = observed_case.get("status")
+            expected_ids = [
+                f"contract-{expected_case['id']}-{step['id']}"
+                for step in contract_steps[:steps_executed]
+            ] if type(steps_executed) is int and steps_executed >= 0 else []
+            ordered_observed = [identifier for identifier in expected_ids if identifier in finding_ids] \
+                if isinstance(finding_ids, list) else []
+            action_executed = any(
+                step.get("action") != "assert" for step in contract_steps[:steps_executed]
+            ) if type(steps_executed) is int and steps_executed >= 0 else False
+            stopped_before_action = (
+                type(steps_executed) is int
+                and 0 <= steps_executed < len(contract_steps)
+                and contract_steps[steps_executed].get("action") != "assert"
+            )
             if (
                 observed_case.get("case_id") != expected_case["id"]
                 or status not in {"passed", "rejected"}
@@ -809,14 +823,19 @@ def _run_html_smoke(
                 or type(steps_executed) is not int
                 or not 1 <= steps_executed <= len(contract_steps)
                 or (status == "passed" and (finding_ids or steps_executed != len(contract_steps)))
-                or (status == "rejected" and len(finding_ids) != 1)
+                or (status == "rejected" and not 1 <= len(finding_ids) <= steps_executed)
+                or (status == "rejected" and len(set(finding_ids)) != len(finding_ids))
+                or (status == "rejected" and finding_ids != ordered_observed)
+                or (status == "rejected" and action_executed and finding_ids != expected_ids[-1:])
+                or (
+                    status == "rejected"
+                    and not action_executed
+                    and steps_executed < len(contract_steps)
+                    and not stopped_before_action
+                )
                 or (status == "rejected" and result.get("status") != "rejected")
             ):
                 raise RunnerError("HTML Playwright smoke gate infrastructure failure")
-            if status == "rejected":
-                failed_step = contract_steps[steps_executed - 1]
-                if finding_ids != [f"contract-{expected_case['id']}-{failed_step['id']}"]:
-                    raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     tool.update(
         {
             "lockfile_sha256": _digest(lockfile),

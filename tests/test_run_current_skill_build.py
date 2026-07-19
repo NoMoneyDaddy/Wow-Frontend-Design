@@ -277,13 +277,21 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "id": "mobile-primary-task",
                 "page": "index.html",
                 "profile": "mobile",
-                "steps": [{
-                    "id": "confirmation-in-first-viewport",
-                    "action": "assert",
-                    "role": "button",
-                    "name": "確認時窗",
-                    "expect": "fully-visible-in-viewport",
-                }],
+                "steps": [
+                    {
+                        "id": "segment-control-in-first-viewport",
+                        "action": "assert",
+                        "selector": "fieldset",
+                        "expect": "fully-visible-in-viewport",
+                    },
+                    {
+                        "id": "confirmation-in-first-viewport",
+                        "action": "assert",
+                        "role": "button",
+                        "name": "確認時窗",
+                        "expect": "fully-visible-in-viewport",
+                    },
+                ],
             }],
         }
         receipt = {
@@ -302,22 +310,35 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "browser_contract": {
                         "case_id": "mobile-primary-task",
                         "status": "rejected",
-                        "finding_ids": ["contract-mobile-primary-task-confirmation-in-first-viewport"],
-                        "steps_executed": 1,
+                        "finding_ids": [
+                            "contract-mobile-primary-task-segment-control-in-first-viewport",
+                            "contract-mobile-primary-task-confirmation-in-first-viewport",
+                        ],
+                        "steps_executed": 2,
                     },
                 },
                 "console": ["PRIVATE-CONSOLE"],
             }],
         }
         feedback = policy.compile_html_feedback(receipt, contract)
-        self.assertEqual([{
-            "case_id": "mobile-primary-task",
-            "profile": "mobile",
-            "step_id": "confirmation-in-first-viewport",
-            "action": "assert",
-            "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
-            "expect": "fully-visible-in-viewport",
-        }], feedback["contract_steps"])
+        self.assertEqual([
+            {
+                "case_id": "mobile-primary-task",
+                "profile": "mobile",
+                "step_id": "segment-control-in-first-viewport",
+                "action": "assert",
+                "locator": {"kind": "css", "selector": "fieldset"},
+                "expect": "fully-visible-in-viewport",
+            },
+            {
+                "case_id": "mobile-primary-task",
+                "profile": "mobile",
+                "step_id": "confirmation-in-first-viewport",
+                "action": "assert",
+                "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
+                "expect": "fully-visible-in-viewport",
+            },
+        ], feedback["contract_steps"])
         serialized = json.dumps(feedback, ensure_ascii=False)
         self.assertLessEqual(len(serialized.encode("utf-8")), 4096)
         self.assertNotIn("PRIVATE-CONSOLE", serialized)
@@ -416,6 +437,35 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             receipt = policy._run_html_smoke(stage, ("index.html",), 30, contract)
             self.assertEqual("passed", receipt["status"])
             self.assertEqual(2, receipt["browser_contract"]["schema_version"])
+
+    def test_html_smoke_accepts_ordered_multiple_pre_action_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            (stage / "index.html").write_text(
+                '<!doctype html><html lang="en"><head><title>Contract</title></head><body><main><h1>Task</h1><button id="activate">Activate</button></main></body></html>',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-preconditions",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [
+                        {"id": "missing-group", "action": "assert", "selector": "fieldset", "expect": "visible"},
+                        {"id": "missing-confirmation", "action": "assert", "role": "button", "name": "Confirm", "expect": "visible"},
+                        {"id": "activate", "action": "click", "selector": "#activate"},
+                    ],
+                }],
+            }
+            receipt = policy._run_html_smoke(stage, ("index.html",), 30, contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("rejected", receipt["status"])
+            self.assertEqual([
+                "contract-mobile-preconditions-missing-group",
+                "contract-mobile-preconditions-missing-confirmation",
+            ], mobile["inspection"]["browser_contract"]["finding_ids"])
+            self.assertEqual(2, mobile["inspection"]["browser_contract"]["steps_executed"])
 
     def test_browser_contract_schema_matrix_is_rejected_before_generation(self) -> None:
         valid_case = {

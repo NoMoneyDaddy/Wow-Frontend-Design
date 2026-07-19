@@ -94,6 +94,36 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             self.assertEqual("passed", mobile["status"], mobile)
             self.assertEqual(1, mobile["inspection"]["browser_contract"]["steps_executed"])
 
+    def test_browser_contract_collects_independent_pre_action_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Preconditions</title></head><body>
+<main><h1>Task</h1><button id="activate">Activate</button></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-preconditions",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [
+                        {"id": "missing-group", "action": "assert", "selector": "fieldset", "expect": "visible"},
+                        {"id": "missing-confirmation", "action": "assert", "role": "button", "name": "Confirm", "expect": "visible"},
+                        {"id": "activate", "action": "click", "selector": "#activate"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            observed = mobile["inspection"]["browser_contract"]
+            self.assertEqual([
+                "contract-mobile-preconditions-missing-group",
+                "contract-mobile-preconditions-missing-confirmation",
+            ], observed["finding_ids"])
+            self.assertEqual(2, observed["steps_executed"])
+
     def test_browser_contract_rejects_viewport_element_clipped_by_ancestor(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

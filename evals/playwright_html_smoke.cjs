@@ -354,7 +354,9 @@ async function waitForAssertion(page, locator, step) {
 async function runBrowserContract(page, contractCase) {
   const findingIds = [];
   let stepsExecuted = 0;
+  let actionObserved = false;
   for (const step of contractCase.steps) {
+    if (findingIds.length > 0 && (actionObserved || step.action !== "assert")) break;
     const finding = `contract-${contractCase.id}-${step.id}`;
     const locator = Object.hasOwn(step, "selector")
       ? page.locator(step.selector)
@@ -382,9 +384,13 @@ async function runBrowserContract(page, contractCase) {
     stepsExecuted += 1;
     if (!passed) {
       findingIds.push(finding);
-      break;
+      if (actionObserved || step.action !== "assert") break;
+      continue;
     }
-    if (step.action !== "assert") await settleStep(page);
+    if (step.action !== "assert") {
+      actionObserved = true;
+      await settleStep(page);
+    }
   }
   await page.waitForTimeout(300);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));

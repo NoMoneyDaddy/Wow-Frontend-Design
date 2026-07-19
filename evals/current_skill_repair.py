@@ -169,26 +169,30 @@ def compile_html_feedback(
                     or not 1 <= steps_executed <= len(expected_steps)
                 ):
                     raise ValueError("HTML browser contract repair context is malformed")
-                failed_step = expected_steps[steps_executed - 1]
-                if not isinstance(failed_step, dict):
-                    raise ValueError("HTML browser contract repair context is malformed")
-                descriptor = {
-                    "case_id": case_id,
-                    "profile": result.get("profile"),
-                    "step_id": failed_step.get("id"),
-                    "action": failed_step.get("action"),
-                }
-                if "selector" in failed_step:
-                    descriptor["locator"] = {"kind": "css", "selector": failed_step.get("selector")}
-                else:
-                    descriptor["locator"] = {
-                        "kind": "role",
-                        "role": failed_step.get("role"),
-                        "name": failed_step.get("name"),
+                failed_ids = set(contract_ids)
+                for failed_step in expected_steps[:steps_executed]:
+                    if not isinstance(failed_step, dict):
+                        raise ValueError("HTML browser contract repair context is malformed")
+                    expected_id = f"contract-{case_id}-{failed_step.get('id')}"
+                    if expected_id not in failed_ids:
+                        continue
+                    descriptor = {
+                        "case_id": case_id,
+                        "profile": result.get("profile"),
+                        "step_id": failed_step.get("id"),
+                        "action": failed_step.get("action"),
                     }
-                if failed_step.get("action") == "assert":
-                    descriptor["expect"] = failed_step.get("expect")
-                contract_steps.append(descriptor)
+                    if "selector" in failed_step:
+                        descriptor["locator"] = {"kind": "css", "selector": failed_step.get("selector")}
+                    else:
+                        descriptor["locator"] = {
+                            "kind": "role",
+                            "role": failed_step.get("role"),
+                            "name": failed_step.get("name"),
+                        }
+                    if failed_step.get("action") == "assert":
+                        descriptor["expect"] = failed_step.get("expect")
+                    contract_steps.append(descriptor)
     if not identifiers:
         identifiers = ["unclassified-1"]
     return _bounded_payload("html", identifiers, contract_steps=contract_steps)
