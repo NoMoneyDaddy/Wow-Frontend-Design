@@ -69,6 +69,32 @@ class CurrentSkillBuildTests(unittest.TestCase):
         self.assertIn("npm run build:current --", documentation)
         self.assertIn("runner-owned `run-manifest.json`", documentation)
 
+    def test_attempt_summary_does_not_publish_repair_segment(self) -> None:
+        execution = {
+            "model": {},
+            "prompt": {},
+            "skill_snapshot": {},
+            "configured_isolation": {},
+            "execution": {},
+            "trace_observed": {},
+            "tools": [],
+        }
+        feedback = {
+            "gate": "html",
+            "finding_ids": ["contract-mobile-heading-release-phrase"],
+            "counts": {"contract-mobile-heading-release-phrase": 1},
+            "truncated": False,
+            "contract_steps": [{
+                "expect": "text-segment-on-one-line",
+                "segment": "放行",
+            }],
+            "signature": "0" * 64,
+        }
+        summary = policy._attempt_summary(1, execution, feedback)
+        serialized = json.dumps(summary, ensure_ascii=False)
+        self.assertNotIn("segment", serialized)
+        self.assertNotIn("放行", serialized)
+
     def fixture(self, root: Path, mode: str = "fresh") -> tuple[Path, Path, Path, dict[str, str]]:
         capture = root / "capture"
         capture.mkdir()
@@ -318,6 +344,13 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         "name": "確認時窗",
                         "expect": "fully-visible-in-viewport",
                     },
+                    {
+                        "id": "release-phrase",
+                        "action": "assert",
+                        "selector": "h1",
+                        "expect": "text-segment-on-one-line",
+                        "segment": "放行",
+                    },
                 ],
             }],
         }
@@ -340,6 +373,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         "finding_ids": [
                             "contract-mobile-primary-task-segment-control-in-first-viewport",
                             "contract-mobile-primary-task-confirmation-in-first-viewport",
+                            "contract-mobile-primary-task-release-phrase",
                         ],
                         "failures": [
                             {
@@ -350,8 +384,12 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                                 "finding_id": "contract-mobile-primary-task-confirmation-in-first-viewport",
                                 "reason": "locator-missing",
                             },
+                            {
+                                "finding_id": "contract-mobile-primary-task-release-phrase",
+                                "reason": "assertion-not-satisfied",
+                            },
                         ],
-                        "steps_executed": 2,
+                        "steps_executed": 3,
                     },
                 },
                 "console": ["PRIVATE-CONSOLE"],
@@ -376,6 +414,16 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
                 "expect": "fully-visible-in-viewport",
                 "reason": "locator-missing",
+            },
+            {
+                "case_id": "mobile-primary-task",
+                "profile": "mobile",
+                "step_id": "release-phrase",
+                "action": "assert",
+                "locator": {"kind": "css", "selector": "h1"},
+                "expect": "text-segment-on-one-line",
+                "segment": "放行",
+                "reason": "assertion-not-satisfied",
             },
         ], feedback["contract_steps"])
         serialized = json.dumps(feedback, ensure_ascii=False)
@@ -447,6 +495,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         {"id": "font-loaded", "action": "assert", "selector": "h1", "expect": "font-face-loaded", "family": "Product Display"},
                         {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3.0},
                         {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2.0},
+                        {"id": "heading-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"},
                         {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
                         {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
                         {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
@@ -459,7 +508,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(7, record["step_count"])
+            self.assertEqual(8, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -551,6 +600,26 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "v2-invalid-line-bounds": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "heading-lines", "action": "assert", "selector": "h1",
                 "expect": "line-count-between", "min_lines": 4, "max_lines": 2,
+            }]}]},
+            "v1-cannot-use-text-segment": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                "id": "heading-phrase", "action": "assert", "selector": "h1",
+                "expect": "text-segment-on-one-line", "segment": "放行",
+            }]}]},
+            "v2-empty-text-segment": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "heading-phrase", "action": "assert", "selector": "h1",
+                "expect": "text-segment-on-one-line", "segment": "",
+            }]}]},
+            "v2-padded-text-segment": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "heading-phrase", "action": "assert", "selector": "h1",
+                "expect": "text-segment-on-one-line", "segment": " 放行",
+            }]}]},
+            "v2-control-text-segment": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "heading-phrase", "action": "assert", "selector": "h1",
+                "expect": "text-segment-on-one-line", "segment": "放\n行",
+            }]}]},
+            "v2-oversized-text-segment": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "heading-phrase", "action": "assert", "selector": "h1",
+                "expect": "text-segment-on-one-line", "segment": "界" * 43,
             }]}]},
             "v2-empty-font-family": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "font-loaded", "action": "assert", "selector": "h1",

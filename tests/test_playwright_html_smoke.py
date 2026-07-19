@@ -343,6 +343,51 @@ contractFont.load();
             self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
             self.assertEqual(2, receipt["browser_contract"]["schema_version"])
 
+    def test_v2_text_segment_assertion_uses_exact_rendered_line_geometry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>Lexical line proof</title><style>
+#broken span { display: block; }
+#vertical { writing-mode: vertical-rl; }
+</style></head><body><main><h1>排版驗證</h1>
+<p id="plain">保持放行詞組</p>
+<p id="inline">保持<span>切</span><span>換</span>詞組</p>
+<p id="broken"><span>放</span><span>行</span></p>
+<p id="missing">沒有指定內容</p>
+<p id="duplicate">切換後再次切換</p>
+<p id="overlap">哈哈哈</p>
+<p id="vertical">保持放行詞組</p>
+</main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-lexical-lines",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [
+                        {"id": "plain", "action": "assert", "selector": "#plain", "expect": "text-segment-on-one-line", "segment": "放行"},
+                        {"id": "inline", "action": "assert", "selector": "#inline", "expect": "text-segment-on-one-line", "segment": "切換"},
+                        {"id": "broken", "action": "assert", "selector": "#broken", "expect": "text-segment-on-one-line", "segment": "放行"},
+                        {"id": "missing", "action": "assert", "selector": "#missing", "expect": "text-segment-on-one-line", "segment": "放行"},
+                        {"id": "duplicate", "action": "assert", "selector": "#duplicate", "expect": "text-segment-on-one-line", "segment": "切換"},
+                        {"id": "overlap", "action": "assert", "selector": "#overlap", "expect": "text-segment-on-one-line", "segment": "哈哈"},
+                        {"id": "vertical", "action": "assert", "selector": "#vertical", "expect": "text-segment-on-one-line", "segment": "放行"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual([
+                "contract-mobile-lexical-lines-broken",
+                "contract-mobile-lexical-lines-missing",
+                "contract-mobile-lexical-lines-duplicate",
+                "contract-mobile-lexical-lines-overlap",
+                "contract-mobile-lexical-lines-vertical",
+            ], mobile["inspection"]["browser_contract"]["finding_ids"])
+
     def test_v2_browser_contract_rejects_fragmented_last_line_and_local_overflow(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
@@ -477,10 +522,13 @@ triggerButton.onclick = () => {
 #ambient { animation: ambient 20s linear infinite; }
 </style></head><body><main><h1>Trusted browser reads</h1>
 <button id="poison">Change page intrinsics</button><div id="overflow"><span>Wide content</span></div><div id="ambient">Moving</div>
+<p id="phrase">保持<span>切</span><span>換</span>詞組</p>
 </main><script>
 window.getComputedStyle = () => ({ display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible' });
 Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 10, bottom: 10, width: 10, height: 10 });
 Element.prototype.getAnimations = () => [];
+Range.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 });
+String.prototype.indexOf = () => -1;
 Object.defineProperty(Element.prototype, 'scrollWidth', { configurable: true, get: () => 1 });
 Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get: () => 1 });
 Object.defineProperty(Element.prototype, 'clientWidth', { configurable: true, get: () => 1000 });
@@ -510,6 +558,16 @@ document.querySelector('#poison').onclick = () => {
             })
             desktop = next(item for item in motion["results"] if item["profile"] == "desktop")
             self.assertEqual(["contract-desktop-trusted-read-settled"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+            phrase = self.invoke(stage, ["index.html"], ["index.html"], {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [{
+                    "id": "phrase", "action": "assert", "selector": "#phrase",
+                    "expect": "text-segment-on-one-line", "segment": "切換",
+                }]}],
+            })
+            desktop = next(item for item in phrase["results"] if item["profile"] == "desktop")
+            self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
 
             font = self.invoke(stage, ["index.html"], ["index.html"], {
                 "schema_version": 2,

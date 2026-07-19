@@ -98,6 +98,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const define = Object.defineProperty;
           const numberFunction = Number;
           const stringCharacter = String.prototype.charAt;
+          const stringIndexOf = String.prototype.indexOf;
           const stringLower = String.prototype.toLocaleLowerCase;
           const stringSlice = String.prototype.slice;
           const stringStartsWith = String.prototype.startsWith;
@@ -297,6 +298,11 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                 result[result.length] = node;
               }
               return freeze(result);
+            },
+            uniqueLiteralRange(text, literal) {
+              const start = apply(stringIndexOf, text, [literal]);
+              if (start < 0 || apply(stringIndexOf, text, [literal, start + 1]) >= 0) return null;
+              return freeze({ start, end: start + literal.length });
             },
           });
           define(pageGlobal, "__wowEvaluatorRead", {

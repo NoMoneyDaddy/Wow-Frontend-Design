@@ -74,6 +74,7 @@ BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
     "last-line-graphemes-at-least",
     "line-count-between",
     "no-content-overflow",
+    "text-segment-on-one-line",
 }
 CONTRACT_ID = re.compile(r"[a-z][a-z0-9-]{0,47}")
 ATTRIBUTE_NAME = re.compile(r"[A-Za-z_:][A-Za-z0-9_.:-]{0,63}")
@@ -213,6 +214,8 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     expected_keys.add("count")
                 if expectation == "line-count-between":
                     expected_keys.update({"min_lines", "max_lines"})
+                if expectation == "text-segment-on-one-line":
+                    expected_keys.add("segment")
                 if expectation == "active-animation-count-between":
                     expected_keys.update({"min_animations", "max_animations"})
             _exact_keys(step, expected_keys, "browser contract step")
@@ -269,6 +272,10 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                         or not 1 <= minimum <= maximum <= 128
                     ):
                         raise RunnerError("browser contract line bounds are invalid")
+                elif expectation == "text-segment-on-one-line":
+                    segment = _bounded_contract_text(step.get("segment"), "text segment", 128)
+                    if segment.strip() != segment:
+                        raise RunnerError("browser contract text segment is invalid")
                 elif expectation == "active-animation-count-between":
                     minimum = step.get("min_animations")
                     maximum = step.get("max_animations")

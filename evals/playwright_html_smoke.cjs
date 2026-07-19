@@ -42,7 +42,7 @@ function validateBrowserContract(value, pages) {
       "active-animation-count-between", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
       "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
-      "text-includes", "visible",
+      "text-includes", "text-segment-on-one-line", "visible",
     ];
   const ids = new Set();
   const routes = new Set();
@@ -78,6 +78,7 @@ function validateBrowserContract(value, pages) {
         if (step.expect === "font-face-loaded") expectedKeys.push("family");
         if (step.expect === "last-line-graphemes-at-least") expectedKeys.push("count");
         if (step.expect === "line-count-between") expectedKeys.push("min_lines", "max_lines");
+        if (step.expect === "text-segment-on-one-line") expectedKeys.push("segment");
         if (step.expect === "active-animation-count-between") expectedKeys.push("min_animations", "max_animations");
       }
       if (!step || typeof step !== "object" || Array.isArray(step)
@@ -129,6 +130,10 @@ function validateBrowserContract(value, pages) {
             || step.min_lines < 1 || step.min_lines > step.max_lines || step.max_lines > 128)) {
           throw new Error("invalid browser contract line assertion");
         }
+        if (step.expect === "text-segment-on-one-line"
+          && (!boundedContractText(step.segment, 128) || step.segment.trim() !== step.segment)) {
+          throw new Error("invalid browser contract text segment assertion");
+        }
         if (step.expect === "active-animation-count-between"
           && (!Number.isInteger(step.min_animations) || !Number.isInteger(step.max_animations)
             || step.min_animations < 0 || step.min_animations > step.max_animations || step.max_animations > 128)) {
@@ -158,6 +163,7 @@ async function checkAssertion(locator, step) {
   if ([
     "active-animation-count-between", "animations-settled", "font-face-loaded",
     "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
+    "text-segment-on-one-line",
   ].includes(step.expect)) {
     return locator.evaluate((element, assertion) => {
       const trusted = globalThis.__wowEvaluatorRead;
@@ -294,6 +300,10 @@ async function checkAssertion(locator, step) {
         combined += value;
       }
       const segments = trusted.segments(combined, trusted.locale() || undefined);
+      const literalRange = assertion.expect === "text-segment-on-one-line"
+        ? trusted.uniqueLiteralRange(combined, assertion.segment)
+        : null;
+      if (assertion.expect === "text-segment-on-one-line" && !literalRange) return false;
       for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
         const segment = segments[segmentIndex];
         if (!trusted.hasVisibleText(segment.value)) continue;
@@ -313,8 +323,28 @@ async function checkAssertion(locator, step) {
           segmentEnd - endChunk.start,
         );
         if (rect.width > 0 && rect.height > 0 && rectVisible(rect, trusted.parent(startChunk.node))) {
-          records[records.length] = { rect, value: segment.value };
+          records[records.length] = {
+            rect,
+            value: segment.value,
+            index: segment.index,
+            end: segmentEnd,
+          };
         }
+      }
+      if (assertion.expect === "text-segment-on-one-line") {
+        const matched = [];
+        let expectedGraphemes = 0;
+        const expectedSegments = trusted.segments(assertion.segment, trusted.locale() || undefined);
+        for (let index = 0; index < expectedSegments.length; index += 1) {
+          if (trusted.hasVisibleText(expectedSegments[index].value)) expectedGraphemes += 1;
+        }
+        for (let index = 0; index < records.length; index += 1) {
+          const record = records[index];
+          if (record.index >= literalRange.start && record.end <= literalRange.end) matched[matched.length] = record;
+        }
+        return expectedGraphemes > 0
+          && matched.length === expectedGraphemes
+          && mergeLineRecords(matched).length === 1;
       }
       const lines = mergeLineRecords(records);
       return lines.length > 0 && lines[lines.length - 1].records.length >= assertion.count;
