@@ -57,6 +57,15 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertIn("one coherent native role/state/keyboard model per control", self.text)
         self.assertIn("a live enabled focus target after re-render", self.text)
 
+    def test_responsive_task_order_stays_semantic_and_reachable(self) -> None:
+        representation = self.text.split("### 2. Representation", 1)[1].split(
+            "### 3. Direction", 1
+        )[0]
+        self.assertIn(
+            "Keep responsive task order in the DOM; never fake it with CSS `order` or `*-reverse`.",
+            representation,
+        )
+
     def test_evidence_and_browser_contracts_remain_public(self) -> None:
         for status in ("`VERIFIED`", "`OBSERVED`", "`INFERRED`", "`UNVERIFIED`"):
             with self.subTest(status=status):

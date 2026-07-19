@@ -86,6 +86,8 @@ Choose the interface form from the task operation and content relationship befor
 - desktop role to mobile replacement, reorder, deferral, or interaction change;
 - one stable identity across selection, navigation, async work, visible details, summaries, and actions.
 
+Keep responsive task order in the DOM; never fake it with CSS `order` or `*-reverse`.
+
 When a choice depends on a named relationship, encode it in perceivable content, structure, or control rather than implicit prose. Preserve actual prerequisites and decision dependencies across viewports.
 
 Use reading, browse, comparison, master-detail, decision, evidence, table, form, or card structures only when the product operation earns them.
