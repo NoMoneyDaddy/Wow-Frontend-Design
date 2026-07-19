@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import re
 import shutil
@@ -54,7 +55,21 @@ CASE_MODES = ("greenfield", "retrofit", "patch")
 PATCH_LANES = {"polish": "POLISH", "repair": "REPAIR"}
 BROWSER_PROFILES = {"desktop", "mobile"}
 BROWSER_STEP_ACTIONS = {"assert", "click", "fill", "press", "select"}
-BROWSER_ASSERTIONS = {"attribute-equals", "count-equals", "fully-visible-in-viewport", "text-includes", "visible"}
+BROWSER_ASSERTIONS_V1 = {
+    "attribute-equals",
+    "count-equals",
+    "fully-visible-in-viewport",
+    "text-includes",
+    "visible",
+}
+BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
+    "active-animation-count-between",
+    "animations-settled",
+    "font-face-loaded",
+    "last-line-graphemes-at-least",
+    "line-count-between",
+    "no-content-overflow",
+}
 CONTRACT_ID = re.compile(r"[a-z][a-z0-9-]{0,47}")
 ATTRIBUTE_NAME = re.compile(r"[A-Za-z_:][A-Za-z0-9_.:-]{0,63}")
 
@@ -112,6 +127,17 @@ def _bounded_contract_text(value: Any, label: str, maximum: int) -> str:
     return value
 
 
+def _json_integer(value: Any) -> bool:
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+    ) or (
+        isinstance(value, float)
+        and math.isfinite(value)
+        and value.is_integer()
+    )
+
+
 def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, dict[str, Any], dict[str, Any]]:
     source = _regular_absolute_file(path, "browser contract", BROWSER_CONTRACT_LIMIT)
     try:
@@ -125,8 +151,10 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
         raise RunnerError("browser contract must be a canonical regular JSON file")
     _exact_keys(payload, {"schema_version", "cases"}, "browser contract")
     cases = payload.get("cases")
-    if type(payload.get("schema_version")) is not int or payload["schema_version"] != 1 or not isinstance(cases, list) or not 1 <= len(cases) <= 4:
+    schema_version = payload.get("schema_version")
+    if not _json_integer(schema_version) or schema_version not in {1, 2} or not isinstance(cases, list) or not 1 <= len(cases) <= 4:
         raise RunnerError("browser contract schema or case quota is invalid")
+    schema_version = int(schema_version)
     output_set = set(outputs)
     seen_cases: set[str] = set()
     seen_routes: set[tuple[str, str]] = set()
@@ -170,6 +198,14 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     expected_keys.add("attribute")
                 if expectation == "count-equals":
                     expected_keys.add("count")
+                if expectation == "font-face-loaded":
+                    expected_keys.add("family")
+                if expectation == "last-line-graphemes-at-least":
+                    expected_keys.add("count")
+                if expectation == "line-count-between":
+                    expected_keys.update({"min_lines", "max_lines"})
+                if expectation == "active-animation-count-between":
+                    expected_keys.update({"min_animations", "max_animations"})
             _exact_keys(step, expected_keys, "browser contract step")
             step_id = step.get("id")
             selector = step.get("selector")
@@ -188,7 +224,8 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     raise RunnerError("browser contract key is invalid")
             elif action == "assert":
                 expectation = step.get("expect")
-                if expectation not in BROWSER_ASSERTIONS:
+                assertions = BROWSER_ASSERTIONS_V1 if schema_version == 1 else BROWSER_ASSERTIONS_V2
+                if expectation not in assertions:
                     raise RunnerError("browser contract assertion is invalid")
                 if expectation == "fully-visible-in-viewport" and action_observed:
                     raise RunnerError("browser contract first viewport assertion must precede actions")
@@ -202,16 +239,44 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     _bounded_contract_text(step.get("value"), "value", 256)
                 elif expectation == "count-equals":
                     count = step.get("count")
-                    if type(count) is not int or not 0 <= count <= 1000:
+                    if not _json_integer(count) or not 0 <= count <= 1000:
                         raise RunnerError("browser contract count is invalid")
+                elif expectation == "font-face-loaded":
+                    _bounded_contract_text(step.get("family"), "font family", 128)
+                elif expectation == "last-line-graphemes-at-least":
+                    count = step.get("count")
+                    if not _json_integer(count) or not 1 <= count <= 128:
+                        raise RunnerError("browser contract grapheme count is invalid")
+                elif expectation == "line-count-between":
+                    minimum = step.get("min_lines")
+                    maximum = step.get("max_lines")
+                    if (
+                        not _json_integer(minimum)
+                        or not _json_integer(maximum)
+                        or not 1 <= minimum <= maximum <= 128
+                    ):
+                        raise RunnerError("browser contract line bounds are invalid")
+                elif expectation == "active-animation-count-between":
+                    minimum = step.get("min_animations")
+                    maximum = step.get("max_animations")
+                    if (
+                        not _json_integer(minimum)
+                        or not _json_integer(maximum)
+                        or not 0 <= minimum <= maximum <= 128
+                    ):
+                        raise RunnerError("browser contract animation bounds are invalid")
             else:
                 action_observed = True
             seen_steps.add(step_id)
-            normalized_steps.append(dict(step))
+            normalized_step = dict(step)
+            for field in ("count", "min_lines", "max_lines", "min_animations", "max_animations"):
+                if field in normalized_step:
+                    normalized_step[field] = int(normalized_step[field])
+            normalized_steps.append(normalized_step)
         normalized_cases.append({"id": case_id, "page": page, "profile": profile, "steps": normalized_steps})
-    normalized = {"schema_version": 1, "cases": normalized_cases}
+    normalized = {"schema_version": schema_version, "cases": normalized_cases}
     record = {
-        "schema_version": 1,
+        "schema_version": schema_version,
         "bytes": len(raw),
         "sha256": _digest_bytes(raw),
         "case_count": len(normalized_cases),
@@ -698,7 +763,7 @@ def _run_html_smoke(
         summary_case_ids = contract_summary.get("case_ids") if isinstance(contract_summary, dict) else None
         if (
             not isinstance(contract_summary, dict)
-            or contract_summary.get("schema_version") != 1
+            or contract_summary.get("schema_version") != browser_contract["schema_version"]
             or contract_summary.get("case_count") != len(expected_contract_cases)
             or not isinstance(summary_case_ids, list)
             or len(summary_case_ids) != len(expected_contract_cases)

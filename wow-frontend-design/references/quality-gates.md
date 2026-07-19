@@ -66,6 +66,8 @@ Before rendered verification, run the dependency-free source layout risk audit w
 
 Use its file/line evidence to inspect forced body breaks, globally destructive CJK breaking, prose wrapping disabled in CSS, Latin-`ch` heading measures, and fixed-height text clipping. Medium findings are review candidates. High findings may enter automatic repair only after checking selector scope and intended role. Always confirm the result with computed browser geometry and matched screenshots; source text alone cannot prove a rendered defect or a successful repair.
 
+When an evaluator supplies browser contract v2, use its font, text-geometry, local-overflow, active-animation, and settled-animation assertions for exact selector/content/viewport cases. Keep v1 contracts valid and unchanged. These assertions may convert a frozen evaluator expectation into `REPAIR REQUIRED`; they cannot turn a model-selected threshold into independent evidence or replace glyph, fallback, localization, motion-craft, and visual-craft review.
+
 When rendering is unavailable, route through [no-visual-first-pass.md](no-visual-first-pass.md). Browserless checks may release a low-risk artifact only with an explicit evidence ceiling; they cannot earn rendered-visual, browser, touch, assistive-technology, or formal-conformance acceptance. A structured high-risk no-visual result must be `blocked` or match an `accepted_by_evaluator` record in the evaluator-owned policy; builder-authored acceptance is invalid.
 
 ## 2. Three-pass review

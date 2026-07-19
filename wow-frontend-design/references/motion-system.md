@@ -231,6 +231,8 @@ exact location → observed state → target behavior → existing local precede
 → scope boundary + source/version stamp → mechanical check → rendered interaction check
 ```
 
+When an evaluator supplies browser contract v2, use `active-animation-count-between` immediately after the named trigger to prove that a bounded Web Animations effect actually starts, then use `animations-settled` plus the final product-state assertion to prove convergence. Repeat the trigger sequence for interruption or reversal, and use a reduced-motion profile with zero active animations when that is the declared static result. These assertions observe browser-exposed active animations only; they do not judge timing, easing, spatial continuity, GSAP/Lottie/Rive internals, or visual craft.
+
 Stop when the source or surrounding contract has drifted; re-inspect instead of applying a stale plan. For stateful motion, verify that rapid input never queues a stale destination; a continuously redirectable interaction should retarget from its current rendered state, while an irreversible or staged result may finish or cancel coherently. Check that enter/exit paths share a believable origin. For draggable direct manipulation that owns a Pointer Events sequence, verify grab offset plus capture and release behavior; do not impose that model on native scrolling, pinch/multi-pointer input, or delegated gestures. Test reduced motion and every input mode relevant to the interaction, including coarse pointer when applicable. Use slow-motion replay or named-frame capture only when normal-speed interaction and DOM/runtime evidence leave a real ambiguity; screenshots are diagnostic evidence, not a mandatory count.
 
 Minimum matrix:

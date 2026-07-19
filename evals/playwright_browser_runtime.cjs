@@ -88,6 +88,224 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
         if (profile.locale) contextOptions.locale = profile.locale;
         if (profile.dpr) contextOptions.deviceScaleFactor = profile.dpr;
         const context = await browser.newContext(contextOptions);
+        await context.addInitScript(() => {
+          const pageGlobal = globalThis;
+          const pageDocument = document;
+          const apply = Reflect.apply;
+          const construct = Reflect.construct;
+          const descriptor = Object.getOwnPropertyDescriptor;
+          const freeze = Object.freeze;
+          const define = Object.defineProperty;
+          const numberFunction = Number;
+          const stringCharacter = String.prototype.charAt;
+          const stringLower = String.prototype.toLocaleLowerCase;
+          const stringSlice = String.prototype.slice;
+          const stringStartsWith = String.prototype.startsWith;
+          const stringTrim = String.prototype.trim;
+          const styleFunction = pageGlobal.getComputedStyle;
+          const styleValue = CSSStyleDeclaration.prototype.getPropertyValue;
+          const elementRect = Element.prototype.getBoundingClientRect;
+          const elementAnimations = Element.prototype.getAnimations;
+          const elementAttribute = Element.prototype.getAttribute;
+          const nodeText = descriptor(Node.prototype, "textContent").get;
+          const nodeParent = descriptor(Node.prototype, "parentElement").get;
+          const scrollWidth = descriptor(Element.prototype, "scrollWidth").get;
+          const scrollHeight = descriptor(Element.prototype, "scrollHeight").get;
+          const clientWidth = descriptor(Element.prototype, "clientWidth").get;
+          const clientHeight = descriptor(Element.prototype, "clientHeight").get;
+          const createRange = Document.prototype.createRange;
+          const createTreeWalker = Document.prototype.createTreeWalker;
+          const treeNext = TreeWalker.prototype.nextNode;
+          const rangeSelect = Range.prototype.selectNodeContents;
+          const rangeStart = Range.prototype.setStart;
+          const rangeEnd = Range.prototype.setEnd;
+          const rangeRects = Range.prototype.getClientRects;
+          const rangeRect = Range.prototype.getBoundingClientRect;
+          const rectListLength = descriptor(DOMRectList.prototype, "length").get;
+          const rectListItem = DOMRectList.prototype.item;
+          const rectPrototype = DOMRectReadOnly.prototype;
+          const rectGetters = Object.fromEntries(
+            ["bottom", "height", "left", "right", "top", "width"].map((name) =>
+              [name, descriptor(rectPrototype, name).get]),
+          );
+          const animationState = descriptor(Animation.prototype, "playState").get;
+          const fontFaceFamily = descriptor(FontFace.prototype, "family").get;
+          const fontFaceStatus = descriptor(FontFace.prototype, "status").get;
+          const fontSet = pageDocument.fonts;
+          const fontIterator = Object.getPrototypeOf(fontSet)[Symbol.iterator];
+          const fontIteratorSample = apply(fontIterator, fontSet, []);
+          const fontIteratorNext = Object.getPrototypeOf(fontIteratorSample).next;
+          const segmentConstructor = Intl.Segmenter;
+          const segmentMethod = Intl.Segmenter.prototype.segment;
+          const segmentSample = apply(segmentMethod, construct(segmentConstructor, [undefined, { granularity: "grapheme" }]), [""]);
+          const segmentIterator = Object.getPrototypeOf(segmentSample)[Symbol.iterator];
+          const segmentIteratorSample = apply(segmentIterator, segmentSample, []);
+          const segmentIteratorNext = Object.getPrototypeOf(segmentIteratorSample).next;
+
+          const normalizeFamily = (value) => {
+            let normalized = apply(stringTrim, value, []);
+            const first = apply(stringCharacter, normalized, [0]);
+            const last = apply(stringCharacter, normalized, [normalized.length - 1]);
+            if ((first === "\"" && last === "\"") || (first === "'" && last === "'")) {
+              normalized = apply(stringSlice, normalized, [1, -1]);
+            }
+            return apply(stringLower, normalized, []);
+          };
+          const appliedFontFamilies = (value) => {
+            const families = [];
+            let token = "";
+            let quote = "";
+            let escaped = false;
+            for (let index = 0; index < value.length; index += 1) {
+              const character = apply(stringCharacter, value, [index]);
+              if (escaped) {
+                token += character;
+                escaped = false;
+              } else if (character === "\\") {
+                token += character;
+                escaped = true;
+              } else if (quote) {
+                token += character;
+                if (character === quote) quote = "";
+              } else if (character === "\"" || character === "'") {
+                token += character;
+                quote = character;
+              } else if (character === ",") {
+                families[families.length] = normalizeFamily(token);
+                token = "";
+              } else {
+                token += character;
+              }
+            }
+            if (apply(stringTrim, token, []).length > 0) families[families.length] = normalizeFamily(token);
+            return families;
+          };
+
+          const rectNames = ["bottom", "height", "left", "right", "top", "width"];
+          const snapshotRect = (rect) => {
+            const result = {};
+            for (let index = 0; index < rectNames.length; index += 1) {
+              const name = rectNames[index];
+              result[name] = apply(rectGetters[name], rect, []);
+            }
+            return freeze(result);
+          };
+          const makeRange = () => apply(createRange, pageDocument, []);
+          const evaluatorRead = freeze({
+            activeAnimationCount(element) {
+              const animations = apply(elementAnimations, element, [{ subtree: true }]);
+              let count = 0;
+              for (let index = 0; index < animations.length; index += 1) {
+                const state = apply(animationState, animations[index], []);
+                if (state === "pending" || state === "running") count += 1;
+              }
+              return count;
+            },
+            attribute(element, name) {
+              return apply(elementAttribute, element, [name]);
+            },
+            fontFaceLoaded(element, family) {
+              const expected = normalizeFamily(family);
+              const computed = apply(styleFunction, pageGlobal, [element]);
+              const applied = appliedFontFamilies(apply(styleValue, computed, ["font-family"]));
+              let familyApplied = false;
+              for (let index = 0; index < applied.length; index += 1) {
+                if (applied[index] === expected) familyApplied = true;
+              }
+              if (!familyApplied) return false;
+              const iterator = apply(fontIterator, fontSet, []);
+              while (true) {
+                const item = apply(fontIteratorNext, iterator, []);
+                if (item.done) return false;
+                if (normalizeFamily(apply(fontFaceFamily, item.value, [])) === expected
+                  && apply(fontFaceStatus, item.value, []) === "loaded") return true;
+              }
+            },
+            hasVisibleText(value) {
+              return apply(stringTrim, value, []).length > 0;
+            },
+            horizontalWritingMode(value) {
+              return apply(stringStartsWith, value, ["horizontal"]);
+            },
+            locale() {
+              return apply(elementAttribute, pageDocument.documentElement, ["lang"]);
+            },
+            parent(node) {
+              return apply(nodeParent, node, []);
+            },
+            rangeRect(startNode, startOffset, endNode, endOffset) {
+              const range = makeRange();
+              apply(rangeStart, range, [startNode, startOffset]);
+              apply(rangeEnd, range, [endNode, endOffset]);
+              return snapshotRect(apply(rangeRect, range, []));
+            },
+            rangeRects(node) {
+              const range = makeRange();
+              apply(rangeSelect, range, [node]);
+              const list = apply(rangeRects, range, []);
+              const length = apply(rectListLength, list, []);
+              const result = [];
+              for (let index = 0; index < length; index += 1) {
+                result[result.length] = snapshotRect(apply(rectListItem, list, [index]));
+              }
+              return freeze(result);
+            },
+            rect(element) {
+              return snapshotRect(apply(elementRect, element, []));
+            },
+            scrollMetrics(element) {
+              return freeze({
+                clientHeight: apply(clientHeight, element, []),
+                clientWidth: apply(clientWidth, element, []),
+                scrollHeight: apply(scrollHeight, element, []),
+                scrollWidth: apply(scrollWidth, element, []),
+              });
+            },
+            segments(text, locale) {
+              let segmenter;
+              try {
+                segmenter = construct(segmentConstructor, [locale || undefined, { granularity: "grapheme" }]);
+              } catch {
+                segmenter = construct(segmentConstructor, [undefined, { granularity: "grapheme" }]);
+              }
+              const segmented = apply(segmentMethod, segmenter, [text]);
+              const iterator = apply(segmentIterator, segmented, []);
+              const result = [];
+              while (true) {
+                const item = apply(segmentIteratorNext, iterator, []);
+                if (item.done) break;
+                result[result.length] = freeze({ index: item.value.index, value: item.value.segment });
+              }
+              return freeze(result);
+            },
+            style(element, property) {
+              const computed = apply(styleFunction, pageGlobal, [element]);
+              return apply(styleValue, computed, [property]);
+            },
+            zeroNumber(value) {
+              return apply(numberFunction, undefined, [value]) === 0;
+            },
+            text(node) {
+              return apply(nodeText, node, []);
+            },
+            textNodes(element) {
+              const walker = apply(createTreeWalker, pageDocument, [element, 4]);
+              const result = [];
+              while (true) {
+                const node = apply(treeNext, walker, []);
+                if (!node) break;
+                result[result.length] = node;
+              }
+              return freeze(result);
+            },
+          });
+          define(pageGlobal, "__wowEvaluatorRead", {
+            configurable: false,
+            enumerable: false,
+            value: evaluatorRead,
+            writable: false,
+          });
+        });
         const counters = {
           page_errors: 0,
           console_errors: 0,

@@ -19,11 +19,26 @@ function exactKeys(value, expected) {
   return keys.length === expected.length && keys.every((key, index) => key === [...expected].sort()[index]);
 }
 
+function boundedContractText(value, maximum, allowEmpty = false) {
+  return typeof value === "string"
+    && (allowEmpty || value.length > 0)
+    && Buffer.byteLength(value) <= maximum
+    && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
 function validateBrowserContract(value, pages) {
   if (!value || typeof value !== "object" || Array.isArray(value)
     || !exactKeys(value, ["cases", "schema_version"])
-    || value.schema_version !== 1 || !Array.isArray(value.cases)
+    || ![1, 2].includes(value.schema_version) || !Array.isArray(value.cases)
     || value.cases.length < 1 || value.cases.length > 4) throw new Error("invalid browser contract");
+  const assertions = value.schema_version === 1
+    ? ["attribute-equals", "count-equals", "fully-visible-in-viewport", "text-includes", "visible"]
+    : [
+      "active-animation-count-between", "animations-settled", "attribute-equals", "count-equals",
+      "font-face-loaded", "fully-visible-in-viewport",
+      "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
+      "text-includes", "visible",
+    ];
   const ids = new Set();
   const routes = new Set();
   for (const contractCase of value.cases) {
@@ -50,16 +65,20 @@ function validateBrowserContract(value, pages) {
         if (["attribute-equals", "text-includes"].includes(step.expect)) expectedKeys.push("value");
         if (step.expect === "attribute-equals") expectedKeys.push("attribute");
         if (step.expect === "count-equals") expectedKeys.push("count");
+        if (step.expect === "font-face-loaded") expectedKeys.push("family");
+        if (step.expect === "last-line-graphemes-at-least") expectedKeys.push("count");
+        if (step.expect === "line-count-between") expectedKeys.push("min_lines", "max_lines");
+        if (step.expect === "active-animation-count-between") expectedKeys.push("min_animations", "max_animations");
       }
       if (!step || typeof step !== "object" || Array.isArray(step)
         || !exactKeys(step, expectedKeys)
         || !/^[a-z][a-z0-9-]{0,47}$/.test(step.id) || stepIds.has(step.id)
         || !["assert", "click", "fill", "press", "select"].includes(step.action)
-        || typeof step.selector !== "string" || step.selector.length < 1 || Buffer.byteLength(step.selector) > 256) {
+        || !boundedContractText(step.selector, 256)) {
         throw new Error("invalid browser contract step");
       }
       if (["fill", "select"].includes(step.action)
-        && (typeof step.value !== "string" || !step.value || Buffer.byteLength(step.value) > 256)) {
+        && !boundedContractText(step.value, 256)) {
         throw new Error("invalid browser contract value");
       }
       if (step.action === "press"
@@ -67,7 +86,7 @@ function validateBrowserContract(value, pages) {
         throw new Error("invalid browser contract key");
       }
       if (step.action === "assert") {
-        if (!["attribute-equals", "count-equals", "fully-visible-in-viewport", "text-includes", "visible"].includes(step.expect)) {
+        if (!assertions.includes(step.expect)) {
           throw new Error("invalid browser contract assertion");
         }
         if (step.expect === "fully-visible-in-viewport" && actionObserved) {
@@ -79,12 +98,30 @@ function validateBrowserContract(value, pages) {
           throw new Error("invalid browser contract attribute assertion");
         }
         if (step.expect === "text-includes"
-          && (typeof step.value !== "string" || !step.value || Buffer.byteLength(step.value) > 256)) {
+          && !boundedContractText(step.value, 256)) {
           throw new Error("invalid browser contract text assertion");
         }
         if (step.expect === "count-equals"
           && (!Number.isInteger(step.count) || step.count < 0 || step.count > 1000)) {
           throw new Error("invalid browser contract count assertion");
+        }
+        if (step.expect === "font-face-loaded"
+          && !boundedContractText(step.family, 128)) {
+          throw new Error("invalid browser contract font assertion");
+        }
+        if (step.expect === "last-line-graphemes-at-least"
+          && (!Number.isInteger(step.count) || step.count < 1 || step.count > 128)) {
+          throw new Error("invalid browser contract grapheme assertion");
+        }
+        if (step.expect === "line-count-between"
+          && (!Number.isInteger(step.min_lines) || !Number.isInteger(step.max_lines)
+            || step.min_lines < 1 || step.min_lines > step.max_lines || step.max_lines > 128)) {
+          throw new Error("invalid browser contract line assertion");
+        }
+        if (step.expect === "active-animation-count-between"
+          && (!Number.isInteger(step.min_animations) || !Number.isInteger(step.max_animations)
+            || step.min_animations < 0 || step.min_animations > step.max_animations || step.max_animations > 128)) {
+          throw new Error("invalid browser contract animation assertion");
         }
       } else {
         actionObserved = true;
@@ -107,6 +144,171 @@ async function checkAssertion(locator, step) {
   if (step.expect === "visible") return locator.isVisible();
   if (step.expect === "attribute-equals") return await locator.getAttribute(step.attribute) === step.value;
   if (step.expect === "text-includes") return (await locator.textContent() || "").includes(step.value);
+  if ([
+    "active-animation-count-between", "animations-settled", "font-face-loaded",
+    "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
+  ].includes(step.expect)) {
+    return locator.evaluate((element, assertion) => {
+      const trusted = globalThis.__wowEvaluatorRead;
+      if (!trusted) return false;
+      const styleVisible = (candidate) => {
+        let current = candidate;
+        while (current) {
+          const display = trusted.style(current, "display");
+          const visibility = trusted.style(current, "visibility");
+          if (display === "none" || visibility === "hidden"
+            || visibility === "collapse" || trusted.zeroNumber(trusted.style(current, "opacity"))) return false;
+          current = trusted.parent(current);
+        }
+        return true;
+      };
+      const elementBox = trusted.rect(element);
+      if (!styleVisible(element) || !(elementBox.width > 0 && elementBox.height > 0)) return false;
+      const rectVisible = (rect, owner) => {
+        let left = rect.left;
+        let right = rect.right;
+        let top = rect.top;
+        let bottom = rect.bottom;
+        for (let current = owner; current; current = trusted.parent(current)) {
+          const overflowX = trusted.style(current, "overflow-x");
+          const overflowY = trusted.style(current, "overflow-y");
+          const box = trusted.rect(current);
+          if (overflowX === "auto" || overflowX === "clip" || overflowX === "hidden" || overflowX === "scroll") {
+            left = left > box.left ? left : box.left;
+            right = right < box.right ? right : box.right;
+          }
+          if (overflowY === "auto" || overflowY === "clip" || overflowY === "hidden" || overflowY === "scroll") {
+            top = top > box.top ? top : box.top;
+            bottom = bottom < box.bottom ? bottom : box.bottom;
+          }
+          if (right <= left || bottom <= top) return false;
+        }
+        return true;
+      };
+      const mergeLineRecords = (records) => {
+        const lines = [];
+        for (let index = 1; index < records.length; index += 1) {
+          const record = records[index];
+          let cursor = index - 1;
+          while (cursor >= 0 && (records[cursor].rect.top > record.rect.top
+            || (records[cursor].rect.top === record.rect.top && records[cursor].rect.left > record.rect.left))) {
+            records[cursor + 1] = records[cursor];
+            cursor -= 1;
+          }
+          records[cursor + 1] = record;
+        }
+        for (let recordIndex = 0; recordIndex < records.length; recordIndex += 1) {
+          const record = records[recordIndex];
+          let matching = null;
+          for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+            const line = lines[lineIndex];
+            const overlapBottom = line.bottom < record.rect.bottom ? line.bottom : record.rect.bottom;
+            const overlapTop = line.top > record.rect.top ? line.top : record.rect.top;
+            const smallestHeight = line.bottom - line.top < record.rect.height
+              ? line.bottom - line.top : record.rect.height;
+            if (overlapBottom - overlapTop > smallestHeight * 0.4) {
+              matching = line;
+              break;
+            }
+          }
+          if (matching) {
+            matching.top = matching.top < record.rect.top ? matching.top : record.rect.top;
+            matching.bottom = matching.bottom > record.rect.bottom ? matching.bottom : record.rect.bottom;
+            matching.records[matching.records.length] = record;
+          } else {
+            lines[lines.length] = { top: record.rect.top, bottom: record.rect.bottom, records: [record] };
+          }
+        }
+        for (let index = 1; index < lines.length; index += 1) {
+          const line = lines[index];
+          let cursor = index - 1;
+          while (cursor >= 0 && lines[cursor].top > line.top) {
+            lines[cursor + 1] = lines[cursor];
+            cursor -= 1;
+          }
+          lines[cursor + 1] = line;
+        }
+        return lines;
+      };
+      const textNodes = () => {
+        const nodes = [];
+        const candidates = trusted.textNodes(element);
+        for (let index = 0; index < candidates.length; index += 1) {
+          const node = candidates[index];
+          if (trusted.hasVisibleText(trusted.text(node) || "") && styleVisible(trusted.parent(node))) {
+            nodes[nodes.length] = node;
+          }
+        }
+        return nodes;
+      };
+      const horizontal = trusted.horizontalWritingMode(trusted.style(element, "writing-mode"));
+      if (assertion.expect === "active-animation-count-between" || assertion.expect === "animations-settled") {
+        const active = trusted.activeAnimationCount(element);
+        if (assertion.expect === "animations-settled") return active === 0;
+        return active >= assertion.min_animations && active <= assertion.max_animations;
+      }
+      if (assertion.expect === "font-face-loaded") {
+        return trusted.fontFaceLoaded(element, assertion.family);
+      }
+      if (assertion.expect === "no-content-overflow") {
+        const metrics = trusted.scrollMetrics(element);
+        return metrics.clientWidth > 0 && metrics.clientHeight > 0
+          && metrics.scrollWidth <= metrics.clientWidth + 1 && metrics.scrollHeight <= metrics.clientHeight + 1;
+      }
+      if (!horizontal) return false;
+      if (assertion.expect === "line-count-between") {
+        const records = [];
+        const nodes = textNodes();
+        for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += 1) {
+          const node = nodes[nodeIndex];
+          const rects = trusted.rangeRects(node);
+          for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
+            const rect = rects[rectIndex];
+            if (rect.width > 0 && rect.height > 0 && rectVisible(rect, trusted.parent(node))) {
+              records[records.length] = { rect };
+            }
+          }
+        }
+        const count = mergeLineRecords(records).length;
+        return count >= assertion.min_lines && count <= assertion.max_lines;
+      }
+      const records = [];
+      const chunks = [];
+      let combined = "";
+      const nodes = textNodes();
+      for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += 1) {
+        const node = nodes[nodeIndex];
+        const value = trusted.text(node) || "";
+        chunks[chunks.length] = { node, start: combined.length, end: combined.length + value.length };
+        combined += value;
+      }
+      const segments = trusted.segments(combined, trusted.locale() || undefined);
+      for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
+        const segment = segments[segmentIndex];
+        if (!trusted.hasVisibleText(segment.value)) continue;
+        const segmentEnd = segment.index + segment.value.length;
+        let startChunk = null;
+        let endChunk = null;
+        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+          const chunk = chunks[chunkIndex];
+          if (segment.index >= chunk.start && segment.index < chunk.end) startChunk = chunk;
+          if (segmentEnd > chunk.start && segmentEnd <= chunk.end) endChunk = chunk;
+        }
+        if (!startChunk || !endChunk) continue;
+        const rect = trusted.rangeRect(
+          startChunk.node,
+          segment.index - startChunk.start,
+          endChunk.node,
+          segmentEnd - endChunk.start,
+        );
+        if (rect.width > 0 && rect.height > 0 && rectVisible(rect, trusted.parent(startChunk.node))) {
+          records[records.length] = { rect, value: segment.value };
+        }
+      }
+      const lines = mergeLineRecords(records);
+      return lines.length > 0 && lines[lines.length - 1].records.length >= assertion.count;
+    }, step);
+  }
   if (step.expect !== "fully-visible-in-viewport") return false;
   return locator.evaluate(async (element) => {
     const box = element.getBoundingClientRect();
@@ -329,7 +531,7 @@ async function main() {
   };
   if (browserContract) {
     receipt.browser_contract = {
-      schema_version: 1,
+      schema_version: browserContract.schema_version,
       case_count: browserContract.cases.length,
       case_ids: browserContract.cases.map((item) => item.id).sort(),
     };

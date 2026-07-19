@@ -263,6 +263,17 @@ Use the same loaded font, CSS width, `white-space`, `word-break`, `overflow-wrap
 
 The lane is optional and fail-soft. The packaged adapter at `scripts/pretext_typography_adapter.mjs` reports `unavailable` when the package or its required `OffscreenCanvas`/DOM canvas capability is absent; keep the existing Playwright/DOM path in that case. Its pinned contract models only horizontal `writing-mode`, `white-space: normal | pre-wrap`, `word-break: normal | keep-all`, finite pixel `letter-spacing`, and `overflow-wrap: break-word`; it returns `invalid` with `reasonCode: unsupported_css_text_behavior` for explicit CSS values it cannot reproduce instead of silently claiming a measurement. A measured result records the normalized options and its claim boundary. Run measurement in a browser-capable context for real font metrics. Pretext does not model complete CSS layout, grid/flex tracks, padding, pseudo-elements, line clamp, transforms, fallback timing, or browser accessibility. Confirm every candidate with `document.fonts.ready`, computed styles, Playwright screenshots, and the actual interaction viewport. Do not install it or edit a lockfile merely to make a visual claim.
 
+### Evaluator-owned rendered proof lane
+
+When the controlled evaluator provides browser contract v2, use its bounded assertions instead of converting the guidance above into new global heuristics:
+
+- `font-face-loaded` proves that the selected element names the evaluator-approved family and a matching `FontFace` reached `loaded`; it does not prove glyph coverage, regional forms, license, fallback quality, or aesthetic fit;
+- `line-count-between` proves the rendered horizontal line count for the exact content, font state, viewport, and browser in that case;
+- `last-line-graphemes-at-least` catches an evaluator-declared stranded final fragment for fixed short display copy without counting UTF-16 code units as characters;
+- `no-content-overflow` proves local scroll/client geometry only where the selected region is not meant to scroll.
+
+Keep these thresholds outside model-owned output. A model must not inspect its result, invent a passing range, and then cite that self-authored contract as acceptance. Use separate cases or evidence for normal font, delayed/failed font, long locale, resize, and consequential interaction states; do not claim one default screenshot covers them.
+
 Capture and inspect:
 
 1. actual smallest supported phone, short phone, desktop, 200% text, and 400%/reflow;

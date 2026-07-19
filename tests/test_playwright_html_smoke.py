@@ -180,6 +180,243 @@ document.querySelector('#primary').onclick = () => {
             self.assertEqual("passed", desktop["status"])
             self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
 
+    def test_v2_browser_contract_proves_loaded_font_and_rendered_text_geometry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>Typography proof</title><style>
+#specimen { font-family: "Contract Probe", sans-serif; inline-size: 18rem; }
+#specimen span { display: block; }
+#specimen .clipped { block-size: 0; overflow: hidden; }
+</style></head><body><main><h1>字體與排版驗證</h1>
+<p id="specimen"><span>繁體中文第一行</span><span>中英混排 Design 2026</span><span style="visibility:hidden">不可冒充第三行</span><span class="clipped"><span>裁切文字不可冒充第三行</span></span></p>
+</main><script>
+const contractFont = new FontFace("Contract Probe", 'local("Arial")');
+document.fonts.add(contractFont);
+contractFont.load();
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-type-proof",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "font-loaded", "action": "assert", "selector": "#specimen", "expect": "font-face-loaded", "family": "Contract Probe"},
+                        {"id": "two-lines", "action": "assert", "selector": "#specimen", "expect": "line-count-between", "min_lines": 2, "max_lines": 2},
+                        {"id": "healthy-last-line", "action": "assert", "selector": "#specimen", "expect": "last-line-graphemes-at-least", "count": 8},
+                        {"id": "no-local-overflow", "action": "assert", "selector": "#specimen", "expect": "no-content-overflow"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("passed", desktop["status"], desktop)
+            self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
+            self.assertEqual(2, receipt["browser_contract"]["schema_version"])
+
+    def test_v2_browser_contract_rejects_fragmented_last_line_and_local_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>Typography risk</title><style>
+#heading { font-family: "Missing Proof", sans-serif; inline-size: 8rem; overflow: hidden; }
+#heading span { display: block; }
+#heading .wide { inline-size: 20rem; }
+</style></head><body><main><h1 id="heading"><span>完整標題首行</span><span class="wide">末</span></h1></main></body></html>''',
+                encoding="utf-8",
+            )
+            base_case = {
+                "id": "mobile-type-risk",
+                "page": "index.html",
+                "profile": "mobile",
+                "steps": [],
+            }
+            fragment_contract = {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [{
+                    "id": "no-stranded-tail", "action": "assert", "selector": "#heading",
+                    "expect": "last-line-graphemes-at-least", "count": 2,
+                }]}],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], fragment_contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual(["contract-mobile-type-risk-no-stranded-tail"], mobile["inspection"]["browser_contract"]["finding_ids"])
+
+            overflow_contract = {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [{
+                    "id": "no-local-overflow", "action": "assert", "selector": "#heading",
+                    "expect": "no-content-overflow",
+                }]}],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], overflow_contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual(["contract-mobile-type-risk-no-local-overflow"], mobile["inspection"]["browser_contract"]["finding_ids"])
+
+            font_contract = {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [{
+                    "id": "font-loaded", "action": "assert", "selector": "#heading",
+                    "expect": "font-face-loaded", "family": "Missing Proof",
+                }]}],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], font_contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual(["contract-mobile-type-risk-font-loaded"], mobile["inspection"]["browser_contract"]["finding_ids"])
+
+    def test_v2_browser_contract_proves_bounded_motion_and_reduced_static_result(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Motion proof</title><style>
+@keyframes reveal { from { opacity: .2; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+#panel.run { animation: reveal 240ms linear; }
+@media (prefers-reduced-motion: reduce) { #panel.run { animation: none; } }
+</style></head><body><main><h1>Motion proof</h1><button id="trigger">Reveal</button><section id="panel" data-state="idle">Ready content</section>
+</main><script>
+const triggerButton = document.querySelector('#trigger');
+const panel = document.querySelector('#panel');
+triggerButton.onclick = () => {
+  panel.classList.remove('run');
+  void panel.offsetWidth;
+  panel.classList.add('run');
+  panel.dataset.state = 'ready';
+};
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            desktop_contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-motion-proof", "page": "index.html", "profile": "desktop",
+                    "steps": [
+                        {"id": "start", "action": "click", "selector": "#trigger"},
+                        {"id": "running", "action": "assert", "selector": "#panel", "expect": "active-animation-count-between", "min_animations": 1, "max_animations": 1},
+                        {"id": "settled", "action": "assert", "selector": "#panel", "expect": "animations-settled"},
+                        {"id": "final-state", "action": "assert", "selector": "#panel", "expect": "attribute-equals", "attribute": "data-state", "value": "ready"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], desktop_contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
+
+            reduced_contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-reduced-proof", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "start", "action": "click", "selector": "#trigger"},
+                        {"id": "static", "action": "assert", "selector": "#panel", "expect": "active-animation-count-between", "min_animations": 0, "max_animations": 0},
+                        {"id": "final-state", "action": "assert", "selector": "#panel", "expect": "attribute-equals", "attribute": "data-state", "value": "ready"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], reduced_contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["inspection"]["browser_contract"]["status"])
+
+    def test_v2_browser_contract_rejects_unsettled_continuous_motion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Motion loop</title><style>
+@keyframes loop { to { transform: translateX(2px); } }
+#ambient { animation: loop 300ms linear infinite alternate; }
+</style></head><body><main><h1>Motion loop</h1><div id="ambient">Ambient</div></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-motion-loop", "page": "index.html", "profile": "desktop",
+                    "steps": [{"id": "settled", "action": "assert", "selector": "#ambient", "expect": "animations-settled"}],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual(["contract-desktop-motion-loop-settled"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+    def test_v2_browser_contract_uses_pre_page_geometry_and_animation_intrinsics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Adversarial proof</title><style>
+@keyframes ambient { from { opacity: .8 } to { opacity: 1 } }
+#overflow { width: 40px; height: 24px; overflow: auto; }
+#overflow > span { display: block; width: 400px; }
+#ambient { animation: ambient 20s linear infinite; }
+</style></head><body><main><h1>Trusted browser reads</h1>
+<button id="poison">Change page intrinsics</button><div id="overflow"><span>Wide content</span></div><div id="ambient">Moving</div>
+</main><script>
+window.getComputedStyle = () => ({ display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible' });
+Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 10, bottom: 10, width: 10, height: 10 });
+Element.prototype.getAnimations = () => [];
+Object.defineProperty(Element.prototype, 'scrollWidth', { configurable: true, get: () => 1 });
+Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get: () => 1 });
+Object.defineProperty(Element.prototype, 'clientWidth', { configurable: true, get: () => 1000 });
+Object.defineProperty(Element.prototype, 'clientHeight', { configurable: true, get: () => 1000 });
+document.querySelector('#poison').onclick = () => {
+  Array.prototype.includes = () => true;
+  Array.prototype.some = () => true;
+};
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            base_case = {"id": "desktop-trusted-read", "page": "index.html", "profile": "desktop", "steps": []}
+            overflow = self.invoke(stage, ["index.html"], ["index.html"], {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [{
+                    "id": "overflow", "action": "assert", "selector": "#overflow", "expect": "no-content-overflow",
+                }]}],
+            })
+            desktop = next(item for item in overflow["results"] if item["profile"] == "desktop")
+            self.assertEqual(["contract-desktop-trusted-read-overflow"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+            motion = self.invoke(stage, ["index.html"], ["index.html"], {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [{
+                    "id": "settled", "action": "assert", "selector": "#ambient", "expect": "animations-settled",
+                }]}],
+            })
+            desktop = next(item for item in motion["results"] if item["profile"] == "desktop")
+            self.assertEqual(["contract-desktop-trusted-read-settled"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+            font = self.invoke(stage, ["index.html"], ["index.html"], {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [
+                    {"id": "poison", "action": "click", "selector": "#poison"},
+                    {"id": "missing-font", "action": "assert", "selector": "#overflow", "expect": "font-face-loaded", "family": "Definitely Missing Font"},
+                ]}],
+            })
+            desktop = next(item for item in font["results"] if item["profile"] == "desktop")
+            self.assertEqual(["contract-desktop-trusted-read-missing-font"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+    def test_v2_last_line_segments_graphemes_across_inline_nodes_and_invalid_lang(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="not_a_locale"><head><title>Grapheme proof</title></head>
+<body><main><h1>Grapheme proof</h1><p id="tail">👩<span>‍💻</span></p></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-grapheme-proof", "page": "index.html", "profile": "desktop",
+                    "steps": [{
+                        "id": "single-cluster", "action": "assert", "selector": "#tail",
+                        "expect": "last-line-graphemes-at-least", "count": 2,
+                    }],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual(["contract-desktop-grapheme-proof-single-cluster"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
     def test_browser_contract_runs_all_declarative_actions_and_assertions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

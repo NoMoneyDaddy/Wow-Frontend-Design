@@ -314,6 +314,55 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertFalse((capture / "invocation-count.txt").exists())
             self.assertEqual([], list(target.iterdir()))
 
+    def test_browser_contract_v2_accepts_bounded_font_and_layout_assertions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            contract = (Path(directory) / "browser-contract.json").resolve()
+            contract.write_text(json.dumps({
+                "schema_version": 2.0,
+                "cases": [{
+                    "id": "desktop-type-proof",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "font-loaded", "action": "assert", "selector": "h1", "expect": "font-face-loaded", "family": "Product Display"},
+                        {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3.0},
+                        {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2.0},
+                        {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
+                        {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
+                        {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
+                    ],
+                }],
+            }), encoding="utf-8")
+            _, normalized, record = policy._load_browser_contract(
+                contract, ("DESIGN.md", "index.html")
+            )
+            self.assertEqual(2, normalized["schema_version"])
+            self.assertEqual(2, record["schema_version"])
+            self.assertEqual(6, record["step_count"])
+
+    def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            (stage / "index.html").write_text(
+                '<!doctype html><html lang="zh-Hant"><head><title>V2</title></head><body><main><h1 id="title">單行標題</h1></main></body></html>',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-type-proof",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [{
+                        "id": "heading-lines", "action": "assert", "selector": "#title",
+                        "expect": "line-count-between", "min_lines": 1, "max_lines": 1,
+                    }],
+                }],
+            }
+            receipt = policy._run_html_smoke(stage, ("index.html",), 30, contract)
+            self.assertEqual("passed", receipt["status"])
+            self.assertEqual(2, receipt["browser_contract"]["schema_version"])
+
     def test_browser_contract_schema_matrix_is_rejected_before_generation(self) -> None:
         valid_case = {
             "id": "mobile-primary-task",
@@ -338,6 +387,22 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 {"id": "late-fold", "action": "assert", "selector": "#primary", "expect": "fully-visible-in-viewport"},
             ]}]},
             "step-quota": {"schema_version": 1, "cases": [{**valid_case, "steps": [{**valid_case["steps"][0], "id": f"step-{index}"} for index in range(25)]}]},
+            "v1-cannot-use-v2-assertion": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                "id": "heading-lines", "action": "assert", "selector": "h1",
+                "expect": "line-count-between", "min_lines": 1, "max_lines": 2,
+            }]}]},
+            "v2-invalid-line-bounds": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "heading-lines", "action": "assert", "selector": "h1",
+                "expect": "line-count-between", "min_lines": 4, "max_lines": 2,
+            }]}]},
+            "v2-empty-font-family": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "font-loaded", "action": "assert", "selector": "h1",
+                "expect": "font-face-loaded", "family": "",
+            }]}]},
+            "v2-invalid-animation-bounds": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "motion-active", "action": "assert", "selector": "main",
+                "expect": "active-animation-count-between", "min_animations": 3, "max_animations": 1,
+            }]}]},
         }
         for label, payload in invalid_payloads.items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:

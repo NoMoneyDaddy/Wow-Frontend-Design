@@ -61,6 +61,34 @@ npm run build:current -- \
 
 Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；其他 assertion 會在兩秒內 bounded polling，scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 會保存 bounded case／step ID，但 selector、輸入值、預期文字及外部絕對路徑不會進 repair prompt 或發布產物。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
 
+`schema_version: 2` 保留全部 v1 行為，並加入按需的 rendered typography／layout assertions；v1 不接受這些新 assertion，避免既有 strict contract 靜默改義：
+
+```json
+{
+  "schema_version": 2,
+  "cases": [{
+    "id": "desktop-type-proof",
+    "page": "index.html",
+    "profile": "desktop",
+    "steps": [
+      {"id": "font-loaded", "action": "assert", "selector": "[data-display-type]", "expect": "font-face-loaded", "family": "Approved Display"},
+      {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3},
+      {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2},
+      {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"}
+    ]
+  }]
+}
+```
+
+- `font-face-loaded` 同時要求 selector 的 computed `font-family` 使用指定 family，且頁面的 `FontFaceSet` 內有同名、狀態為 `loaded` 的 `@font-face`；它不證明字形完整、區域字形正確、授權或美感。
+- `line-count-between` 量測 horizontal writing mode 的實際 text client rects；上下限是 evaluator 對這份固定內容與 viewport 的契約，不是通用最佳行數。
+- `last-line-graphemes-at-least` 使用 grapheme cluster 而不是 UTF-16 code unit，適合確認固定短標題沒有一字尾行；不要對可任意變動的 user content 設成全域 gate。
+- `no-content-overflow` 要求 selector 有非零 client box，再比較 scroll/client geometry；只對 block/container 使用，且該區域不應是合法 scroll container。
+- `active-animation-count-between` 量測 selector subtree 內 `pending`／`running` 的 Web Animations API 數量；可在互動後證明有限動畫確實啟動，或在 reduced-motion profile 證明沒有 active animation。
+- `animations-settled` 以同一個兩秒 bounded polling 等待 subtree 不再有 active animation。把它與最終產品 state assertion、rapid retrigger／reverse 動作一起使用；「已停止」不代表 timing、easing 或美感良好。
+
+這些是 deterministic proof，不會自行挑選字體、判定排版漂亮或操縱 GSAP、Lottie、Rive、View Transition 等 runtime 的內部 timeline。候選字體、fallback、長文、resize 與具體 motion frame 仍須由 evaluator 提供固定 fixture，並以 fresh rendered craft review 收口。
+
 `--case-mode patch` 使用相同契約，並必須用 `--patch-lane polish|repair` 明示它是受限呈現調整（`POLISH`）或有證據的缺陷修復（`REPAIR`），不建立平行 lane。Retrofit／patch 必須提供 seed 與至少一個 `--allow-change`；任何未授權修改、刪除、重新命名、新增路徑、file／directory mode 漂移、空目錄遺失、seed 漂移或輸出集合漂移都會拒絕發布。Manifest 只保存 mode、實際 Skill lane、seed file/directory hashes 或 modes 與 observed mutation，不保存外部絕對路徑或 brief 內容。
 
 Runner 不開放 shell 讀檔。小型 seed 會在 hash 重驗後，以最多 256 KiB 的 strict UTF-8 untrusted JSON 放入初始 prompt；每次 repair 另以最多 512 KiB 的當前 output snapshot 提供最小修正所需內容。檔案內的 instruction-like text 一律視為資料，retrofit／patch 的 repair prompt 也會重申原 mutation allowlist；超出 context quota 會 fail closed，不會改成開放 shell 或截斷內容。

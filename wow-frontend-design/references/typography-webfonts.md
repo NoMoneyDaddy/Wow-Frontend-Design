@@ -85,6 +85,8 @@ The catalogue's “open source” label is a lead, not proof that every font has
 
 ## 6. Verify typography as rendered behavior
 
+In a controlled run that supplies browser contract v2, bind the approved family to `font-face-loaded` and bind fixed display copy to the applicable line/fragment assertions described in [typographic-layout.md](typographic-layout.md). This proves only the exact fresh browser case. It does not select the family, inspect the font binary, prove glyph coverage, or replace the normal/late/failed-font matrix below.
+
 Test at minimum:
 
 - slow/blocked font, warm/cold cache, offline, and font-service failure;
