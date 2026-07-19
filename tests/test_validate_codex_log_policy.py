@@ -40,7 +40,60 @@ class CodexLogPolicyTests(unittest.TestCase):
             )
             self.assertEqual(3, policy.validate(trace, root))
 
-    def test_command_free_mode_rejects_even_safe_local_commands(self) -> None:
+    def test_command_free_mode_accepts_only_canonical_inert_noops(self) -> None:
+        commands = (
+            "true",
+            "/bin/sh -c true",
+            "/bin/sh -lc true",
+            "/bin/bash -c true",
+            "/bin/bash -lc true",
+            "/bin/zsh -c true",
+            "/bin/zsh -lc true",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trace = root / "trace.jsonl"
+            trace.write_text("\n".join(event(command) for command in commands) + "\n", encoding="utf-8")
+            self.assertEqual(len(commands), policy.validate(trace, root, allow_commands=False))
+
+    def test_command_free_mode_rejects_non_noop_or_extended_commands(self) -> None:
+        commands = (
+            "node --check app.js",
+            "true extra",
+            "true; echo changed",
+            "true | echo changed",
+            "true > marker",
+            ":",
+            "echo true",
+            "/usr/bin/true",
+            "/bin/zsh -c 'true; echo changed'",
+            "/bin/zsh -lc true extra",
+            "tr\\'ue",
+            'tr\\"ue',
+            "/bin/zs\\'h -c true",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                trace = root / "trace.jsonl"
+                trace.write_text(event(command) + "\n", encoding="utf-8")
+                with self.assertRaisesRegex(policy.PolicyError, "unless it is an inert no-op"):
+                    policy.validate(trace, root, allow_commands=False)
+
+    def test_command_free_mode_still_checks_expansion_and_credentials(self) -> None:
+        cases = (
+            ("/bin/zsh -c '$NOOP'", "shell expansion is forbidden"),
+            ("/bin/zsh -c 'env'", "forbidden credential access"),
+        )
+        for command, message in cases:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                trace = root / "trace.jsonl"
+                trace.write_text(event(command) + "\n", encoding="utf-8")
+                with self.assertRaisesRegex(policy.PolicyError, message):
+                    policy.validate(trace, root, allow_commands=False)
+
+    def test_command_free_mode_rejects_safe_local_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trace = root / "trace.jsonl"

@@ -613,7 +613,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
                 "shell_tool_available": True,
                 "shell_commands_allowed_by_contract": False,
                 "shell_command_prevention": False,
-                "shell_command_acceptance": "post_execution_trace_rejection",
+                "shell_command_acceptance": "inert_noop_only_other_commands_post_trace_rejection",
                 "filesystem_profile": "minimal-read-workspace-write",
                 "process_environment_inheritance": "none",
             },

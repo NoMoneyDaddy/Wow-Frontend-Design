@@ -111,6 +111,18 @@ def _forbidden_credential_access(command: str) -> str | None:
     return None
 
 
+def _is_inert_noop(command: str) -> bool:
+    tokens = shlex.split(command, posix=True)
+    if tokens == ["true"]:
+        return True
+    return (
+        len(tokens) == 3
+        and tokens[0] in {"/bin/sh", "/bin/bash", "/bin/zsh"}
+        and tokens[1] in {"-c", "-lc"}
+        and tokens[2] == "true"
+    )
+
+
 def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
     stage = stage.resolve(strict=False)
     checked_commands = 0
@@ -123,8 +135,6 @@ def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
             raise PolicyError(f"forbidden tool event: {item_type}")
         if item_type != "command_execution":
             continue
-        if not allow_commands:
-            raise PolicyError("command execution is forbidden in this controlled trace")
         command = item.get("command")
         if not isinstance(command, str) or not command:
             raise PolicyError("command_execution has no command")
@@ -142,6 +152,8 @@ def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
         external_temp = _external_temp_path(canonical, stage)
         if external_temp is not None:
             raise PolicyError(f"command referenced evaluator-external temporary storage: {external_temp}")
+        if not allow_commands and not _is_inert_noop(command):
+            raise PolicyError("command execution is forbidden in this controlled trace unless it is an inert no-op")
     return checked_commands
 
 

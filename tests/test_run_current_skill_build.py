@@ -76,6 +76,23 @@ class CurrentSkillBuildTests(unittest.TestCase):
         )
         self.assertNotIn("private prose", json.dumps(observed))
 
+    def test_trace_observation_accepts_inert_noops_and_rejects_other_commands(self) -> None:
+        observed = self.observe_trace([
+            {"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -c true"}},
+            {"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -c true"}},
+            {"type": "turn.completed"},
+        ])
+        self.assertEqual(2, observed["command_event_count"])
+
+        for command in ("node --check app.js", "/bin/zsh -c 'true > marker'"):
+            with self.subTest(command=command), self.assertRaisesRegex(
+                core.RunnerError, "unless it is an inert no-op"
+            ):
+                self.observe_trace([
+                    {"type": "item.completed", "item": {"type": "command_execution", "command": command}},
+                    {"type": "turn.completed"},
+                ])
+
     def test_trace_usage_is_latest_bounded_integer_report_or_unreported(self) -> None:
         cases = (
             (
@@ -2248,7 +2265,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertFalse(receipt["configured_isolation"]["shell_commands_allowed_by_contract"])
             self.assertFalse(receipt["configured_isolation"]["shell_command_prevention"])
             self.assertEqual(
-                "post_execution_trace_rejection",
+                "inert_noop_only_other_commands_post_trace_rejection",
                 receipt["configured_isolation"]["shell_command_acceptance"],
             )
             self.assertEqual(0, receipt["trace_observed"]["command_event_count"])
