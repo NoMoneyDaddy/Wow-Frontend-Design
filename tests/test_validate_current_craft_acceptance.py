@@ -8,6 +8,7 @@ import copy
 import hashlib
 import io
 import json
+import os
 import shutil
 import stat
 import subprocess
@@ -273,6 +274,52 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
 
             with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "route does not match"):
+                self.validate(fixture)
+
+    def test_capture_hardlink_alias_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            result_path, ledger_path, policy_path, _, _, receipt_path, _ = fixture
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            capture = receipt["captures"][0]
+            original = receipt_path.parent / capture["path"]
+            alias = original.with_name("hardlink-alias.png")
+            os.link(original, alias)
+            old_ledger_path = original.relative_to(ledger_path.parent).as_posix()
+            new_ledger_path = alias.relative_to(ledger_path.parent).as_posix()
+            capture["path"] = alias.relative_to(receipt_path.parent).as_posix()
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["evidence"][capture["label"]]["path"] = new_ledger_path
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+            event = next(item for item in ledger["events"] if item.get("label") == capture["label"])
+            event["path"] = new_ledger_path
+            ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            result["handoff"]["rendered_evidence"]["paths"] = [
+                new_ledger_path if path == old_ledger_path else path
+                for path in result["handoff"]["rendered_evidence"]["paths"]
+            ]
+            result_path.write_text(json.dumps(result), encoding="utf-8")
+
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "one filesystem identity"):
+                self.validate(fixture)
+
+    def test_capture_symlink_alias_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            receipt_path = fixture[5]
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            capture = receipt["captures"][0]
+            original = receipt_path.parent / capture["path"]
+            alias = original.with_name("symlink-alias.png")
+            alias.symlink_to(original.name)
+            capture["path"] = alias.relative_to(receipt_path.parent).as_posix()
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "unaliased regular file"):
                 self.validate(fixture)
 
     def test_screenshot_tampering_after_capture_is_rejected(self) -> None:

@@ -247,15 +247,19 @@ def validate_current_acceptance(
         if not isinstance(label, str) or not label or label in capture_labels:
             raise CurrentCraftError("capture labels must be unique non-empty strings")
         relative = _relative(capture["path"], f"captures[{index}].path")
-        artifact = (evidence_root / relative).resolve(strict=True)
+        candidate = evidence_root / relative
+        artifact = candidate.resolve(strict=True)
         try:
             artifact.relative_to(evidence_root)
             ledger_relative = artifact.relative_to(ledger_root).as_posix()
         except ValueError as error:
             raise CurrentCraftError("capture artifact is outside evaluator evidence roots") from error
-        if artifact.is_symlink() or not artifact.is_file():
-            raise CurrentCraftError(f"capture artifact is missing: {relative}")
-        size = artifact.stat().st_size
+        if artifact != candidate or not artifact.is_file():
+            raise CurrentCraftError(f"capture artifact must be an unaliased regular file: {relative}")
+        info = artifact.stat()
+        if info.st_nlink != 1:
+            raise CurrentCraftError(f"capture artifact must have one filesystem identity: {relative}")
+        size = info.st_size
         if size != capture["bytes"] or size > MAX_CAPTURE_BYTES or _sha256(artifact) != capture["sha256"]:
             raise CurrentCraftError(f"capture artifact provenance is invalid: {relative}")
         width, height = _png_dimensions(artifact)
