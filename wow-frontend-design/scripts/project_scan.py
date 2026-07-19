@@ -639,11 +639,11 @@ def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any
     kind_priority = {
         "design_contract": 0,
         "brand_guidance": 1,
-        "campaign_overlay": 2,
-        "token_resolver": 3,
-        "token_source": 4,
-        "identity_asset": 5,
-        "font_asset": 6,
+        "token_resolver": 2,
+        "token_source": 3,
+        "identity_asset": 4,
+        "font_asset": 5,
+        "campaign_overlay": 6,
     }
 
     for path in files:

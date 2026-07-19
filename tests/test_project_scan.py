@@ -127,6 +127,32 @@ class ProjectScanTests(unittest.TestCase):
             self.assertIn("does not establish approval", evidence["claim_boundary"])
             self.assertIn("resolution order", evidence["claim_boundary"])
 
+    def test_brand_evidence_limit_keeps_durable_system_sources_before_campaign_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "DESIGN.md").write_text("# Contract\n", encoding="utf-8")
+            styles = root / "styles"
+            styles.mkdir()
+            (styles / "product.resolver.json").write_text("{}\n", encoding="utf-8")
+            (styles / "brand.tokens.json").write_text("{}\n", encoding="utf-8")
+            public = root / "public"
+            public.mkdir()
+            (public / "logo.svg").write_text("<svg/>\n", encoding="utf-8")
+            campaign = public / "campaigns" / "launch"
+            campaign.mkdir(parents=True)
+            for index in range(project_scan.BRAND_EVIDENCE_LIMIT + 5):
+                (campaign / f"visual-{index:02d}.webp").write_bytes(b"image")
+
+            evidence = project_scan.scan(root)["brand_evidence"]
+            candidates = {(item["kind"], item["path"]) for item in evidence["candidates"]}
+
+            self.assertTrue(evidence["truncated"])
+            self.assertEqual(project_scan.BRAND_EVIDENCE_LIMIT, len(evidence["candidates"]))
+            self.assertIn(("design_contract", "DESIGN.md"), candidates)
+            self.assertIn(("token_resolver", "styles/product.resolver.json"), candidates)
+            self.assertIn(("token_source", "styles/brand.tokens.json"), candidates)
+            self.assertIn(("identity_asset", "public/logo.svg"), candidates)
+
     def test_empty_directory_is_build_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             report = project_scan.scan(Path(temp))
