@@ -15,13 +15,18 @@ Before code, fill one card and stop generating alternatives:
 ```text
 USER / TOP TASK / CONTENT ORDER:
 CONCEPT + ONE VISUAL GRAMMAR:
-TYPE ROLES + REAL FALLBACKS:
+EVIDENCE → REQUIRED VISUAL PROPERTY:
+TYPE ROLES + REAL FALLBACKS + ROLE-SPECIFIC MEASURE / WRAP:
+FOCAL ANCHOR + MAJOR-REGION COMPOSITION / HIERARCHY:
 COLOR ROLES + OPAQUE CONTRAST PAIRS + APPEARANCES:
 MATERIAL / EDGE / LIGHT / DEPTH:
 MOBILE REORDER-REPLACE-DEFER TABLE:
 ONE AUTHORED DISTINCTION OR PRESERVED IDENTITY:
+MOTION PURPOSE + FREQUENCY + REDUCED RESULT, OR NONE:
 PROHIBITED HIGH-UNCERTAINTY EFFECTS:
 ```
+
+Translate evidence into required properties before choosing style tokens. Long reading may justify measure and line-height constraints, and night use may justify glare limits; neither justifies a font category, material metaphor, or palette. When evidence is insufficient, inherit proven project values, leave identity decisions unresolved, or choose only the smallest task-safe, replaceable values required to render. Treat fallback as scaffolding, never identity; an authored distinction may remain `none` until evidence supports one.
 
 Prefer product evidence, stable layout primitives, semantic tokens, native controls, explicit aspect ratios, resilient wrapping, and conservative effects. Reuse detected project primitives. Do not add a new dependency, remote font, unstable CSS feature, shader, canvas-only content, dynamic text-over-media, complex blend stack, or crop-dependent meaning without a visual/runtime verifier and fallback.
 

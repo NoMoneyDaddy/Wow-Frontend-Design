@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 SKILL = Path(__file__).resolve().parents[1] / "wow-frontend-design" / "SKILL.md"
+NO_VISUAL = SKILL.parent / "references" / "no-visual-first-pass.md"
 
 
 class SkillCoreContractTests(unittest.TestCase):
@@ -19,7 +20,8 @@ class SkillCoreContractTests(unittest.TestCase):
 
     def test_core_stays_within_progressive_disclosure_budget(self) -> None:
         self.assertLessEqual(len(self.raw), 20_000)
-        self.assertIn("On the initial reference pass", self.text)
+        self.assertIn("When rendering is unavailable, also read", self.text)
+        self.assertIn("no-visual-first-pass.md", self.text)
         self.assertIn("at most one task-specific reference", self.text)
 
     def test_generation_first_stages_keep_their_order(self) -> None:
@@ -127,6 +129,22 @@ class SkillCoreContractTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text)
+
+    def test_no_visual_first_pass_freezes_craft_decisions_before_code(self) -> None:
+        text = NO_VISUAL.read_text(encoding="utf-8")
+        for phrase in (
+            "EVIDENCE → REQUIRED VISUAL PROPERTY",
+            "ROLE-SPECIFIC MEASURE / WRAP",
+            "FOCAL ANCHOR + MAJOR-REGION COMPOSITION / HIERARCHY",
+            "MOTION PURPOSE + FREQUENCY + REDUCED RESULT, OR NONE",
+            "neither justifies a font category, material metaphor, or palette",
+            "inherit proven project values",
+            "smallest task-safe, replaceable values required to render",
+            "Treat fallback as scaffolding, never identity",
+            "an authored distinction may remain `none`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
 
 
 if __name__ == "__main__":
