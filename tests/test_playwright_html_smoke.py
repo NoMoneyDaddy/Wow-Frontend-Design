@@ -102,7 +102,7 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
             self.assertNotIn("label-content-name-mismatch", mobile["inspection"]["axe_rule_ids"])
 
-    def test_rendered_text_excludes_hidden_descendants_and_ignores_poisoned_getter(self) -> None:
+    def test_rendered_text_assertions_exclude_hidden_descendants_and_ignore_poisoned_getter(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
             (stage / "index.html").write_text(
@@ -112,8 +112,17 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
 <p id="hidden-child">Idle<span hidden>Ready</span></p>
 <p id="visible-child">Idle <span>Ready</span></p>
 <p id="hidden-parent" hidden>Ready</p>
+<div id="contents" style="display: contents">Loading</div>
+<svg id="svg-state"><text>Loading</text></svg>
+<svg id="hidden-svg-state" hidden><text>Loading</text></svg>
+<p id="poisoned-removal">Loading</p>
+<div id="shadow-visible"></div><div id="shadow-hidden" hidden></div>
 </main>
-<script>Object.defineProperty(HTMLElement.prototype, 'innerText', { configurable: true, get() { return 'Ready'; } });</script>
+<script>
+document.querySelector('#shadow-visible').attachShadow({mode: 'open'}).innerHTML = '<p id="shadow-visible-state">Loading</p>';
+document.querySelector('#shadow-hidden').attachShadow({mode: 'open'}).innerHTML = '<p id="shadow-hidden-state">Loading</p>';
+Object.defineProperty(HTMLElement.prototype, 'innerText', { configurable: true, get() { return 'Ready'; } });
+</script>
 </body></html>''',
                 encoding="utf-8",
             )
@@ -126,8 +135,17 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
                     "steps": [
                         {"id": "legacy-raw", "action": "assert", "selector": "#raw", "expect": "text-includes", "value": "Ready"},
                         {"id": "hidden-child", "action": "assert", "selector": "#hidden-child", "expect": "rendered-text-includes", "value": "Ready"},
+                        {"id": "hidden-stale-absent", "action": "assert", "selector": "#hidden-child", "expect": "rendered-text-excludes", "value": "Ready"},
                         {"id": "visible-child", "action": "assert", "selector": "#visible-child", "expect": "rendered-text-includes", "value": "Ready"},
+                        {"id": "visible-stale-present", "action": "assert", "selector": "#visible-child", "expect": "rendered-text-excludes", "value": "Ready"},
                         {"id": "hidden-parent", "action": "assert", "selector": "#hidden-parent", "expect": "rendered-text-includes", "value": "Ready"},
+                        {"id": "hidden-parent-stale-absent", "action": "assert", "selector": "#hidden-parent", "expect": "rendered-text-excludes", "value": "Ready"},
+                        {"id": "display-contents-stale-present", "action": "assert", "selector": "#contents", "expect": "rendered-text-excludes", "value": "Loading"},
+                        {"id": "svg-fails-closed", "action": "assert", "selector": "#svg-state", "expect": "rendered-text-excludes", "value": "Loading"},
+                        {"id": "hidden-svg-fails-closed", "action": "assert", "selector": "#hidden-svg-state", "expect": "rendered-text-excludes", "value": "Loading"},
+                        {"id": "poisoned-removal-still-found", "action": "assert", "selector": "#poisoned-removal", "expect": "rendered-text-excludes", "value": "Loading"},
+                        {"id": "visible-shadow-stale-present", "action": "assert", "selector": "#shadow-visible-state", "expect": "rendered-text-excludes", "value": "Loading"},
+                        {"id": "hidden-shadow-stale-absent", "action": "assert", "selector": "#shadow-hidden-state", "expect": "rendered-text-excludes", "value": "Loading"},
                     ],
                 }],
             }
@@ -135,9 +153,15 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
             self.assertEqual([
                 "contract-desktop-rendered-state-hidden-child",
+                "contract-desktop-rendered-state-visible-stale-present",
                 "contract-desktop-rendered-state-hidden-parent",
+                "contract-desktop-rendered-state-display-contents-stale-present",
+                "contract-desktop-rendered-state-svg-fails-closed",
+                "contract-desktop-rendered-state-hidden-svg-fails-closed",
+                "contract-desktop-rendered-state-poisoned-removal-still-found",
+                "contract-desktop-rendered-state-visible-shadow-stale-present",
             ], desktop["inspection"]["browser_contract"]["finding_ids"])
-            self.assertEqual(4, desktop["inspection"]["browser_contract"]["steps_executed"])
+            self.assertEqual(13, desktop["inspection"]["browser_contract"]["steps_executed"])
 
     def test_accessible_name_must_include_the_visible_control_label(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

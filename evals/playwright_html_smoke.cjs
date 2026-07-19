@@ -45,7 +45,7 @@ function validateBrowserContract(value, pages) {
       "active-animation-count-between", "animations-inactive-for", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
       "inline-start-aligned-with", "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
-      "rendered-text-includes", "text-includes", "text-segment-on-one-line", "visible",
+      "rendered-text-excludes", "rendered-text-includes", "text-includes", "text-segment-on-one-line", "visible",
     ];
   const ids = new Set();
   const routes = new Set();
@@ -78,7 +78,7 @@ function validateBrowserContract(value, pages) {
       if (step?.action === "press") expectedKeys.push("key");
       if (step?.action === "assert") {
         expectedKeys.push("expect");
-        if (["attribute-equals", "rendered-text-includes", "text-includes"].includes(step.expect)) expectedKeys.push("value");
+        if (["attribute-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"].includes(step.expect)) expectedKeys.push("value");
         if (step.expect === "attribute-equals") expectedKeys.push("attribute");
         if (step.expect === "count-equals") expectedKeys.push("count");
         if (step.expect === "font-face-loaded") expectedKeys.push("family");
@@ -117,7 +117,7 @@ function validateBrowserContract(value, pages) {
             || typeof step.value !== "string" || Buffer.byteLength(step.value) > 256)) {
           throw new Error("invalid browser contract attribute assertion");
         }
-        if (["rendered-text-includes", "text-includes"].includes(step.expect)
+        if (["rendered-text-excludes", "rendered-text-includes", "text-includes"].includes(step.expect)
           && !boundedContractText(step.value, 256)) {
           throw new Error("invalid browser contract text assertion");
         }
@@ -227,7 +227,7 @@ async function checkAssertion(page, locator, step) {
   if ([
     "active-animation-count-between", "animations-inactive-for", "animations-settled", "font-face-loaded",
     "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
-    "rendered-text-includes", "text-segment-on-one-line",
+    "rendered-text-excludes", "rendered-text-includes", "text-segment-on-one-line",
   ].includes(step.expect)) {
     return locator.evaluate((element, assertion) => {
       const trusted = globalThis.__wowEvaluatorRead;
@@ -244,6 +244,11 @@ async function checkAssertion(page, locator, step) {
         return true;
       };
       const elementBox = trusted.rect(element);
+      if (assertion.expect === "rendered-text-excludes") {
+        if (!trusted.renderedTextIncludes(element, "")) return false;
+        if (!styleVisible(element)) return true;
+        return !trusted.renderedTextIncludes(element, assertion.value);
+      }
       if (!styleVisible(element) || !(elementBox.width > 0 && elementBox.height > 0)) return false;
       const textNodes = () => {
         const nodes = [];

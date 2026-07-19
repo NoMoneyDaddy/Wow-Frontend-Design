@@ -653,6 +653,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2.0},
                         {"id": "heading-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"},
                         {"id": "visible-state", "action": "assert", "selector": "main", "expect": "rendered-text-includes", "value": "Task"},
+                        {"id": "stale-state-absent", "action": "assert", "selector": "main", "expect": "rendered-text-excludes", "value": "Loading"},
                         {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
                         {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
                         {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
@@ -666,7 +667,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(10, record["step_count"])
+            self.assertEqual(11, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -818,9 +819,17 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "id": "visible-state", "action": "assert", "selector": "main",
                 "expect": "rendered-text-includes", "value": "Ready",
             }]}]},
+            "v1-cannot-use-rendered-text-excludes": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                "id": "stale-state", "action": "assert", "selector": "main",
+                "expect": "rendered-text-excludes", "value": "Loading",
+            }]}]},
             "v2-empty-rendered-text": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "visible-state", "action": "assert", "selector": "main",
                 "expect": "rendered-text-includes", "value": "",
+            }]}]},
+            "v2-empty-rendered-text-excludes": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "stale-state", "action": "assert", "selector": "main",
+                "expect": "rendered-text-excludes", "value": "",
             }]}]},
             "v2-empty-text-segment": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "heading-phrase", "action": "assert", "selector": "h1",
