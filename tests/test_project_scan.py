@@ -85,6 +85,7 @@ class ProjectScanTests(unittest.TestCase):
             styles = root / "styles"
             styles.mkdir()
             (styles / "brand.tokens.json").write_text("{}\n", encoding="utf-8")
+            (styles / "product.resolver.json").write_text("{}\n", encoding="utf-8")
 
             public = root / "public"
             (public / "fonts").mkdir(parents=True)
@@ -95,6 +96,7 @@ class ProjectScanTests(unittest.TestCase):
             (campaign / "key-visual.webp").write_bytes(b"image")
             (campaign / "logo-lockup.svg").write_text("<svg/>\n", encoding="utf-8")
             (campaign / "headline.woff2").write_bytes(b"campaign-font")
+            (campaign / "launch.resolver.json").write_text("{}\n", encoding="utf-8")
             (campaign / "theme.css").write_text(":root {}\n", encoding="utf-8")
 
             generated = root / "dist"
@@ -109,11 +111,13 @@ class ProjectScanTests(unittest.TestCase):
             self.assertIn(("design_contract", "DESIGN.md"), candidates)
             self.assertIn(("brand_guidance", "BRAND.md"), candidates)
             self.assertIn(("token_source", "styles/brand.tokens.json"), candidates)
+            self.assertIn(("token_resolver", "styles/product.resolver.json"), candidates)
             self.assertIn(("identity_asset", "public/logo-primary.svg"), candidates)
             self.assertIn(("font_asset", "public/fonts/brand-display.woff2"), candidates)
             self.assertIn(("campaign_overlay", "public/campaigns/summer/key-visual.webp"), candidates)
             self.assertIn(("campaign_overlay", "public/campaigns/summer/logo-lockup.svg"), candidates)
             self.assertIn(("campaign_overlay", "public/campaigns/summer/headline.woff2"), candidates)
+            self.assertIn(("campaign_overlay", "public/campaigns/summer/launch.resolver.json"), candidates)
             self.assertIn(("campaign_overlay", "public/campaigns/summer/theme.css"), candidates)
             self.assertNotIn(("identity_asset", "public/campaigns/summer/logo-lockup.svg"), candidates)
             self.assertNotIn(("font_asset", "public/campaigns/summer/headline.woff2"), candidates)
@@ -121,6 +125,7 @@ class ProjectScanTests(unittest.TestCase):
             self.assertNotIn(".env", str(evidence))
             self.assertNotIn("logo-stale.svg", str(evidence))
             self.assertIn("does not establish approval", evidence["claim_boundary"])
+            self.assertIn("resolution order", evidence["claim_boundary"])
 
     def test_empty_directory_is_build_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

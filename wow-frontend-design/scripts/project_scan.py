@@ -318,7 +318,8 @@ IDENTITY_ASSET_NAME = re.compile(
 BRAND_EVIDENCE_BOUNDARY = (
     "Filename and path discovery only; a candidate does not establish approval, ownership, "
     "currentness, rights, scope, or a reusable brand invariant. Inspect the source and classify "
-    "it as explicit, observed, inferred, inherited, or unknown before use."
+    "it as explicit, observed, inferred, inherited, or unknown before use. Preserve any declared "
+    "resolver contexts and resolution order instead of flattening variants."
 )
 
 
@@ -639,9 +640,10 @@ def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any
         "design_contract": 0,
         "brand_guidance": 1,
         "campaign_overlay": 2,
-        "token_source": 3,
-        "identity_asset": 4,
-        "font_asset": 5,
+        "token_resolver": 3,
+        "token_source": 4,
+        "identity_asset": 5,
+        "font_asset": 6,
     }
 
     for path in files:
@@ -653,6 +655,7 @@ def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any
         signal: str | None = None
 
         is_campaign_path = bool(parts & CAMPAIGN_PATH_PARTS)
+        is_token_resolver = name.endswith(".resolver.json")
         is_token_source = bool(
             (name.endswith(".tokens.json") or suffix == ".tokens")
             or (suffix in TOKEN_SOURCE_EXTENSIONS and TOKEN_SOURCE_NAME.search(name))
@@ -663,6 +666,7 @@ def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any
 
         if is_campaign_path and (
             suffix in CAMPAIGN_ASSET_EXTENSIONS
+            or is_token_resolver
             or is_token_source
             or name in BRAND_GUIDANCE_NAMES
         ):
@@ -671,6 +675,8 @@ def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any
             kind, signal = "design_contract", "canonical contract filename"
         elif name in BRAND_GUIDANCE_NAMES:
             kind, signal = "brand_guidance", "brand guidance filename"
+        elif is_token_resolver:
+            kind, signal = "token_resolver", "DTCG resolver filename"
         elif is_token_source:
             kind, signal = "token_source", "token or theme filename"
         elif is_identity_asset:
