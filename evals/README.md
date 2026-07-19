@@ -108,7 +108,7 @@ Runner 會：
 
 1. 把現行 Skill 複製成唯讀 snapshot，並記錄來源 hash。
 2. 要求 Codex 只產生 caller 明列的相對輸出。
-3. 以 process group、hard deadline、inactivity deadline、輸出 byte budget 與 exact-output inventory 約束執行。
+3. 以 process group、預設 30 分鐘 hard deadline、`min(10 分鐘, hard deadline)` inactivity deadline、輸出 byte budget 與 exact-output inventory 約束執行；兩個 deadline 都可由 CLI 明示覆寫，且 inactivity 不得超過 hard。
 4. 驗證 Codex log policy、輸出路徑與 `DESIGN.md` clean contract。
 5. 對 HTML 以 fresh Playwright Chromium context 執行可見內容、console、resource、網路邊界、root overflow 與 Axe smoke。
 6. 將 deterministic failure 壓成 bounded repair packet，連同 hash-verified current output snapshot 交給同一模型與 reasoning effort 做最小修正；每輪只重驗受影響面。

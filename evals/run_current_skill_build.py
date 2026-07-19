@@ -51,6 +51,7 @@ REPAIR_PROMPT_LIMIT = 512 * 1024
 LOG_STEM = "current-skill-build"
 CURRENT_DEFAULT_MODEL = "gpt-5.4-mini"
 CURRENT_DEFAULT_REASONING_EFFORT = "high"
+DEFAULT_INACTIVITY_SECONDS = 600
 CASE_MODES = ("greenfield", "retrofit", "patch")
 PATCH_LANES = {"polish": "POLISH", "repair": "REPAIR"}
 BROWSER_PROFILES_V1 = {"desktop", "mobile"}
@@ -1745,6 +1746,11 @@ def main() -> int:
         help="repeat for each evaluator-authorized seeded path that may change",
     )
     args = parser.parse_args()
+    inactivity_seconds = (
+        args.inactivity_seconds
+        if args.inactivity_seconds is not None
+        else min(DEFAULT_INACTIVITY_SECONDS, args.hard_seconds)
+    )
     try:
         run(
             args.brief,
@@ -1752,7 +1758,7 @@ def main() -> int:
             model=args.model,
             reasoning_effort=args.reasoning_effort,
             hard_seconds=args.hard_seconds,
-            inactivity_seconds=args.inactivity_seconds,
+            inactivity_seconds=inactivity_seconds,
             outputs=args.output,
             log_dir=args.log_dir,
             max_repair_rounds=args.max_repair_rounds,

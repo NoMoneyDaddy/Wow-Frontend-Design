@@ -1075,6 +1075,52 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("gpt-5.4-mini", invocation["args"][model_index + 1])
             self.assertIn('model_reasoning_effort="high"', invocation["args"])
 
+    def test_current_cli_has_a_bounded_default_inactivity_fuse(self) -> None:
+        base_arguments = [
+            "run_current_skill_build.py",
+            "--brief",
+            "/tmp/brief.md",
+            "--target",
+            "/tmp/target",
+            "--log-dir",
+            "/tmp/logs",
+        ]
+        cases = (
+            ((), 600),
+            (("--hard-seconds", "5"), 5),
+            (("--hard-seconds", "5", "--inactivity-seconds", "3"), 3),
+            (("--hard-seconds", "900", "--inactivity-seconds", "700"), 700),
+        )
+        for extra, expected in cases:
+            with self.subTest(extra=extra), mock.patch.object(
+                sys, "argv", [*base_arguments, *extra]
+            ), mock.patch.object(policy, "run") as run:
+                self.assertEqual(0, policy.main())
+                self.assertEqual(expected, run.call_args.kwargs["inactivity_seconds"])
+
+        self.assertEqual(600, policy.DEFAULT_INACTIVITY_SECONDS)
+
+    def test_isolated_execution_rejects_invalid_inactivity_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            for inactivity in (0, -1, 6):
+                with self.subTest(inactivity=inactivity), self.assertRaisesRegex(
+                    core.RunnerError,
+                    "inactivity timeout must be within 1..hard timeout seconds",
+                ):
+                    core.execute_isolated(core.ExecutionSpec(
+                        stage=stage,
+                        stdout_log=root / f"stdout-{inactivity}.jsonl",
+                        stderr_log=root / f"stderr-{inactivity}.txt",
+                        skill_source=ROOT / "wow-frontend-design",
+                        skill_name="wow-frontend-design",
+                        prompt="Create the declared outputs.",
+                        hard_seconds=5,
+                        inactivity_seconds=inactivity,
+                    ))
+
     def test_seeded_retrofit_publishes_only_allowlisted_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
