@@ -463,6 +463,11 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "inspection": {
                     "axe_rule_ids": [],
                     "layout_hazards": {},
+                    "typography_advisories": {
+                        "heading_scan_count": 1,
+                        "heading_scan_truncated": False,
+                        "single_han_last_line_heading_count": 1,
+                    },
                     "browser_contract": {
                         "case_id": "mobile-primary-task",
                         "status": "rejected",
@@ -525,6 +530,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         serialized = json.dumps(feedback, ensure_ascii=False)
         self.assertLessEqual(len(serialized.encode("utf-8")), 4096)
         self.assertNotIn("PRIVATE-CONSOLE", serialized)
+        self.assertNotIn("single_han_last_line_heading_count", serialized)
         receipt["results"][0]["inspection"]["browser_contract"]["failures"][0]["reason"] = "action-failed"
         with self.assertRaisesRegex(ValueError, "repair context is malformed"):
             policy.compile_html_feedback(receipt, contract)

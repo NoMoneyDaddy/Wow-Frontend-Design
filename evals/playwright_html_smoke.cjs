@@ -245,72 +245,6 @@ async function checkAssertion(page, locator, step) {
       };
       const elementBox = trusted.rect(element);
       if (!styleVisible(element) || !(elementBox.width > 0 && elementBox.height > 0)) return false;
-      const rectVisible = (rect, owner) => {
-        let left = rect.left;
-        let right = rect.right;
-        let top = rect.top;
-        let bottom = rect.bottom;
-        for (let current = owner; current; current = trusted.parent(current)) {
-          const overflowX = trusted.style(current, "overflow-x");
-          const overflowY = trusted.style(current, "overflow-y");
-          const box = trusted.rect(current);
-          if (overflowX === "auto" || overflowX === "clip" || overflowX === "hidden" || overflowX === "scroll") {
-            left = left > box.left ? left : box.left;
-            right = right < box.right ? right : box.right;
-          }
-          if (overflowY === "auto" || overflowY === "clip" || overflowY === "hidden" || overflowY === "scroll") {
-            top = top > box.top ? top : box.top;
-            bottom = bottom < box.bottom ? bottom : box.bottom;
-          }
-          if (right <= left || bottom <= top) return false;
-        }
-        return true;
-      };
-      const mergeLineRecords = (records) => {
-        const lines = [];
-        for (let index = 1; index < records.length; index += 1) {
-          const record = records[index];
-          let cursor = index - 1;
-          while (cursor >= 0 && (records[cursor].rect.top > record.rect.top
-            || (records[cursor].rect.top === record.rect.top && records[cursor].rect.left > record.rect.left))) {
-            records[cursor + 1] = records[cursor];
-            cursor -= 1;
-          }
-          records[cursor + 1] = record;
-        }
-        for (let recordIndex = 0; recordIndex < records.length; recordIndex += 1) {
-          const record = records[recordIndex];
-          let matching = null;
-          for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-            const line = lines[lineIndex];
-            const overlapBottom = line.bottom < record.rect.bottom ? line.bottom : record.rect.bottom;
-            const overlapTop = line.top > record.rect.top ? line.top : record.rect.top;
-            const smallestHeight = line.bottom - line.top < record.rect.height
-              ? line.bottom - line.top : record.rect.height;
-            if (overlapBottom - overlapTop > smallestHeight * 0.4) {
-              matching = line;
-              break;
-            }
-          }
-          if (matching) {
-            matching.top = matching.top < record.rect.top ? matching.top : record.rect.top;
-            matching.bottom = matching.bottom > record.rect.bottom ? matching.bottom : record.rect.bottom;
-            matching.records[matching.records.length] = record;
-          } else {
-            lines[lines.length] = { top: record.rect.top, bottom: record.rect.bottom, records: [record] };
-          }
-        }
-        for (let index = 1; index < lines.length; index += 1) {
-          const line = lines[index];
-          let cursor = index - 1;
-          while (cursor >= 0 && lines[cursor].top > line.top) {
-            lines[cursor + 1] = lines[cursor];
-            cursor -= 1;
-          }
-          lines[cursor + 1] = line;
-        }
-        return lines;
-      };
       const textNodes = () => {
         const nodes = [];
         const candidates = trusted.textNodes(element);
@@ -322,7 +256,6 @@ async function checkAssertion(page, locator, step) {
         }
         return nodes;
       };
-      const horizontal = trusted.horizontalWritingMode(trusted.style(element, "writing-mode"));
       if (assertion.expect === "animations-inactive-for") {
         return trusted.animationsInactiveFor(element, assertion.duration_ms);
       }
@@ -342,65 +275,22 @@ async function checkAssertion(page, locator, step) {
         return metrics.clientWidth > 0 && metrics.clientHeight > 0
           && metrics.scrollWidth <= metrics.clientWidth + 1 && metrics.scrollHeight <= metrics.clientHeight + 1;
       }
-      if (!horizontal) return false;
+      const profile = trusted.renderedLineProfile(element);
+      if (!profile) return false;
       if (assertion.expect === "line-count-between") {
-        const records = [];
-        const nodes = textNodes();
-        for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += 1) {
-          const node = nodes[nodeIndex];
-          const rects = trusted.rangeRects(node);
-          for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
-            const rect = rects[rectIndex];
-            if (rect.width > 0 && rect.height > 0 && rectVisible(rect, trusted.parent(node))) {
-              records[records.length] = { rect };
-            }
-          }
-        }
-        const count = mergeLineRecords(records).length;
-        return count >= assertion.min_lines && count <= assertion.max_lines;
+        return profile.lineCount >= assertion.min_lines && profile.lineCount <= assertion.max_lines;
       }
-      const records = [];
-      const chunks = [];
       let combined = "";
       const nodes = textNodes();
       for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += 1) {
         const node = nodes[nodeIndex];
         const value = trusted.text(node) || "";
-        chunks[chunks.length] = { node, start: combined.length, end: combined.length + value.length };
         combined += value;
       }
-      const segments = trusted.segments(combined, trusted.locale() || undefined);
       const literalRange = assertion.expect === "text-segment-on-one-line"
         ? trusted.uniqueLiteralRange(combined, assertion.segment)
         : null;
       if (assertion.expect === "text-segment-on-one-line" && !literalRange) return false;
-      for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
-        const segment = segments[segmentIndex];
-        if (!trusted.hasVisibleText(segment.value)) continue;
-        const segmentEnd = segment.index + segment.value.length;
-        let startChunk = null;
-        let endChunk = null;
-        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
-          const chunk = chunks[chunkIndex];
-          if (segment.index >= chunk.start && segment.index < chunk.end) startChunk = chunk;
-          if (segmentEnd > chunk.start && segmentEnd <= chunk.end) endChunk = chunk;
-        }
-        if (!startChunk || !endChunk) continue;
-        const rect = trusted.rangeRect(
-          startChunk.node,
-          segment.index - startChunk.start,
-          endChunk.node,
-          segmentEnd - endChunk.start,
-        );
-        if (rect.width > 0 && rect.height > 0 && rectVisible(rect, trusted.parent(startChunk.node))) {
-          records[records.length] = {
-            rect,
-            value: segment.value,
-            index: segment.index,
-            end: segmentEnd,
-          };
-        }
-      }
       if (assertion.expect === "text-segment-on-one-line") {
         const matched = [];
         let expectedGraphemes = 0;
@@ -408,16 +298,17 @@ async function checkAssertion(page, locator, step) {
         for (let index = 0; index < expectedSegments.length; index += 1) {
           if (trusted.hasVisibleText(expectedSegments[index].value)) expectedGraphemes += 1;
         }
-        for (let index = 0; index < records.length; index += 1) {
-          const record = records[index];
-          if (record.index >= literalRange.start && record.end <= literalRange.end) matched[matched.length] = record;
+        for (let index = 0; index < profile.segments.length; index += 1) {
+          const record = profile.segments[index];
+          if (record.start >= literalRange.start && record.end <= literalRange.end) matched[matched.length] = record;
         }
-        return expectedGraphemes > 0
-          && matched.length === expectedGraphemes
-          && mergeLineRecords(matched).length === 1;
+        if (expectedGraphemes === 0 || matched.length !== expectedGraphemes) return false;
+        for (let index = 1; index < matched.length; index += 1) {
+          if (matched[index].line !== matched[0].line) return false;
+        }
+        return true;
       }
-      const lines = mergeLineRecords(records);
-      return lines.length > 0 && lines[lines.length - 1].records.length >= assertion.count;
+      return profile.lastLineGraphemes >= assertion.count;
     }, step);
   }
   if (step.expect !== "fully-visible-in-viewport") return false;
@@ -593,6 +484,28 @@ async function main() {
           && a.top < b.bottom && a.bottom > b.top;
         const hiddenAttributeVisible = Array.from(document.querySelectorAll("[hidden]"))
           .filter(visible).length;
+        const trusted = globalThis.__wowEvaluatorRead;
+        let singleHanLastLineHeadingCount = 0;
+        let headingScanCount = 0;
+        let headingScanTruncated = false;
+        const displayHeadings = Array.from(document.querySelectorAll("h1,[role='heading'][aria-level='1']"));
+        if (displayHeadings.length > 16) headingScanTruncated = true;
+        for (let index = 0; index < displayHeadings.length && index < 16; index += 1) {
+          const heading = displayHeadings[index];
+          const text = trusted?.text(heading) || "";
+          if (text.length > 512) {
+            headingScanTruncated = true;
+            continue;
+          }
+          const profile = trusted?.renderedLineProfile(heading);
+          if (!profile) continue;
+          headingScanCount += 1;
+          if (profile.lineCount >= 2
+            && profile.lastLineHanGraphemes === 1
+            && profile.lastLineGraphemes === 1 + profile.lastLinePunctuationGraphemes) {
+            singleHanLastLineHeadingCount += 1;
+          }
+        }
         const main = document.querySelector("main");
         let fixedContentObstructions = 0;
         if (main) {
@@ -626,6 +539,9 @@ async function main() {
         return {
           hidden_attribute_visible_count: hiddenAttributeVisible,
           fixed_content_obstruction_count: fixedContentObstructions,
+          heading_scan_count: headingScanCount,
+          heading_scan_truncated: headingScanTruncated,
+          single_han_last_line_heading_count: singleHanLastLineHeadingCount,
         };
       });
       const matchingContract = browserContract?.cases.find((item) =>
@@ -636,7 +552,15 @@ async function main() {
       const inspection = {
         axe_violation_count: analysis.violations.length,
         axe_rule_ids: analysis.violations.map((violation) => violation.id).sort(),
-        layout_hazards: layoutHazards,
+        layout_hazards: {
+          hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
+          fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
+        },
+        typography_advisories: {
+          heading_scan_count: layoutHazards.heading_scan_count,
+          heading_scan_truncated: layoutHazards.heading_scan_truncated,
+          single_han_last_line_heading_count: layoutHazards.single_han_last_line_heading_count,
+        },
       };
       if (browserContractResult) inspection.browser_contract = browserContractResult;
       return inspection;

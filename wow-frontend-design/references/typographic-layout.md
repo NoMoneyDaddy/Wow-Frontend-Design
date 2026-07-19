@@ -272,6 +272,8 @@ When the controlled evaluator provides browser contract v2, use its bounded asse
 - `last-line-graphemes-at-least` catches an evaluator-declared stranded final fragment for fixed short display copy without counting UTF-16 code units as characters;
 - `no-content-overflow` proves local scroll/client geometry only where the selected region is not meant to scroll.
 
+The generic HTML smoke receipt also records a bounded `single_han_last_line_heading_count` advisory for visible horizontal `h1` or level-one ARIA headings whose rendered final line contains exactly one Han grapheme plus optional punctuation. It scans at most the first 16 matching DOM elements and at most 512 UTF-16 code units per element; `heading_scan_count` and `heading_scan_truncated` disclose coverage. This is a discovery lead, not a failure or repair instruction: CLReq defines the observable orphan shape, but a campaign lockup, poem, or deliberate stepped heading can use it intentionally. The receipt contains only per-page/profile counts and truncation state, never the heading text. Confirm the candidate in a fresh screenshot, then use evaluator-owned `last-line-graphemes-at-least` or `text-segment-on-one-line` only when the fixed copy makes the intended boundary explicit. Do not infer Chinese phrases from `Intl.Segmenter` word mode, add a global `keep-all`, or promote this advisory to a release gate.
+
 Keep these thresholds outside model-owned output. A model must not inspect its result, invent a passing range, and then cite that self-authored contract as acceptance. Use separate cases or evidence for normal font, delayed/failed font, long locale, resize, and consequential interaction states; do not claim one default screenshot covers them.
 
 Capture and inspect:

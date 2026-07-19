@@ -99,6 +99,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const define = Object.defineProperty;
           const numberFunction = Number;
           const promiseConstructor = Promise;
+          const regexExec = RegExp.prototype.exec;
           const animationFrame = pageGlobal.requestAnimationFrame;
           const performanceNow = Performance.prototype.now;
           const stringCharacter = String.prototype.charAt;
@@ -151,6 +152,8 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const segmentIterator = Object.getPrototypeOf(segmentSample)[Symbol.iterator];
           const segmentIteratorSample = apply(segmentIterator, segmentSample, []);
           const segmentIteratorNext = Object.getPrototypeOf(segmentIteratorSample).next;
+          const hanGrapheme = /^\p{Script=Han}\p{M}*$/u;
+          const punctuationGrapheme = /^\p{P}+$/u;
 
           const normalizeFamily = (value) => {
             let normalized = apply(stringTrim, value, []);
@@ -201,6 +204,182 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             return freeze(result);
           };
           const makeRange = () => apply(createRange, pageDocument, []);
+          const parentOf = (node) => {
+            const parent = apply(nodeParent, node, []);
+            if (parent) return parent;
+            const root = apply(nodeRoot, node, []);
+            return apply(isPrototypeOf, shadowPrototype, [root])
+              ? apply(shadowHost, root, [])
+              : null;
+          };
+          const visible = (element) => {
+            for (let current = element; current; current = parentOf(current)) {
+              const computed = apply(styleFunction, pageGlobal, [current]);
+              const display = apply(styleValue, computed, ["display"]);
+              const visibility = apply(styleValue, computed, ["visibility"]);
+              if (display === "none" || visibility === "hidden" || visibility === "collapse"
+                || apply(numberFunction, undefined, [apply(styleValue, computed, ["opacity"])]) === 0) return false;
+            }
+            return true;
+          };
+          const visibleRect = (rect, owner) => {
+            let left = rect.left;
+            let right = rect.right;
+            let top = rect.top;
+            let bottom = rect.bottom;
+            for (let current = owner; current; current = parentOf(current)) {
+              const computed = apply(styleFunction, pageGlobal, [current]);
+              const overflowX = apply(styleValue, computed, ["overflow-x"]);
+              const overflowY = apply(styleValue, computed, ["overflow-y"]);
+              const box = snapshotRect(apply(elementRect, current, []));
+              if (overflowX === "auto" || overflowX === "clip" || overflowX === "hidden" || overflowX === "scroll") {
+                left = left > box.left ? left : box.left;
+                right = right < box.right ? right : box.right;
+              }
+              if (overflowY === "auto" || overflowY === "clip" || overflowY === "hidden" || overflowY === "scroll") {
+                top = top > box.top ? top : box.top;
+                bottom = bottom < box.bottom ? bottom : box.bottom;
+              }
+              if (right <= left || bottom <= top) return false;
+            }
+            return true;
+          };
+          const segmentText = (text, locale) => {
+            let segmenter;
+            try {
+              segmenter = construct(segmentConstructor, [locale || undefined, { granularity: "grapheme" }]);
+            } catch {
+              segmenter = construct(segmentConstructor, [undefined, { granularity: "grapheme" }]);
+            }
+            const segmented = apply(segmentMethod, segmenter, [text]);
+            const iterator = apply(segmentIterator, segmented, []);
+            const result = [];
+            while (true) {
+              const item = apply(segmentIteratorNext, iterator, []);
+              if (item.done) break;
+              result[result.length] = freeze({ index: item.value.index, value: item.value.segment });
+            }
+            return freeze(result);
+          };
+          const mergeRenderedLines = (records) => {
+            for (let index = 1; index < records.length; index += 1) {
+              const record = records[index];
+              let cursor = index - 1;
+              while (cursor >= 0 && (records[cursor].rect.top > record.rect.top
+                || (records[cursor].rect.top === record.rect.top && records[cursor].rect.left > record.rect.left))) {
+                records[cursor + 1] = records[cursor];
+                cursor -= 1;
+              }
+              records[cursor + 1] = record;
+            }
+            const lines = [];
+            for (let recordIndex = 0; recordIndex < records.length; recordIndex += 1) {
+              const record = records[recordIndex];
+              let matching = null;
+              for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+                const line = lines[lineIndex];
+                const overlapBottom = line.bottom < record.rect.bottom ? line.bottom : record.rect.bottom;
+                const overlapTop = line.top > record.rect.top ? line.top : record.rect.top;
+                const smallestHeight = line.bottom - line.top < record.rect.height
+                  ? line.bottom - line.top : record.rect.height;
+                if (overlapBottom - overlapTop > smallestHeight * 0.4) {
+                  matching = line;
+                  break;
+                }
+              }
+              if (matching) {
+                matching.top = matching.top < record.rect.top ? matching.top : record.rect.top;
+                matching.bottom = matching.bottom > record.rect.bottom ? matching.bottom : record.rect.bottom;
+                matching.records[matching.records.length] = record;
+              } else {
+                lines[lines.length] = { top: record.rect.top, bottom: record.rect.bottom, records: [record] };
+              }
+            }
+            for (let index = 1; index < lines.length; index += 1) {
+              const line = lines[index];
+              let cursor = index - 1;
+              while (cursor >= 0 && lines[cursor].top > line.top) {
+                lines[cursor + 1] = lines[cursor];
+                cursor -= 1;
+              }
+              lines[cursor + 1] = line;
+            }
+            return lines;
+          };
+          const renderedLineProfile = (element) => {
+            const computed = apply(styleFunction, pageGlobal, [element]);
+            const writingMode = apply(styleValue, computed, ["writing-mode"]);
+            const elementBox = snapshotRect(apply(elementRect, element, []));
+            if (!visible(element) || !(elementBox.width > 0 && elementBox.height > 0)
+              || !apply(stringStartsWith, writingMode, ["horizontal"])) return null;
+            const nodes = [];
+            const walker = apply(createTreeWalker, pageDocument, [element, 4]);
+            let combined = "";
+            while (true) {
+              const node = apply(treeNext, walker, []);
+              if (!node) break;
+              const value = apply(nodeText, node, []) || "";
+              const owner = parentOf(node);
+              if (apply(stringTrim, value, []).length === 0 || !visible(owner)) continue;
+              nodes[nodes.length] = { node, owner, start: combined.length, end: combined.length + value.length };
+              combined += value;
+            }
+            const segments = segmentText(combined, apply(elementAttribute, pageDocument.documentElement, ["lang"]));
+            const records = [];
+            for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
+              const segment = segments[segmentIndex];
+              if (apply(stringTrim, segment.value, []).length === 0) continue;
+              const segmentEnd = segment.index + segment.value.length;
+              let startChunk = null;
+              let endChunk = null;
+              for (let chunkIndex = 0; chunkIndex < nodes.length; chunkIndex += 1) {
+                const chunk = nodes[chunkIndex];
+                if (segment.index >= chunk.start && segment.index < chunk.end) startChunk = chunk;
+                if (segmentEnd > chunk.start && segmentEnd <= chunk.end) endChunk = chunk;
+              }
+              if (!startChunk || !endChunk) continue;
+              const range = makeRange();
+              apply(rangeStart, range, [startChunk.node, segment.index - startChunk.start]);
+              apply(rangeEnd, range, [endChunk.node, segmentEnd - endChunk.start]);
+              const rect = snapshotRect(apply(rangeRect, range, []));
+              if (!(rect.width > 0 && rect.height > 0) || !visibleRect(rect, startChunk.owner)) continue;
+              records[records.length] = {
+                rect,
+                start: segment.index,
+                end: segmentEnd,
+                han: apply(regexExec, hanGrapheme, [segment.value]) !== null,
+                punctuation: apply(regexExec, punctuationGrapheme, [segment.value]) !== null,
+              };
+            }
+            const lines = mergeRenderedLines(records);
+            const publicSegments = [];
+            let lastLineGraphemes = 0;
+            let lastLineHanGraphemes = 0;
+            let lastLinePunctuationGraphemes = 0;
+            for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+              const line = lines[lineIndex];
+              for (let recordIndex = 0; recordIndex < line.records.length; recordIndex += 1) {
+                const record = line.records[recordIndex];
+                publicSegments[publicSegments.length] = freeze({
+                  start: record.start,
+                  end: record.end,
+                  line: lineIndex,
+                });
+                if (lineIndex === lines.length - 1) {
+                  lastLineGraphemes += 1;
+                  if (record.han) lastLineHanGraphemes += 1;
+                  if (record.punctuation) lastLinePunctuationGraphemes += 1;
+                }
+              }
+            }
+            return freeze({
+              lineCount: lines.length,
+              lastLineGraphemes,
+              lastLineHanGraphemes,
+              lastLinePunctuationGraphemes,
+              segments: freeze(publicSegments),
+            });
+          };
           const evaluatorRead = freeze({
             activeAnimationCount(element) {
               const animations = apply(elementAnimations, element, [{ subtree: true }]);
@@ -267,12 +446,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               return apply(elementAttribute, pageDocument.documentElement, ["lang"]);
             },
             parent(node) {
-              const parent = apply(nodeParent, node, []);
-              if (parent) return parent;
-              const root = apply(nodeRoot, node, []);
-              return apply(isPrototypeOf, shadowPrototype, [root])
-                ? apply(shadowHost, root, [])
-                : null;
+              return parentOf(node);
             },
             rangeRect(startNode, startOffset, endNode, endOffset) {
               const range = makeRange();
@@ -298,6 +472,9 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               if (!apply(isPrototypeOf, htmlPrototype, [element])) return false;
               return apply(stringIndexOf, apply(htmlInnerText, element, []), [literal]) >= 0;
             },
+            renderedLineProfile(element) {
+              return renderedLineProfile(element);
+            },
             scrollMetrics(element) {
               return freeze({
                 clientHeight: apply(clientHeight, element, []),
@@ -307,21 +484,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               });
             },
             segments(text, locale) {
-              let segmenter;
-              try {
-                segmenter = construct(segmentConstructor, [locale || undefined, { granularity: "grapheme" }]);
-              } catch {
-                segmenter = construct(segmentConstructor, [undefined, { granularity: "grapheme" }]);
-              }
-              const segmented = apply(segmentMethod, segmenter, [text]);
-              const iterator = apply(segmentIterator, segmented, []);
-              const result = [];
-              while (true) {
-                const item = apply(segmentIteratorNext, iterator, []);
-                if (item.done) break;
-                result[result.length] = freeze({ index: item.value.index, value: item.value.segment });
-              }
-              return freeze(result);
+              return segmentText(text, locale);
             },
             style(element, property) {
               const computed = apply(styleFunction, pageGlobal, [element]);

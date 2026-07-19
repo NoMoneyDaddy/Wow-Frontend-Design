@@ -380,6 +380,70 @@ contractFont.load();
             self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
             self.assertEqual(2, receipt["browser_contract"]["schema_version"])
 
+    def test_generic_smoke_reports_bounded_single_han_heading_tail_advisory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>Heading wrap advisory</title><style>
+.forced span { display: block; }
+#hidden { display: none; }
+#vertical { writing-mode: vertical-rl; }
+</style></head><body><main>
+<h1 class="forced"><span>不回傳這段固定標題</span><span>家。</span></h1>
+<div class="forced" role="heading" aria-level="1"><span>健康標題</span><span>回到家。</span></div>
+<h1 class="forced"><span>第一行</span><span>第二行</span><span>第三行</span><span>第四行</span><span>字。</span></h1>
+<h1 id="hidden" class="forced"><span>隱藏標題</span><span>字。</span></h1>
+<h1 id="vertical" class="forced"><span>直排標題</span><span>字。</span></h1>
+<p class="forced"><span>本文不是顯示標題</span><span>字。</span></p>
+</main><script>
+const nativeRegExpExec = RegExp.prototype.exec;
+RegExp.prototype.exec = function(value) {
+  return this.source.includes("Script=Han") ? null : nativeRegExpExec.call(this, value);
+};
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            self.assertEqual(
+                [2, 2],
+                [
+                    result["inspection"]["typography_advisories"]["single_han_last_line_heading_count"]
+                    for result in receipt["results"]
+                ],
+            )
+            self.assertEqual(
+                [3, 3],
+                [result["inspection"]["typography_advisories"]["heading_scan_count"] for result in receipt["results"]],
+            )
+            self.assertFalse(any(
+                result["inspection"]["typography_advisories"]["heading_scan_truncated"]
+                for result in receipt["results"]
+            ))
+            self.assertNotIn("不回傳這段固定標題", json.dumps(receipt, ensure_ascii=False))
+
+    def test_heading_tail_advisory_discloses_bounded_scan_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            oversized = "長" * 513
+            ordinary = "".join(f"<h1>健康標題{index}</h1>" for index in range(15))
+            (stage / "index.html").write_text(
+                f'''<!doctype html><html lang="zh-Hant"><head><title>Bounded advisory</title><style>
+.forced span {{ display: block; }}
+</style></head><body><main>
+<h1 class="forced"><span>{oversized}</span><span>字。</span></h1>
+{ordinary}
+<h1 class="forced"><span>第十七個標題</span><span>字。</span></h1>
+</main></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            for result in receipt["results"]:
+                advisory = result["inspection"]["typography_advisories"]
+                self.assertEqual(15, advisory["heading_scan_count"])
+                self.assertTrue(advisory["heading_scan_truncated"])
+                self.assertEqual(0, advisory["single_han_last_line_heading_count"])
+
     def test_v2_text_segment_assertion_uses_exact_rendered_line_geometry(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

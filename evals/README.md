@@ -100,6 +100,8 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 
 這些是 deterministic proof，不會自行挑選字體、判定排版漂亮或操縱 GSAP、Lottie、Rive、View Transition 等 runtime 的內部 timeline。候選字體、fallback、長文、resize 與具體 motion frame 仍須由 evaluator 提供固定 fixture，並以 fresh rendered craft review 收口。
 
+Generic HTML smoke 會額外記錄 visible horizontal `h1`／level-one ARIA heading 的 `single_han_last_line_heading_count`。每頁／profile 最多掃描前 16 個 matching elements、每個最多 512 UTF-16 code units，並以 `heading_scan_count` 與 `heading_scan_truncated` 明示 coverage。它由實際 rendered grapheme geometry 得出，只是 novel-discovery advisory：不影響 gate status、不回傳文字，也不觸發自動修復。若 fresh screenshot 確認固定文案真的有孤字，再由 evaluator contract 明示 `last-line-graphemes-at-least` 或 exact `text-segment-on-one-line`；不要以中文斷詞猜測取代內容契約。
+
 `--case-mode patch` 使用相同契約，並必須用 `--patch-lane polish|repair` 明示它是受限呈現調整（`POLISH`）或有證據的缺陷修復（`REPAIR`），不建立平行 lane。Retrofit／patch 必須提供 seed 與至少一個 `--allow-change`；任何未授權修改、刪除、重新命名、新增路徑、file／directory mode 漂移、空目錄遺失、seed 漂移或輸出集合漂移都會拒絕發布。Manifest 只保存 mode、實際 Skill lane、seed file/directory hashes 或 modes 與 observed mutation，不保存外部絕對路徑或 brief 內容。
 
 Runner 不開放 shell 讀檔。小型 seed 會在 hash 重驗後，以最多 256 KiB 的 strict UTF-8 untrusted JSON 放入初始 prompt；每次 repair 另以最多 512 KiB 的當前 output snapshot 提供最小修正所需內容。檔案內的 instruction-like text 一律視為資料，retrofit／patch 的 repair prompt 也會重申原 mutation allowlist；超出 context quota 會 fail closed，不會改成開放 shell 或截斷內容。
