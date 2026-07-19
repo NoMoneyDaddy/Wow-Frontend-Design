@@ -112,7 +112,7 @@ Runner 會：
 4. 驗證 Codex log policy、輸出路徑與 `DESIGN.md` clean contract。
 5. 對 HTML 以 fresh Playwright Chromium context 執行可見內容、console、resource、網路邊界、root overflow 與 Axe smoke。
 6. 將 deterministic failure 壓成 bounded repair packet，連同 hash-verified current output snapshot 交給同一模型與 reasoning effort 做最小修正；每輪只重驗受影響面。
-7. 只有全部 release gates clean 時，才以原子 rename 發布 staged artifact，並寫入 runner-owned `run-manifest.json` 與 evaluator receipt。若 repair fuse 觸頂，則把最後一個已驗證 checkpoint 移到 evaluator-owned quarantine、保持 target 空白並回傳失敗 receipt；quarantine 不是可發布成品。
+7. 只有全部 release gates clean 時，才以原子 rename 發布 staged artifact，並寫入 runner-owned `run-manifest.json` 與 evaluator receipt。`trace_observed` 只記錄 `completed_item_counts` 與終端 token usage，不收錄模型文字或檔案內容，讓候選比較能辨識修復成本退步。若 repair fuse 觸頂，則把最後一個已驗證 checkpoint 移到 evaluator-owned quarantine、保持 target 空白並回傳失敗 receipt；quarantine 不是可發布成品。
 
 若獨立 Playwright evaluator 不可用，Skill 可以繼續交付 runnable artifact，但相關 rendered claim 必須是 `UNVERIFIED`。模型自己的截圖、分數或完成宣告不能取代 evaluator receipt。
 

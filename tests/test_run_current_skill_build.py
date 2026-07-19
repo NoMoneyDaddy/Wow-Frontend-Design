@@ -32,6 +32,84 @@ SAFE_DESIGN = "---\nversion: alpha\nname: Runner Test\n---\n# Runner Test\n"
 
 
 class CurrentSkillBuildTests(unittest.TestCase):
+    def observe_trace(self, events: list[dict[str, object]]) -> dict[str, object]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            trace = root / "trace.jsonl"
+            trace.write_text(
+                "".join(json.dumps(event) + "\n" for event in events),
+                encoding="utf-8",
+            )
+            return core._validate_trace(trace, stage)
+
+    def test_trace_observation_records_convergence_activity_without_trace_text(self) -> None:
+        events = [
+            {"type": "item.completed", "item": {"type": "file_change"}},
+            {"type": "item.completed", "item": {"type": "file_change"}},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "private prose"}},
+            {"type": "item.completed", "item": {"type": "private-item-type"}},
+            {
+                "type": "turn.completed",
+                "usage": {
+                    "input_tokens": 1200,
+                    "cached_input_tokens": 800,
+                    "output_tokens": 300,
+                    "reasoning_output_tokens": 120,
+                },
+            },
+        ]
+
+        observed = self.observe_trace(events)
+
+        self.assertEqual({"agent_message": 1, "file_change": 2}, observed["completed_item_counts"])
+        self.assertEqual(
+            {
+                "status": "reported",
+                "input_tokens": 1200,
+                "cached_input_tokens": 800,
+                "output_tokens": 300,
+                "reasoning_output_tokens": 120,
+            },
+            observed["terminal_usage"],
+        )
+        self.assertNotIn("private prose", json.dumps(observed))
+
+    def test_trace_usage_is_latest_bounded_integer_report_or_unreported(self) -> None:
+        cases = (
+            (
+                "missing",
+                [{"type": "turn.completed"}],
+                {"status": "unreported"},
+            ),
+            (
+                "invalid",
+                [{
+                    "type": "turn.completed",
+                    "usage": {
+                        "input_tokens": True,
+                        "cached_input_tokens": -1,
+                        "output_tokens": "3",
+                        "private_text": 900,
+                    },
+                }],
+                {"status": "unreported"},
+            ),
+            (
+                "latest",
+                [
+                    {"type": "turn.completed", "usage": {"input_tokens": 99}},
+                    {"type": "turn.completed", "usage": {"input_tokens": 7}},
+                ],
+                {"status": "reported", "input_tokens": 7},
+            ),
+        )
+        for name, terminal_events, expected in cases:
+            with self.subTest(name=name):
+                observed = self.observe_trace(terminal_events)
+                self.assertEqual(expected, observed["terminal_usage"])
+
     def test_repair_prompt_preserves_visible_and_accessible_label_alignment(self) -> None:
         prompt = policy.build_repair_prompt(
             ("DESIGN.md", "index.html"),
@@ -68,6 +146,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
         documentation = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
         self.assertIn("npm run build:current --", documentation)
         self.assertIn("runner-owned `run-manifest.json`", documentation)
+        self.assertIn("`completed_item_counts`", documentation)
 
     def test_browser_contract_guidance_avoids_candidate_dom_overfitting(self) -> None:
         documentation = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")

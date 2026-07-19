@@ -397,11 +397,43 @@ def _validate_trace(path: Path, stage: Path, *, require_terminal: bool = True) -
     event_types = [event.get("type") for event in events]
     if require_terminal and (not events or "turn.failed" in event_types or "turn.completed" not in event_types):
         raise RunnerError("Codex trace has no successful terminal event")
+    completed_items = {"file_change": 0, "agent_message": 0}
+    for event in events:
+        if event.get("type") != "item.completed":
+            continue
+        item = event.get("item")
+        if not isinstance(item, dict) or item.get("type") not in completed_items:
+            continue
+        item_type = item["type"]
+        completed_items[item_type] += 1
+    usage_keys = (
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+    )
+    terminal_usage: dict[str, Any] = {"status": "unreported"}
+    for event in reversed(events):
+        if event.get("type") != "turn.completed":
+            continue
+        usage = event.get("usage")
+        if not isinstance(usage, dict):
+            break
+        observed_usage = {
+            key: usage[key]
+            for key in usage_keys
+            if type(usage.get(key)) is int and usage[key] >= 0
+        }
+        if observed_usage:
+            terminal_usage = {"status": "reported", **observed_usage}
+        break
     return {
         "policy": "passed",
         "event_count": len(events),
         "command_event_count": command_events,
         "successful_terminal_event": "turn.completed" in event_types and "turn.failed" not in event_types,
+        "completed_item_counts": completed_items,
+        "terminal_usage": terminal_usage,
     }
 
 
