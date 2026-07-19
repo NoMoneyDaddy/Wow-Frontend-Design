@@ -314,6 +314,16 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                             "contract-mobile-primary-task-segment-control-in-first-viewport",
                             "contract-mobile-primary-task-confirmation-in-first-viewport",
                         ],
+                        "failures": [
+                            {
+                                "finding_id": "contract-mobile-primary-task-segment-control-in-first-viewport",
+                                "reason": "locator-missing",
+                            },
+                            {
+                                "finding_id": "contract-mobile-primary-task-confirmation-in-first-viewport",
+                                "reason": "locator-missing",
+                            },
+                        ],
                         "steps_executed": 2,
                     },
                 },
@@ -329,6 +339,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "action": "assert",
                 "locator": {"kind": "css", "selector": "fieldset"},
                 "expect": "fully-visible-in-viewport",
+                "reason": "locator-missing",
             },
             {
                 "case_id": "mobile-primary-task",
@@ -337,11 +348,19 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "action": "assert",
                 "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
                 "expect": "fully-visible-in-viewport",
+                "reason": "locator-missing",
             },
         ], feedback["contract_steps"])
         serialized = json.dumps(feedback, ensure_ascii=False)
         self.assertLessEqual(len(serialized.encode("utf-8")), 4096)
         self.assertNotIn("PRIVATE-CONSOLE", serialized)
+        receipt["results"][0]["inspection"]["browser_contract"]["failures"][0]["reason"] = "action-failed"
+        with self.assertRaisesRegex(ValueError, "repair context is malformed"):
+            policy.compile_html_feedback(receipt, contract)
+        contract["cases"][0]["steps"][0].update({"expect": "count-equals", "count": 2})
+        receipt["results"][0]["inspection"]["browser_contract"]["failures"][0]["reason"] = "locator-missing"
+        with self.assertRaisesRegex(ValueError, "repair context is malformed"):
+            policy.compile_html_feedback(receipt, contract)
 
     def test_persistent_browser_contract_rejection_hits_repair_fuse(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -573,6 +592,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                             "case_id": "mobile-primary-task",
                             "status": "rejected",
                             "finding_ids": ["contract-mobile-primary-task-primary-in-first-viewport"],
+                            "failures": [{
+                                "finding_id": "contract-mobile-primary-task-primary-in-first-viewport",
+                                "reason": "assertion-not-satisfied",
+                            }],
                             "steps_executed": 1,
                         }},
                     },
@@ -583,6 +606,54 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "case_ids": ["mobile-primary-task"],
                 },
             }
+            process = mock.Mock(returncode=0)
+            with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
+                policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")
+            ), self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._run_html_smoke(root, ("DESIGN.md", "index.html"), 1, contract)
+
+    def test_browser_contract_failure_reason_must_match_step_action(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            contract_path = self.browser_contract_fixture(root)
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            version = json.loads((ROOT / "node_modules" / "playwright" / "package.json").read_text(encoding="utf-8"))["version"]
+            finding = "contract-mobile-primary-task-primary-in-first-viewport"
+            receipt = {
+                "schema_version": 1,
+                "status": "rejected",
+                "tool": {"package": "playwright", "version": version},
+                "results": [
+                    {"page": "index.html", "profile": "desktop", "status": "passed", "inspection": {}},
+                    {
+                        "page": "index.html",
+                        "profile": "mobile",
+                        "status": "rejected",
+                        "inspection": {"browser_contract": {
+                            "case_id": "mobile-primary-task",
+                            "status": "rejected",
+                            "finding_ids": [finding],
+                            "failures": [{"finding_id": finding, "reason": "action-failed"}],
+                            "steps_executed": 1,
+                        }},
+                    },
+                ],
+                "browser_contract": {
+                    "schema_version": 1,
+                    "case_count": 1,
+                    "case_ids": ["mobile-primary-task"],
+                },
+            }
+            process = mock.Mock(returncode=0)
+            with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
+                policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")
+            ), self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._run_html_smoke(root, ("DESIGN.md", "index.html"), 1, contract)
+
+            contract["schema_version"] = 2
+            contract["cases"][0]["steps"][0].update({"expect": "count-equals", "count": 2})
+            receipt["browser_contract"]["schema_version"] = 2
+            receipt["results"][1]["inspection"]["browser_contract"]["failures"][0]["reason"] = "locator-ambiguous"
             process = mock.Mock(returncode=0)
             with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
                 policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")

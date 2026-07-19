@@ -64,6 +64,10 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
                 ["contract-mobile-primary-task-primary-in-first-viewport"],
                 mobile["inspection"]["browser_contract"]["finding_ids"],
             )
+            self.assertEqual([{
+                "finding_id": "contract-mobile-primary-task-primary-in-first-viewport",
+                "reason": "assertion-not-satisfied",
+            }], mobile["inspection"]["browser_contract"]["failures"])
 
     def test_browser_contract_can_target_one_named_button_among_multiple_buttons(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -93,6 +97,49 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
             self.assertEqual("passed", mobile["status"], mobile)
             self.assertEqual(1, mobile["inspection"]["browser_contract"]["steps_executed"])
+            self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
+
+    def test_browser_contract_distinguishes_ambiguous_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '<!doctype html><html lang="en"><head><title>Ambiguous</title></head><body><main><h1>Task</h1><button>One</button><button>Two</button></main></body></html>',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-action",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [{"id": "button", "action": "assert", "selector": "button", "expect": "visible"}],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual([{
+                "finding_id": "contract-mobile-action-button",
+                "reason": "locator-ambiguous",
+            }], mobile["inspection"]["browser_contract"]["failures"])
+
+            count_contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-count",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [{
+                        "id": "three-buttons", "action": "assert", "selector": "button",
+                        "expect": "count-equals", "count": 3,
+                    }],
+                }],
+            }
+            count_receipt = self.invoke(stage, ["index.html"], ["index.html"], count_contract)
+            count_mobile = next(item for item in count_receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual([{
+                "finding_id": "contract-mobile-count-three-buttons",
+                "reason": "assertion-not-satisfied",
+            }], count_mobile["inspection"]["browser_contract"]["failures"])
 
     def test_browser_contract_collects_independent_pre_action_failures(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

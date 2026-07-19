@@ -795,10 +795,11 @@ def _run_html_smoke(
                     raise RunnerError("HTML Playwright smoke gate infrastructure failure")
                 continue
             if not isinstance(observed_case, dict) or set(observed_case) != {
-                "case_id", "finding_ids", "status", "steps_executed"
+                "case_id", "failures", "finding_ids", "status", "steps_executed"
             }:
                 raise RunnerError("HTML Playwright smoke gate infrastructure failure")
             finding_ids = observed_case.get("finding_ids")
+            failures = observed_case.get("failures")
             steps_executed = observed_case.get("steps_executed")
             contract_steps = expected_case["steps"]
             status = observed_case.get("status")
@@ -816,16 +817,45 @@ def _run_html_smoke(
                 and 0 <= steps_executed < len(contract_steps)
                 and contract_steps[steps_executed].get("action") != "assert"
             )
+            valid_failure_reasons = {
+                "action-failed", "assertion-not-satisfied", "locator-ambiguous", "locator-missing",
+            }
+            expected_step_semantics = {
+                identifier: (step.get("action"), step.get("expect"))
+                for identifier, step in zip(expected_ids, contract_steps[:steps_executed])
+            }
+            normalized_failures = [
+                failure.get("finding_id")
+                for failure in failures
+                if isinstance(failure, dict)
+                and set(failure) == {"finding_id", "reason"}
+                and failure.get("reason") in valid_failure_reasons
+                and not (
+                    failure.get("reason") == "assertion-not-satisfied"
+                    and expected_step_semantics.get(failure.get("finding_id"), (None, None))[0] != "assert"
+                )
+                and not (
+                    failure.get("reason") == "action-failed"
+                    and expected_step_semantics.get(failure.get("finding_id"), (None, None))[0] == "assert"
+                )
+                and not (
+                    expected_step_semantics.get(failure.get("finding_id"), (None, None))[1] == "count-equals"
+                    and failure.get("reason") != "assertion-not-satisfied"
+                )
+            ] if isinstance(failures, list) else []
             if (
                 observed_case.get("case_id") != expected_case["id"]
                 or status not in {"passed", "rejected"}
                 or not isinstance(finding_ids, list)
+                or not isinstance(failures, list)
                 or type(steps_executed) is not int
                 or not 1 <= steps_executed <= len(contract_steps)
                 or (status == "passed" and (finding_ids or steps_executed != len(contract_steps)))
+                or (status == "passed" and failures)
                 or (status == "rejected" and not 1 <= len(finding_ids) <= steps_executed)
                 or (status == "rejected" and len(set(finding_ids)) != len(finding_ids))
                 or (status == "rejected" and finding_ids != ordered_observed)
+                or (status == "rejected" and normalized_failures != finding_ids)
                 or (status == "rejected" and action_executed and finding_ids != expected_ids[-1:])
                 or (
                     status == "rejected"

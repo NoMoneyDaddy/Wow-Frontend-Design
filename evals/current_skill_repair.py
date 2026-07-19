@@ -146,13 +146,29 @@ def compile_html_feedback(
                 raise ValueError("HTML browser contract findings are malformed")
             contract_status = observed_contract.get("status")
             contract_ids = observed_contract.get("finding_ids")
+            contract_failures = observed_contract.get("failures")
             if (
                 contract_status not in {"passed", "rejected"}
                 or not isinstance(contract_ids, list)
+                or not isinstance(contract_failures, list)
                 or len(contract_ids) > 24
-                or (contract_status == "passed" and contract_ids)
-                or (contract_status == "rejected" and not contract_ids)
+                or (contract_status == "passed" and (contract_ids or contract_failures))
+                or (contract_status == "rejected" and len(contract_failures) != len(contract_ids))
             ):
+                raise ValueError("HTML browser contract findings are malformed")
+            failure_reasons: dict[str, str] = {}
+            for failure in contract_failures:
+                if (
+                    not isinstance(failure, dict)
+                    or set(failure) != {"finding_id", "reason"}
+                    or failure.get("finding_id") not in contract_ids
+                    or failure.get("reason") not in {
+                        "action-failed", "assertion-not-satisfied", "locator-ambiguous", "locator-missing",
+                    }
+                ):
+                    raise ValueError("HTML browser contract findings are malformed")
+                failure_reasons[failure["finding_id"]] = failure["reason"]
+            if len(failure_reasons) != len(contract_ids):
                 raise ValueError("HTML browser contract findings are malformed")
             for identifier in contract_ids:
                 if not isinstance(identifier, str) or re.fullmatch(r"contract-[a-z][a-z0-9-]{2,103}", identifier) is None:
@@ -192,6 +208,17 @@ def compile_html_feedback(
                         }
                     if failed_step.get("action") == "assert":
                         descriptor["expect"] = failed_step.get("expect")
+                    reason = failure_reasons[expected_id]
+                    if (
+                        (reason == "assertion-not-satisfied" and failed_step.get("action") != "assert")
+                        or (reason == "action-failed" and failed_step.get("action") == "assert")
+                        or (
+                            failed_step.get("expect") == "count-equals"
+                            and reason != "assertion-not-satisfied"
+                        )
+                    ):
+                        raise ValueError("HTML browser contract repair context is malformed")
+                    descriptor["reason"] = reason
                     contract_steps.append(descriptor)
     if not identifiers:
         identifiers = ["unclassified-1"]

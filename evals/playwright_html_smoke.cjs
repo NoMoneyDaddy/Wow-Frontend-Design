@@ -353,6 +353,7 @@ async function waitForAssertion(page, locator, step) {
 
 async function runBrowserContract(page, contractCase) {
   const findingIds = [];
+  const failures = [];
   let stepsExecuted = 0;
   let actionObserved = false;
   for (const step of contractCase.steps) {
@@ -384,6 +385,20 @@ async function runBrowserContract(page, contractCase) {
     stepsExecuted += 1;
     if (!passed) {
       findingIds.push(finding);
+      let matches = null;
+      try {
+        matches = await locator.count();
+      } catch {
+        matches = null;
+      }
+      const reason = step.action === "assert" && step.expect === "count-equals"
+        ? "assertion-not-satisfied"
+        : matches === 0
+          ? "locator-missing"
+          : matches > 1
+            ? "locator-ambiguous"
+            : step.action === "assert" ? "assertion-not-satisfied" : "action-failed";
+      failures.push({ finding_id: finding, reason });
       if (actionObserved || step.action !== "assert") break;
       continue;
     }
@@ -398,6 +413,7 @@ async function runBrowserContract(page, contractCase) {
     case_id: contractCase.id,
     status: findingIds.length === 0 ? "passed" : "rejected",
     finding_ids: findingIds,
+    failures,
     steps_executed: stepsExecuted,
   };
 }
