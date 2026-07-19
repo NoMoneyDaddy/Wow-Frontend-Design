@@ -8,6 +8,11 @@ const VIEWPORTS = [
   { name: "desktop", viewport: { width: 1440, height: 1000 }, reducedMotion: "no-preference" },
   { name: "mobile", viewport: { width: 390, height: 844 }, reducedMotion: "reduce" },
 ];
+const LOCATOR_ROLES = new Set([
+  "button", "checkbox", "combobox", "dialog", "form", "group", "heading", "link",
+  "listbox", "menuitem", "navigation", "option", "radio", "region", "searchbox",
+  "slider", "spinbutton", "switch", "tab", "table", "textbox", "treeitem",
+]);
 
 function fail(message) {
   process.stderr.write(`html smoke infrastructure failure: ${message}\n`);
@@ -57,7 +62,12 @@ function validateBrowserContract(value, pages) {
     const stepIds = new Set();
     let actionObserved = false;
     for (const step of contractCase.steps) {
-      const expectedKeys = ["action", "id", "selector"];
+      const usesSelector = Object.hasOwn(step || {}, "selector");
+      const usesRole = Object.hasOwn(step || {}, "role") || Object.hasOwn(step || {}, "name");
+      if (usesSelector === usesRole || (usesRole && value.schema_version !== 2)) {
+        throw new Error("invalid browser contract step locator");
+      }
+      const expectedKeys = usesSelector ? ["action", "id", "selector"] : ["action", "id", "name", "role"];
       if (["fill", "select"].includes(step?.action)) expectedKeys.push("value");
       if (step?.action === "press") expectedKeys.push("key");
       if (step?.action === "assert") {
@@ -74,7 +84,8 @@ function validateBrowserContract(value, pages) {
         || !exactKeys(step, expectedKeys)
         || !/^[a-z][a-z0-9-]{0,47}$/.test(step.id) || stepIds.has(step.id)
         || !["assert", "click", "fill", "press", "select"].includes(step.action)
-        || !boundedContractText(step.selector, 256)) {
+        || (usesSelector && !boundedContractText(step.selector, 256))
+        || (usesRole && (!LOCATOR_ROLES.has(step.role) || !boundedContractText(step.name, 256)))) {
         throw new Error("invalid browser contract step");
       }
       if (["fill", "select"].includes(step.action)
@@ -345,7 +356,9 @@ async function runBrowserContract(page, contractCase) {
   let stepsExecuted = 0;
   for (const step of contractCase.steps) {
     const finding = `contract-${contractCase.id}-${step.id}`;
-    const locator = page.locator(step.selector);
+    const locator = Object.hasOwn(step, "selector")
+      ? page.locator(step.selector)
+      : page.getByRole(step.role, { name: step.name, exact: true });
     let passed = false;
     try {
       if (step.action === "click") {

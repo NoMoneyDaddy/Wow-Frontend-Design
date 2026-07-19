@@ -65,6 +65,35 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
                 mobile["inspection"]["browser_contract"]["finding_ids"],
             )
 
+    def test_browser_contract_can_target_one_named_button_among_multiple_buttons(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>語意定位</title></head><body>
+<main><h1>排程</h1><button>切換區段</button><button>確認時窗</button></main>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-primary-task",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [{
+                        "id": "confirmation-in-first-viewport",
+                        "action": "assert",
+                        "role": "button",
+                        "name": "確認時窗",
+                        "expect": "fully-visible-in-viewport",
+                    }],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["status"], mobile)
+            self.assertEqual(1, mobile["inspection"]["browser_contract"]["steps_executed"])
+
     def test_browser_contract_rejects_viewport_element_clipped_by_ancestor(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

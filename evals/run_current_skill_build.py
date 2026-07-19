@@ -55,6 +55,11 @@ CASE_MODES = ("greenfield", "retrofit", "patch")
 PATCH_LANES = {"polish": "POLISH", "repair": "REPAIR"}
 BROWSER_PROFILES = {"desktop", "mobile"}
 BROWSER_STEP_ACTIONS = {"assert", "click", "fill", "press", "select"}
+BROWSER_LOCATOR_ROLES = {
+    "button", "checkbox", "combobox", "dialog", "form", "group", "heading", "link",
+    "listbox", "menuitem", "navigation", "option", "radio", "region", "searchbox",
+    "slider", "spinbutton", "switch", "tab", "table", "textbox", "treeitem",
+}
 BROWSER_ASSERTIONS_V1 = {
     "attribute-equals",
     "count-equals",
@@ -184,7 +189,11 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
             if not isinstance(step, dict):
                 raise RunnerError("browser contract step is invalid")
             action = step.get("action")
-            expected_keys = {"id", "action", "selector"}
+            uses_selector = "selector" in step
+            uses_role = "role" in step or "name" in step
+            if uses_selector == uses_role or (uses_role and schema_version != 2):
+                raise RunnerError("browser contract step locator is invalid")
+            expected_keys = {"id", "action", "selector"} if uses_selector else {"id", "action", "role", "name"}
             if action in {"fill", "select"}:
                 expected_keys.add("value")
             elif action == "press":
@@ -208,7 +217,6 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     expected_keys.update({"min_animations", "max_animations"})
             _exact_keys(step, expected_keys, "browser contract step")
             step_id = step.get("id")
-            selector = step.get("selector")
             if (
                 action not in BROWSER_STEP_ACTIONS
                 or not isinstance(step_id, str)
@@ -216,7 +224,12 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                 or step_id in seen_steps
             ):
                 raise RunnerError("browser contract step id or action is invalid")
-            _bounded_contract_text(selector, "selector", 256)
+            if uses_selector:
+                _bounded_contract_text(step.get("selector"), "selector", 256)
+            else:
+                if step.get("role") not in BROWSER_LOCATOR_ROLES:
+                    raise RunnerError("browser contract role is invalid")
+                _bounded_contract_text(step.get("name"), "accessible name", 256)
             if action in {"fill", "select"}:
                 _bounded_contract_text(step.get("value"), "value", 256)
             elif action == "press":

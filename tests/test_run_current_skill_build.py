@@ -330,6 +330,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
                         {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
                         {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
+                        {"id": "named-action", "action": "assert", "role": "button", "name": "確認時窗", "expect": "visible"},
                     ],
                 }],
             }), encoding="utf-8")
@@ -338,7 +339,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(6, record["step_count"])
+            self.assertEqual(7, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -382,6 +383,13 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "duplicate-route": {"schema_version": 1, "cases": [valid_case, {**valid_case, "id": "mobile-secondary-task"}]},
             "undeclared-page": {"schema_version": 1, "cases": [{**valid_case, "page": "private.html"}]},
             "control-character-selector": {"schema_version": 1, "cases": [{**valid_case, "steps": [{**valid_case["steps"][0], "selector": "#primary\nprivate"}]}]},
+            "mixed-locator": {"schema_version": 2, "cases": [{**valid_case, "steps": [{**valid_case["steps"][0], "role": "button", "name": "Continue"}]}]},
+            "v1-semantic-locator": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                "id": "primary-visible", "action": "assert", "role": "button", "name": "Continue", "expect": "visible",
+            }]}]},
+            "unknown-role": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "primary-visible", "action": "assert", "role": "made-up", "name": "Continue", "expect": "visible",
+            }]}]},
             "first-viewport-after-action": {"schema_version": 1, "cases": [{**valid_case, "steps": [
                 {"id": "activate", "action": "click", "selector": "#primary"},
                 {"id": "late-fold", "action": "assert", "selector": "#primary", "expect": "fully-visible-in-viewport"},
