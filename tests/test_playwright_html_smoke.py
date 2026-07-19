@@ -102,6 +102,43 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
             self.assertNotIn("label-content-name-mismatch", mobile["inspection"]["axe_rule_ids"])
 
+    def test_rendered_text_excludes_hidden_descendants_and_ignores_poisoned_getter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Rendered state</title></head><body>
+<main><h1>Task</h1>
+<p id="raw">Idle<span hidden>Ready</span></p>
+<p id="hidden-child">Idle<span hidden>Ready</span></p>
+<p id="visible-child">Idle <span>Ready</span></p>
+<p id="hidden-parent" hidden>Ready</p>
+</main>
+<script>Object.defineProperty(HTMLElement.prototype, 'innerText', { configurable: true, get() { return 'Ready'; } });</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-rendered-state",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "legacy-raw", "action": "assert", "selector": "#raw", "expect": "text-includes", "value": "Ready"},
+                        {"id": "hidden-child", "action": "assert", "selector": "#hidden-child", "expect": "rendered-text-includes", "value": "Ready"},
+                        {"id": "visible-child", "action": "assert", "selector": "#visible-child", "expect": "rendered-text-includes", "value": "Ready"},
+                        {"id": "hidden-parent", "action": "assert", "selector": "#hidden-parent", "expect": "rendered-text-includes", "value": "Ready"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual([
+                "contract-desktop-rendered-state-hidden-child",
+                "contract-desktop-rendered-state-hidden-parent",
+            ], desktop["inspection"]["browser_contract"]["finding_ids"])
+            self.assertEqual(4, desktop["inspection"]["browser_contract"]["steps_executed"])
+
     def test_accessible_name_must_include_the_visible_control_label(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

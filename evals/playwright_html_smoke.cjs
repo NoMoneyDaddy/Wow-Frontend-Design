@@ -45,7 +45,7 @@ function validateBrowserContract(value, pages) {
       "active-animation-count-between", "animations-inactive-for", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
       "inline-start-aligned-with", "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
-      "text-includes", "text-segment-on-one-line", "visible",
+      "rendered-text-includes", "text-includes", "text-segment-on-one-line", "visible",
     ];
   const ids = new Set();
   const routes = new Set();
@@ -78,7 +78,7 @@ function validateBrowserContract(value, pages) {
       if (step?.action === "press") expectedKeys.push("key");
       if (step?.action === "assert") {
         expectedKeys.push("expect");
-        if (["attribute-equals", "text-includes"].includes(step.expect)) expectedKeys.push("value");
+        if (["attribute-equals", "rendered-text-includes", "text-includes"].includes(step.expect)) expectedKeys.push("value");
         if (step.expect === "attribute-equals") expectedKeys.push("attribute");
         if (step.expect === "count-equals") expectedKeys.push("count");
         if (step.expect === "font-face-loaded") expectedKeys.push("family");
@@ -117,7 +117,7 @@ function validateBrowserContract(value, pages) {
             || typeof step.value !== "string" || Buffer.byteLength(step.value) > 256)) {
           throw new Error("invalid browser contract attribute assertion");
         }
-        if (step.expect === "text-includes"
+        if (["rendered-text-includes", "text-includes"].includes(step.expect)
           && !boundedContractText(step.value, 256)) {
           throw new Error("invalid browser contract text assertion");
         }
@@ -227,7 +227,7 @@ async function checkAssertion(page, locator, step) {
   if ([
     "active-animation-count-between", "animations-inactive-for", "animations-settled", "font-face-loaded",
     "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
-    "text-segment-on-one-line",
+    "rendered-text-includes", "text-segment-on-one-line",
   ].includes(step.expect)) {
     return locator.evaluate((element, assertion) => {
       const trusted = globalThis.__wowEvaluatorRead;
@@ -333,6 +333,9 @@ async function checkAssertion(page, locator, step) {
       }
       if (assertion.expect === "font-face-loaded") {
         return trusted.fontFaceLoaded(element, assertion.family);
+      }
+      if (assertion.expect === "rendered-text-includes") {
+        return trusted.renderedTextIncludes(element, assertion.value);
       }
       if (assertion.expect === "no-content-overflow") {
         const metrics = trusted.scrollMetrics(element);

@@ -69,6 +69,23 @@ class CurrentSkillBuildTests(unittest.TestCase):
         self.assertIn("npm run build:current --", documentation)
         self.assertIn("runner-owned `run-manifest.json`", documentation)
 
+    def test_browser_contract_guidance_avoids_candidate_dom_overfitting(self) -> None:
+        documentation = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
+        for boundary in (
+            "使用者實際可操作、能接收 pointer event 的表面",
+            "raw descendant `textContent` substring",
+            "v2 的公開可見狀態改用 `rendered-text-includes`",
+            "不要把分置 sibling spans",
+            "client box 本身就是 brief 凍結的版面邊界",
+            "不要僅因 locator 是 heading 或文字節點",
+        ):
+            with self.subTest(boundary=boundary):
+                self.assertIn(boundary, documentation)
+        self.assertNotIn(
+            '"selector": "h1", "expect": "no-content-overflow"',
+            documentation,
+        )
+
     def test_attempt_summary_does_not_publish_repair_segment(self) -> None:
         execution = {
             "model": {},
@@ -550,6 +567,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3.0},
                         {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2.0},
                         {"id": "heading-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"},
+                        {"id": "visible-state", "action": "assert", "selector": "main", "expect": "rendered-text-includes", "value": "Task"},
                         {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
                         {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
                         {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
@@ -563,7 +581,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(9, record["step_count"])
+            self.assertEqual(10, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -710,6 +728,14 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "v1-cannot-use-text-segment": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
                 "id": "heading-phrase", "action": "assert", "selector": "h1",
                 "expect": "text-segment-on-one-line", "segment": "放行",
+            }]}]},
+            "v1-cannot-use-rendered-text": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                "id": "visible-state", "action": "assert", "selector": "main",
+                "expect": "rendered-text-includes", "value": "Ready",
+            }]}]},
+            "v2-empty-rendered-text": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "visible-state", "action": "assert", "selector": "main",
+                "expect": "rendered-text-includes", "value": "",
             }]}]},
             "v2-empty-text-segment": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "heading-phrase", "action": "assert", "selector": "h1",

@@ -10,6 +10,7 @@ from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1] / "wow-frontend-design" / "SKILL.md"
 NO_VISUAL = SKILL.parent / "references" / "no-visual-first-pass.md"
+QUALITY_GATES = SKILL.parent / "references" / "quality-gates.md"
 
 
 class SkillCoreContractTests(unittest.TestCase):
@@ -63,6 +64,12 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertIn("project-pinned Playwright", self.text)
         self.assertIn("Do not use Computer Use", self.text)
         self.assertIn("Do not reuse an old screenshot, old page, stale build", self.text)
+
+    def test_visible_state_contract_uses_rendered_text(self) -> None:
+        quality = QUALITY_GATES.read_text(encoding="utf-8")
+        self.assertIn("prefer `rendered-text-includes`", quality)
+        self.assertIn("reads raw descendant `textContent`", quality)
+        self.assertIn("may match hidden alternatives", quality)
 
     def test_public_metadata_and_all_markdown_routes_remain_discoverable(self) -> None:
         frontmatter = self.text.split("---", 2)[1]

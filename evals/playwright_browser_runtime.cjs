@@ -112,6 +112,8 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const elementRect = Element.prototype.getBoundingClientRect;
           const elementAnimations = Element.prototype.getAnimations;
           const elementAttribute = Element.prototype.getAttribute;
+          const htmlPrototype = HTMLElement.prototype;
+          const htmlInnerText = descriptor(htmlPrototype, "innerText").get;
           const nodeText = descriptor(Node.prototype, "textContent").get;
           const nodeParent = descriptor(Node.prototype, "parentElement").get;
           const nodeRoot = Node.prototype.getRootNode;
@@ -291,6 +293,10 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             },
             rect(element) {
               return snapshotRect(apply(elementRect, element, []));
+            },
+            renderedTextIncludes(element, literal) {
+              if (!apply(isPrototypeOf, htmlPrototype, [element])) return false;
+              return apply(stringIndexOf, apply(htmlInnerText, element, []), [literal]) >= 0;
             },
             scrollMetrics(element) {
               return freeze({

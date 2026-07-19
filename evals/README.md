@@ -61,6 +61,12 @@ npm run build:current -- \
 
 Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；一般 assertion 會在兩秒內 bounded polling，`animations-inactive-for` 則對整段明示的觀察窗做一次連續判定；scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 只保存 bounded case／step ID。失敗步驟的 evaluator-authored locator、accessible name 與 `segment` 可進入 bounded repair prompt，但不會進 receipt、manifest 或發布產物；輸入值、預期狀態文字及外部絕對路徑不會進 repair prompt。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
 
+先凍結 brief 支持的可觀察語意，再選不依賴候選 DOM 排列的最小 locator／assertion：
+
+- `click` 應指向使用者實際可操作、能接收 pointer event 的表面。若 radio／checkbox 以透明 input 加可見 label 客製，點 evaluator 明列的 label／control surface，不要把 `pointer-events: none` 的 input 當點擊目標；Playwright 仍會執行 [actionability checks](https://playwright.dev/docs/actionability)。
+- v1 `text-includes` 保留 raw descendant `textContent` substring 語意，會受 source whitespace 影響，也不排除 hidden descendants；只用於已凍結、沒有隱藏替代文字的精確 leaf state。v2 的公開可見狀態改用 `rendered-text-includes`：它要求唯一 HTMLElement locator 在 composed tree 可見，並以瀏覽器 `innerText` 排除未渲染後代。兩者都一次驗證一個 brief 已固定的事實；不要把分置 sibling spans 的時間、名稱或狀態拼成候選 DOM 才可能連續出現的字串。
+- `no-content-overflow` 只在該 element 的 client box 本身就是 brief 凍結的版面邊界、且 scroll extents 有契約意義時使用。不要僅因 locator 是 heading 或文字節點就拿它推論 glyph crop 或排版品質：字形 ink／line box 可能讓 scroll geometry 大於 client geometry，即使內容沒有被裁切；文字換行與詞組完整性改用對應的 rendered text assertions。
+
 `schema_version: 2` 保留全部 v1 行為，並加入按需的 rendered typography／layout assertions；v1 不接受這些新 assertion，避免既有 strict contract 靜默改義：
 
 ```json
@@ -74,8 +80,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
       {"id": "font-loaded", "action": "assert", "selector": "[data-display-type]", "expect": "font-face-loaded", "family": "Approved Display"},
       {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3},
       {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2},
-      {"id": "keep-release-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"},
-      {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"}
+      {"id": "keep-release-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"}
     ]
   }]
 }
@@ -85,7 +90,8 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 - `line-count-between` 量測 horizontal writing mode 的實際 text client rects；上下限是 evaluator 對這份固定內容與 viewport 的契約，不是通用最佳行數。
 - `last-line-graphemes-at-least` 使用 grapheme cluster 而不是 UTF-16 code unit，適合確認固定短標題沒有一字尾行；不要對可任意變動的 user content 設成全域 gate。
 - `text-segment-on-one-line` 要求 evaluator 明示的 literal segment 在唯一 locator 的可見文字中恰好出現一次，且其 rendered grapheme rects 位於同一列。它不做 Unicode 正規化、斷詞或字典猜測；不存在、重複、裁切或 vertical writing mode 都失敗。
-- `no-content-overflow` 要求 selector 有非零 client box，再比較 scroll/client geometry；只對 block/container 使用，且該區域不應是合法 scroll container。
+- `rendered-text-includes` 要求唯一 HTMLElement locator 與其 composed ancestors 可見、有非零 box，並在 evaluator 啟動時捕獲的原生 `innerText` 中包含 literal value；它排除 `display:none` 等未渲染後代，不接受頁面覆寫 getter 後偽造的結果。它不證明語句美感、live-region 宣告或完整互動流程。
+- `no-content-overflow` 要求 selector 有非零 client box，再比較 scroll/client geometry；只在該 box 是 evaluator 凍結的版面邊界且該區域不應合法捲動時使用。它不是 heading glyph crop、字形 ink 或 line box 的檢查器。
 - `active-animation-count-between` 量測 selector subtree 內 `pending`／`running` 的 Web Animations API 數量；可在互動後證明有限動畫確實啟動，或在 reduced-motion profile 證明沒有 active animation。
 - `animations-inactive-for` 要求 selector subtree 在 `duration_ms` 的 `50–1000` ms 觀察窗內每個 animation frame 都沒有 `pending`／`running` 動畫；任一 frame 出現即失敗且不重試，適合證明 reduced-motion 沒有延遲啟動。每個 case 最多一個觀察窗；它不是任意 sleep，也不證明非 Web Animations runtime 已停止。
 - `animations-settled` 以同一個兩秒 bounded polling 等待 subtree 不再有 active animation。把它與最終產品 state assertion、rapid retrigger／reverse 動作一起使用；「已停止」不代表 timing、easing 或美感良好。
