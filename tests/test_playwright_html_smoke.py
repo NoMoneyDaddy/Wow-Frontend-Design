@@ -748,6 +748,34 @@ html, body { overflow-x: clip; }
                 self.assertEqual(0, hazards["hidden_attribute_visible_count"])
                 self.assertEqual(0, hazards["fixed_content_obstruction_count"])
 
+    def test_wide_touch_height_fixed_action_covering_task_content_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Covered action</title><style>
+main { position: relative; min-height: 100vh; }
+.required-copy { position: absolute; inset: auto 0 12px; }
+.action { position: fixed; inset: auto 0 0; width: 100%; height: 44px; background: white; z-index: 3; }
+</style></head><body><main><h1>Review task</h1><p class="required-copy">Required decision context</p></main>
+<button class="action">Continue</button></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(1, item["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
+    def test_wide_touch_height_fixed_action_clear_of_task_content_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Clear action</title><style>
+.action { position: fixed; inset: auto 0 0; width: 100%; height: 44px; background: white; z-index: 3; }
+</style></head><body><main><h1>Review task</h1><p>Decision context remains clear.</p></main>
+<button class="action">Continue</button></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
+            for item in receipt["results"]:
+                self.assertEqual(0, item["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
     def test_transparent_portal_and_transparent_ancestor_do_not_impersonate_layout_hazards(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

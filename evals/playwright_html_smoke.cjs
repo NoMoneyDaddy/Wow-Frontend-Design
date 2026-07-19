@@ -501,7 +501,7 @@ async function main() {
             const paintedElements = [fixed, ...Array.from(fixed.querySelectorAll("*")).filter(visible)];
             const paintedRects = paintedElements.flatMap(paintRects).filter((box) =>
               box.width * box.height >= viewportArea * 0.12
-              || (box.width >= innerWidth * 0.7 && box.height >= 96));
+              || (box.width >= innerWidth * 0.7 && box.height >= 44));
             if (paintedRects.length === 0) continue;
             const contentRects = [];
             const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
