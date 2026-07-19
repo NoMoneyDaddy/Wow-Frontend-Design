@@ -490,6 +490,40 @@ triggerButton.onclick = () => {
             mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
             self.assertEqual("passed", mobile["inspection"]["browser_contract"]["status"])
 
+    def test_v2_browser_contract_can_opt_into_mobile_motion_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Mobile motion</title><style>
+@keyframes select { from { transform: translateX(-8px); } to { transform: none; } }
+#panel.run { animation: select 240ms linear; }
+@media (prefers-reduced-motion: reduce) { #panel.run { animation: none; } }
+</style></head><body><main><h1>Mobile motion</h1><button id="trigger">Select</button><section id="panel">Ready</section>
+</main><script>document.querySelector('#trigger').onclick = () => document.querySelector('#panel').classList.add('run');</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-motion-proof", "page": "index.html", "profile": "mobile-motion",
+                    "steps": [
+                        {"id": "start", "action": "click", "selector": "#trigger"},
+                        {"id": "running", "action": "assert", "selector": "#panel",
+                         "expect": "active-animation-count-between", "min_animations": 1, "max_animations": 1},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            self.assertEqual(["desktop", "mobile", "mobile-motion"], [
+                item["name"] for item in receipt["profiles"]
+            ])
+            mobile_motion = next(item for item in receipt["results"] if item["profile"] == "mobile-motion")
+            self.assertEqual("passed", mobile_motion["inspection"]["browser_contract"]["status"])
+            self.assertEqual("no-preference", next(
+                item["reduced_motion"] for item in receipt["profiles"] if item["name"] == "mobile-motion"
+            ))
+
     def test_v2_browser_contract_rejects_unsettled_continuous_motion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

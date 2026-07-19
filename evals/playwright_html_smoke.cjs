@@ -8,6 +8,9 @@ const VIEWPORTS = [
   { name: "desktop", viewport: { width: 1440, height: 1000 }, reducedMotion: "no-preference" },
   { name: "mobile", viewport: { width: 390, height: 844 }, reducedMotion: "reduce" },
 ];
+const MOBILE_MOTION_VIEWPORT = {
+  name: "mobile-motion", viewport: { width: 390, height: 844 }, reducedMotion: "no-preference",
+};
 const LOCATOR_ROLES = new Set([
   "button", "checkbox", "combobox", "dialog", "form", "group", "heading", "link",
   "listbox", "menuitem", "navigation", "option", "radio", "region", "searchbox",
@@ -51,7 +54,9 @@ function validateBrowserContract(value, pages) {
       || !exactKeys(contractCase, ["id", "page", "profile", "steps"])
       || !/^[a-z][a-z0-9-]{0,47}$/.test(contractCase.id)
       || ids.has(contractCase.id) || !pages.includes(contractCase.page)
-      || !["desktop", "mobile"].includes(contractCase.profile)
+      || !(value.schema_version === 1
+        ? ["desktop", "mobile"]
+        : ["desktop", "mobile", "mobile-motion"]).includes(contractCase.profile)
       || !Array.isArray(contractCase.steps) || contractCase.steps.length < 1 || contractCase.steps.length > 24) {
       throw new Error("invalid browser contract case");
     }
@@ -476,11 +481,14 @@ async function main() {
   const browserContract = process.argv.length === 6
     ? validateBrowserContract(JSON.parse(process.argv[5]), pages)
     : null;
+  const profiles = browserContract?.cases.some((item) => item.profile === "mobile-motion")
+    ? [...VIEWPORTS, MOBILE_MOTION_VIEWPORT]
+    : VIEWPORTS;
   const { browserVersion, results } = await runLocalPageMatrix({
     stage,
     pages,
     allowedFiles,
-    profiles: VIEWPORTS,
+    profiles,
     inspectPage: async (page, { relativePage, profile }) => {
       const analysis = await new AxeBuilder({ page })
         .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
@@ -605,7 +613,7 @@ async function main() {
       browser_version: browserVersion,
     },
     settle_ms: 300,
-    profiles: VIEWPORTS.map(({ name, viewport, reducedMotion }) => ({ name, viewport, reduced_motion: reducedMotion })),
+    profiles: profiles.map(({ name, viewport, reducedMotion }) => ({ name, viewport, reduced_motion: reducedMotion })),
     results,
   };
   if (browserContract) {

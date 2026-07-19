@@ -53,7 +53,8 @@ CURRENT_DEFAULT_MODEL = "gpt-5.4-mini"
 CURRENT_DEFAULT_REASONING_EFFORT = "high"
 CASE_MODES = ("greenfield", "retrofit", "patch")
 PATCH_LANES = {"polish": "POLISH", "repair": "REPAIR"}
-BROWSER_PROFILES = {"desktop", "mobile"}
+BROWSER_PROFILES_V1 = {"desktop", "mobile"}
+BROWSER_PROFILES_V2 = BROWSER_PROFILES_V1 | {"mobile-motion"}
 BROWSER_STEP_ACTIONS = {"assert", "click", "fill", "press", "select"}
 BROWSER_LOCATOR_ROLES = {
     "button", "checkbox", "combobox", "dialog", "form", "group", "heading", "link",
@@ -178,7 +179,8 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
             raise RunnerError("browser contract case id is invalid")
         if not isinstance(page, str) or page not in output_set or not page.casefold().endswith(".html"):
             raise RunnerError("browser contract page must be a declared HTML output")
-        if profile not in BROWSER_PROFILES or (page, profile) in seen_routes:
+        profiles = BROWSER_PROFILES_V1 if schema_version == 1 else BROWSER_PROFILES_V2
+        if profile not in profiles or (page, profile) in seen_routes:
             raise RunnerError("browser contract page/profile pair is invalid or duplicated")
         if not isinstance(steps, list) or not 1 <= len(steps) <= 24:
             raise RunnerError("browser contract step quota is invalid")
@@ -759,7 +761,10 @@ def _run_html_smoke(
         receipt = json.loads(stdout)
     except json.JSONDecodeError as error:
         raise RunnerError("HTML Playwright smoke gate infrastructure failure") from error
-    expected = {(name, profile) for name in html_outputs for profile in ("desktop", "mobile")}
+    expected_profiles = {"desktop", "mobile"}
+    if browser_contract is not None:
+        expected_profiles.update(case["profile"] for case in browser_contract["cases"])
+    expected = {(name, profile) for name in html_outputs for profile in expected_profiles}
     results = receipt.get("results")
     tool = receipt.get("tool")
     if not isinstance(results, list) or not isinstance(tool, dict):

@@ -534,6 +534,41 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("passed", receipt["status"])
             self.assertEqual(2, receipt["browser_contract"]["schema_version"])
 
+    def test_html_smoke_accepts_opt_in_mobile_motion_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            (stage / "index.html").write_text(
+                '<!doctype html><html lang="zh-Hant"><head><title>Motion</title></head><body><main><h1>Motion</h1></main></body></html>',
+                encoding="utf-8",
+            )
+            (stage / "details.html").write_text(
+                '<!doctype html><html lang="zh-Hant"><head><title>Details</title></head><body><main><h1>Details</h1></main></body></html>',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-motion-proof", "page": "index.html", "profile": "mobile-motion",
+                    "steps": [{"id": "heading-visible", "action": "assert", "selector": "h1", "expect": "visible"}],
+                }],
+            }
+            receipt = policy._run_html_smoke(stage, ("index.html", "details.html"), 30, contract)
+            self.assertEqual("passed", receipt["status"])
+            self.assertEqual(
+                {
+                    (page, profile)
+                    for page in ("index.html", "details.html")
+                    for profile in ("desktop", "mobile", "mobile-motion")
+                },
+                {(item["page"], item["profile"]) for item in receipt["results"]},
+            )
+            contract_results = [
+                (item["page"], item["profile"])
+                for item in receipt["results"]
+                if "browser_contract" in item["inspection"]
+            ]
+            self.assertEqual([("index.html", "mobile-motion")], contract_results)
+
     def test_html_smoke_accepts_ordered_multiple_pre_action_findings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory).resolve()
@@ -586,6 +621,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "v1-semantic-locator": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
                 "id": "primary-visible", "action": "assert", "role": "button", "name": "Continue", "expect": "visible",
             }]}]},
+            "v1-mobile-motion-profile": {"schema_version": 1, "cases": [{**valid_case, "profile": "mobile-motion"}]},
             "unknown-role": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "primary-visible", "action": "assert", "role": "made-up", "name": "Continue", "expect": "visible",
             }]}]},
