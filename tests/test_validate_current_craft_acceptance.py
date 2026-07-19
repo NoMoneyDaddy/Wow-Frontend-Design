@@ -252,6 +252,29 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "inspect every fresh capture"):
                 self.validate(fixture)
 
+    def test_capture_route_must_match_its_declared_page(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            receipt_path = fixture[5]
+            policy_path = fixture[2]
+            ledger_path = fixture[1]
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            capture = receipt["captures"][0]
+            capture["context"]["route"] = "/not-the-captured-page.html"
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["evidence"][capture["label"]]["context"]["route"] = capture["context"]["route"]
+            policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+            event = next(item for item in ledger["events"] if item.get("label") == capture["label"])
+            event["context"]["route"] = capture["context"]["route"]
+            ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "route does not match"):
+                self.validate(fixture)
+
     def test_screenshot_tampering_after_capture_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = self.build_fixture(Path(directory))

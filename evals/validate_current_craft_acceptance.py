@@ -276,6 +276,8 @@ def validate_current_acceptance(
             captured_at = datetime.fromisoformat(capture["captured_at"].replace("Z", "+00:00"))
         except (AttributeError, ValueError) as error:
             raise CurrentCraftError("capture timestamp is invalid") from error
+        if context["route"] != f"/{capture['page']}":
+            raise CurrentCraftError("capture route does not match its declared page")
         if (
             capture["page"] not in html_pages
             or expected_viewport is None
