@@ -10,6 +10,8 @@ Familiar patterns are allowed when they clearly support the task, preserve an ex
 
 Judge only the rendered product surface and the evidence available for that surface. Route component, interaction, responsive, motion, accessibility, security, and implementation defects to their owning references and gates.
 
+Reconcile every explicit negative constraint before the product-swap check. Match the visible result and implementation values to the forbidden pattern and the chosen alternative recorded before coding. A qualified, softened, renamed, or rationalized instance of the same pattern is still a contradiction unless the brief explicitly permits that exception. Confirm the contradiction from the fresh render and repair the smallest owning system decision; do not rewrite `DESIGN.md` to excuse the result.
+
 ## Review
 
 Apply these checks to representative rendered routes and states:

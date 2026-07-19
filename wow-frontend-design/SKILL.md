@@ -94,11 +94,11 @@ Use reading, browse, comparison, master-detail, decision, evidence, table, form,
 
 ### 3. Direction
 
-Derive one product-specific concept from the frozen evidence. Bind product truth to a perceptible behavior and user outcome. For `BUILD`, broad `RETROFIT`, or a new direction, choose the minimum sufficient identity-bearing decision and state why it would misfit an unrelated product. Identity may live in the information model, workflow, composition, content cadence, type, material, imagery, or interaction; `none` is valid when extra salience would compete with trust, scanning, accessibility, or performance.
+Derive one product-specific concept from the frozen evidence. Bind product truth to a perceptible behavior and user outcome. For `BUILD`, broad `RETROFIT`, or a new direction, choose one identity-bearing decision and state why it would misfit an unrelated product. Identity may live in the information model, workflow, composition, content cadence, type, material, imagery, or interaction; `none` is valid when extra salience would compete with trust, scanning, accessibility, or performance.
 
 A category noun alone does not earn a palette, material, font, shape, or motif. Require a more specific artifact, relationship, workflow, approved asset, or stated preference; otherwise keep that choice neutral or unresolved.
 
-When evidence calls for creating or improving identity, carry it in a task-bearing structure or behavior, not only nouns, copy, palette, background, or cards. If the result is interchangeable, revise it; `none` remains valid when identity would harm the task. Treat explicit rejected directions as hard negative constraints in plan and rendered review.
+When evidence calls for identity, use task-bearing structure or behavior; nouns, copy, palette, background, or cards alone fail. Revise an interchangeable result; `none` remains valid when identity would harm the task. For each explicit rejection, name its forbidden visible pattern and alternative; a softened or renamed version still fails source and rendered review.
 
 Compare directions only for a material unresolved choice. A focused repair inherits the direction unless it is the evidenced root cause.
 

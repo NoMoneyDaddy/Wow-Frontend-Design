@@ -137,9 +137,9 @@ class SkillCoreContractTests(unittest.TestCase):
         for phrase in (
             "encode it in perceivable content, structure, or control",
             "actual prerequisites and decision dependencies",
-            "When evidence calls for creating or improving identity",
+            "When evidence calls for identity",
             "`none` remains valid when identity would harm the task",
-            "explicit rejected directions as hard negative constraints",
+            "a softened or renamed version still fails source and rendered review",
             "rendered wraps preserve semantic units and intentional rhythm",
             "cannot cover, bypass, or weaken required evidence",
         ):
