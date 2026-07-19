@@ -1453,7 +1453,7 @@ def run(
             if html_smoke_gate.get("status") == "rejected":
                 if repair_rounds < max_repair_rounds:
                     try:
-                        feedback = compile_html_feedback(html_smoke_gate)
+                        feedback = compile_html_feedback(html_smoke_gate, browser_contract_data)
                     except ValueError as error:
                         raise RunnerError("HTML repair feedback infrastructure failure") from error
                     output_records = perform_repair(feedback, output_records)

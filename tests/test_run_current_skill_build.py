@@ -267,7 +267,60 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertNotIn("#primary", serialized_manifest)
             repair_prompt = json.loads((capture / "invocation-2.json").read_text(encoding="utf-8"))["prompt"]
             self.assertIn("contract-mobile-primary-task-primary-in-first-viewport", repair_prompt)
-            self.assertNotIn("#primary", repair_prompt)
+            self.assertIn('"locator":{"kind":"css","selector":"#primary"}', repair_prompt)
+            self.assertIn('"expect":"fully-visible-in-viewport"', repair_prompt)
+
+    def test_html_feedback_preserves_bounded_semantic_locator_without_runtime_diagnostics(self) -> None:
+        contract = {
+            "schema_version": 2,
+            "cases": [{
+                "id": "mobile-primary-task",
+                "page": "index.html",
+                "profile": "mobile",
+                "steps": [{
+                    "id": "confirmation-in-first-viewport",
+                    "action": "assert",
+                    "role": "button",
+                    "name": "確認時窗",
+                    "expect": "fully-visible-in-viewport",
+                }],
+            }],
+        }
+        receipt = {
+            "results": [{
+                "status": "rejected",
+                "profile": "mobile",
+                "navigation": "passed",
+                "visible_main": True,
+                "visible_text": True,
+                "visible_primary_content": True,
+                "root_horizontal_overflow": False,
+                "counters": {},
+                "inspection": {
+                    "axe_rule_ids": [],
+                    "layout_hazards": {},
+                    "browser_contract": {
+                        "case_id": "mobile-primary-task",
+                        "status": "rejected",
+                        "finding_ids": ["contract-mobile-primary-task-confirmation-in-first-viewport"],
+                        "steps_executed": 1,
+                    },
+                },
+                "console": ["PRIVATE-CONSOLE"],
+            }],
+        }
+        feedback = policy.compile_html_feedback(receipt, contract)
+        self.assertEqual([{
+            "case_id": "mobile-primary-task",
+            "profile": "mobile",
+            "step_id": "confirmation-in-first-viewport",
+            "action": "assert",
+            "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
+            "expect": "fully-visible-in-viewport",
+        }], feedback["contract_steps"])
+        serialized = json.dumps(feedback, ensure_ascii=False)
+        self.assertLessEqual(len(serialized.encode("utf-8")), 4096)
+        self.assertNotIn("PRIVATE-CONSOLE", serialized)
 
     def test_persistent_browser_contract_rejection_hits_repair_fuse(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
