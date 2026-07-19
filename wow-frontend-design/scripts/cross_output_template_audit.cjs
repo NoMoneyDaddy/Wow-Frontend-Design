@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const MAX_INPUT_BYTES = 1024 * 1024;
-const CLAIM_BOUNDARY = "exact or categorical dominant rendered macro-template candidate only; product specificity, originality and design quality remain unverified";
+const CLAIM_BOUNDARY = "exact or categorical dominant rendered macro-template and low-resolution visual-grammar candidates only; product specificity, originality and design quality remain unverified";
 
 function fail(message) {
   throw new Error(message);
@@ -47,11 +47,37 @@ function collectMacroFingerprint() {
     return "region";
   };
   const radiusBucket = (node) => {
-    const radius = Number.parseFloat(getComputedStyle(node).borderTopLeftRadius);
+    const radius = effectiveRadius(node);
     if (!Number.isFinite(radius) || radius <= 1) return "none";
     if (radius <= 8) return "small";
     if (radius <= 16) return "medium";
     return "large";
+  };
+  const familyCategory = (value) => {
+    const family = String(value || "").toLowerCase();
+    if (family.includes("黑體")) return "sans";
+    if (family.includes("明體") || family.includes("宋體")) return "serif";
+    if (/\b(monospace|mono|courier|consolas|menlo)\b/u.test(family)) return "mono";
+    if (/\b(sans|system-ui|arial|helvetica|avenir|segoe|jhenghei|pingfang)\b/u.test(family)) return "sans";
+    if (/\b(serif|ming|song|georgia|baskerville|palatino|iowan)\b/u.test(family)) return "serif";
+    return "other";
+  };
+  const densityBucket = (count) => (count === 0 ? "none" : count <= 3 ? "sparse" : "many");
+  function effectiveRadii(node) {
+    const rect = node.getBoundingClientRect();
+    const raw = String(getComputedStyle(node).borderTopLeftRadius || "0").trim().split(/\s+/u);
+    const toPixels = (token, extent) => token.endsWith("%")
+      ? Number.parseFloat(token) * extent / 100 : Number.parseFloat(token);
+    return { horizontal: toPixels(raw[0], rect.width), vertical: toPixels(raw[1] || raw[0], rect.height) };
+  }
+  function effectiveRadius(node) {
+    const radius = effectiveRadii(node);
+    return Math.min(radius.horizontal, radius.vertical);
+  }
+  const mode = (values) => {
+    const counts = new Map();
+    for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
+    return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] || "none";
   };
   const rectSignature = (rect, owner) => [
     q(rect.left - owner.left, owner.width),
@@ -83,8 +109,25 @@ function collectMacroFingerprint() {
   });
   const representationHistogram = ["form", "table", "ul", "ol", "figure", "img", "video", "canvas", "svg"]
     .map((selector) => [selector, [...main.querySelectorAll(selector)].filter(visible).length]);
+  const display = [...document.querySelectorAll("h1, [data-display-type]")].find(visible);
+  const displayStyle = display ? getComputedStyle(display) : null;
+  const displayRatio = displayStyle ? Number.parseFloat(displayStyle.fontSize) / innerWidth : 0;
+  const displayScale = !displayStyle ? "none" : displayRatio < 0.03 ? "compact" : displayRatio < 0.075 ? "display" : "oversized";
+  const candidates = [...main.querySelectorAll("section, article, aside, form, main > *")].filter((node) => {
+    if (!visible(node)) return false;
+    const rect = node.getBoundingClientRect();
+    return rect.width >= Math.min(320, innerWidth * 0.5) && rect.height >= 80;
+  });
+  const pills = [...document.querySelectorAll("button, a, [role='button'], [role='status'], [class*='pill'], [class*='chip'], [class~='tag'], [class*='badge']")]
+    .filter((node) => {
+      if (!visible(node)) return false;
+      const rect = node.getBoundingClientRect();
+      const radius = effectiveRadii(node);
+      return rect.height > 0 && rect.height <= 64 && rect.width >= rect.height * 1.25
+        && radius.horizontal >= rect.height * 0.45 && radius.vertical >= rect.height * 0.45;
+    });
   return {
-    version: 1,
+    version: 2,
     landmarks,
     mainFlow: {
       display: mainStyle.display,
@@ -94,12 +137,24 @@ function collectMacroFingerprint() {
     },
     regions,
     representationHistogram,
+    visualGrammar: {
+      displayFamily: displayStyle ? familyCategory(displayStyle.fontFamily) : "none",
+      displayScale,
+      majorRadius: mode(candidates.map(radiusBucket)),
+      pillDensity: densityBucket(pills.length),
+    },
   };
 }
 
 function boundedToken(value, label) {
   if (typeof value !== "string" || value.length < 1 || value.length > 80 || value.trim() !== value) fail(`${label} is invalid`);
   return value;
+}
+
+function boundedEnum(value, allowed, label) {
+  const token = boundedToken(value, label);
+  if (!allowed.includes(token)) fail(`${label} is invalid`);
+  return token;
 }
 
 function requireExactKeys(value, expected, label) {
@@ -114,8 +169,11 @@ function boundedNumber(value, label) {
 }
 
 function projectFingerprint(value) {
-  requireExactKeys(value, ["version", "landmarks", "mainFlow", "regions", "representationHistogram"], "macroFingerprint");
-  if (value.version !== 1) fail("macroFingerprint is invalid");
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("macroFingerprint is invalid");
+  const baseKeys = ["version", "landmarks", "mainFlow", "regions", "representationHistogram"];
+  if (value.version === 1) requireExactKeys(value, baseKeys, "macroFingerprint");
+  else if (value.version === 2) requireExactKeys(value, [...baseKeys, "visualGrammar"], "macroFingerprint");
+  else fail("macroFingerprint is invalid");
   if (!Array.isArray(value.landmarks) || value.landmarks.length > 50
     || !Array.isArray(value.regions) || value.regions.length > 100
     || !Array.isArray(value.representationHistogram) || value.representationHistogram.length > 30
@@ -154,7 +212,17 @@ function projectFingerprint(value) {
     }
     return [boundedToken(item[0], `representationHistogram[${index}][0]`), item[1]];
   });
-  return { version: 1, landmarks, mainFlow, regions, representationHistogram };
+  const projected = { version: value.version, landmarks, mainFlow, regions, representationHistogram };
+  if (value.version === 2) {
+    requireExactKeys(value.visualGrammar, ["displayFamily", "displayScale", "majorRadius", "pillDensity"], "visualGrammar");
+    projected.visualGrammar = {
+      displayFamily: boundedEnum(value.visualGrammar.displayFamily, ["none", "serif", "sans", "mono", "other"], "visualGrammar.displayFamily"),
+      displayScale: boundedEnum(value.visualGrammar.displayScale, ["none", "compact", "display", "oversized"], "visualGrammar.displayScale"),
+      majorRadius: boundedEnum(value.visualGrammar.majorRadius, ["none", "small", "medium", "large"], "visualGrammar.majorRadius"),
+      pillDensity: boundedEnum(value.visualGrammar.pillDensity, ["none", "sparse", "many"], "visualGrammar.pillDensity"),
+    };
+  }
+  return projected;
 }
 
 function dominantFingerprint(value) {
@@ -190,6 +258,17 @@ function dominantFingerprint(value) {
   };
 }
 
+function visualGrammarFingerprint(value) {
+  const projected = projectFingerprint(value);
+  return projected.version === 2 ? { version: 1, ...projected.visualGrammar } : null;
+}
+
+function macroStructureFingerprint(value) {
+  const projected = projectFingerprint(value);
+  const { visualGrammar: _visualGrammar, ...macro } = projected;
+  return { ...macro, version: 1 };
+}
+
 function fingerprintHash(value) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -208,6 +287,7 @@ function auditCrossOutputTemplates(input) {
   const identities = new Set();
   const exactGroups = new Map();
   const dominantGroups = new Map();
+  const visualGrammarGroups = new Map();
   for (const [index, observation] of input.observations.entries()) {
     requireExactKeys(observation, ["caseId", "route", "surface", "viewport", "state", "macroFingerprint"], `observations[${index}]`);
     for (const field of ["caseId", "route", "surface", "viewport", "state"]) {
@@ -217,8 +297,11 @@ function auditCrossOutputTemplates(input) {
     if (identities.has(identity)) fail(`duplicate observation identity: ${identity}`);
     identities.add(identity);
     const projected = projectFingerprint(observation.macroFingerprint);
-    const fingerprintSha256 = fingerprintHash(projected);
-    const dominantFingerprintSha256 = fingerprintHash(dominantFingerprint(projected));
+    const macro = macroStructureFingerprint(projected);
+    const fingerprintSha256 = fingerprintHash(macro);
+    const dominantFingerprintSha256 = fingerprintHash(dominantFingerprint(macro));
+    const visualGrammar = visualGrammarFingerprint(projected);
+    const visualGrammarSha256 = visualGrammar ? fingerprintHash(visualGrammar) : null;
     const groupKey = JSON.stringify([observation.surface, observation.viewport, observation.state, fingerprintSha256]);
     const dominantGroupKey = JSON.stringify([
       observation.surface, observation.viewport, observation.state, dominantFingerprintSha256,
@@ -238,6 +321,13 @@ function auditCrossOutputTemplates(input) {
       || { dominantFingerprintSha256, observations: [] };
     dominantGroup.observations.push(receipt);
     dominantGroups.set(dominantGroupKey, dominantGroup);
+    if (visualGrammarSha256) {
+      const visualGrammarKey = JSON.stringify([observation.surface, observation.viewport, observation.state, visualGrammarSha256]);
+      const visualGrammarGroup = visualGrammarGroups.get(visualGrammarKey)
+        || { visualGrammarSha256, observations: [] };
+      visualGrammarGroup.observations.push(receipt);
+      visualGrammarGroups.set(visualGrammarKey, visualGrammarGroup);
+    }
   }
   const exactAdvisories = [...exactGroups.values()].flatMap((group) => {
     const caseIds = [...new Set(group.observations.map((item) => item.caseId))].sort();
@@ -268,11 +358,23 @@ function auditCrossOutputTemplates(input) {
       confirmation: "review product evidence and paired blind renders; categorical structural similarity is not a defect",
     }];
   });
-  const advisories = [...exactAdvisories, ...nearAdvisories].sort((left, right) => (
+  const visualGrammarAdvisories = [...visualGrammarGroups.values()].flatMap((group) => {
+    const caseIds = [...new Set(group.observations.map((item) => item.caseId))].sort();
+    if (caseIds.length < 2) return [];
+    const observations = [...group.observations].sort(compareReceipts);
+    return [{
+      code: "cross_output_visual_grammar_candidate",
+      caseIds,
+      visualGrammarSha256: group.visualGrammarSha256,
+      observations: observations.map(({ fingerprintSha256, ...identity }) => ({ ...identity, fingerprintSha256 })),
+      confirmation: "review product evidence and paired blind renders; low-resolution type, radius, and pill similarity is not a defect",
+    }];
+  });
+  const advisories = [...exactAdvisories, ...nearAdvisories, ...visualGrammarAdvisories].sort((left, right) => (
     left.code.localeCompare(right.code)
       || left.caseIds.join("|").localeCompare(right.caseIds.join("|"))
-      || (left.fingerprintSha256 || left.dominantFingerprintSha256)
-        .localeCompare(right.fingerprintSha256 || right.dominantFingerprintSha256)
+      || (left.fingerprintSha256 || left.dominantFingerprintSha256 || left.visualGrammarSha256)
+        .localeCompare(right.fingerprintSha256 || right.dominantFingerprintSha256 || right.visualGrammarSha256)
   ));
   return {
     schemaVersion: 1,
@@ -303,7 +405,7 @@ function main(argv) {
 
 module.exports = {
   CLAIM_BOUNDARY, auditCrossOutputTemplates, collectMacroFingerprint, dominantFingerprint,
-  projectFingerprint, quantize,
+  macroStructureFingerprint, projectFingerprint, quantize, visualGrammarFingerprint,
 };
 
 if (require.main === module) {

@@ -58,6 +58,73 @@ const { auditCrossOutputTemplates, collectMacroFingerprint } = require(__AUDITOR
         self.assertNotIn("visualIssues", observed["result"])
         self.assertIn("unverified", observed["result"]["claimBoundary"])
 
+    def test_different_layouts_with_same_visual_grammar_produce_advisory(self) -> None:
+        source = """
+const { chromium } = require('playwright');
+const { auditCrossOutputTemplates, collectMacroFingerprint } = require(__AUDITOR__);
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  const render = async (kind, font) => {
+    const regions = kind === 'grid'
+      ? '<section><form></form></section><aside><ul><li></li></ul></aside>'
+      : '<article><table><tr><td></td></tr></table></article><section><figure></figure></section><section></section>';
+    await page.setContent(`<style>body{margin:0}h1{font:64px/1.1 ${font}}main{display:${kind === 'grid' ? 'grid' : 'flex'};grid-template-columns:2fr 1fr;gap:24px;height:560px}main>*{flex:1;border:1px solid;border-radius:${font.includes('Georgia') ? '28px' : '0'} }.pill{display:inline-block;width:88px;height:32px;border-radius:999px}</style><header><h1>Title</h1><span class="pill"></span><span class="pill"></span><span class="pill"></span><span class="pill"></span></header><main>${regions}</main>`);
+    return page.evaluate(collectMacroFingerprint);
+  };
+  const a = await render('grid', 'Georgia, serif');
+  const b = await render('flex', 'Georgia, serif');
+  const c = await render('flex', 'Arial, sans-serif');
+  await browser.close();
+  const row = (caseId, macroFingerprint) => ({ caseId, route:'/', surface:'primary', viewport:'desktop', state:'base', macroFingerprint });
+  const result = auditCrossOutputTemplates({ schemaVersion:1, cohort:'grammar-1', observations:[row('a',a),row('b',b),row('c',c)] });
+  process.stdout.write(JSON.stringify({a:a.visualGrammar,b:b.visualGrammar,c:c.visualGrammar,result}));
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+""".replace("__AUDITOR__", json.dumps(str(AUDITOR)))
+        observed = self.run_node(source)
+        self.assertEqual(observed["a"], observed["b"])
+        self.assertNotEqual(observed["b"], observed["c"])
+        advisories = [item for item in observed["result"]["advisories"] if item["code"] == "cross_output_visual_grammar_candidate"]
+        self.assertEqual(1, len(advisories))
+        self.assertEqual(["a", "b"], advisories[0]["caseIds"])
+        self.assertIn("not a defect", advisories[0]["confirmation"])
+
+    def test_cjk_font_family_categories_are_observed(self) -> None:
+        source = """
+const { chromium } = require('playwright');
+const { collectMacroFingerprint } = require(__AUDITOR__);
+(async () => {
+  const browser = await chromium.launch({ headless:true });
+  const page = await browser.newPage({ viewport:{width:1200,height:800} });
+  const render = async (family) => {
+    await page.setContent(`<h1 style="font-family:${family};font-size:64px">標題</h1><main></main>`);
+    return (await page.evaluate(collectMacroFingerprint)).visualGrammar.displayFamily;
+  };
+  const ming = await render('新細明體');
+  const hei = await render('微軟正黑體');
+  await browser.close();
+  process.stdout.write(JSON.stringify({ming,hei}));
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+""".replace("__AUDITOR__", json.dumps(str(AUDITOR)))
+        self.assertEqual({"ming": "serif", "hei": "sans"}, self.run_node(source))
+
+    def test_percentage_radii_use_element_geometry(self) -> None:
+        source = """
+const { chromium } = require('playwright');
+const { collectMacroFingerprint } = require(__AUDITOR__);
+(async () => {
+  const browser = await chromium.launch({ headless:true });
+  const page = await browser.newPage({ viewport:{width:1200,height:800} });
+  await page.setContent('<style>body{margin:0}h1{font:64px Georgia,serif}main>section{width:1200px;height:200px;border-radius:10%}.tag{display:block;width:100px;height:32px;border-radius:25%}</style><h1>Title</h1><main><section><span class="tag"></span></section></main>');
+  const grammar = (await page.evaluate(collectMacroFingerprint)).visualGrammar;
+  await browser.close();
+  process.stdout.write(JSON.stringify(grammar));
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+""".replace("__AUDITOR__", json.dumps(str(AUDITOR)))
+        grammar = self.run_node(source)
+        self.assertEqual("large", grammar["majorRadius"])
+        self.assertEqual("none", grammar["pillDensity"])
+
     def test_same_product_routes_do_not_create_cross_output_advisory(self) -> None:
         fingerprint = {"version": 1, "landmarks": [], "mainFlow": {"display": "block", "flexDirection": "row", "gridTracks": [], "gap": 0}, "regions": [], "representationHistogram": []}
         source = f"""
@@ -158,6 +225,37 @@ process.stdout.write(JSON.stringify({{forward:audit(input),reverse:audit([...inp
         result = self.run_node(source)
         self.assertEqual(result["forward"], result["reverse"])
 
+    def test_multiple_visual_grammar_groups_sort_stably(self) -> None:
+        base = {"version": 2, "landmarks": [], "mainFlow": {"display": "block", "flexDirection": "row", "gridTracks": [], "gap": 0}, "regions": [], "representationHistogram": []}
+        serif = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "display", "majorRadius": "large", "pillDensity": "many"}}
+        sans = {**base, "visualGrammar": {"displayFamily": "sans", "displayScale": "compact", "majorRadius": "none", "pillDensity": "none"}}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId,macroFingerprint)=>( {{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}} );
+const rows=[row('a',{json.dumps(serif)}),row('b',{json.dumps(serif)}),row('c',{json.dumps(sans)}),row('d',{json.dumps(sans)})];
+const audit=(observations)=>auditCrossOutputTemplates({{schemaVersion:1,cohort:'stable-visual',observations}});
+process.stdout.write(JSON.stringify({{forward:audit(rows),reverse:audit([...rows].reverse())}}));
+"""
+        result = self.run_node(source)
+        self.assertEqual(result["forward"], result["reverse"])
+        visual = [item for item in result["forward"]["advisories"] if item["code"] == "cross_output_visual_grammar_candidate"]
+        self.assertEqual(2, len(visual))
+
+    def test_v2_visual_grammar_does_not_change_exact_macro_identity(self) -> None:
+        base = {"version": 2, "landmarks": [], "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.5, 0.5], "gap": 0.02}, "regions": [], "representationHistogram": []}
+        serif = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "display", "majorRadius": "large", "pillDensity": "many"}}
+        sans = {**base, "visualGrammar": {"displayFamily": "sans", "displayScale": "compact", "majorRadius": "none", "pillDensity": "none"}}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId,macroFingerprint)=>( {{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}} );
+process.stdout.write(JSON.stringify(auditCrossOutputTemplates({{schemaVersion:1,cohort:'v2-macro',observations:[row('a',{json.dumps(serif)}),row('b',{json.dumps(sans)})]}})));
+"""
+        result = self.run_node(source)
+        exact = [item for item in result["advisories"] if item["code"] == "cross_output_template_candidate"]
+        visual = [item for item in result["advisories"] if item["code"] == "cross_output_visual_grammar_candidate"]
+        self.assertEqual(1, len(exact))
+        self.assertEqual([], visual)
+
     def test_key_order_does_not_change_hash(self) -> None:
         source = f"""
 const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
@@ -184,6 +282,16 @@ process.stdout.write(JSON.stringify({{forbidden,collision}}));
         result = self.run_node(source)
         self.assertIn("fields", result["forbidden"])
         self.assertEqual([], result["collision"]["advisories"])
+
+    def test_unknown_visual_grammar_enum_fails_closed(self) -> None:
+        fingerprint = {"version": 2, "landmarks": [], "mainFlow": {"display": "block", "flexDirection": "row", "gridTracks": [], "gap": 0}, "regions": [], "representationHistogram": [], "visualGrammar": {"displayFamily": "fantasy", "displayScale": "compact", "majorRadius": "none", "pillDensity": "none"}}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId)=>( {{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint:{json.dumps(fingerprint)}}} );
+try {{ auditCrossOutputTemplates({{schemaVersion:1,cohort:'bad-enum',observations:[row('a'),row('b')]}}); }}
+catch (error) {{ process.stdout.write(JSON.stringify(error.message)); }}
+"""
+        self.assertIn("displayFamily is invalid", self.run_node(source))
 
     def test_nested_landmark_changes_rendered_fingerprint(self) -> None:
         source = f"""

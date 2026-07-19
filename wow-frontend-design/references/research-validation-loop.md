@@ -125,9 +125,9 @@ Do not modify the accepted Skill merely because this research sounds plausible. 
 
 ### Cross-output convergence telemetry
 
-`scripts/cross_output_template_audit.cjs` is evaluator-only advisory telemetry for two or more independently generated outputs in the same frozen cohort. Compare only matched surface, viewport, and state observations across different cases. Its normalized structure and representation signals deliberately exclude copy, brand color, font identity, and asset source.
+`scripts/cross_output_template_audit.cjs` is evaluator-only advisory telemetry for two or more independently generated outputs in the same frozen cohort. Compare only matched surface, viewport, and state observations across different cases. Its normalized signals cover macro structure, representation, and low-resolution visual grammar: generic display-type category, display scale, major-surface radius, and pill density. They deliberately exclude copy, brand color, specific font identity, asset source, and aesthetic quality.
 
-`cross_output_template_candidate` and `near_cross_output_template_candidate` are review candidates, never product findings, release blockers, or proof of interchangeability. Confirm a concern through product evidence and paired rendered review; a match does not prove a defect, and a non-match does not prove originality. If consecutive frozen cohorts produce only manual false positives, disable the candidate instead of adding similarity weights, palette rules, or novelty thresholds.
+`cross_output_template_candidate`, `near_cross_output_template_candidate`, and `cross_output_visual_grammar_candidate` are review candidates, never product findings, release blockers, or proof of interchangeability. Confirm a concern through product evidence and paired rendered review; a match does not prove a defect, and a non-match does not prove originality. If consecutive frozen cohorts produce only manual false positives, disable the candidate instead of adding similarity weights, palette rules, or novelty thresholds.
 
 ## Validation-gated Skill optimization
 
