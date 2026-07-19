@@ -46,6 +46,17 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             with self.subTest(stale_section=stale_section):
                 self.assertNotIn(stale_section, self.creative)
 
+    def test_attention_dominant_grammar_requires_evidence_without_novelty_pressure(self) -> None:
+        for phrase in (
+            "attention-dominant display-type category, major-surface shape, and repeated control silhouette",
+            "A subject noun, mood, or claim of polish is not evidence",
+            "inherit a proven project rule or leave it unresolved",
+            "not a requirement to make these choices unusual or different",
+            "attention-dominant grammar jobs or unresolved choices",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.creative)
+
     def test_component_reference_owns_behavior_not_visual_or_agent_orchestration(self) -> None:
         for stale_section in (
             "## 6. Build material and surface hierarchy",

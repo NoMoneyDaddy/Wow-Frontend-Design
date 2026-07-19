@@ -49,6 +49,8 @@ Use the task representation and content order established by the core workflow o
 
 Name why the direction belongs to this product. Test the identity-bearing decision by removing the product name, logo, and accent color: if the same rationale remains equally defensible for an unrelated product, return to the evidence instead of adding novelty. Familiar patterns remain valid when the task, platform, accessibility, or existing system earns them.
 
+Before implementation, name the evidence and task job for the attention-dominant display-type category, major-surface shape, and repeated control silhouette. A subject noun, mood, or claim of polish is not evidence for any of them. If a choice has no job, inherit a proven project rule or leave it unresolved; do not replace it with a preferred style. This is a traceability record, not a requirement to make these choices unusual or different.
+
 Record an evidence-backed rejection only when the brief, existing product, or a material unresolved choice provides one. Do not invent a disliked trope or visual opposite merely to complete the record.
 
 ## 3. Compare only when a decision is unresolved
@@ -82,6 +84,7 @@ Before implementation, keep a terse direction record:
 
 ```text
 concept → evidence locators → preserved invariants → identity decision
+→ attention-dominant grammar jobs or unresolved choices
 → affected route/state → expected task/content consequence → failure signal
 ```
 
