@@ -75,6 +75,53 @@ class ProjectScanTests(unittest.TestCase):
             self.assertNotIn(".env", report["priority_files"])
             self.assertFalse(any("TOP_SECRET" in str(value) for value in report.values()))
 
+    def test_surfaces_bounded_brand_evidence_candidates_without_promoting_them(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "DESIGN.md").write_text("# Visual contract\n", encoding="utf-8")
+            (root / "BRAND.md").write_text("# Brand guidance\n", encoding="utf-8")
+            (root / ".env").write_text("BRAND_SECRET=do-not-read\n", encoding="utf-8")
+
+            styles = root / "styles"
+            styles.mkdir()
+            (styles / "brand.tokens.json").write_text("{}\n", encoding="utf-8")
+
+            public = root / "public"
+            (public / "fonts").mkdir(parents=True)
+            (public / "logo-primary.svg").write_text("<svg/>\n", encoding="utf-8")
+            (public / "fonts" / "brand-display.woff2").write_bytes(b"font")
+            campaign = public / "campaigns" / "summer"
+            campaign.mkdir(parents=True)
+            (campaign / "key-visual.webp").write_bytes(b"image")
+            (campaign / "logo-lockup.svg").write_text("<svg/>\n", encoding="utf-8")
+            (campaign / "headline.woff2").write_bytes(b"campaign-font")
+            (campaign / "theme.css").write_text(":root {}\n", encoding="utf-8")
+
+            generated = root / "dist"
+            generated.mkdir()
+            (generated / "logo-stale.svg").write_text("<svg/>\n", encoding="utf-8")
+
+            report = project_scan.scan(root)
+            evidence = report["brand_evidence"]
+            candidates = {(item["kind"], item["path"]) for item in evidence["candidates"]}
+
+            self.assertEqual("candidate_only", evidence["status"])
+            self.assertIn(("design_contract", "DESIGN.md"), candidates)
+            self.assertIn(("brand_guidance", "BRAND.md"), candidates)
+            self.assertIn(("token_source", "styles/brand.tokens.json"), candidates)
+            self.assertIn(("identity_asset", "public/logo-primary.svg"), candidates)
+            self.assertIn(("font_asset", "public/fonts/brand-display.woff2"), candidates)
+            self.assertIn(("campaign_overlay", "public/campaigns/summer/key-visual.webp"), candidates)
+            self.assertIn(("campaign_overlay", "public/campaigns/summer/logo-lockup.svg"), candidates)
+            self.assertIn(("campaign_overlay", "public/campaigns/summer/headline.woff2"), candidates)
+            self.assertIn(("campaign_overlay", "public/campaigns/summer/theme.css"), candidates)
+            self.assertNotIn(("identity_asset", "public/campaigns/summer/logo-lockup.svg"), candidates)
+            self.assertNotIn(("font_asset", "public/campaigns/summer/headline.woff2"), candidates)
+            self.assertNotIn(("token_source", "public/campaigns/summer/theme.css"), candidates)
+            self.assertNotIn(".env", str(evidence))
+            self.assertNotIn("logo-stale.svg", str(evidence))
+            self.assertIn("does not establish approval", evidence["claim_boundary"])
+
     def test_empty_directory_is_build_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             report = project_scan.scan(Path(temp))

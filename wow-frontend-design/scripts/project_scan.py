@@ -292,6 +292,35 @@ ENTRY_PATTERNS = (
     re.compile(r"(^|/)(globals?|styles?|app)\.(css|scss|sass)$"),
 )
 
+BRAND_EVIDENCE_LIMIT = 48
+BRAND_GUIDANCE_NAMES = {
+    "brand.md",
+    "branding.md",
+    "brand-book.md",
+    "brand-book.pdf",
+    "brand-guide.md",
+    "brand-guide.pdf",
+    "brand-guidelines.md",
+    "brand-guidelines.pdf",
+    "brandbook.md",
+    "brandbook.pdf",
+}
+IDENTITY_ASSET_EXTENSIONS = {".avif", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".webp"}
+FONT_ASSET_EXTENSIONS = {".otf", ".ttf", ".woff", ".woff2"}
+CAMPAIGN_ASSET_EXTENSIONS = IDENTITY_ASSET_EXTENSIONS | FONT_ASSET_EXTENSIONS | {".mp4", ".webm"}
+CAMPAIGN_PATH_PARTS = {"campaign", "campaigns"}
+TOKEN_SOURCE_EXTENSIONS = CODE_EXTENSIONS | {".json", ".tokens", ".yaml", ".yml"}
+TOKEN_SOURCE_NAME = re.compile(r"(?:^|[._-])(?:design[._-]?)?tokens?(?:[._-]|$)|(?:^|[._-])theme(?:[._-]|$)")
+IDENTITY_ASSET_NAME = re.compile(
+    r"(?:^|[._-])(?:brandmark|favicon|logo|logomark|wordmark)(?:[._-]|$)"
+)
+
+BRAND_EVIDENCE_BOUNDARY = (
+    "Filename and path discovery only; a candidate does not establish approval, ownership, "
+    "currentness, rights, scope, or a reusable brand invariant. Inspect the source and classify "
+    "it as explicit, observed, inferred, inherited, or unknown before use."
+)
+
 
 def _is_sensitive(path: Path) -> bool:
     name = path.name.lower()
@@ -603,6 +632,65 @@ def entry_score(rel: str) -> tuple[int, int, str]:
     return score, lowered.count("/"), lowered
 
 
+def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any]:
+    """List bounded path candidates without interpreting their visual values or authority."""
+    candidates: list[dict[str, str]] = []
+    kind_priority = {
+        "design_contract": 0,
+        "brand_guidance": 1,
+        "campaign_overlay": 2,
+        "token_source": 3,
+        "identity_asset": 4,
+        "font_asset": 5,
+    }
+
+    for path in files:
+        rel = path.relative_to(root).as_posix()
+        name = path.name.lower()
+        suffix = path.suffix.lower()
+        parts = {part.lower() for part in path.relative_to(root).parts[:-1]}
+        kind: str | None = None
+        signal: str | None = None
+
+        is_campaign_path = bool(parts & CAMPAIGN_PATH_PARTS)
+        is_token_source = bool(
+            (name.endswith(".tokens.json") or suffix == ".tokens")
+            or (suffix in TOKEN_SOURCE_EXTENSIONS and TOKEN_SOURCE_NAME.search(name))
+        )
+        is_identity_asset = suffix in IDENTITY_ASSET_EXTENSIONS and bool(
+            IDENTITY_ASSET_NAME.search(name)
+        )
+
+        if is_campaign_path and (
+            suffix in CAMPAIGN_ASSET_EXTENSIONS
+            or is_token_source
+            or name in BRAND_GUIDANCE_NAMES
+        ):
+            kind, signal = "campaign_overlay", "campaign path"
+        elif name == "design.md":
+            kind, signal = "design_contract", "canonical contract filename"
+        elif name in BRAND_GUIDANCE_NAMES:
+            kind, signal = "brand_guidance", "brand guidance filename"
+        elif is_token_source:
+            kind, signal = "token_source", "token or theme filename"
+        elif is_identity_asset:
+            kind, signal = "identity_asset", "identity asset filename"
+        elif suffix in FONT_ASSET_EXTENSIONS:
+            kind, signal = "font_asset", "local font file"
+
+        if kind and signal:
+            candidates.append({"path": rel, "kind": kind, "signal": signal})
+
+    candidates.sort(key=lambda item: (kind_priority[item["kind"]], item["path"]))
+    truncated = len(candidates) > BRAND_EVIDENCE_LIMIT
+    return {
+        "status": "candidate_only",
+        "candidates": candidates[:BRAND_EVIDENCE_LIMIT],
+        "truncated": truncated,
+        "claim_boundary": BRAND_EVIDENCE_BOUNDARY,
+    }
+
+
 def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
     files, truncated = collect_files(root, max_files)
     rel_paths = relative(root, files)
@@ -706,6 +794,7 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
             }
         )
     lint_tools = lint_capability_inventory(root, files, package_files)
+    brand_evidence = brand_evidence_inventory(root, files)
     candidate_pool = [
         rel
         for rel in rel_paths
@@ -751,6 +840,7 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
         "package_scripts": script_names,
         "package_profiles": package_profiles,
         "lint_tools": lint_tools,
+        "brand_evidence": brand_evidence,
         "manifests": relative(root, manifests),
         "lockfiles": relative(root, lockfiles),
         "language_tags": sorted(lang_tags),
@@ -839,6 +929,18 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.extend(f"- {name}: {count}" for name, count in report["frontend_signals"].items())
     else:
         lines.append("- none detected")
+
+    lines.extend(["", "## Brand evidence candidates", ""])
+    if report["brand_evidence"]["candidates"]:
+        for item in report["brand_evidence"]["candidates"]:
+            lines.append(
+                f"- {literal(item['path'])} — {item['kind']} ({item['signal']})"
+            )
+        if report["brand_evidence"]["truncated"]:
+            lines.append(f"- Candidate list stopped at {BRAND_EVIDENCE_LIMIT} entries.")
+    else:
+        lines.append("- none detected")
+    lines.append(f"- Boundary: {report['brand_evidence']['claim_boundary']}")
 
     lines.extend(["", "## Inspect next", ""])
     if report["priority_files"]:
