@@ -74,7 +74,9 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             stage = Path(directory)
             (stage / "index.html").write_text(
                 '''<!doctype html><html lang="zh-Hant"><head><title>語意定位</title></head><body>
-<main><h1>排程</h1><button>切換區段</button><button>確認時窗</button></main>
+<main><h1>排程</h1><button>切換區段</button><p id="window-time">01:20–02:10</p>
+<button aria-describedby="window-time">確認時窗</button></main>
+<script>document.querySelector('#window-time').textContent = '02:25–03:15';</script>
 </body></html>''',
                 encoding="utf-8",
             )
@@ -98,6 +100,24 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             self.assertEqual("passed", mobile["status"], mobile)
             self.assertEqual(1, mobile["inspection"]["browser_contract"]["steps_executed"])
             self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
+            self.assertNotIn("label-content-name-mismatch", mobile["inspection"]["axe_rule_ids"])
+
+    def test_accessible_name_must_include_the_visible_control_label(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Label in name</title></head><body>
+<main><h1>Checkout</h1><button aria-label="Submit order">Buy now</button></main>
+</body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            for result in receipt["results"]:
+                self.assertIn(
+                    "label-content-name-mismatch",
+                    result["inspection"]["axe_rule_ids"],
+                )
 
     def test_browser_contract_distinguishes_ambiguous_locator(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

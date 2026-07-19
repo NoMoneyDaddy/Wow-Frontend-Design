@@ -32,6 +32,33 @@ SAFE_DESIGN = "---\nversion: alpha\nname: Runner Test\n---\n# Runner Test\n"
 
 
 class CurrentSkillBuildTests(unittest.TestCase):
+    def test_repair_prompt_preserves_visible_and_accessible_label_alignment(self) -> None:
+        prompt = policy.build_repair_prompt(
+            ("DESIGN.md", "index.html"),
+            {
+                "schema_version": 1,
+                "gate": "html",
+                "finding_ids": ["contract-mobile-primary-task-confirmation"],
+                "counts": {"contract-mobile-primary-task-confirmation": 1},
+                "truncated": False,
+                "contract_steps": [{
+                    "case_id": "mobile-primary-task",
+                    "profile": "mobile",
+                    "step_id": "confirmation",
+                    "action": "assert",
+                    "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
+                    "expect": "visible",
+                    "reason": "locator-missing",
+                }],
+                "signature": "0" * 64,
+            },
+            file_context=(),
+        )
+        self.assertIn("never infer multiple DOM targets from a count alone", prompt)
+        self.assertIn("keep each control's complete visible label inside its accessible name", prompt)
+        self.assertIn("keep the visible label stable", prompt)
+        self.assertIn("Do not remove unrelated labels", prompt)
+
     def test_repository_exposes_one_documented_current_build_entry(self) -> None:
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(

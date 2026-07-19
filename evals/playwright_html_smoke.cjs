@@ -440,7 +440,9 @@ async function main() {
     allowedFiles,
     profiles: VIEWPORTS,
     inspectPage: async (page, { relativePage, profile }) => {
-      const analysis = await new AxeBuilder({ page }).analyze();
+      const analysis = await new AxeBuilder({ page })
+        .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
+        .analyze();
       const layoutHazards = await page.evaluate(() => {
         const visible = (element) => {
           let current = element;
