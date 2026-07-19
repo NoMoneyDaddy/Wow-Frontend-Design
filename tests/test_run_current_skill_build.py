@@ -499,6 +499,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
                         {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
                         {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
+                        {"id": "motion-inactive", "action": "assert", "selector": "main", "expect": "animations-inactive-for", "duration_ms": 200.0},
                         {"id": "named-action", "action": "assert", "role": "button", "name": "確認時窗", "expect": "visible"},
                     ],
                 }],
@@ -508,7 +509,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(8, record["step_count"])
+            self.assertEqual(9, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -629,6 +630,20 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "id": "motion-active", "action": "assert", "selector": "main",
                 "expect": "active-animation-count-between", "min_animations": 3, "max_animations": 1,
             }]}]},
+            "v2-short-inactivity-window": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "motion-inactive", "action": "assert", "selector": "main",
+                "expect": "animations-inactive-for", "duration_ms": 49,
+            }]}]},
+            "v2-long-inactivity-window": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "motion-inactive", "action": "assert", "selector": "main",
+                "expect": "animations-inactive-for", "duration_ms": 1001,
+            }]}]},
+            "v2-duplicate-inactivity-window": {"schema_version": 2, "cases": [{**valid_case, "steps": [
+                {"id": "motion-inactive-a", "action": "assert", "selector": "main",
+                 "expect": "animations-inactive-for", "duration_ms": 200},
+                {"id": "motion-inactive-b", "action": "assert", "selector": "main",
+                 "expect": "animations-inactive-for", "duration_ms": 200},
+            ]}]},
         }
         for label, payload in invalid_payloads.items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:

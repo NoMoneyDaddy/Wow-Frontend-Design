@@ -59,7 +59,7 @@ npm run build:current -- \
 }
 ```
 
-Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；其他 assertion 會在兩秒內 bounded polling，scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 只保存 bounded case／step ID。失敗步驟的 evaluator-authored locator、accessible name 與 `segment` 可進入 bounded repair prompt，但不會進 receipt、manifest 或發布產物；輸入值、預期狀態文字及外部絕對路徑不會進 repair prompt。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
+Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；一般 assertion 會在兩秒內 bounded polling，`animations-inactive-for` 則對整段明示的觀察窗做一次連續判定；scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 只保存 bounded case／step ID。失敗步驟的 evaluator-authored locator、accessible name 與 `segment` 可進入 bounded repair prompt，但不會進 receipt、manifest 或發布產物；輸入值、預期狀態文字及外部絕對路徑不會進 repair prompt。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
 
 `schema_version: 2` 保留全部 v1 行為，並加入按需的 rendered typography／layout assertions；v1 不接受這些新 assertion，避免既有 strict contract 靜默改義：
 
@@ -87,6 +87,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 - `text-segment-on-one-line` 要求 evaluator 明示的 literal segment 在唯一 locator 的可見文字中恰好出現一次，且其 rendered grapheme rects 位於同一列。它不做 Unicode 正規化、斷詞或字典猜測；不存在、重複、裁切或 vertical writing mode 都失敗。
 - `no-content-overflow` 要求 selector 有非零 client box，再比較 scroll/client geometry；只對 block/container 使用，且該區域不應是合法 scroll container。
 - `active-animation-count-between` 量測 selector subtree 內 `pending`／`running` 的 Web Animations API 數量；可在互動後證明有限動畫確實啟動，或在 reduced-motion profile 證明沒有 active animation。
+- `animations-inactive-for` 要求 selector subtree 在 `duration_ms` 的 `50–1000` ms 觀察窗內每個 animation frame 都沒有 `pending`／`running` 動畫；任一 frame 出現即失敗且不重試，適合證明 reduced-motion 沒有延遲啟動。每個 case 最多一個觀察窗；它不是任意 sleep，也不證明非 Web Animations runtime 已停止。
 - `animations-settled` 以同一個兩秒 bounded polling 等待 subtree 不再有 active animation。把它與最終產品 state assertion、rapid retrigger／reverse 動作一起使用；「已停止」不代表 timing、easing 或美感良好。
 
 這些是 deterministic proof，不會自行挑選字體、判定排版漂亮或操縱 GSAP、Lottie、Rive、View Transition 等 runtime 的內部 timeline。候選字體、fallback、長文、resize 與具體 motion frame 仍須由 evaluator 提供固定 fixture，並以 fresh rendered craft review 收口。

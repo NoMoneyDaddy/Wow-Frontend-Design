@@ -69,6 +69,7 @@ BROWSER_ASSERTIONS_V1 = {
 }
 BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
     "active-animation-count-between",
+    "animations-inactive-for",
     "animations-settled",
     "font-face-loaded",
     "last-line-graphemes-at-least",
@@ -186,6 +187,7 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
         seen_steps: set[str] = set()
         normalized_steps: list[dict[str, Any]] = []
         action_observed = False
+        inactivity_assertion_seen = False
         for step in steps:
             if not isinstance(step, dict):
                 raise RunnerError("browser contract step is invalid")
@@ -218,6 +220,8 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     expected_keys.add("segment")
                 if expectation == "active-animation-count-between":
                     expected_keys.update({"min_animations", "max_animations"})
+                if expectation == "animations-inactive-for":
+                    expected_keys.add("duration_ms")
             _exact_keys(step, expected_keys, "browser contract step")
             step_id = step.get("id")
             if (
@@ -285,11 +289,20 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                         or not 0 <= minimum <= maximum <= 128
                     ):
                         raise RunnerError("browser contract animation bounds are invalid")
+                elif expectation == "animations-inactive-for":
+                    duration = step.get("duration_ms")
+                    if (
+                        inactivity_assertion_seen
+                        or not _json_integer(duration)
+                        or not 50 <= duration <= 1000
+                    ):
+                        raise RunnerError("browser contract animation inactivity duration is invalid")
+                    inactivity_assertion_seen = True
             else:
                 action_observed = True
             seen_steps.add(step_id)
             normalized_step = dict(step)
-            for field in ("count", "min_lines", "max_lines", "min_animations", "max_animations"):
+            for field in ("count", "duration_ms", "min_lines", "max_lines", "min_animations", "max_animations"):
                 if field in normalized_step:
                     normalized_step[field] = int(normalized_step[field])
             normalized_steps.append(normalized_step)

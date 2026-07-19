@@ -39,7 +39,7 @@ function validateBrowserContract(value, pages) {
   const assertions = value.schema_version === 1
     ? ["attribute-equals", "count-equals", "fully-visible-in-viewport", "text-includes", "visible"]
     : [
-      "active-animation-count-between", "animations-settled", "attribute-equals", "count-equals",
+      "active-animation-count-between", "animations-inactive-for", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
       "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
       "text-includes", "text-segment-on-one-line", "visible",
@@ -61,6 +61,7 @@ function validateBrowserContract(value, pages) {
     routes.add(route);
     const stepIds = new Set();
     let actionObserved = false;
+    let inactivityAssertionSeen = false;
     for (const step of contractCase.steps) {
       const usesSelector = Object.hasOwn(step || {}, "selector");
       const usesRole = Object.hasOwn(step || {}, "role") || Object.hasOwn(step || {}, "name");
@@ -80,6 +81,7 @@ function validateBrowserContract(value, pages) {
         if (step.expect === "line-count-between") expectedKeys.push("min_lines", "max_lines");
         if (step.expect === "text-segment-on-one-line") expectedKeys.push("segment");
         if (step.expect === "active-animation-count-between") expectedKeys.push("min_animations", "max_animations");
+        if (step.expect === "animations-inactive-for") expectedKeys.push("duration_ms");
       }
       if (!step || typeof step !== "object" || Array.isArray(step)
         || !exactKeys(step, expectedKeys)
@@ -139,6 +141,12 @@ function validateBrowserContract(value, pages) {
             || step.min_animations < 0 || step.min_animations > step.max_animations || step.max_animations > 128)) {
           throw new Error("invalid browser contract animation assertion");
         }
+        if (step.expect === "animations-inactive-for"
+          && (inactivityAssertionSeen || !Number.isInteger(step.duration_ms)
+            || step.duration_ms < 50 || step.duration_ms > 1000)) {
+          throw new Error("invalid browser contract animation inactivity assertion");
+        }
+        if (step.expect === "animations-inactive-for") inactivityAssertionSeen = true;
       } else {
         actionObserved = true;
       }
@@ -161,7 +169,7 @@ async function checkAssertion(locator, step) {
   if (step.expect === "attribute-equals") return await locator.getAttribute(step.attribute) === step.value;
   if (step.expect === "text-includes") return (await locator.textContent() || "").includes(step.value);
   if ([
-    "active-animation-count-between", "animations-settled", "font-face-loaded",
+    "active-animation-count-between", "animations-inactive-for", "animations-settled", "font-face-loaded",
     "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
     "text-segment-on-one-line",
   ].includes(step.expect)) {
@@ -259,6 +267,9 @@ async function checkAssertion(locator, step) {
         return nodes;
       };
       const horizontal = trusted.horizontalWritingMode(trusted.style(element, "writing-mode"));
+      if (assertion.expect === "animations-inactive-for") {
+        return trusted.animationsInactiveFor(element, assertion.duration_ms);
+      }
       if (assertion.expect === "active-animation-count-between" || assertion.expect === "animations-settled") {
         const active = trusted.activeAnimationCount(element);
         if (assertion.expect === "animations-settled") return active === 0;
@@ -373,6 +384,7 @@ async function checkAssertion(locator, step) {
 }
 
 async function waitForAssertion(page, locator, step) {
+  if (step.expect === "animations-inactive-for") return checkAssertion(locator, step);
   const deadline = Date.now() + 2_000;
   do {
     if (await checkAssertion(locator, step)) return true;

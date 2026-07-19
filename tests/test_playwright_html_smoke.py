@@ -511,6 +511,53 @@ triggerButton.onclick = () => {
             desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
             self.assertEqual(["contract-desktop-motion-loop-settled"], desktop["inspection"]["browser_contract"]["finding_ids"])
 
+    def test_v2_browser_contract_observes_continuous_animation_inactivity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Delayed motion</title></head><body>
+<main><h1>Delayed motion</h1><button id="trigger">Update</button><section id="panel">Ready</section></main>
+<script>
+const panel = document.querySelector('#panel');
+document.querySelector('#trigger').onclick = () => {
+  setTimeout(() => panel.animate(
+    [{ transform: 'translateX(0)' }, { transform: 'translateX(24px)' }],
+    { duration: 180, iterations: 1 }
+  ), 100);
+};
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            delayed_contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-delayed-motion", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "start", "action": "click", "selector": "#trigger"},
+                        {"id": "static-window", "action": "assert", "selector": "#panel",
+                         "expect": "animations-inactive-for", "duration_ms": 350},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], delayed_contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual(
+                ["contract-mobile-delayed-motion-static-window"],
+                mobile["inspection"]["browser_contract"]["finding_ids"],
+            )
+
+            static_contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-static-result", "page": "index.html", "profile": "mobile",
+                    "steps": [{"id": "static-window", "action": "assert", "selector": "#panel",
+                               "expect": "animations-inactive-for", "duration_ms": 200}],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], static_contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["inspection"]["browser_contract"]["status"])
+
     def test_v2_browser_contract_uses_pre_page_geometry_and_animation_intrinsics(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

@@ -97,6 +97,9 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const freeze = Object.freeze;
           const define = Object.defineProperty;
           const numberFunction = Number;
+          const promiseConstructor = Promise;
+          const animationFrame = pageGlobal.requestAnimationFrame;
+          const performanceNow = Performance.prototype.now;
           const stringCharacter = String.prototype.charAt;
           const stringIndexOf = String.prototype.indexOf;
           const stringLower = String.prototype.toLocaleLowerCase;
@@ -201,6 +204,32 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                 if (state === "pending" || state === "running") count += 1;
               }
               return count;
+            },
+            animationsInactiveFor(element, duration) {
+              const activeCount = () => {
+                const animations = apply(elementAnimations, element, [{ subtree: true }]);
+                let count = 0;
+                for (let index = 0; index < animations.length; index += 1) {
+                  const state = apply(animationState, animations[index], []);
+                  if (state === "pending" || state === "running") count += 1;
+                }
+                return count;
+              };
+              const started = apply(performanceNow, pageGlobal.performance, []);
+              return new promiseConstructor((resolve) => {
+                const observe = () => {
+                  if (activeCount() !== 0) {
+                    resolve(false);
+                    return;
+                  }
+                  if (apply(performanceNow, pageGlobal.performance, []) - started >= duration) {
+                    resolve(true);
+                    return;
+                  }
+                  apply(animationFrame, pageGlobal, [observe]);
+                };
+                observe();
+              });
             },
             attribute(element, name) {
               return apply(elementAttribute, element, [name]);
