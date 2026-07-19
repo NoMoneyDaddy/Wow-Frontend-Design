@@ -89,6 +89,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 - `active-animation-count-between` 量測 selector subtree 內 `pending`／`running` 的 Web Animations API 數量；可在互動後證明有限動畫確實啟動，或在 reduced-motion profile 證明沒有 active animation。
 - `animations-inactive-for` 要求 selector subtree 在 `duration_ms` 的 `50–1000` ms 觀察窗內每個 animation frame 都沒有 `pending`／`running` 動畫；任一 frame 出現即失敗且不重試，適合證明 reduced-motion 沒有延遲啟動。每個 case 最多一個觀察窗；它不是任意 sleep，也不證明非 Web Animations runtime 已停止。
 - `animations-settled` 以同一個兩秒 bounded polling 等待 subtree 不再有 active animation。把它與最終產品 state assertion、rapid retrigger／reverse 動作一起使用；「已停止」不代表 timing、easing 或美感良好。
+- `inline-start-aligned-with` 以原子雙元素快照比較 evaluator 指定、唯一且在 composed tree 可見的水平書寫元素之 logical inline-start；LTR 比左邊界、RTL 比右邊界，容許 `1 CSS px` 次像素差，並要求相隔 `50ms` 的兩次快照位置穩定。它只證明固定 viewport 下的相對 box 對齊，不判定 optical correction 或所有內容都該共用同一錨點。
 - v2 可使用 opt-in `mobile-motion` profile；它與既有 `mobile` 同為 `390×844`，但前者設為 `reducedMotion: no-preference`、後者維持 `reduce`。只有 contract 實際引用時才增加該 profile，讓 evaluator 在固定 viewport 下分離一般動效與 reduced result，不增加普通 smoke 的預設矩陣。
 
 這些是 deterministic proof，不會自行挑選字體、判定排版漂亮或操縱 GSAP、Lottie、Rive、View Transition 等 runtime 的內部 timeline。候選字體、fallback、長文、resize 與具體 motion frame 仍須由 evaluator 提供固定 fixture，並以 fresh rendered craft review 收口。

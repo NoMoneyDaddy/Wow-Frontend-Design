@@ -437,6 +437,60 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         with self.assertRaisesRegex(ValueError, "repair context is malformed"):
             policy.compile_html_feedback(receipt, contract)
 
+    def test_alignment_feedback_preserves_bounded_reference_only_for_repair(self) -> None:
+        contract = {
+            "schema_version": 2,
+            "cases": [{
+                "id": "desktop-alignment",
+                "page": "index.html",
+                "profile": "desktop",
+                "steps": [{
+                    "id": "field-column",
+                    "action": "assert",
+                    "selector": "#candidate",
+                    "expect": "inline-start-aligned-with",
+                    "reference_selector": "#anchor",
+                }],
+            }],
+        }
+        receipt = {
+            "results": [{
+                "status": "rejected",
+                "profile": "desktop",
+                "navigation": "passed",
+                "visible_main": True,
+                "visible_text": True,
+                "visible_primary_content": True,
+                "root_horizontal_overflow": False,
+                "counters": {},
+                "inspection": {
+                    "axe_rule_ids": [],
+                    "layout_hazards": {},
+                    "browser_contract": {
+                        "case_id": "desktop-alignment",
+                        "status": "rejected",
+                        "finding_ids": ["contract-desktop-alignment-field-column"],
+                        "failures": [{
+                            "finding_id": "contract-desktop-alignment-field-column",
+                            "reason": "assertion-not-satisfied",
+                        }],
+                        "steps_executed": 1,
+                    },
+                },
+            }],
+        }
+        feedback = policy.compile_html_feedback(receipt, contract)
+        self.assertEqual(
+            {"kind": "css", "selector": "#anchor"},
+            feedback["contract_steps"][0]["reference_locator"],
+        )
+        prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
+        self.assertIn("#candidate", prompt)
+        self.assertIn("#anchor", prompt)
+        serialized_receipt = json.dumps(receipt, ensure_ascii=False)
+        self.assertNotIn("#candidate", serialized_receipt)
+        self.assertNotIn("#anchor", serialized_receipt)
+
     def test_persistent_browser_contract_rejection_hits_repair_fuse(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -622,6 +676,21 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "id": "primary-visible", "action": "assert", "role": "button", "name": "Continue", "expect": "visible",
             }]}]},
             "v1-mobile-motion-profile": {"schema_version": 1, "cases": [{**valid_case, "profile": "mobile-motion"}]},
+            "v1-alignment-assertion": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                **valid_case["steps"][0], "expect": "inline-start-aligned-with", "reference_selector": "#reference",
+            }]}]},
+            "alignment-missing-reference": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                **valid_case["steps"][0], "expect": "inline-start-aligned-with",
+            }]}]},
+            "alignment-empty-reference": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                **valid_case["steps"][0], "expect": "inline-start-aligned-with", "reference_selector": "",
+            }]}]},
+            "alignment-control-reference": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                **valid_case["steps"][0], "expect": "inline-start-aligned-with", "reference_selector": "#ref\nprivate",
+            }]}]},
+            "alignment-long-reference": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                **valid_case["steps"][0], "expect": "inline-start-aligned-with", "reference_selector": "#" + "a" * 256,
+            }]}]},
             "unknown-role": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "primary-visible", "action": "assert", "role": "made-up", "name": "Continue", "expect": "visible",
             }]}]},

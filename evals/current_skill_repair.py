@@ -210,6 +210,11 @@ def compile_html_feedback(
                         descriptor["expect"] = failed_step.get("expect")
                         if failed_step.get("expect") == "text-segment-on-one-line":
                             descriptor["segment"] = failed_step.get("segment")
+                        if failed_step.get("expect") == "inline-start-aligned-with":
+                            descriptor["reference_locator"] = {
+                                "kind": "css",
+                                "selector": failed_step.get("reference_selector"),
+                            }
                     reason = failure_reasons[expected_id]
                     if (
                         (reason == "assertion-not-satisfied" and failed_step.get("action") != "assert")

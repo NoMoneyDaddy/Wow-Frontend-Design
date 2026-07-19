@@ -44,7 +44,7 @@ function validateBrowserContract(value, pages) {
     : [
       "active-animation-count-between", "animations-inactive-for", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
-      "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
+      "inline-start-aligned-with", "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
       "text-includes", "text-segment-on-one-line", "visible",
     ];
   const ids = new Set();
@@ -82,6 +82,7 @@ function validateBrowserContract(value, pages) {
         if (step.expect === "attribute-equals") expectedKeys.push("attribute");
         if (step.expect === "count-equals") expectedKeys.push("count");
         if (step.expect === "font-face-loaded") expectedKeys.push("family");
+        if (step.expect === "inline-start-aligned-with") expectedKeys.push("reference_selector");
         if (step.expect === "last-line-graphemes-at-least") expectedKeys.push("count");
         if (step.expect === "line-count-between") expectedKeys.push("min_lines", "max_lines");
         if (step.expect === "text-segment-on-one-line") expectedKeys.push("segment");
@@ -128,6 +129,10 @@ function validateBrowserContract(value, pages) {
           && !boundedContractText(step.family, 128)) {
           throw new Error("invalid browser contract font assertion");
         }
+        if (step.expect === "inline-start-aligned-with"
+          && !boundedContractText(step.reference_selector, 256)) {
+          throw new Error("invalid browser contract alignment assertion");
+        }
         if (step.expect === "last-line-graphemes-at-least"
           && (!Number.isInteger(step.count) || step.count < 1 || step.count > 128)) {
           throw new Error("invalid browser contract grapheme assertion");
@@ -166,13 +171,59 @@ async function settleStep(page) {
   await page.waitForTimeout(20);
 }
 
-async function checkAssertion(locator, step) {
+async function checkAssertion(page, locator, step) {
   const count = await locator.count();
   if (step.expect === "count-equals") return count === step.count;
   if (count !== 1) return false;
   if (step.expect === "visible") return locator.isVisible();
   if (step.expect === "attribute-equals") return await locator.getAttribute(step.attribute) === step.value;
   if (step.expect === "text-includes") return (await locator.textContent() || "").includes(step.value);
+  if (step.expect === "inline-start-aligned-with") {
+    const reference = page.locator(step.reference_selector);
+    if (await reference.count() !== 1) return false;
+    const snapshot = async () => {
+      const [candidateHandle, anchorHandle] = await Promise.all([
+        locator.elementHandle(), reference.elementHandle(),
+      ]);
+      if (!candidateHandle || !anchorHandle) return null;
+      try {
+        return await page.evaluate(({ candidate, anchor }) => {
+          const trusted = globalThis.__wowEvaluatorRead;
+          if (!trusted) return null;
+          const probe = (element) => {
+            let current = element;
+            while (current) {
+              const display = trusted.style(current, "display");
+              const visibility = trusted.style(current, "visibility");
+              if (display === "none" || visibility === "hidden"
+                || visibility === "collapse" || trusted.zeroNumber(trusted.style(current, "opacity"))) return null;
+              current = trusted.parent(current);
+            }
+            const box = trusted.rect(element);
+            const direction = trusted.style(element, "direction");
+            const writingMode = trusted.style(element, "writing-mode");
+            if (!(box.width > 0 && box.height > 0) || !trusted.horizontalWritingMode(writingMode)
+              || (direction !== "ltr" && direction !== "rtl")) return null;
+            return { direction, inlineStart: direction === "rtl" ? box.right : box.left };
+          };
+          return { candidate: probe(candidate), anchor: probe(anchor) };
+        }, { candidate: candidateHandle, anchor: anchorHandle });
+      } finally {
+        await candidateHandle.dispose();
+        await anchorHandle.dispose();
+      }
+    };
+    const aligned = (value) => value !== null && value.candidate !== null && value.anchor !== null
+      && value.candidate.direction === value.anchor.direction
+      && Math.abs(value.candidate.inlineStart - value.anchor.inlineStart) <= 1;
+    const first = await snapshot();
+    if (!aligned(first)) return false;
+    await page.waitForTimeout(50);
+    const second = await snapshot();
+    return aligned(second)
+      && Math.abs(first.candidate.inlineStart - second.candidate.inlineStart) <= 1
+      && Math.abs(first.anchor.inlineStart - second.anchor.inlineStart) <= 1;
+  }
   if ([
     "active-animation-count-between", "animations-inactive-for", "animations-settled", "font-face-loaded",
     "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
@@ -389,10 +440,10 @@ async function checkAssertion(locator, step) {
 }
 
 async function waitForAssertion(page, locator, step) {
-  if (step.expect === "animations-inactive-for") return checkAssertion(locator, step);
+  if (step.expect === "animations-inactive-for") return checkAssertion(page, locator, step);
   const deadline = Date.now() + 2_000;
   do {
-    if (await checkAssertion(locator, step)) return true;
+    if (await checkAssertion(page, locator, step)) return true;
     await page.waitForTimeout(50);
   } while (Date.now() < deadline);
   return false;

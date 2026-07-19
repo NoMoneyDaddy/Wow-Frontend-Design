@@ -388,6 +388,124 @@ contractFont.load();
                 "contract-mobile-lexical-lines-vertical",
             ], mobile["inspection"]["browser_contract"]["finding_ids"])
 
+    def test_v2_inline_start_alignment_uses_relative_logical_geometry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Alignment</title><style>
+.row { display: grid; grid-template-columns: 8rem 1fr; }
+.field { grid-column: 2; inline-size: 12rem; }
+#shifted { margin-inline-start: 12px; }
+#within-tolerance { margin-inline-start: 1px; }
+#outside-tolerance { margin-inline-start: 1.25px; }
+#hidden-reference { display: none; }
+#zero-reference { inline-size: 0; block-size: 0; }
+#vertical-reference { writing-mode: vertical-rl; }
+#rtl-reference { direction: rtl; }
+#rtl-shifted { margin-inline-start: 12px; }
+@keyframes cross-anchor { from { transform: translateX(-20px); } to { transform: translateX(20px); } }
+#moving.run { animation: cross-anchor 400ms linear forwards; }
+</style></head><body><main><h1>Alignment</h1>
+<button id="move">Move</button>
+<div class="row"><label>Anchor</label><input id="anchor" class="field"></div>
+<div class="row"><label>Aligned</label><input id="aligned" class="field"></div>
+<div class="row"><label>Shifted</label><input id="shifted" class="field"></div>
+<div class="row"><label>Within</label><input id="within-tolerance" class="field"></div>
+<div class="row"><label>Outside</label><input id="outside-tolerance" class="field"></div>
+<div class="row"><label>Hidden</label><span id="hidden-reference" class="field">Hidden</span></div>
+<div class="row"><label>Zero</label><span id="zero-reference" class="field"></span></div>
+<div class="row"><label>Vertical</label><span id="vertical-reference" class="field">Vertical</span></div>
+<div class="row"><label>RTL</label><span id="rtl-reference" class="field">RTL</span></div>
+<div class="row"><label>Moving</label><input id="moving" class="field"></div>
+<div class="row"><label>Shadow</label><span id="shadow-host" class="field"></span></div>
+<div class="row"><label>Duplicate A</label><span class="duplicate field">A</span></div>
+<div class="row"><label>Duplicate B</label><span class="duplicate field">B</span></div>
+<section dir="rtl">
+<div class="row"><label>مرجع</label><input id="rtl-anchor" class="field"></div>
+<div class="row"><label>محاذاة</label><input id="rtl-aligned" class="field"></div>
+<div class="row"><label>إزاحة</label><input id="rtl-shifted" class="field"></div>
+</section>
+<script>
+document.querySelector('#move').onclick = () => document.querySelector('#moving').classList.add('run');
+const shadow = document.querySelector('#shadow-host').attachShadow({ mode: 'open' });
+shadow.innerHTML = '<span id="shadow-reference" style="display:block">Shadow</span>';
+document.querySelector('#shadow-host').style.opacity = '0';
+globalThis.ShadowRoot = function PoisonedShadowRoot() {};
+</script>
+</main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-alignment",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "aligned", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#anchor"},
+                        {"id": "shifted", "action": "assert", "selector": "#shifted",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#anchor"},
+                        {"id": "within-tolerance", "action": "assert", "selector": "#within-tolerance",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#anchor"},
+                        {"id": "outside-tolerance", "action": "assert", "selector": "#outside-tolerance",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#anchor"},
+                        {"id": "missing", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#missing"},
+                        {"id": "ambiguous", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": ".duplicate"},
+                        {"id": "hidden", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#hidden-reference"},
+                        {"id": "zero", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#zero-reference"},
+                        {"id": "vertical", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#vertical-reference"},
+                        {"id": "mixed-direction", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#rtl-reference"},
+                        {"id": "shadow-hidden", "action": "assert", "selector": "#aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#shadow-reference"},
+                        {"id": "rtl-aligned", "action": "assert", "selector": "#rtl-aligned",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#rtl-anchor"},
+                        {"id": "rtl-shifted", "action": "assert", "selector": "#rtl-shifted",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#rtl-anchor"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual([
+                "contract-desktop-alignment-shifted",
+                "contract-desktop-alignment-outside-tolerance",
+                "contract-desktop-alignment-missing",
+                "contract-desktop-alignment-ambiguous",
+                "contract-desktop-alignment-hidden",
+                "contract-desktop-alignment-zero",
+                "contract-desktop-alignment-vertical",
+                "contract-desktop-alignment-mixed-direction",
+                "contract-desktop-alignment-shadow-hidden",
+                "contract-desktop-alignment-rtl-shifted",
+            ], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+            motion_contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "desktop-moving-alignment",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "start-moving", "action": "click", "selector": "#move"},
+                        {"id": "transient-crossing", "action": "assert", "selector": "#moving",
+                         "expect": "inline-start-aligned-with", "reference_selector": "#anchor"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], motion_contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual(
+                ["contract-desktop-moving-alignment-transient-crossing"],
+                desktop["inspection"]["browser_contract"]["finding_ids"],
+            )
+
     def test_v2_browser_contract_rejects_fragmented_last_line_and_local_overflow(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
@@ -604,6 +722,7 @@ document.querySelector('#trigger').onclick = () => {
 </style></head><body><main><h1>Trusted browser reads</h1>
 <button id="poison">Change page intrinsics</button><div id="overflow"><span>Wide content</span></div><div id="ambient">Moving</div>
 <p id="phrase">保持<span>切</span><span>換</span>詞組</p>
+<div id="anchor">Anchor</div><div id="aligned">Aligned</div>
 </main><script>
 window.getComputedStyle = () => ({ display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible' });
 Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 10, bottom: 10, width: 10, height: 10 });
@@ -615,7 +734,7 @@ Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, g
 Object.defineProperty(Element.prototype, 'clientWidth', { configurable: true, get: () => 1000 });
 Object.defineProperty(Element.prototype, 'clientHeight', { configurable: true, get: () => 1000 });
 document.querySelector('#poison').onclick = () => {
-  Array.prototype.includes = () => true;
+  Array.prototype.includes = () => false;
   Array.prototype.some = () => true;
 };
 </script></body></html>''',
@@ -659,6 +778,17 @@ document.querySelector('#poison').onclick = () => {
             })
             desktop = next(item for item in font["results"] if item["profile"] == "desktop")
             self.assertEqual(["contract-desktop-trusted-read-missing-font"], desktop["inspection"]["browser_contract"]["finding_ids"])
+
+            alignment = self.invoke(stage, ["index.html"], ["index.html"], {
+                "schema_version": 2,
+                "cases": [{**base_case, "steps": [
+                    {"id": "poison", "action": "click", "selector": "#poison"},
+                    {"id": "aligned", "action": "assert", "selector": "#aligned",
+                     "expect": "inline-start-aligned-with", "reference_selector": "#anchor"},
+                ]}],
+            })
+            desktop = next(item for item in alignment["results"] if item["profile"] == "desktop")
+            self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
 
     def test_v2_last_line_segments_graphemes_across_inline_nodes_and_invalid_lang(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

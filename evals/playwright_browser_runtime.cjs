@@ -94,6 +94,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const apply = Reflect.apply;
           const construct = Reflect.construct;
           const descriptor = Object.getOwnPropertyDescriptor;
+          const isPrototypeOf = Object.prototype.isPrototypeOf;
           const freeze = Object.freeze;
           const define = Object.defineProperty;
           const numberFunction = Number;
@@ -113,6 +114,9 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const elementAttribute = Element.prototype.getAttribute;
           const nodeText = descriptor(Node.prototype, "textContent").get;
           const nodeParent = descriptor(Node.prototype, "parentElement").get;
+          const nodeRoot = Node.prototype.getRootNode;
+          const shadowPrototype = ShadowRoot.prototype;
+          const shadowHost = descriptor(ShadowRoot.prototype, "host").get;
           const scrollWidth = descriptor(Element.prototype, "scrollWidth").get;
           const scrollHeight = descriptor(Element.prototype, "scrollHeight").get;
           const clientWidth = descriptor(Element.prototype, "clientWidth").get;
@@ -261,7 +265,12 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               return apply(elementAttribute, pageDocument.documentElement, ["lang"]);
             },
             parent(node) {
-              return apply(nodeParent, node, []);
+              const parent = apply(nodeParent, node, []);
+              if (parent) return parent;
+              const root = apply(nodeRoot, node, []);
+              return apply(isPrototypeOf, shadowPrototype, [root])
+                ? apply(shadowHost, root, [])
+                : null;
             },
             rangeRect(startNode, startOffset, endNode, endOffset) {
               const range = makeRange();

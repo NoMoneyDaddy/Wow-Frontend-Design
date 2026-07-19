@@ -73,6 +73,7 @@ BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
     "animations-inactive-for",
     "animations-settled",
     "font-face-loaded",
+    "inline-start-aligned-with",
     "last-line-graphemes-at-least",
     "line-count-between",
     "no-content-overflow",
@@ -214,6 +215,8 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                     expected_keys.add("count")
                 if expectation == "font-face-loaded":
                     expected_keys.add("family")
+                if expectation == "inline-start-aligned-with":
+                    expected_keys.add("reference_selector")
                 if expectation == "last-line-graphemes-at-least":
                     expected_keys.add("count")
                 if expectation == "line-count-between":
@@ -265,6 +268,8 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                         raise RunnerError("browser contract count is invalid")
                 elif expectation == "font-face-loaded":
                     _bounded_contract_text(step.get("family"), "font family", 128)
+                elif expectation == "inline-start-aligned-with":
+                    _bounded_contract_text(step.get("reference_selector"), "reference selector", 256)
                 elif expectation == "last-line-graphemes-at-least":
                     count = step.get("count")
                     if not _json_integer(count) or not 1 <= count <= 128:
