@@ -100,6 +100,44 @@ async function settleStep(page) {
   await page.waitForTimeout(20);
 }
 
+async function checkAssertion(locator, step) {
+  const count = await locator.count();
+  if (step.expect === "count-equals") return count === step.count;
+  if (count !== 1) return false;
+  if (step.expect === "visible") return locator.isVisible();
+  if (step.expect === "attribute-equals") return await locator.getAttribute(step.attribute) === step.value;
+  if (step.expect === "text-includes") return (await locator.textContent() || "").includes(step.value);
+  if (step.expect !== "fully-visible-in-viewport") return false;
+  return locator.evaluate(async (element) => {
+    const box = element.getBoundingClientRect();
+    let current = element;
+    while (current instanceof Element) {
+      const style = getComputedStyle(current);
+      if (style.display === "none" || style.visibility === "hidden"
+        || style.visibility === "collapse" || Number(style.opacity) === 0) return false;
+      current = current.parentElement;
+    }
+    if (!(box.width > 0 && box.height > 0 && box.left >= 0 && box.top >= 0
+      && box.right <= innerWidth && box.bottom <= innerHeight)) return false;
+    return new Promise((resolve) => {
+      const observer = new IntersectionObserver(([entry]) => {
+        observer.disconnect();
+        resolve(Boolean(entry?.isIntersecting && entry.intersectionRatio === 1));
+      }, { threshold: [1] });
+      observer.observe(element);
+    });
+  });
+}
+
+async function waitForAssertion(page, locator, step) {
+  const deadline = Date.now() + 2_000;
+  do {
+    if (await checkAssertion(locator, step)) return true;
+    await page.waitForTimeout(50);
+  } while (Date.now() < deadline);
+  return false;
+}
+
 async function runBrowserContract(page, contractCase) {
   const findingIds = [];
   let stepsExecuted = 0;
@@ -121,35 +159,7 @@ async function runBrowserContract(page, contractCase) {
         await locator.press(step.key, { timeout: 2_000 });
         passed = true;
       } else if (step.action === "assert") {
-        const count = await locator.count();
-        if (step.expect === "count-equals") {
-          passed = count === step.count;
-        } else if (count === 1) {
-          if (step.expect === "visible") passed = await locator.isVisible();
-          if (step.expect === "attribute-equals") passed = await locator.getAttribute(step.attribute) === step.value;
-          if (step.expect === "text-includes") passed = (await locator.textContent() || "").includes(step.value);
-          if (step.expect === "fully-visible-in-viewport") {
-            passed = await locator.evaluate(async (element) => {
-              const box = element.getBoundingClientRect();
-              let current = element;
-              while (current instanceof Element) {
-                const style = getComputedStyle(current);
-                if (style.display === "none" || style.visibility === "hidden"
-                  || style.visibility === "collapse" || Number(style.opacity) === 0) return false;
-                current = current.parentElement;
-              }
-              if (!(box.width > 0 && box.height > 0 && box.left >= 0 && box.top >= 0
-                && box.right <= innerWidth && box.bottom <= innerHeight)) return false;
-              return new Promise((resolve) => {
-                const observer = new IntersectionObserver(([entry]) => {
-                  observer.disconnect();
-                  resolve(Boolean(entry?.isIntersecting && entry.intersectionRatio === 1));
-                }, { threshold: [1] });
-                observer.observe(element);
-              });
-            });
-          }
-        }
+        passed = await waitForAssertion(page, locator, step);
       }
     } catch {
       passed = false;

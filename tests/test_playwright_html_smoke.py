@@ -150,6 +150,36 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
             self.assertGreater(desktop["counters"]["console_errors"], 0)
             self.assertNotIn("PRIVATE delayed", json.dumps(receipt))
 
+    def test_browser_contract_waits_for_bounded_async_state_after_action(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Async</title></head><body><main>
+<h1>Task</h1><button id="primary">Continue</button><output id="state">Idle</output>
+</main><script>
+document.querySelector('#primary').onclick = () => {
+  setTimeout(() => { document.querySelector('#state').textContent = 'Ready'; }, 80);
+};
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "desktop-primary-task",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "activate", "action": "click", "selector": "#primary"},
+                        {"id": "ready", "action": "assert", "selector": "#state", "expect": "text-includes", "value": "Ready"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("passed", desktop["status"])
+            self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
+
     def test_browser_contract_runs_all_declarative_actions_and_assertions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

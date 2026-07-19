@@ -59,7 +59,7 @@ npm run build:current -- \
 }
 ```
 
-Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 會保存 bounded case／step ID，但 selector、輸入值、預期文字及外部絕對路徑不會進 repair prompt 或發布產物。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
+Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；其他 assertion 會在兩秒內 bounded polling，scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多兩輪 repair，不另建第二套 runner。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 會保存 bounded case／step ID，但 selector、輸入值、預期文字及外部絕對路徑不會進 repair prompt 或發布產物。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
 
 `--case-mode patch` 使用相同契約，並必須用 `--patch-lane polish|repair` 明示它是受限呈現調整（`POLISH`）或有證據的缺陷修復（`REPAIR`），不建立平行 lane。Retrofit／patch 必須提供 seed 與至少一個 `--allow-change`；任何未授權修改、刪除、重新命名、新增路徑、file／directory mode 漂移、空目錄遺失、seed 漂移或輸出集合漂移都會拒絕發布。Manifest 只保存 mode、實際 Skill lane、seed file/directory hashes 或 modes 與 observed mutation，不保存外部絕對路徑或 brief 內容。
 
