@@ -1075,6 +1075,15 @@ def _wrapper_tool_records() -> dict[str, Any]:
     return records
 
 
+def _assert_wrapper_tool_records(expected: dict[str, Any]) -> None:
+    try:
+        observed = _wrapper_tool_records()
+    except OSError as error:
+        raise RunnerError("current policy tool provenance drifted during execution") from error
+    if observed != expected:
+        raise RunnerError("current policy tool provenance drifted during execution")
+
+
 def _target_unchanged(target: Path, identity: tuple[int, int]) -> None:
     try:
         info = target.lstat()
@@ -1664,6 +1673,7 @@ def run(
         output_records = validate_candidate()
         while True:
             design_gate = _run_design_validator(stage / "DESIGN.md", min(300, max(5, hard_seconds)))
+            _assert_wrapper_tool_records(wrapper_tools)
             if validate_candidate() != output_records:
                 raise RunnerError("output content or mode drifted during validation")
             if design_gate.get("status") == "rejected":
@@ -1701,6 +1711,7 @@ def run(
                     min(120, max(15, hard_seconds)),
                     browser_contract_data,
                 )
+                _assert_wrapper_tool_records(wrapper_tools)
             except RunnerError:
                 html_smoke_unavailable = {
                     "quarantine": _quarantine_outputs(
@@ -1745,8 +1756,7 @@ def run(
             if html_smoke_gate.get("status") != "passed":
                 raise RunnerError("HTML Playwright smoke gate returned an invalid status")
             break
-        if _wrapper_tool_records() != wrapper_tools:
-            raise RunnerError("current policy tool provenance drifted during execution")
+        _assert_wrapper_tool_records(wrapper_tools)
         if seed_root is not None and _seed_records(seed_root) != seed_snapshot:
             raise RunnerError("seed root provenance drifted during execution")
         if seed_root is not None and _directory_records(seed_root) != seed_directories:
@@ -1840,8 +1850,22 @@ def run(
         committed = True
         return manifest
     except BaseException as error:
+        trusted_wrapper_tools: dict[str, Any] | None = None
+        try:
+            _assert_wrapper_tool_records(wrapper_tools)
+            trusted_wrapper_tools = wrapper_tools
+        except (OSError, RunnerError):
+            pass
+        if trusted_wrapper_tools is None:
+            error = RunnerError("current policy tool provenance drifted during failure handling")
+            design_rejection = None
+            html_smoke_rejection = None
+            html_smoke_unavailable = None
+            repair_failure = None
+            failure_artifact = None
         if (
-            not quarantine_path.exists()
+            trusted_wrapper_tools is not None
+            and not quarantine_path.exists()
             and execution is not None
             and execution.get("execution", {}).get("exit_code") == 0
             and execution.get("execution", {}).get("reason") == "completed"
@@ -1865,7 +1889,11 @@ def run(
                 }
             except (OSError, RunnerError):
                 pass
-        classification = _classification(error, execution)
+        classification = (
+            _classification(error, execution)
+            if trusted_wrapper_tools is not None
+            else "execution_infrastructure_failure"
+        )
         if publication_prepared:
             assert expected_execution_receipt is not None
             try:
@@ -1891,10 +1919,10 @@ def run(
                 design_rejection=design_rejection,
                 html_smoke_rejection=html_smoke_rejection,
                 html_smoke_unavailable=html_smoke_unavailable,
-                repair=repair_summary(),
+                repair=repair_summary() if trusted_wrapper_tools is not None else None,
                 repair_failure=repair_failure,
                 failure_artifact=failure_artifact,
-                policy_tools=wrapper_tools,
+                policy_tools=trusted_wrapper_tools,
                 browser_contract=browser_contract_record,
                 skill_references=(
                     execution["skill_references"]

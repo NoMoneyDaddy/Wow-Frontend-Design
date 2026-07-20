@@ -1320,6 +1320,76 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("execution_infrastructure_failure", receipt["classification"])
             self.assertNotIn("#primary", json.dumps(receipt))
 
+    def test_rejection_path_revalidates_wrapper_provenance_before_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            baseline = policy._wrapper_tool_records()
+            drifted = json.loads(json.dumps(baseline))
+            drifted["design_validator"]["sha256"] = "0" * 64
+            rejected = {
+                "status": "rejected",
+                "required_result": "zero-errors-zero-warnings",
+                "summary": {"errors": 0, "warnings": 1, "infos": 0},
+                "findings": [{"message": "orphan token"}],
+                "input": {"bytes": 1, "sha256": "a" * 64},
+                "tool": {"package": "@google/design.md", "version": "0.3.0"},
+            }
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", return_value=rejected
+            ), mock.patch.object(
+                policy, "_wrapper_tool_records", side_effect=[baseline, drifted, drifted]
+            ) as provenance, self.assertRaisesRegex(
+                policy.RunnerError, "execution_infrastructure_failure"
+            ):
+                policy.run(
+                    brief,
+                    target,
+                    hard_seconds=5,
+                    log_dir=log_dir,
+                    max_repair_rounds=0,
+                )
+            self.assertEqual(3, provenance.call_count)
+            receipt = json.loads(
+                (log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertNotIn("tools", receipt)
+            self.assertNotIn("design_rejection", receipt)
+
+    def test_generation_failure_only_trusts_fresh_wrapper_provenance(self) -> None:
+        for drift in (False, True):
+            with self.subTest(drift=drift), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                brief, target, _, environment = self.fixture(root, "exit-one")
+                log_dir = root / "logs"
+                log_dir.mkdir()
+                baseline = policy._wrapper_tool_records()
+                fresh = json.loads(json.dumps(baseline))
+                if drift:
+                    fresh["current_policy"]["sha256"] = "0" * 64
+                expected = "execution_infrastructure_failure" if drift else "generation_exit_nonzero"
+                with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                    policy, "_wrapper_tool_records", side_effect=[baseline, fresh]
+                ) as provenance, self.assertRaisesRegex(policy.RunnerError, expected):
+                    policy.run(
+                        brief,
+                        target,
+                        hard_seconds=5,
+                        log_dir=log_dir,
+                        max_repair_rounds=0,
+                    )
+                self.assertEqual(2, provenance.call_count)
+                receipt = json.loads(
+                    (log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(expected, receipt["classification"])
+                if drift:
+                    self.assertNotIn("tools", receipt)
+                else:
+                    self.assertEqual(baseline, receipt["tools"])
     def test_invalid_browser_contract_is_rejected_before_generation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -2908,6 +2978,35 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 hashlib.sha256((root / "logs" / "current-skill-build.execution.json").read_bytes()).hexdigest(),
                 publication["execution_receipt"]["sha256"],
             )
+
+    def test_publication_failure_revalidates_wrapper_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            baseline = policy._wrapper_tool_records()
+            drifted = json.loads(json.dumps(baseline))
+            drifted["current_policy"]["sha256"] = "0" * 64
+
+            def gate(_: Path, **__: object) -> dict[str, object]:
+                (target / "racer-owned.txt").write_text("preserve", encoding="utf-8")
+                return {"status": "passed"}
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy.design_policy, "validate_local", side_effect=gate
+            ), mock.patch.object(
+                policy, "_wrapper_tool_records", side_effect=[baseline, baseline, baseline, baseline, drifted]
+            ) as provenance, self.assertRaisesRegex(
+                policy.RunnerError, "execution_infrastructure_failure"
+            ):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual(5, provenance.call_count)
+            publication = json.loads(
+                (log_dir / "current-skill-build.publication-failure.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("publication_failed", publication["classification"])
+            self.assertNotIn("tools", publication)
 
     def test_publication_failure_does_not_rebuild_execution_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
