@@ -9,7 +9,7 @@ import re
 import shlex
 import sys
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 
 FORBIDDEN_EXECUTABLES = (
@@ -123,10 +123,12 @@ def _is_inert_noop(command: str) -> bool:
     )
 
 
-def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
+def validate_events(
+    events: Iterable[dict[str, Any]], stage: Path, *, allow_commands: bool = True
+) -> int:
     stage = stage.resolve(strict=False)
     checked_commands = 0
-    for event in _events(path):
+    for event in events:
         item = event.get("item")
         if not isinstance(item, dict):
             continue
@@ -155,6 +157,10 @@ def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
         if not allow_commands and not _is_inert_noop(command):
             raise PolicyError("command execution is forbidden in this controlled trace unless it is an inert no-op")
     return checked_commands
+
+
+def validate(path: Path, stage: Path, *, allow_commands: bool = True) -> int:
+    return validate_events(_events(path), stage, allow_commands=allow_commands)
 
 
 def main() -> int:

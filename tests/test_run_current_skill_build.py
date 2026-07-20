@@ -11,6 +11,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -1716,6 +1717,13 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertNotIn(str(seed), invocation["prompt"])
             self.assertNotIn(str(seed), json.dumps(manifest))
 
+    def test_mutation_record_rejects_duplicate_file_identity(self) -> None:
+        seed = [{"path": "app.js", "bytes": 4, "mode": "0644", "sha256": "a" * 64}]
+        outputs = [dict(seed[0]), dict(seed[0])]
+
+        with self.assertRaisesRegex(policy.RunnerError, "duplicate output file path"):
+            policy._mutation_record(seed, outputs, (), [], [])
+
     def test_seeded_directory_paths_and_modes_are_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -2120,6 +2128,130 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertFalse((capture / "invocation.json").exists())
             self.assertEqual([], list(target.iterdir()))
 
+    def test_raw_log_is_atomically_created_with_private_nofollow_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "trace.jsonl"
+            real_open = os.open
+            calls: list[tuple[int, int]] = []
+
+            def tracked_open(target: object, flags: int, mode: int = 0o777) -> int:
+                calls.append((flags, mode))
+                return real_open(target, flags, mode)
+
+            with mock.patch.object(core.os, "open", side_effect=tracked_open):
+                with core._open_private_log(path) as handle:
+                    handle.write(b"{}\n")
+
+            required = os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+            self.assertEqual(required, calls[0][0] & required)
+            self.assertEqual(os.O_RDWR, calls[0][0] & os.O_ACCMODE)
+            self.assertEqual(0o600, calls[0][1])
+            self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
+
+    def test_raw_log_replacement_during_execution_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            trace = root / "trace.jsonl"
+            stderr = root / "stderr.txt"
+            replacement_errors: list[str] = []
+
+            def replace_trace() -> None:
+                for _ in range(100):
+                    if trace.exists() and trace.stat().st_size:
+                        trace.unlink()
+                        trace.write_text('{"type":"turn.completed"}\n', encoding="utf-8")
+                        return
+                    time.sleep(0.01)
+                replacement_errors.append("trace was not written before deadline")
+
+            replacer = threading.Thread(target=replace_trace)
+            replacer.start()
+            command = [
+                sys.executable,
+                "-c",
+                (
+                    "import json,time; "
+                    "print(json.dumps({'type':'thread.started'}), flush=True); "
+                    "time.sleep(0.4); "
+                    "print(json.dumps({'type':'turn.completed'}), flush=True)"
+                ),
+            ]
+            with self.assertRaisesRegex(core.RunnerError, "log provenance drifted"):
+                core._run_codex(command, "", os.environ.copy(), stage, trace, stderr, 2)
+            replacer.join(timeout=2)
+            self.assertFalse(replacer.is_alive())
+            self.assertEqual([], replacement_errors)
+
+    def test_raw_log_snapshot_reads_exactly_across_short_preads(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "trace.jsonl"
+            payload = b'{"type":"thread.started"}\n{"type":"turn.completed"}\n'
+            real_pread = os.pread
+
+            def short_pread(descriptor: int, count: int, offset: int) -> bytes:
+                return real_pread(descriptor, min(count, 7), offset)
+
+            with core._open_private_log(path) as handle:
+                handle.write(payload)
+                handle.flush()
+                with mock.patch.object(core.os, "pread", side_effect=short_pread):
+                    self.assertEqual(payload, core._read_fd_exact(handle.fileno(), len(payload)))
+
+    def test_receipt_uses_validated_execution_log_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            trace = root / "trace.jsonl"
+            stderr = root / "stderr.txt"
+            trace.write_bytes(b"replacement trace")
+            stderr.write_bytes(b"replacement stderr")
+            expected_trace = {"bytes": 10, "sha256": "a" * 64}
+            expected_stderr = {"bytes": 11, "sha256": "b" * 64}
+            receipt = policy._receipt(
+                status="execution_passed",
+                classification="publication_pending",
+                brief_bytes=b"brief",
+                prompt="prompt",
+                model="model",
+                reasoning_effort="high",
+                case_mode="greenfield",
+                lane_contract="BUILD",
+                stdout_log=trace,
+                stderr_log=stderr,
+                execution={
+                    "execution": {"trace": expected_trace, "stderr": expected_stderr},
+                    "configured_isolation": {},
+                    "trace_observed": {},
+                },
+            )
+            self.assertEqual(expected_trace, receipt["logs"]["trace"])
+            self.assertEqual(expected_stderr, receipt["logs"]["stderr"])
+
+    def test_receipt_rejects_unknown_or_mismatched_categories(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            common = {
+                "brief_bytes": b"brief",
+                "prompt": "prompt",
+                "model": "model",
+                "reasoning_effort": "high",
+                "case_mode": "greenfield",
+                "lane_contract": "BUILD",
+                "stdout_log": root / "trace.jsonl",
+                "stderr_log": root / "stderr.txt",
+                "execution": None,
+            }
+            for status, classification in (
+                ("unknown", "publication_pending"),
+                ("execution_passed", "generation_exit_nonzero"),
+                ("failed", "unknown"),
+            ):
+                with self.subTest(status=status, classification=classification), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt status/classification"
+                ):
+                    policy._receipt(status=status, classification=classification, **common)
+
     def test_log_directory_and_target_must_not_contain_one_another(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -2382,7 +2514,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             repair_trace = log_dir / "current-skill-build.repair-01.trace.jsonl"
             self.assertEqual("trace_policy_rejection", receipt["classification"])
             self.assertEqual(hashlib.sha256(repair_prompt).hexdigest(), receipt["prompt"]["sha256"])
-            self.assertEqual(hashlib.sha256(repair_trace.read_bytes()).hexdigest(), receipt["logs"]["trace"]["sha256"])
+            self.assertTrue(repair_trace.is_file())
+            self.assertEqual({}, receipt["logs"])
             self.assertNotIn("execution", receipt)
             self.assertEqual(1, len(receipt["repair"]["attempts"]))
             self.assertTrue((log_dir / "current-skill-build.quarantine").is_dir())

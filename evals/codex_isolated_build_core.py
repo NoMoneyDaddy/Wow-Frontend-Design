@@ -472,6 +472,32 @@ def _child_limits() -> None:
     resource.setrlimit(resource.RLIMIT_FSIZE, (2 * 1024 * 1024, 2 * 1024 * 1024))
 
 
+def _open_private_log(path: Path) -> Any:
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        return os.fdopen(descriptor, "w+b")
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _read_fd_exact(descriptor: int, size: int) -> bytes:
+    chunks: list[bytes] = []
+    offset = 0
+    while offset < size:
+        chunk = os.pread(descriptor, size - offset, offset)
+        if not chunk:
+            raise RunnerError("generation log snapshot changed during read")
+        chunks.append(chunk)
+        offset += len(chunk)
+    if os.fstat(descriptor).st_size != size:
+        raise RunnerError("generation log snapshot changed during read")
+    return b"".join(chunks)
+
+
 def _run_codex(
     command: list[str],
     prompt: str,
@@ -482,10 +508,8 @@ def _run_codex(
     hard_seconds: int,
     inactivity_seconds: int | None = None,
     initial_fingerprint: tuple[tuple[str, str, int, int], ...] = (),
-) -> tuple[int, str, int]:
-    with stdout_log.open("xb") as stdout, stderr_log.open("xb") as stderr:
-        stdout_log.chmod(0o600)
-        stderr_log.chmod(0o600)
+) -> tuple[int, str, int, bytes, bytes]:
+    with _open_private_log(stdout_log) as stdout, _open_private_log(stderr_log) as stderr:
         process: subprocess.Popen[bytes] | None = None
         try:
             process = subprocess.Popen(
@@ -515,11 +539,10 @@ def _run_codex(
                     last_fingerprint = fingerprint
                     last_progress = now
                     progress_events += 1
-                if stdout_log.stat().st_size > log_offset:
-                    with stdout_log.open("rb") as reader:
-                        reader.seek(log_offset)
-                        chunk = reader.read()
-                        log_offset += len(chunk)
+                stdout_size = os.fstat(stdout.fileno()).st_size
+                if stdout_size > log_offset:
+                    chunk = os.pread(stdout.fileno(), stdout_size - log_offset, log_offset)
+                    log_offset += len(chunk)
                     decoded = buffered + chunk.decode("utf-8", errors="replace")
                     lines = decoded.splitlines(keepends=True)
                     buffered = "" if not lines or lines[-1].endswith(("\n", "\r")) else lines.pop()
@@ -531,7 +554,7 @@ def _run_codex(
                     reason = "resource_quota"
                     _terminate(process)
                     break
-                if stdout_log.stat().st_size + stderr_log.stat().st_size > LOG_LIMIT:
+                if os.fstat(stdout.fileno()).st_size + os.fstat(stderr.fileno()).st_size > LOG_LIMIT:
                     reason = "resource_quota"
                     _terminate(process)
                     break
@@ -550,18 +573,38 @@ def _run_codex(
         finally:
             if process is not None:
                 _terminate(process)
-    return exit_code, reason, progress_events
+        stdout_info = os.fstat(stdout.fileno())
+        stderr_info = os.fstat(stderr.fileno())
+        try:
+            stdout_path_info = stdout_log.lstat()
+            stderr_path_info = stderr_log.lstat()
+        except OSError as error:
+            raise RunnerError("generation log provenance drifted during execution") from error
+        if (
+            stdout_log.is_symlink()
+            or stderr_log.is_symlink()
+            or (stdout_info.st_dev, stdout_info.st_ino)
+            != (stdout_path_info.st_dev, stdout_path_info.st_ino)
+            or (stderr_info.st_dev, stderr_info.st_ino)
+            != (stderr_path_info.st_dev, stderr_path_info.st_ino)
+        ):
+            raise RunnerError("generation log provenance drifted during execution")
+        stdout_data = _read_fd_exact(stdout.fileno(), stdout_info.st_size)
+        stderr_data = _read_fd_exact(stderr.fileno(), stderr_info.st_size)
+    return exit_code, reason, progress_events, stdout_data, stderr_data
 
 
-def _validate_trace(path: Path, stage: Path, *, require_terminal: bool = True) -> dict[str, Any]:
+def _validate_trace_bytes(
+    raw: bytes, stage: Path, *, require_terminal: bool = True
+) -> dict[str, Any]:
     try:
-        command_events = trace_policy.validate(path, stage, allow_commands=False)
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = raw.decode("utf-8").splitlines()
         events = [json.loads(line) for line in lines if line.strip()]
-    except (OSError, UnicodeError, json.JSONDecodeError, trace_policy.PolicyError) as error:
+        if any(not isinstance(event, dict) for event in events):
+            raise RunnerError("Codex trace has no valid events")
+        command_events = trace_policy.validate_events(events, stage, allow_commands=False)
+    except (UnicodeError, json.JSONDecodeError, trace_policy.PolicyError) as error:
         raise RunnerError(f"Codex trace violated the controlled policy: {error}") from error
-    if any(not isinstance(event, dict) for event in events):
-        raise RunnerError("Codex trace has no valid events")
     event_types = [event.get("type") for event in events]
     if require_terminal and (not events or "turn.failed" in event_types or "turn.completed" not in event_types):
         raise RunnerError("Codex trace has no successful terminal event")
@@ -603,6 +646,16 @@ def _validate_trace(path: Path, stage: Path, *, require_terminal: bool = True) -
         "completed_item_counts": completed_items,
         "terminal_usage": terminal_usage,
     }
+
+
+def _validate_trace(path: Path, stage: Path, *, require_terminal: bool = True) -> dict[str, Any]:
+    try:
+        if not path.is_file() or path.is_symlink():
+            raise OSError("trace is missing or unsafe")
+        raw = path.read_bytes()
+    except OSError as error:
+        raise RunnerError(f"Codex trace violated the controlled policy: {error}") from error
+    return _validate_trace_bytes(raw, stage, require_terminal=require_terminal)
 
 
 def _file_tool_records() -> dict[str, Any]:
@@ -738,7 +791,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             "--json",
             "-",
         ])
-        exit_code, reason, progress_events = _run_codex(
+        exit_code, reason, progress_events, stdout_data, stderr_data = _run_codex(
             command,
             spec.prompt,
             environment,
@@ -749,10 +802,10 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             spec.inactivity_seconds,
             initial_fingerprint,
         )
-        if spec.stdout_log.stat().st_size + spec.stderr_log.stat().st_size > LOG_LIMIT:
+        if len(stdout_data) + len(stderr_data) > LOG_LIMIT:
             raise RunnerError("generation log quota exceeded")
-        observed = _validate_trace(
-            spec.stdout_log,
+        observed = _validate_trace_bytes(
+            stdout_data,
             spec.stage,
             require_terminal=reason == "completed" and exit_code == 0,
         )
@@ -809,12 +862,12 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
                     ),
                 },
                 "trace": {
-                    "bytes": spec.stdout_log.stat().st_size,
-                    "sha256": _digest(spec.stdout_log),
+                    "bytes": len(stdout_data),
+                    "sha256": _digest_bytes(stdout_data),
                 },
                 "stderr": {
-                    "bytes": spec.stderr_log.stat().st_size,
-                    "sha256": _digest(spec.stderr_log),
+                    "bytes": len(stderr_data),
+                    "sha256": _digest_bytes(stderr_data),
                 },
             },
             "tools": {"codex": provenance["codex"], **tool_before},

@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+from collections import Counter
 from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
@@ -93,6 +94,20 @@ BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
 }
 CONTRACT_ID = re.compile(r"[a-z][a-z0-9-]{0,47}")
 ATTRIBUTE_NAME = re.compile(r"[A-Za-z_:][A-Za-z0-9_.:-]{0,63}")
+RECEIPT_CATEGORIES = {
+    "execution_passed": {"publication_pending"},
+    "failed": {
+        "design_gate_rejection",
+        "execution_infrastructure_failure",
+        "generation_exit_nonzero",
+        "hard_timeout",
+        "html_smoke_rejection",
+        "inactivity_timeout",
+        "output_contract_rejection",
+        "resource_quota",
+        "trace_policy_rejection",
+    },
+}
 
 
 def _module(name: str, path: Path) -> Any:
@@ -554,19 +569,39 @@ def _mutation_record(
     seed_directories: list[dict[str, Any]],
     output_directories: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    before = {record["path"]: record for record in seed}
-    after = {record["path"]: record for record in outputs}
+    def record_counter(
+        records: list[dict[str, Any]], fields: tuple[str, ...], label: str
+    ) -> tuple[Counter[tuple[Any, ...]], Counter[str]]:
+        identities: list[tuple[Any, ...]] = []
+        paths: list[str] = []
+        for record in records:
+            if not isinstance(record, dict) or set(record) != set(fields):
+                raise RunnerError(f"{label} record has an invalid shape")
+            identity = tuple(record[field] for field in fields)
+            try:
+                hash(identity)
+            except TypeError as error:
+                raise RunnerError(f"{label} record has an invalid identity") from error
+            identities.append(identity)
+            paths.append(record["path"])
+        path_counts = Counter(paths)
+        if any(count != 1 for count in path_counts.values()):
+            raise RunnerError(f"duplicate {label} path")
+        return Counter(identities), path_counts
+
+    file_fields = ("path", "bytes", "mode", "sha256")
+    before, before_paths = record_counter(seed, file_fields, "seed file")
+    after, after_paths = record_counter(outputs, file_fields, "output file")
     allowed_set = set(allowed)
-    changed = sorted(
-        path for path, record in after.items()
-        if path not in before or record != before[path]
-    )
+    changed = sorted({identity[0] for identity in after - before})
     forbidden = sorted(path for path in changed if path not in allowed_set)
-    removed = sorted(set(before) - set(after))
+    removed = sorted((before_paths - after_paths).elements())
     if forbidden or removed:
         raise RunnerError("seeded output changed outside the evaluator-owned mutation allowlist")
-    output_directory_map = {record["path"]: record for record in output_directories}
-    if any(output_directory_map.get(record["path"]) != record for record in seed_directories):
+    directory_fields = ("path", "mode")
+    before_directories, _ = record_counter(seed_directories, directory_fields, "seed directory")
+    after_directories, _ = record_counter(output_directories, directory_fields, "output directory")
+    if before_directories - after_directories:
         raise RunnerError("seeded directory path or mode changed outside the mutation allowlist")
     return {
         "allowed_changes": list(allowed),
@@ -1041,10 +1076,14 @@ def _receipt(
     browser_contract: dict[str, Any] | None = None,
     skill_references: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if classification not in RECEIPT_CATEGORIES.get(status, set()):
+        raise RunnerError("receipt status/classification is not in the closed schema")
     logs = {}
-    for name, path in (("trace", stdout_log), ("stderr", stderr_log)):
-        if path.is_file() and not path.is_symlink():
-            logs[name] = {"bytes": path.stat().st_size, "sha256": _digest(path)}
+    if execution is not None:
+        logs = {
+            "trace": dict(execution["execution"]["trace"]),
+            "stderr": dict(execution["execution"]["stderr"]),
+        }
     payload: dict[str, Any] = {
         "schema_version": 1,
         "status": status,
