@@ -430,14 +430,14 @@ RegExp.prototype.exec = function(value) {
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
             self.assertEqual("passed", receipt["status"])
             self.assertEqual(
-                [2, 2],
+                [2, 2, 2],
                 [
                     result["inspection"]["typography_advisories"]["single_han_last_line_heading_count"]
                     for result in receipt["results"]
                 ],
             )
             self.assertEqual(
-                [3, 3],
+                [3, 3, 3],
                 [result["inspection"]["typography_advisories"]["heading_scan_count"] for result in receipt["results"]],
             )
             self.assertFalse(any(
@@ -758,7 +758,7 @@ triggerButton.onclick = () => {
                 }],
             }
             receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
-            self.assertEqual(["desktop", "mobile", "mobile-motion"], [
+            self.assertEqual(["desktop", "mobile", "narrow", "mobile-motion"], [
                 item["name"] for item in receipt["profiles"]
             ])
             mobile_motion = next(item for item in receipt["results"] if item["profile"] == "mobile-motion")
@@ -1028,7 +1028,7 @@ activateButton.onclick = () => activateButton.setAttribute('aria-pressed', 'true
             self.assertEqual(2, completed.returncode)
             self.assertIn("html smoke infrastructure failure", completed.stderr)
 
-    def test_clean_multi_page_output_passes_both_fresh_profiles(self) -> None:
+    def test_clean_multi_page_output_passes_all_smoke_profiles(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
             (stage / "app.js").write_text("document.querySelector('main').dataset.ready = 'true';\n", encoding="utf-8")
@@ -1039,10 +1039,36 @@ activateButton.onclick = () => activateButton.setAttribute('aria-pressed', 'true
             receipt = self.invoke(stage, ["index.html", "details.html"], outputs)
             self.assertEqual("passed", receipt["status"])
             self.assertEqual(
-                {("index.html", "desktop"), ("index.html", "mobile"), ("details.html", "desktop"), ("details.html", "mobile")},
+                {
+                    ("index.html", "desktop"), ("index.html", "mobile"), ("index.html", "narrow"),
+                    ("details.html", "desktop"), ("details.html", "mobile"), ("details.html", "narrow"),
+                },
                 {(item["page"], item["profile"]) for item in receipt["results"]},
             )
             self.assertTrue(all(item["status"] == "passed" for item in receipt["results"]))
+
+    def test_narrow_profile_rejects_overflow_that_mobile_misses(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Narrow</title><style>
+main { min-width: 360px; }
+</style></head><body><main><h1>Narrow layout</h1></main></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            results = {item["profile"]: item for item in receipt["results"]}
+            self.assertEqual("passed", results["desktop"]["status"])
+            self.assertEqual("passed", results["mobile"]["status"])
+            self.assertEqual("rejected", results["narrow"]["status"])
+            self.assertTrue(results["narrow"]["root_horizontal_overflow"])
+            self.assertEqual(
+                {
+                    "name": "narrow", "viewport": {"width": 320, "height": 800},
+                    "reduced_motion": "reduce",
+                },
+                next(item for item in receipt["profiles"] if item["name"] == "narrow"),
+            )
 
     def test_runtime_accessibility_overflow_and_external_failures_are_observed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

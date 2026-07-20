@@ -65,7 +65,7 @@ DEFAULT_SKILL_REFERENCES = (
 CASE_MODES = ("greenfield", "retrofit", "patch")
 PATCH_LANES = {"polish": "POLISH", "repair": "REPAIR"}
 BROWSER_PROFILES_V1 = {"desktop", "mobile"}
-BROWSER_PROFILES_V2 = BROWSER_PROFILES_V1 | {"mobile-motion"}
+BROWSER_PROFILES_V2 = BROWSER_PROFILES_V1 | {"narrow", "mobile-motion"}
 BROWSER_STEP_ACTIONS = {"assert", "click", "fill", "press", "select"}
 BROWSER_LOCATOR_ROLES = {
     "button", "checkbox", "combobox", "dialog", "form", "group", "heading", "link",
@@ -815,7 +815,7 @@ def _run_html_smoke(
         receipt = json.loads(stdout)
     except json.JSONDecodeError as error:
         raise RunnerError("HTML Playwright smoke gate infrastructure failure") from error
-    expected_profiles = {"desktop", "mobile"}
+    expected_profiles = {"desktop", "mobile", "narrow"}
     if browser_contract is not None:
         expected_profiles.update(case["profile"] for case in browser_contract["cases"])
     expected = {(name, profile) for name in html_outputs for profile in expected_profiles}

@@ -1262,7 +1262,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 {
                     (page, profile)
                     for page in ("index.html", "details.html")
-                    for profile in ("desktop", "mobile", "mobile-motion")
+                    for profile in ("desktop", "mobile", "narrow", "mobile-motion")
                 },
                 {(item["page"], item["profile"]) for item in receipt["results"]},
             )
@@ -1326,6 +1326,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "id": "primary-visible", "action": "assert", "role": "button", "name": "Continue", "expect": "visible",
             }]}]},
             "v1-mobile-motion-profile": {"schema_version": 1, "cases": [{**valid_case, "profile": "mobile-motion"}]},
+            "v1-narrow-profile": {"schema_version": 1, "cases": [{**valid_case, "profile": "narrow"}]},
             "v1-alignment-assertion": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
                 **valid_case["steps"][0], "expect": "inline-start-aligned-with", "reference_selector": "#reference",
             }]}]},

@@ -7,6 +7,7 @@ const { runLocalPageMatrix } = require("./playwright_browser_runtime.cjs");
 const VIEWPORTS = [
   { name: "desktop", viewport: { width: 1440, height: 1000 }, reducedMotion: "no-preference" },
   { name: "mobile", viewport: { width: 390, height: 844 }, reducedMotion: "reduce" },
+  { name: "narrow", viewport: { width: 320, height: 800 }, reducedMotion: "reduce" },
 ];
 const MOBILE_MOTION_VIEWPORT = {
   name: "mobile-motion", viewport: { width: 390, height: 844 }, reducedMotion: "no-preference",
@@ -56,7 +57,7 @@ function validateBrowserContract(value, pages) {
       || ids.has(contractCase.id) || !pages.includes(contractCase.page)
       || !(value.schema_version === 1
         ? ["desktop", "mobile"]
-        : ["desktop", "mobile", "mobile-motion"]).includes(contractCase.profile)
+        : ["desktop", "mobile", "narrow", "mobile-motion"]).includes(contractCase.profile)
       || !Array.isArray(contractCase.steps) || contractCase.steps.length < 1 || contractCase.steps.length > 24) {
       throw new Error("invalid browser contract case");
     }
