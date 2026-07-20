@@ -21,7 +21,70 @@ class SourceLockTests(unittest.TestCase):
         count = validate_external_sources.validate(
             root / "wow-frontend-design" / "references" / "external-sources.lock.json"
         )
-        self.assertEqual(count, 69)
+        self.assertEqual(count, 91)
+
+    def test_user_provided_repositories_have_review_decisions(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        lock = validate_external_sources.load(
+            root / "wow-frontend-design" / "references" / "external-sources.lock.json"
+        )
+        reviewed = {source["repository"] for source in lock["sources"]}
+        expected = {
+            "AlmogBaku/debug-skill",
+            "AugmentedAJ/skills",
+            "Dammyjay93/interface-design",
+            "Leonxlnx/taste-skill",
+            "Lombiq/Tailwind-Agent-Skills",
+            "Mindrally/skills",
+            "Xialiang98/design-visual-frontend",
+            "akseolabs-seo/cinematic-ui",
+            "anthropics/claude-cookbooks",
+            "anthropics/claude-plugins-official",
+            "biomejs/biome",
+            "buildermethods/design-os",
+            "carmahhawwari/ui-design-brain",
+            "chenglou/pretext",
+            "colbymchenry/frontend-audit-skill",
+            "daniruiz/skeuos-gtk",
+            "dceoy/ai-coding-agent-skills",
+            "design-token-kit/design-token-kit",
+            "emilkowalski/skills",
+            "facebook/astryx",
+            "figma/mcp-server-guide",
+            "garrytan/gstack",
+            "github/awesome-copilot",
+            "hamen/material-3-skill",
+            "ibelick/ui-skills",
+            "jamiemill/layers-skills",
+            "jezweb/claude-skills",
+            "majiayu000/claude-skill-registry",
+            "microsoft/GitHubCopilot_Customized",
+            "microsoft/skills",
+            "mikemai2awesome/agent-skills",
+            "mitang-ai/frontend-distill",
+            "moondesignsystem/react",
+            "moondesignsystem/ui",
+            "multica-ai/andrej-karpathy-skills",
+            "neonwatty/css-animation-skill",
+            "nexu-io/open-design",
+            "pm7y/pm7y-marketplace",
+            "sleekdotdesign/agent-skills",
+            "stylelint/stylelint",
+            "superdesigndev/superdesign",
+            "superdesigndev/superdesign-skill",
+            "szymdzum/browser-debugger-cli",
+            "tigerless-labs/design-harness",
+            "tommyjepsen/awesome-ux-skills",
+            "vercel-labs/agent-skills",
+            "w3c/css-validator",
+            "web-platform-tests/wpt",
+            "xntj-ai/ppvi",
+        }
+        self.assertEqual(set(), expected - reviewed)
+        integration = (
+            root / "wow-frontend-design" / "references" / "curated-skill-integration.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("`Amandeepwazir/UX-Designer` was empty", integration)
 
     def test_short_revision_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -29,7 +92,7 @@ class SourceLockTests(unittest.TestCase):
             path.write_text(
                 json.dumps(
                     {
-                        "schema_version": 1,
+                        "schema_version": 2,
                         "retrieved_at": "2026-07-14",
                         "policy": "Pinned research only; verify before any use.",
                         "sources": [
@@ -38,6 +101,11 @@ class SourceLockTests(unittest.TestCase):
                                 "revision": "deadbeef",
                                 "license": "MIT",
                                 "paths": ["SKILL.md"],
+                                "review": {
+                                    "disposition": "no_integration",
+                                    "reviewed_revision": "deadbeef",
+                                    "no_integration_reason": "Reviewed only as a fixture; no portable rule was adopted.",
+                                },
                             }
                         ],
                     }
@@ -63,6 +131,133 @@ class SourceLockTests(unittest.TestCase):
             bracket_text = root / "bracket-text.json"
             bracket_text.write_text(json.dumps({"value": "[" * 1_100}), encoding="utf-8")
             self.assertEqual("[" * 1_100, validate_external_sources.load(bracket_text)["value"])
+
+    def test_review_revision_must_match_pin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "lock.json"
+            owner = root / "owner.md"
+            owner.write_text("# Owner\n", encoding="utf-8")
+            revision = "a" * 40
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "retrieved_at": "2026-07-20",
+                        "policy": "Pinned research only; a review decision is required before use.",
+                        "sources": [
+                            {
+                                "repository": "example/repo",
+                                "revision": revision,
+                                "license": "MIT",
+                                "paths": ["SKILL.md"],
+                                "review": {
+                                    "disposition": "integrated",
+                                    "reviewed_revision": "b" * 40,
+                                    "owner_reference": "owner.md",
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validate_external_sources.SourceLockError, "must equal revision"):
+                validate_external_sources.validate(path)
+
+    def test_integrated_review_requires_existing_owned_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "lock.json"
+            revision = "a" * 40
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "retrieved_at": "2026-07-20",
+                        "policy": "Pinned research only; a review decision is required before use.",
+                        "sources": [
+                            {
+                                "repository": "example/repo",
+                                "revision": revision,
+                                "license": "MIT",
+                                "paths": ["SKILL.md"],
+                                "review": {
+                                    "disposition": "integrated",
+                                    "reviewed_revision": revision,
+                                    "owner_reference": "missing.md",
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validate_external_sources.SourceLockError, "owned reference"):
+                validate_external_sources.validate(path)
+
+    def test_integrated_review_rejects_backslash_owner_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "lock.json"
+            revision = "a" * 40
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "retrieved_at": "2026-07-20",
+                        "policy": "Pinned research only; a review decision is required before use.",
+                        "sources": [
+                            {
+                                "repository": "example/repo",
+                                "revision": revision,
+                                "license": "MIT",
+                                "paths": ["SKILL.md"],
+                                "review": {
+                                    "disposition": "integrated",
+                                    "reviewed_revision": revision,
+                                    "owner_reference": "..\\owner.md",
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validate_external_sources.SourceLockError, "safe Markdown"):
+                validate_external_sources.validate(path)
+
+    def test_no_integration_review_rejects_owner_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "lock.json"
+            revision = "a" * 40
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "retrieved_at": "2026-07-20",
+                        "policy": "Pinned research only; a review decision is required before use.",
+                        "sources": [
+                            {
+                                "repository": "example/repo",
+                                "revision": revision,
+                                "license": "MIT",
+                                "paths": ["SKILL.md"],
+                                "review": {
+                                    "disposition": "no_integration",
+                                    "reviewed_revision": revision,
+                                    "no_integration_reason": "Reviewed; no portable rule was adopted from this source.",
+                                    "owner_reference": "owner.md",
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validate_external_sources.SourceLockError, "exactly"):
+                validate_external_sources.validate(path)
 
 
 if __name__ == "__main__":

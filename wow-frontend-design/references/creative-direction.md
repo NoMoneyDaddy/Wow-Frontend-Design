@@ -27,6 +27,15 @@ Do not infer visual taste, ability, income, gender, age, or culture from demogra
 
 Translate a preference into its underlying intent and expected product consequence instead of copying the referenced implementation. Preserve the intent only while it remains compatible with task success, readability, accessibility, performance, safety, and established brand evidence.
 
+Decompose a visual reference before adopting anything from it:
+
+```text
+reference instance → rhythm | density | navigation | type | material | imagery | motion
+→ intended consequence → compatible product evidence → adopted dimension or rejection
+```
+
+Borrow only the supported dimension and rebuild it through this product's content, brand, task, and system. Do not import a reference's whole hero, palette, grid shell, component family, or decorative signature as a shortcut. A faithful-reproduction task is a separate, explicitly scoped mode and still needs asset, rights, behavior, and viewport evidence.
+
 Keep one compact trace:
 
 ```text
@@ -46,6 +55,16 @@ product truth → perceptible behavior → user outcome
 The product truth must name something supported by the evidence. The perceptible behavior describes what the experience makes clear or possible; it is not a style label, effect, palette, font category, layout archetype, or motion preset. The outcome must relate to the user's task or understanding rather than a claim that the interface feels polished.
 
 Use the task representation and content order established by the core workflow or [component-composition.md](component-composition.md). Creative direction may strengthen their meaning, emphasis, and identity, but must not replace a correct task surface merely to appear unusual.
+
+Before drawing a page, freeze a small composition contract:
+
+```text
+top user job → surface archetype → page thesis → protagonist
+→ supporting evidence/controls → region roles and proportions
+→ reading/action sequence → mobile transformation → failure signal
+```
+
+The protagonist is the content, object, comparison, decision, or action the page must make most legible—not automatically a hero heading or decorative visual. Large and ultrawide regions must still have an earned role; accidental emptiness, a squeezed text rail, or a decorative peer cannot be justified as “premium whitespace.” For multi-route work, establish each representative page's thesis and composition before extracting shared page shells. Shared foundations and primitives may start earlier, but a composition abstraction is earned only by repeated task roles; do not make every route inherit the first page's silhouette.
 
 Name why the direction belongs to this product. Test the identity-bearing decision by removing the product name, logo, and accent color: if the same rationale remains equally defensible for an unrelated product, return to the evidence instead of adding novelty. Familiar patterns remain valid when the task, platform, accessibility, or existing system earns them.
 

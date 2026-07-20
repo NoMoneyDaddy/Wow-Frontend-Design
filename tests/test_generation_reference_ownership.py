@@ -19,6 +19,10 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         cls.behavioral = (ROOT / "behavioral-design-evidence.md").read_text(encoding="utf-8")
         cls.weak = (ROOT / "weak-model-playbook.md").read_text(encoding="utf-8")
         cls.research = (ROOT / "research-validation-loop.md").read_text(encoding="utf-8")
+        cls.exploration = (ROOT / "design-exploration.md").read_text(encoding="utf-8")
+        cls.discovery = (ROOT / "product-discovery-usability.md").read_text(encoding="utf-8")
+        cls.tokens = (ROOT / "design-token-portability.md").read_text(encoding="utf-8")
+        cls.visual = (ROOT / "visual-regression-evidence.md").read_text(encoding="utf-8")
 
     def test_references_keep_bounded_responsibility_sections(self) -> None:
         for heading in (
@@ -56,6 +60,22 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.creative)
+
+    def test_external_methods_are_distilled_into_bounded_mother_rules(self) -> None:
+        for phrase in (
+            "reference instance → rhythm | density | navigation | type | material | imagery | motion",
+            "top user job → surface archetype → page thesis → protagonist",
+            "a composition abstraction is earned only by repeated task roles",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.creative)
+        self.assertIn("immutable baseline", self.exploration)
+        self.assertIn("Every candidate records its parent and changed axes", self.exploration)
+        self.assertIn("method → can answer → cannot answer", self.discovery)
+        self.assertIn("Cross-channel journey evidence", self.discovery)
+        self.assertIn("runtime/framework adapter consumes the resolved semantic", self.tokens)
+        self.assertIn("fresh source-bound artifacts under neutral candidate IDs", self.visual)
+        self.assertIn("rendered geometry/computed styles, and a stable semantic locator", self.visual)
 
     def test_component_reference_owns_behavior_not_visual_or_agent_orchestration(self) -> None:
         for stale_section in (

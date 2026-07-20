@@ -29,6 +29,8 @@ source/primitive → semantic role → component role → platform output
 - **Component** exists only when a component needs a stable exception or public contract that cannot be expressed by semantic roles.
 - **Platform output** translates units, naming, capabilities, and fallbacks; it is generated, not another source of truth.
 
+A runtime/framework adapter consumes the resolved semantic and, when justified, component contract. It may translate API shape, units, capabilities, and fallbacks, but it must not quietly become the owner of primitive values, rename semantic meaning, or fork a second theme source. Keep adapter components optional and composable; a compound API is a product/framework choice, not a required token layer.
+
 Avoid both extremes: components referencing raw palette values everywhere, and thousands of component tokens that merely duplicate semantic aliases.
 
 ## Freeze the resolution contract

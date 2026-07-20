@@ -19,11 +19,14 @@ intent → detected stack/version → risk → missing capability → selected s
 
 Before reusing a rule, record repository, full content-addressed commit, path, retrieval date, and license evidence in [external-sources.lock.json](external-sources.lock.json) or an evaluator-owned equivalent. If text/code is copied rather than independently paraphrased, also retain the exact file hash and required notice.
 
+The lock's `review` object is the machine-readable source-level decision. `integrated` means only that a bounded portable method was adopted by the named owner reference; it does not mean wholesale copying, endorsement, installation, compatibility, or runtime support. `no_integration` means the pinned source was read but added no distinct portable rule or failed an adoption boundary. `reviewed_revision` must equal the pin, so updating a source without re-review fails validation. Qualitative research files may explain the decision but must not override the lock.
+
 - Never fetch mutable `main`, `@latest`, floating actions, CDN scripts, or reusable workflows during an ordinary project run.
 - Prefer installed package types/docs and the project's lockfile for framework behavior. A pinned research Skill does not override the installed version.
 - Re-audit when the pinned commit disappears, the content hash changes, the license changes, or the source redirects.
 - A repository without a complete applicable license may be studied and paraphrased as facts or methodology; do not copy its expressive text or code into this MIT project.
 - Keep third-party notices when copied MIT/Apache-2.0 material requires them. A framework license does not automatically license icon collections, fonts, templates, generated assets, editors, or export runtimes.
+- A repository with no commit or readable artifact cannot enter the immutable lock. Record it as an empty/unavailable coordinate rather than inventing a revision; `Amandeepwazir/UX-Designer` was empty when reviewed on 2026-07-20 and contributed no rule.
 
 ## 3. Conditional routing matrix
 

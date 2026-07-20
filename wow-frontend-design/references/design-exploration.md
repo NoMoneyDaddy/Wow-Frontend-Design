@@ -19,6 +19,10 @@ Write a variant manifest:
 variant id → hypothesis → changed axes → held-constant axes → expected benefit → risk → states/viewports → selection evidence
 ```
 
+Preserve the first faithful/current-state render as an immutable baseline. Every candidate records its parent and changed axes; never overwrite the baseline or let a mutable “latest” artifact become ancestry. A wireframe, canvas draft, or decision specimen helps compare a material ambiguity, but it is not implementation or acceptance evidence.
+
+Define exclusion gates and decision criteria before revealing candidate identities. When specialist judgments are independent, collect them independently before discussion; a reviewer should score only dimensions supported by their evidence. Keep disagreement and unresolved criteria instead of manufacturing consensus.
+
 ## 2. Inspect before asking
 
 Detect the project, current visual tokens, component patterns, framework/version, package manager, routes, and available preview/test surface first. Ask only questions whose answers change the exploration materially:

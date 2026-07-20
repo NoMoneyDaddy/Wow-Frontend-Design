@@ -44,6 +44,10 @@ Classify a mismatch as `product regression`, `intended change`, `environment dri
 2. **Targeted visual regression:** stable components and critical routes/states with a frozen environment.
 3. **Human/blind craft review:** hierarchy, brand fit, material coherence, photography/crop, motion character, and whether the result is actually good.
 
+For comparative Skill or design experiments, freeze the brief, fixtures, environment, evidence matrix, and rubric before judging. Give reviewers fresh source-bound artifacts under neutral candidate IDs; do not expose prior scores, repair answers, implementation commentary, model identity, or a preferred candidate. Change one named system variable per comparison while holding the rest constant, then repeat separately if coupled variables are the hypothesis. This is an experimental-control rule, not a requirement to serialize ordinary production fixes.
+
+Triangulate a visual finding with the freshest available screenshot, rendered geometry/computed styles, and a stable semantic locator. Prefer role/name or an owned stable test locator; class names and screenshot coordinates are edit hints, not durable identity. A stale image hash, a locator that resolves a different state, or a source-only guess cannot become a new rendered finding.
+
 A pixel threshold is a noise tolerance, not an acceptance score. Prefer focused element baselines for stable components and representative full-page captures for composition. Keep mobile, desktop, light/dark, long-locale, error, overlay, and forced/reduced-preference cases risk-based rather than screenshotting every permutation without review capacity.
 
 Distinguish a viewport capture from a full-page document capture. Full-page stitching can paint fixed, sticky, or transformed off-canvas UI at a document boundary where a user would not see it in the named viewport. Use an exact viewport capture for first-screen and closed-overlay claims; keep full-page captures separately labelled, and verify suspicious fixed-position artifacts in the live viewport before reporting a UI defect.

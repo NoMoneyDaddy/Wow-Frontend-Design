@@ -14,6 +14,18 @@ Never invent participants, quotes, interview results, analytics, pain points, pe
 
 Do not infer ability, culture, income, motivation, or visual preference from age, gender, region, disability, job title, or another demographic. Segment only when task, permission, behavior, context, or decision needs materially differ.
 
+### Route the method from the question
+
+Do not select the familiar method first. Record:
+
+```text
+decision at risk → question → behavior or attitude → why/how or how-many/how-much
+→ natural/scripted/limited/no product use → available product maturity
+→ method → can answer → cannot answer → complementary evidence
+```
+
+Direct observation and self-report answer different questions; qualitative evidence is suited to mechanisms and repair ideas, while quantitative evidence estimates frequency or magnitude only under its sampling and measurement assumptions. Product phase and practical limits influence the choice but do not turn a method into proof of another outcome. Treat method maps as routing guidance, not rigid classifications. See Nielsen Norman Group's current [research-method selection framework](https://www.nngroup.com/articles/which-ux-research-methods/) and state the transfer limits for the actual decision.
+
 ## 2. Interview without leading
 
 Before recruiting or contacting anyone, obtain authorization and define data handling, consent, privacy, compensation, recording, retention, and deletion. Prefer questions about a recent real event:
@@ -57,6 +69,12 @@ Never run external submissions, purchases, messages, uploads, production writes,
 - Pair every design decision with the observation or hypothesis that supports it.
 - Re-test the smallest risky assumption before broad visual polish.
 - Do not make research theater block a low-risk reversible change; mark the evidence ceiling and continue when authorized.
+
+### Cross-channel journey evidence
+
+Use an experience or journey map only when the service spans meaningful time, locations, channels, teams, or touchpoints. Keep it separate from a product user flow. Build participant journeys individually before consolidating them; merge only genuinely shared stages and retain materially different paths.
+
+For every stage or event, keep actor, context, action, thought/feeling report, touchpoint, dependency, breakdown, source, and confidence distinguishable. A sourced quote is not an observed action, and an inferred emotion is not a participant report. Empty regions and contradictions become research questions rather than invented content. GOV.UK's [experience-map guidance](https://www.gov.uk/service-manual/user-research/creating-an-experience-map/) requires prior user evidence and preserves cross-service events and dependencies; use it as practitioner guidance, not a universal deliverable.
 
 ## Source and adoption boundary
 
