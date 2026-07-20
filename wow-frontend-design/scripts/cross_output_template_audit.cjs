@@ -288,6 +288,7 @@ function auditCrossOutputTemplates(input) {
   const exactGroups = new Map();
   const dominantGroups = new Map();
   const visualGrammarGroups = new Map();
+  const visualGrammarObservations = [];
   for (const [index, observation] of input.observations.entries()) {
     requireExactKeys(observation, ["caseId", "route", "surface", "viewport", "state", "macroFingerprint"], `observations[${index}]`);
     for (const field of ["caseId", "route", "surface", "viewport", "state"]) {
@@ -327,6 +328,7 @@ function auditCrossOutputTemplates(input) {
         || { visualGrammarSha256, observations: [] };
       visualGrammarGroup.observations.push(receipt);
       visualGrammarGroups.set(visualGrammarKey, visualGrammarGroup);
+      visualGrammarObservations.push({ receipt, visualGrammar, visualGrammarSha256 });
     }
   }
   const exactAdvisories = [...exactGroups.values()].flatMap((group) => {
@@ -370,11 +372,49 @@ function auditCrossOutputTemplates(input) {
       confirmation: "review product evidence and paired blind renders; low-resolution type, radius, and pill similarity is not a defect",
     }];
   });
-  const advisories = [...exactAdvisories, ...nearAdvisories, ...visualGrammarAdvisories].sort((left, right) => (
+  const visualAxes = ["displayFamily", "displayScale", "majorRadius", "pillDensity"];
+  const partialVisualGroups = new Map();
+  for (let leftIndex = 0; leftIndex < visualGrammarObservations.length; leftIndex += 1) {
+    const left = visualGrammarObservations[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < visualGrammarObservations.length; rightIndex += 1) {
+      const right = visualGrammarObservations[rightIndex];
+      if (left.receipt.caseId === right.receipt.caseId) continue;
+      if (["surface", "viewport", "state"].some((field) => left.receipt[field] !== right.receipt[field])) continue;
+      if (left.visualGrammarSha256 === right.visualGrammarSha256) continue;
+      const sharedAxes = visualAxes.flatMap((name) => (
+        left.visualGrammar[name] !== "none" && left.visualGrammar[name] === right.visualGrammar[name]
+          ? [{ name, value: left.visualGrammar[name] }] : []
+      ));
+      if (sharedAxes.length < 2) continue;
+      const caseIds = [left.receipt.caseId, right.receipt.caseId].sort();
+      const groupKey = JSON.stringify([
+        caseIds, left.receipt.surface, left.receipt.viewport, left.receipt.state, sharedAxes,
+      ]);
+      const group = partialVisualGroups.get(groupKey)
+        || { caseIds, sharedAxes, observations: new Map() };
+      for (const receipt of [left.receipt, right.receipt]) {
+        const identity = JSON.stringify([
+          receipt.caseId, receipt.route, receipt.surface, receipt.viewport, receipt.state,
+        ]);
+        group.observations.set(identity, receipt);
+      }
+      partialVisualGroups.set(groupKey, group);
+    }
+  }
+  const partialVisualAdvisories = [...partialVisualGroups.values()].map((group) => ({
+    code: "cross_output_partial_visual_grammar_candidate",
+    caseIds: group.caseIds,
+    sharedAxes: group.sharedAxes,
+    observations: [...group.observations.values()].sort(compareReceipts),
+    confirmation: "review product evidence and paired blind renders; sharing multiple low-resolution visual axes is not a defect",
+  }));
+  const advisories = [
+    ...exactAdvisories, ...nearAdvisories, ...visualGrammarAdvisories, ...partialVisualAdvisories,
+  ].sort((left, right) => (
     left.code.localeCompare(right.code)
       || left.caseIds.join("|").localeCompare(right.caseIds.join("|"))
-      || (left.fingerprintSha256 || left.dominantFingerprintSha256 || left.visualGrammarSha256)
-        .localeCompare(right.fingerprintSha256 || right.dominantFingerprintSha256 || right.visualGrammarSha256)
+      || (left.fingerprintSha256 || left.dominantFingerprintSha256 || left.visualGrammarSha256 || JSON.stringify(left.sharedAxes))
+        .localeCompare(right.fingerprintSha256 || right.dominantFingerprintSha256 || right.visualGrammarSha256 || JSON.stringify(right.sharedAxes))
   ));
   return {
     schemaVersion: 1,

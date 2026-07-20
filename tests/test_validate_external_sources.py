@@ -21,7 +21,7 @@ class SourceLockTests(unittest.TestCase):
         count = validate_external_sources.validate(
             root / "wow-frontend-design" / "references" / "external-sources.lock.json"
         )
-        self.assertEqual(count, 91)
+        self.assertEqual(count, 98)
 
     def test_user_provided_repositories_have_review_decisions(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -40,6 +40,7 @@ class SourceLockTests(unittest.TestCase):
             "akseolabs-seo/cinematic-ui",
             "anthropics/claude-cookbooks",
             "anthropics/claude-plugins-official",
+            "anthropics/skills",
             "biomejs/biome",
             "buildermethods/design-os",
             "carmahhawwari/ui-design-brain",
@@ -48,6 +49,8 @@ class SourceLockTests(unittest.TestCase):
             "daniruiz/skeuos-gtk",
             "dceoy/ai-coding-agent-skills",
             "design-token-kit/design-token-kit",
+            "dylantarre/animation-principles",
+            "eachlabs/skills",
             "emilkowalski/skills",
             "facebook/astryx",
             "figma/mcp-server-guide",
@@ -58,17 +61,21 @@ class SourceLockTests(unittest.TestCase):
             "jamiemill/layers-skills",
             "jezweb/claude-skills",
             "majiayu000/claude-skill-registry",
+            "mastepanoski/claude-skills",
+            "mattpocock/skills",
             "microsoft/GitHubCopilot_Customized",
             "microsoft/skills",
             "mikemai2awesome/agent-skills",
             "mitang-ai/frontend-distill",
             "moondesignsystem/react",
             "moondesignsystem/ui",
+            "MoizIbnYousaf/Ai-Agent-Skills",
             "multica-ai/andrej-karpathy-skills",
             "neonwatty/css-animation-skill",
             "nexu-io/open-design",
             "pm7y/pm7y-marketplace",
             "sleekdotdesign/agent-skills",
+            "sickn33/agentic-awesome-skills",
             "stylelint/stylelint",
             "superdesigndev/superdesign",
             "superdesigndev/superdesign-skill",
@@ -79,12 +86,16 @@ class SourceLockTests(unittest.TestCase):
             "w3c/css-validator",
             "web-platform-tests/wpt",
             "xntj-ai/ppvi",
+            "rknall/claude-skills",
         }
         self.assertEqual(set(), expected - reviewed)
         integration = (
             root / "wow-frontend-design" / "references" / "curated-skill-integration.md"
         ).read_text(encoding="utf-8")
         self.assertIn("`Amandeepwazir/UX-Designer` was empty", integration)
+        self.assertIn("`ThepExcel/agent-skills` was unavailable", integration)
+        self.assertIn("`sickn33/antigravity-awesome-skills` redirected", integration)
+        self.assertIn("`skillcreatorai/ai-agent-skills` redirected", integration)
 
     def test_short_revision_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

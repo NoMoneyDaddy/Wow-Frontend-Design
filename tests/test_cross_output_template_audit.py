@@ -241,6 +241,50 @@ process.stdout.write(JSON.stringify({{forward:audit(rows),reverse:audit([...rows
         visual = [item for item in result["forward"]["advisories"] if item["code"] == "cross_output_visual_grammar_candidate"]
         self.assertEqual(2, len(visual))
 
+    def test_partial_visual_grammar_overlap_is_reported_without_collapsing_products(self) -> None:
+        base = {"version": 2, "landmarks": [], "mainFlow": {"display": "block", "flexDirection": "row", "gridTracks": [], "gap": 0}, "regions": [], "representationHistogram": []}
+        coffee = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "display", "majorRadius": "large", "pillDensity": "sparse"}}
+        editorial = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "compact", "majorRadius": "large", "pillDensity": "sparse"}}
+        audit_log = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "display", "majorRadius": "large", "pillDensity": "many"}}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId,macroFingerprint)=>( {{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}} );
+const rows=[row('coffee',{json.dumps(coffee)}),row('editorial',{json.dumps(editorial)}),row('audit-log',{json.dumps(audit_log)})];
+const audit=(observations)=>auditCrossOutputTemplates({{schemaVersion:1,cohort:'partial-visual',observations}});
+process.stdout.write(JSON.stringify({{forward:audit(rows),reverse:audit([...rows].reverse())}}));
+"""
+        result = self.run_node(source)
+        self.assertEqual(result["forward"], result["reverse"])
+        partial = [item for item in result["forward"]["advisories"] if item["code"] == "cross_output_partial_visual_grammar_candidate"]
+        self.assertEqual(3, len(partial))
+        coffee_editorial = next(item for item in partial if item["caseIds"] == ["coffee", "editorial"])
+        self.assertEqual(
+            [
+                {"name": "displayFamily", "value": "serif"},
+                {"name": "majorRadius", "value": "large"},
+                {"name": "pillDensity", "value": "sparse"},
+            ],
+            coffee_editorial["sharedAxes"],
+        )
+        self.assertEqual(
+            {"code", "caseIds", "sharedAxes", "observations", "confirmation"},
+            set(coffee_editorial),
+        )
+        self.assertIn("not a defect", coffee_editorial["confirmation"])
+
+    def test_single_shared_visual_axis_does_not_create_partial_advisory(self) -> None:
+        base = {"version": 2, "landmarks": [], "mainFlow": {"display": "block", "flexDirection": "row", "gridTracks": [], "gap": 0}, "regions": [], "representationHistogram": []}
+        first = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "display", "majorRadius": "large", "pillDensity": "sparse"}}
+        second = {**base, "visualGrammar": {"displayFamily": "sans", "displayScale": "compact", "majorRadius": "large", "pillDensity": "many"}}
+        source = f"""
+const {{ auditCrossOutputTemplates }} = require({json.dumps(str(AUDITOR))});
+const row=(caseId,macroFingerprint)=>( {{caseId,route:'/',surface:'primary',viewport:'desktop',state:'base',macroFingerprint}} );
+process.stdout.write(JSON.stringify(auditCrossOutputTemplates({{schemaVersion:1,cohort:'single-axis',observations:[row('a',{json.dumps(first)}),row('b',{json.dumps(second)})]}})));
+"""
+        result = self.run_node(source)
+        partial = [item for item in result["advisories"] if item["code"] == "cross_output_partial_visual_grammar_candidate"]
+        self.assertEqual([], partial)
+
     def test_v2_visual_grammar_does_not_change_exact_macro_identity(self) -> None:
         base = {"version": 2, "landmarks": [], "mainFlow": {"display": "grid", "flexDirection": "row", "gridTracks": [0.5, 0.5], "gap": 0.02}, "regions": [], "representationHistogram": []}
         serif = {**base, "visualGrammar": {"displayFamily": "serif", "displayScale": "display", "majorRadius": "large", "pillDensity": "many"}}

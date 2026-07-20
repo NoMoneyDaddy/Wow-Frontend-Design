@@ -26,7 +26,7 @@ The lock's `review` object is the machine-readable source-level decision. `integ
 - Re-audit when the pinned commit disappears, the content hash changes, the license changes, or the source redirects.
 - A repository without a complete applicable license may be studied and paraphrased as facts or methodology; do not copy its expressive text or code into this MIT project.
 - Keep third-party notices when copied MIT/Apache-2.0 material requires them. A framework license does not automatically license icon collections, fonts, templates, generated assets, editors, or export runtimes.
-- A repository with no commit or readable artifact cannot enter the immutable lock. Record it as an empty/unavailable coordinate rather than inventing a revision; `Amandeepwazir/UX-Designer` was empty when reviewed on 2026-07-20 and contributed no rule.
+- A repository with no commit or readable artifact cannot enter the immutable lock. Record it as an empty/unavailable coordinate rather than inventing a revision; `Amandeepwazir/UX-Designer` was empty and `ThepExcel/agent-skills` was unavailable through live Git and API checks when reviewed on 2026-07-20, so neither contributed a rule. Canonicalize redirects instead of counting aliases as independent evidence: `sickn33/antigravity-awesome-skills` redirected to the locked `sickn33/agentic-awesome-skills`, and `skillcreatorai/ai-agent-skills` redirected to the locked `MoizIbnYousaf/Ai-Agent-Skills`.
 
 ## 3. Conditional routing matrix
 
