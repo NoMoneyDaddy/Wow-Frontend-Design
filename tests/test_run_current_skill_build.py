@@ -188,6 +188,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
             "model": {},
             "prompt": {},
             "skill_snapshot": {},
+            "skill_references": {"files": [], "total_bytes": 0},
             "configured_isolation": {},
             "execution": {},
             "trace_observed": {},
@@ -289,6 +290,8 @@ if mode == "skill-content-drift":
     (root / "skill-source" / "SKILL.md").write_text("drifted", encoding="utf-8")
 if mode == "skill-mode-drift":
     (root / "skill-source" / "SKILL.md").chmod(0o700)
+if mode == "skill-reference-drift":
+    (root / "skill-source" / "references" / "creative-direction.md").write_text("drifted reference", encoding="utf-8")
 if mode == "browser-contract-drift":
     (root / "browser-contract.json").write_text('{{"schema_version":1,"cases":[]}}', encoding="utf-8")
 print(json.dumps({{"type":"turn.completed"}}))
@@ -330,6 +333,16 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         )
         return brief, target, capture, environment
 
+    def reference_skill_fixture(self, root: Path) -> Path:
+        skill = root / "skill-source"
+        references = skill / "references"
+        references.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: test\ndescription: test\n---\n", encoding="utf-8")
+        (references / "creative-direction.md").write_text("creative-context\n", encoding="utf-8")
+        (references / "no-visual-first-pass.md").write_text("visual-context\n", encoding="utf-8")
+        (references / "optional.md").write_text("optional-context\n", encoding="utf-8")
+        return skill
+
     def seed_fixture(self, root: Path) -> Path:
         seed = (root / "seed-project").resolve()
         seed.mkdir()
@@ -355,6 +368,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         seed_root: Path | None = None,
         allow_changes: tuple[str, ...] = (),
         browser_contract: Path | None = None,
+        skill_reference: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         selected_log_dir = log_dir or Path(environment["CODEX_HOME"]).parent / "logs"
         selected_log_dir.mkdir(exist_ok=True)
@@ -379,6 +393,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             command.extend(("--seed-root", str(seed_root)))
         if browser_contract is not None:
             command.extend(("--browser-contract", str(browser_contract)))
+        if skill_reference is not None:
+            command.extend(("--skill-reference", skill_reference))
         for path in allow_changes:
             command.extend(("--allow-change", path))
         command.extend(("--hard-seconds", str(hard_seconds)))
@@ -393,6 +409,140 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             timeout=15,
             check=False,
         )
+
+    def test_bounded_skill_reference_context_happy_path_and_privacy_safe_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            skill = self.reference_skill_fixture(root)
+            records, payload = core.prepare_skill_reference_context(
+                skill,
+                (
+                    "references/creative-direction.md",
+                    "references/no-visual-first-pass.md",
+                    "references/optional.md",
+                ),
+            )
+            self.assertEqual(3, len(records))
+            self.assertEqual(
+                ["creative-context\n", "visual-context\n", "optional-context\n"],
+                [item["content"] for item in payload],
+            )
+            summary = core._skill_reference_summary(records)
+            serialized = json.dumps(summary, ensure_ascii=False)
+            self.assertEqual(sum(record[1] for record in records), summary["total_bytes"])
+            self.assertNotIn("creative-context", serialized)
+            self.assertNotIn("optional-context", serialized)
+
+    def test_bounded_skill_reference_context_rejects_unsafe_or_unknown_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            skill = self.reference_skill_fixture(root)
+            rejected = (
+                ("traversal", ("references/../SKILL.md",)),
+                ("absolute", (str((skill / "references" / "optional.md").resolve()),)),
+                ("unknown", ("references/missing.md",)),
+                ("duplicate", ("references/optional.md", "references/optional.md")),
+            )
+            for name, paths in rejected:
+                with self.subTest(name=name), self.assertRaises(core.RunnerError):
+                    core.prepare_skill_reference_context(skill, paths)
+
+    def test_bounded_skill_reference_context_rejects_symlinked_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            skill = self.reference_skill_fixture(root)
+            (skill / "references" / "linked.md").symlink_to(skill / "references" / "optional.md")
+            with self.assertRaises(core.RunnerError):
+                core.prepare_skill_reference_context(skill, ("references/linked.md",))
+
+    def test_bounded_skill_reference_context_rejects_invalid_text_and_quotas(self) -> None:
+        cases = (
+            ("nul.md", b"before\x00after"),
+            ("non-utf8.md", b"\xff"),
+            ("oversize.md", b"x" * (core.SKILL_REFERENCE_FILE_LIMIT + 1)),
+        )
+        for filename, content in cases:
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                skill = self.reference_skill_fixture(root)
+                (skill / "references" / filename).write_bytes(content)
+                with self.assertRaises(core.RunnerError):
+                    core.prepare_skill_reference_context(skill, (f"references/{filename}",))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            skill = self.reference_skill_fixture(root)
+            for filename in ("total-a.md", "total-b.md", "total-c.md"):
+                (skill / "references" / filename).write_bytes(b"x" * (44 * 1024))
+            with self.assertRaisesRegex(core.RunnerError, "context byte quota"):
+                core.prepare_skill_reference_context(
+                    skill,
+                    (
+                        "references/total-a.md",
+                        "references/total-b.md",
+                        "references/total-c.md",
+                    ),
+                )
+
+    def test_initial_and_repair_prompts_receive_the_identical_controlled_skill_context(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "page-error-repairable")
+            completed = self.invoke(
+                brief,
+                target,
+                environment,
+                skill_reference="references/typographic-layout.md",
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            initial = json.loads((capture / "invocation-1.json").read_text(encoding="utf-8"))["prompt"]
+            repair = json.loads((capture / "invocation-2.json").read_text(encoding="utf-8"))["prompt"]
+
+            def controlled_context(prompt: str) -> str:
+                begin = "--- CONTROLLED SKILL REFERENCE CONTEXT: BEGIN ---"
+                end = "--- CONTROLLED SKILL REFERENCE CONTEXT: END ---"
+                return prompt.split(begin, 1)[1].split(end, 1)[0]
+
+            self.assertEqual(controlled_context(initial), controlled_context(repair))
+            self.assertLess(initial.index("CONTROLLED SKILL REFERENCE CONTEXT"), initial.index("UNTRUSTED PRODUCT BRIEF"))
+            for required in policy.DEFAULT_SKILL_REFERENCES:
+                self.assertIn(required, initial)
+            self.assertIn("references/typographic-layout.md", initial)
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            receipt = json.loads((root / "logs" / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["skill_references"], receipt["skill_references"])
+            self.assertEqual(manifest["skill_references"], manifest["repair"]["attempts"][0]["skill_references"])
+            provenance = json.dumps(manifest["skill_references"], ensure_ascii=False)
+            private_reference_line = next(
+                line
+                for line in (ROOT / "wow-frontend-design" / policy.DEFAULT_SKILL_REFERENCES[0]).read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                if len(line) >= 20
+            )
+            self.assertNotIn(private_reference_line, provenance)
+            self.assertNotIn(private_reference_line, json.dumps(receipt, ensure_ascii=False))
+
+    def test_controlled_skill_context_precedes_every_untrusted_payload(self) -> None:
+        context = "--- CONTROLLED SKILL REFERENCE CONTEXT: BEGIN ---\ntrusted\n--- CONTROLLED SKILL REFERENCE CONTEXT: END ---\n"
+        initial = policy.build_prompt(
+            "brief",
+            ("index.html",),
+            case_mode="retrofit",
+            lane_contract="RETROFIT",
+            seed_files=({"path": "index.html", "content": "seed"},),
+            allowed_changes=("index.html",),
+            skill_reference_context=context,
+        )
+        self.assertLess(initial.index("CONTROLLED SKILL REFERENCE CONTEXT"), initial.index("UNTRUSTED FROZEN PROJECT JSON"))
+        self.assertLess(initial.index("CONTROLLED SKILL REFERENCE CONTEXT"), initial.index("UNTRUSTED PRODUCT BRIEF"))
+        repair = policy.build_repair_prompt(
+            ("index.html",),
+            {"gate": "html", "finding_ids": [], "counts": {}, "truncated": False, "signature": "0" * 64},
+            file_context=({"path": "index.html", "content": "output"},),
+            skill_reference_context=context,
+        )
+        self.assertLess(repair.index("CONTROLLED SKILL REFERENCE CONTEXT"), repair.index("UNTRUSTED CURRENT OUTPUT JSON"))
 
     def browser_contract_fixture(self, root: Path, *, selector: str = "#primary") -> Path:
         contract = (root / "browser-contract.json").resolve()
@@ -2275,8 +2425,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             brief, target, _, environment = self.fixture(root)
             log_dir = root / "logs"
             log_dir.mkdir()
-            skill_source = root / "skill-source"
-            skill_source.mkdir()
+            skill_source = self.reference_skill_fixture(root)
             (skill_source / "SKILL.md").write_text("initial skill\n", encoding="utf-8")
             rejected = {"status": "rejected", "findings": [{"message": "orphan token"}]}
 
@@ -2718,6 +2867,33 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                             hard_seconds=5,
                         )
                     )
+
+    def test_execute_isolated_rejects_selected_reference_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, _, _, environment = self.fixture(root, "skill-reference-drift")
+            skill_source = self.reference_skill_fixture(root)
+            selected, _ = core.prepare_skill_reference_context(
+                skill_source,
+                ("references/creative-direction.md",),
+            )
+            stage = root / "stage"
+            stage.mkdir()
+            with mock.patch.dict(os.environ, environment, clear=True), self.assertRaisesRegex(
+                core.RunnerError, "skill snapshot provenance drifted|selected skill reference"
+            ):
+                core.execute_isolated(
+                    core.ExecutionSpec(
+                        stage=stage,
+                        stdout_log=root / "trace.jsonl",
+                        stderr_log=root / "stderr.txt",
+                        skill_source=skill_source,
+                        skill_name="wow-frontend-design",
+                        prompt="Build.",
+                        hard_seconds=5,
+                        skill_references=selected,
+                    )
+                )
 
 
 if __name__ == "__main__":

@@ -452,6 +452,7 @@ def build_repair_prompt(
     case_mode: str = "greenfield",
     allowed_changes: tuple[str, ...] = (),
     file_context: tuple[dict[str, Any], ...] = (),
+    skill_reference_context: str = "",
 ) -> str:
     encoded = json.dumps(feedback, sort_keys=True, separators=(",", ":"))
     context = json.dumps(file_context, ensure_ascii=False, separators=(",", ":"))
@@ -479,6 +480,7 @@ def build_repair_prompt(
         "axe-label-content-name-mismatch, keep each control's complete visible label inside its accessible name "
         "across every rendered state. If an exact stable name is required, keep the visible label stable and "
         "expose changing details in adjacent text. Do not remove unrelated labels.\n"
+        f"{skill_reference_context}"
         f"--- UNTRUSTED CURRENT OUTPUT JSON: BEGIN ---\n{context}\n"
         "--- UNTRUSTED CURRENT OUTPUT JSON: END ---\n"
         f"--- MACHINE GATE FEEDBACK ---\n{encoded}\n--- END FEEDBACK ---\n"

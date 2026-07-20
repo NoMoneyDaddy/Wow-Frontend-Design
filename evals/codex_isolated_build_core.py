@@ -29,6 +29,10 @@ SKILL_FILE_LIMIT = 1_048_576
 MAX_STAGE_ENTRIES = 16
 MAX_SKILL_ENTRIES = 512
 MODEL_LIMIT = 128
+SKILL_REFERENCE_FILE_LIMIT = 64 * 1024
+SKILL_REFERENCE_TOTAL_LIMIT = 128 * 1024
+MAX_SKILL_REFERENCES = 3
+SKILL_REFERENCE_PATH = re.compile(r"references/[a-z0-9][a-z0-9-]{0,127}\.md")
 
 
 def _module(name: str, path: Path) -> Any:
@@ -54,6 +58,7 @@ class ExecutionSpec(NamedTuple):
     hard_seconds: int = 1800
     inactivity_seconds: int | None = None
     reasoning_effort: str | None = None
+    skill_references: tuple[tuple[str, int, str], ...] = ()
 
 
 class RunnerError(ValueError):
@@ -140,6 +145,169 @@ def _tree_summary(records: list[dict[str, Any]], name: str) -> dict[str, Any]:
         "tree_sha256": _digest_bytes(encoded),
         "inventory": records,
     }
+
+
+def _validated_skill_reference_records(
+    records: tuple[tuple[str, int, str], ...],
+) -> tuple[tuple[str, int, str], ...]:
+    if not isinstance(records, tuple) or len(records) > MAX_SKILL_REFERENCES:
+        raise RunnerError("skill reference selection may contain at most three files")
+    normalized: list[tuple[str, int, str]] = []
+    seen: set[str] = set()
+    total = 0
+    for record in records:
+        if (
+            not isinstance(record, tuple)
+            or len(record) != 3
+            or not isinstance(record[0], str)
+            or SKILL_REFERENCE_PATH.fullmatch(record[0]) is None
+            or type(record[1]) is not int
+            or not 1 <= record[1] <= SKILL_REFERENCE_FILE_LIMIT
+            or not isinstance(record[2], str)
+            or re.fullmatch(r"[0-9a-f]{64}", record[2]) is None
+        ):
+            raise RunnerError("skill reference record is invalid")
+        folded = record[0].casefold()
+        if folded in seen:
+            raise RunnerError("skill reference selection contains a duplicate")
+        seen.add(folded)
+        total += record[1]
+        if total > SKILL_REFERENCE_TOTAL_LIMIT:
+            raise RunnerError("skill reference context byte quota exceeded")
+        normalized.append(record)
+    return tuple(normalized)
+
+
+def _skill_reference_summary(
+    records: tuple[tuple[str, int, str], ...],
+) -> dict[str, Any]:
+    return {
+        "files": [
+            {"path": path, "bytes": size, "sha256": digest}
+            for path, size, digest in records
+        ],
+        "total_bytes": sum(size for _, size, _ in records),
+    }
+
+
+def _assert_skill_reference_records(
+    tree: dict[str, Any], records: tuple[tuple[str, int, str], ...]
+) -> None:
+    files = {
+        item["path"]: item
+        for item in tree.get("inventory", ())
+        if item.get("kind") == "file"
+    }
+    for path, size, digest in records:
+        observed = files.get(path)
+        if observed is None or observed.get("bytes") != size or observed.get("sha256") != digest:
+            raise RunnerError("selected skill reference provenance drifted")
+
+
+def _read_skill_reference(root: Path, path: str) -> tuple[os.stat_result, bytes, str]:
+    """Read one fixed-depth reference through no-follow directory descriptors."""
+
+    if SKILL_REFERENCE_PATH.fullmatch(path) is None:
+        raise RunnerError("skill reference path is invalid")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if nofollow is None or directory is None:
+        raise RunnerError("safe skill reference reads are unavailable on this platform")
+    root_fd = references_fd = file_fd = None
+    try:
+        root_fd = os.open(root, os.O_RDONLY | directory | nofollow)
+        references_fd = os.open("references", os.O_RDONLY | directory | nofollow, dir_fd=root_fd)
+        file_fd = os.open(path.removeprefix("references/"), os.O_RDONLY | nofollow, dir_fd=references_fd)
+        info = os.fstat(file_fd)
+        if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= SKILL_REFERENCE_FILE_LIMIT:
+            raise RunnerError("selected skill reference is not a bounded regular file")
+        chunks: list[bytes] = []
+        remaining = SKILL_REFERENCE_FILE_LIMIT + 1
+        while remaining:
+            chunk = os.read(file_fd, min(64 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        if len(data) != info.st_size or len(data) > SKILL_REFERENCE_FILE_LIMIT:
+            raise RunnerError("selected skill reference changed while being read")
+        try:
+            text = data.decode("utf-8")
+        except UnicodeError as error:
+            raise RunnerError("selected skill reference is not strict UTF-8") from error
+        if "\x00" in text:
+            raise RunnerError("selected skill reference contains NUL")
+        return info, data, text
+    except OSError as error:
+        raise RunnerError("selected skill reference is unsafe or unreadable") from error
+    finally:
+        for descriptor in (file_fd, references_fd, root_fd):
+            if descriptor is not None:
+                os.close(descriptor)
+
+
+def _assert_skill_reference_files(
+    root: Path, records: tuple[tuple[str, int, str], ...]
+) -> None:
+    for path, size, digest in records:
+        info, data, _ = _read_skill_reference(root, path)
+        if (
+            len(data) != size
+            or _digest_bytes(data) != digest
+        ):
+            raise RunnerError("selected skill reference provenance drifted")
+
+
+def prepare_skill_reference_context(
+    source: Path, paths: tuple[str, ...]
+) -> tuple[tuple[tuple[str, int, str], ...], tuple[dict[str, Any], ...]]:
+    """Read a bounded, source-owned reference set and freeze its provenance."""
+
+    if not isinstance(paths, tuple) or not 1 <= len(paths) <= MAX_SKILL_REFERENCES:
+        raise RunnerError("skill reference selection must contain one to three files")
+    before = _tree_records(source)
+    files = {
+        item["path"]: item
+        for item in before
+        if item.get("kind") == "file"
+    }
+    selected: list[tuple[str, int, str]] = []
+    payload: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    total = 0
+    for path in paths:
+        if not isinstance(path, str) or SKILL_REFERENCE_PATH.fullmatch(path) is None:
+            raise RunnerError("skill reference must match references/<safe-name>.md")
+        folded = path.casefold()
+        if folded in seen:
+            raise RunnerError("skill reference selection contains a duplicate")
+        seen.add(folded)
+        expected = files.get(path)
+        if expected is None:
+            raise RunnerError(f"unknown skill reference: {path}")
+        info, data, text = _read_skill_reference(source, path)
+        digest = _digest_bytes(data)
+        if (
+            info.st_size != expected.get("bytes")
+            or len(data) != expected.get("bytes")
+            or digest != expected.get("sha256")
+        ):
+            raise RunnerError(f"skill reference changed while being read: {path}")
+        total += len(data)
+        if total > SKILL_REFERENCE_TOTAL_LIMIT:
+            raise RunnerError("skill reference context byte quota exceeded")
+        selected.append((path, len(data), digest))
+        payload.append({
+            "path": path,
+            "bytes": len(data),
+            "sha256": digest,
+            "content": text,
+        })
+    frozen = _validated_skill_reference_records(tuple(selected))
+    if _tree_records(source) != before:
+        raise RunnerError("skill snapshot drifted while references were being read")
+    return frozen, tuple(payload)
 
 
 def _snapshot_skill(source: Path, destination: Path, name: str) -> dict[str, Any]:
@@ -491,6 +659,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
     initial_fingerprint = _execution_paths(spec)
     model = _validate_model(spec.model)
     reasoning_effort = _validate_reasoning_effort(spec.reasoning_effort)
+    skill_references = _validated_skill_reference_records(spec.skill_references)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", spec.skill_name):
         raise RunnerError("skill name must be a bounded identifier")
     if type(spec.hard_seconds) is not int or not 1 <= spec.hard_seconds <= 14_400:
@@ -508,6 +677,12 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
     isolation: Path | None = None
     try:
         isolation, environment, codex, provenance = _isolated_environment(spec.skill_source, spec.skill_name)
+        installed_skill = Path(environment["CODEX_HOME"]) / "skills" / spec.skill_name
+        installed_before = _tree_summary(_tree_records(installed_skill), spec.skill_name)
+        _assert_skill_reference_records(provenance["skill"], skill_references)
+        _assert_skill_reference_records(installed_before, skill_references)
+        _assert_skill_reference_files(spec.skill_source, skill_references)
+        _assert_skill_reference_files(installed_skill, skill_references)
         shell_path = json.dumps(environment["PATH"])
         shell_home = json.dumps(str(spec.stage))
         command = [
@@ -584,12 +759,13 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
         if _codex_record(codex, environment) != provenance["codex"]:
             raise RunnerError("Codex CLI provenance drifted during execution")
         source_after = _tree_summary(_tree_records(spec.skill_source), spec.skill_name)
-        installed_after = _tree_summary(
-            _tree_records(Path(environment["CODEX_HOME"]) / "skills" / spec.skill_name),
-            spec.skill_name,
-        )
+        installed_after = _tree_summary(_tree_records(installed_skill), spec.skill_name)
         if source_after != provenance["skill"] or installed_after != provenance["skill"]:
             raise RunnerError("skill snapshot provenance drifted during execution")
+        _assert_skill_reference_records(source_after, skill_references)
+        _assert_skill_reference_records(installed_after, skill_references)
+        _assert_skill_reference_files(spec.skill_source, skill_references)
+        _assert_skill_reference_files(installed_skill, skill_references)
         _assert_file_tool_records(tool_before)
         model_record = {
             "requested_identifier": model,
@@ -602,6 +778,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             "model": model_record,
             "prompt": {"bytes": len(prompt_bytes), "sha256": _digest_bytes(prompt_bytes)},
             "skill_snapshot": provenance["skill"],
+            "skill_references": _skill_reference_summary(skill_references),
             "configured_isolation": {
                 "ephemeral_codex_home": True,
                 "first_party_chatgpt_login_required": True,

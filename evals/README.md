@@ -17,6 +17,10 @@ npm run build:current -- \
 
 預設 forward-test builder 是 `gpt-5.4-mini`，reasoning effort 是 `high`。可用 `--model` 與 `--reasoning-effort low|medium|high|xhigh` 明示覆寫；receipt 只記錄請求值，不把它當成服務端已履行或品質已通過的證明。
 
+每次 initial build 固定載入 `references/creative-direction.md` 與 `references/no-visual-first-pass.md` 的完整內容作為 controlled Skill context；可額外提供一次 `--skill-reference references/<safe-name>.md`，但不能重複，也不能由 brief 或 seed 內容決定。選取只接受現行 Skill source 內已驗證的 regular non-symlink、strict UTF-8 Markdown；absolute path、`..`、未知路徑、NUL、單檔超過 64 KiB 或合計超過 128 KiB 都 fail closed。相同的 frozen context 會原樣帶進每輪 repair，且位於 untrusted product／output data 之前。
+
+Receipt、每次 attempt 與 manifest 的 `skill_references` 只保存相對 path、bytes、SHA-256 與 `total_bytes`，不保存 reference 內容。`ExecutionSpec` 會把這組 provenance 與 source tree、ephemeral installed Skill snapshot 在執行前後逐項重驗；任何 selected content、path 或 hash drift 都拒絕結果，完整 Skill tree 的 mode 也在每次 execution 內前後重驗。Shell tool 仍存在，但契約只容許 inert no-op，任何其他 command 都會在 trace policy 拒絕且不得發布；network、外部讀取與其他整合維持停用。Raw evaluator trace 可能含模型自行複述的 Skill 文字，因此保持 private，Skill references 不應存放機密。
+
 Greenfield 沿用上方命令。Retrofit 或 patch 使用 evaluator-owned、位於 repository／log／target 之外的小型 frozen seed，並明列唯一可變路徑；seed 其餘檔案必須逐 byte 與 mode 保持不變：
 
 ```bash
