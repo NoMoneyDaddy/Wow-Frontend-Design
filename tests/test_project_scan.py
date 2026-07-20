@@ -405,6 +405,56 @@ class ProjectScanTests(unittest.TestCase):
             with self.assertRaisesRegex(project_scan.ProjectRootError, "symlink component"):
                 project_scan.resolve_project_root(jump / "project", authorized)
 
+    @unittest.skipUnless(
+        project_scan.DESCRIPTOR_ANCHORING_AVAILABLE,
+        "requires descriptor-relative project I/O",
+    )
+    def test_descriptor_anchored_reader_rejects_parent_directory_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            authorized = base / "authorized"
+            project = authorized / "project"
+            source = project / "src"
+            outside_source = base / "outside" / "src"
+            source.mkdir(parents=True)
+            outside_source.mkdir(parents=True)
+            (source / "app.css").write_text("inside", encoding="utf-8")
+            (outside_source / "app.css").write_text("outside", encoding="utf-8")
+
+            with project_scan.open_project_tree(project, authorized) as tree:
+                files, truncated = tree.collect_files(max_files=10)
+                target = next(path for path in files if path.name == "app.css")
+                source.rename(project / "src-original")
+                source.symlink_to(outside_source, target_is_directory=True)
+
+                with self.assertRaises(project_scan.UnsafeProjectFileError):
+                    tree.read_text(target)
+
+            self.assertFalse(truncated)
+
+    @unittest.skipUnless(
+        project_scan.DESCRIPTOR_ANCHORING_AVAILABLE,
+        "requires descriptor-relative project I/O",
+    )
+    def test_descriptor_anchored_reader_stays_on_opened_project_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            authorized = base / "authorized"
+            project = authorized / "project"
+            outside_project = base / "outside" / "project"
+            project.mkdir(parents=True)
+            outside_project.mkdir(parents=True)
+            (project / "app.css").write_text("inside", encoding="utf-8")
+            (outside_project / "app.css").write_text("outside", encoding="utf-8")
+
+            with project_scan.open_project_tree(project, authorized) as tree:
+                files, _ = tree.collect_files(max_files=10)
+                target = next(path for path in files if path.name == "app.css")
+                project.rename(authorized / "project-original")
+                project.symlink_to(outside_project, target_is_directory=True)
+
+                self.assertEqual("inside", tree.read_text(target))
+
     @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX FIFOs")
     def test_non_regular_project_entries_are_not_collected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

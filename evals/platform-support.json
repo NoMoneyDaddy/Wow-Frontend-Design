@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "snapshot_at": "2026-07-18",
+  "snapshot_at": "2026-07-20",
   "semantics": "This current-only matrix separates Agent Skills package compatibility from installed scripts, CI, the controlled build evaluator and its Playwright Chromium smoke. A configured runtime is never promoted beyond repository-owned evidence for the exact listed check.",
   "source_snapshot": "wow-frontend-design/references/platform-support-sources.json",
   "targets": [
@@ -42,6 +42,17 @@
       "source_ids": ["github-actions-python", "github-hosted-runners"],
       "artifacts": [".github/workflows/ci.yml", "tests/test_capture_runtime_profile.py", "tests/test_validate_platform_support.py"],
       "boundary": "The current Python suite passed in the local macOS checkout; configured Linux, macOS CI and Windows lanes remain not_run until a completed job for this exact revision is preserved."
+    },
+    {
+      "id": "script-descriptor-project-io",
+      "category": "installed_script",
+      "repository_status": "partially_tested",
+      "entrypoints": ["wow-frontend-design/scripts/safe_project_io.py"],
+      "requirements": ["Python 3.9+ on Unix", "os.open dir_fd support", "O_DIRECTORY and O_NOFOLLOW", "Caller-authorized real directory root"],
+      "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_supported", "browser": "not_applicable", "visual": "not_applicable"},
+      "source_ids": ["python-os-directory-descriptors"],
+      "artifacts": ["wow-frontend-design/scripts/safe_project_io.py", "tests/test_project_scan.py", "tests/test_source_layout_audit.py"],
+      "boundary": "Descriptor anchoring and symlink-race regression tests passed on this macOS checkout. Windows is explicitly unsupported because Python dir_fd is unavailable there; no path-based fallback is represented as equivalent protection."
     },
     {
       "id": "script-git-installability",

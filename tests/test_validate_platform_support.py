@@ -29,15 +29,19 @@ class PlatformSupportTests(unittest.TestCase):
         return path
 
     def test_repository_snapshot_is_valid(self) -> None:
-        self.assertEqual(validate_platform_support.validate(self.matrix_path, self.root), (7, 5))
+        self.assertEqual(validate_platform_support.validate(self.matrix_path, self.root), (8, 6))
 
     def test_gap_report_is_bounded_and_does_not_promote_cells(self) -> None:
         report = validate_platform_support.build_gap_report(self.matrix_path, self.root)
-        self.assertEqual(report["target_count"], 7)
-        self.assertEqual(report["official_source_count"], 5)
-        self.assertEqual(report["installed_script_entrypoint_count"], 18)
+        self.assertEqual(report["target_count"], 8)
+        self.assertEqual(report["official_source_count"], 6)
+        self.assertEqual(report["installed_script_entrypoint_count"], 19)
         self.assertIn("evaluator-posix-runners", report["incomplete_target_ids"])
         self.assertEqual(report["unsupported_target_ids"], [])
+        self.assertIn(
+            "script-descriptor-project-io",
+            report["target_ids_by_incomplete_check"]["windows"],
+        )
         self.assertIn("ci-portable-python-matrix", report["target_ids_by_incomplete_check"]["windows"])
         self.assertEqual(report["failed_target_ids"], [])
         self.assertNotIn("model-gpt-5-4-mini", json.dumps(report))

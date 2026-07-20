@@ -34,6 +34,7 @@ TARGET_KEYS = {
 CHECK_KEYS = {"static", "unit", "linux", "macos", "windows", "browser", "visual"}
 APPROVED_SOURCE_HOSTS = {
     "agentskills.io",
+    "docs.python.org",
     "docs.github.com",
     "playwright.dev",
 }
@@ -57,6 +58,7 @@ CHECK_STATUSES = {"passed", "failed", "partial", "not_run", "not_applicable", "n
 REQUIRED_TARGET_IDS = {
     "package-agent-skills-standard",
     "script-portable-python-core",
+    "script-descriptor-project-io",
     "script-git-installability",
     "script-command-evidence-ledger",
     "ci-portable-python-matrix",

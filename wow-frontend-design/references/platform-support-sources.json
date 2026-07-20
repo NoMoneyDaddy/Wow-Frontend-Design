@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "retrieved_at": "2026-07-18",
+  "retrieved_at": "2026-07-20",
   "policy": "Frozen official-source coordinates for this repository version. Validation checks structure, approved origins and claim bindings; it does not re-fetch pages or prove that mutable upstream content remains unchanged.",
   "sources": [
     {
       "id": "agent-skills-specification",
       "publisher": "Agent Skills",
       "url": "https://agentskills.io/specification",
-      "retrieved_at": "2026-07-18",
+      "retrieved_at": "2026-07-20",
       "mutable": true,
       "claims": ["portable skill format", "optional compatibility metadata"]
     },
@@ -15,7 +15,7 @@
       "id": "github-actions-python",
       "publisher": "GitHub",
       "url": "https://docs.github.com/en/actions/tutorials/build-and-test-code/python",
-      "retrieved_at": "2026-07-18",
+      "retrieved_at": "2026-07-20",
       "mutable": true,
       "claims": ["cross-operating-system Python matrix", "setup-python guidance"]
     },
@@ -23,15 +23,23 @@
       "id": "github-hosted-runners",
       "publisher": "GitHub",
       "url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
-      "retrieved_at": "2026-07-18",
+      "retrieved_at": "2026-07-20",
       "mutable": true,
       "claims": ["GitHub-hosted runner labels", "runner architecture boundary", "latest label boundary"]
+    },
+    {
+      "id": "python-os-directory-descriptors",
+      "publisher": "Python Software Foundation",
+      "url": "https://docs.python.org/3/library/os.html",
+      "retrieved_at": "2026-07-20",
+      "mutable": true,
+      "claims": ["dir_fd capability detection", "Unix-only dir_fd boundary", "directory file descriptor traversal"]
     },
     {
       "id": "playwright-installation",
       "publisher": "Microsoft",
       "url": "https://playwright.dev/docs/intro",
-      "retrieved_at": "2026-07-18",
+      "retrieved_at": "2026-07-20",
       "mutable": true,
       "claims": ["Playwright browser engines", "Playwright operating systems", "Playwright runtime requirements"]
     },
@@ -39,7 +47,7 @@
       "id": "playwright-browsers",
       "publisher": "Microsoft",
       "url": "https://playwright.dev/docs/browsers",
-      "retrieved_at": "2026-07-18",
+      "retrieved_at": "2026-07-20",
       "mutable": true,
       "claims": ["browser engine differences", "Chrome and Edge channels", "WebKit boundary"]
     }

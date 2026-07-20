@@ -11,12 +11,20 @@ import argparse
 import json
 import os
 import re
-import stat
 import sys
 import unicodedata
 from collections import Counter
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+
+from safe_project_io import (
+    DESCRIPTOR_ANCHORING_AVAILABLE,
+    ProjectIoError,
+    ProjectRootError,
+    ProjectTree,
+    UnsafeProjectFileError,
+    open_project_tree,
+)
 
 
 IGNORED_DIRS = {
@@ -330,16 +338,8 @@ def _is_sensitive(path: Path) -> bool:
     return any(part.lower() in {"secrets", "credentials"} for part in path.parts)
 
 
-class ProjectRootError(ValueError):
-    """Raised when a requested project root crosses its authorized boundary."""
-
-
-class UnsafeProjectFileError(ValueError):
-    """Raised when a project file is not a bounded regular file."""
-
-
 def resolve_project_root(requested: Path, authorized: Path) -> Path:
-    """Resolve a real project directory contained by an explicit authorized root."""
+    """Compatibility preflight; use open_project_tree() to anchor subsequent reads."""
     requested_absolute = Path(os.path.abspath(requested.expanduser()))
     authorized_absolute = Path(os.path.abspath(authorized.expanduser()))
     if authorized_absolute.is_symlink():
@@ -376,19 +376,8 @@ def resolve_project_root(requested: Path, authorized: Path) -> Path:
 
 
 def _read_bounded_regular_bytes(path: Path, max_bytes: int = MAX_READ_BYTES) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
-    flags |= getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags)
-    with os.fdopen(descriptor, "rb") as stream:
-        info = os.fstat(stream.fileno())
-        if not stat.S_ISREG(info.st_mode):
-            raise UnsafeProjectFileError(f"{path} is not a regular file")
-        if info.st_size > max_bytes:
-            raise UnsafeProjectFileError(f"{path} exceeds {max_bytes} bytes")
-        raw = stream.read(max_bytes + 1)
-        if len(raw) > max_bytes:
-            raise UnsafeProjectFileError(f"{path} exceeds {max_bytes} bytes")
-        return raw
+    with open_project_tree(path.parent, path.parent) as tree:
+        return tree.read_bytes(tree.root / path.name, max_bytes=max_bytes)
 
 
 def collect_files(
@@ -397,52 +386,20 @@ def collect_files(
     max_directories: int = MAX_WALK_DIRECTORIES,
     max_directory_entries: int = MAX_DIRECTORY_ENTRIES,
 ) -> tuple[list[Path], bool]:
-    files: list[Path] = []
-    visited_directories = 0
-    pending = [root]
-
-    while pending:
-        current_path = pending.pop()
-        visited_directories += 1
-        if visited_directories > max_directories:
-            return files, True
-        directories: list[Path] = []
-        regular_files: list[Path] = []
-        try:
-            with os.scandir(current_path) as entries:
-                for entry_index, entry in enumerate(entries, start=1):
-                    if entry_index > max_directory_entries:
-                        return files, True
-                    candidate = Path(entry.path)
-                    if entry.is_symlink():
-                        continue
-                    if entry.is_dir(follow_symlinks=False):
-                        rel = candidate.relative_to(root).as_posix()
-                        if entry.name in IGNORED_DIRS or rel in IGNORED_DIRS:
-                            continue
-                        if entry.name.startswith(".") and entry.name not in {".github", ".storybook"}:
-                            continue
-                        directories.append(candidate)
-                    elif entry.is_file(follow_symlinks=False) and not _is_sensitive(candidate):
-                        regular_files.append(candidate)
-        except OSError:
-            continue
-        remaining_directory_budget = max_directories - visited_directories - len(pending)
-        if len(directories) > remaining_directory_budget:
-            return files, True
-        pending.extend(sorted(directories, reverse=True))
-        for path in sorted(regular_files):
-            files.append(path)
-            if len(files) >= max_files:
-                return files, True
-
-    return files, False
+    with open_project_tree(root, root) as tree:
+        return tree.collect_files(
+            max_files,
+            max_directories=max_directories,
+            max_directory_entries=max_directory_entries,
+            ignored_directories=IGNORED_DIRS,
+            is_sensitive=_is_sensitive,
+        )
 
 
 def read_text(path: Path) -> str:
     try:
         return _read_bounded_regular_bytes(path).decode("utf-8", errors="ignore")
-    except (OSError, UnsafeProjectFileError):
+    except (OSError, ProjectIoError):
         return ""
 
 
@@ -460,7 +417,11 @@ def _json_depth_exceeds(value: Any, limit: int = MAX_JSON_DEPTH) -> bool:
     return False
 
 
-def load_packages(root: Path, files: Iterable[Path]) -> tuple[list[tuple[str, dict[str, Any]]], list[str]]:
+def load_packages(
+    root: Path,
+    files: Iterable[Path],
+    tree: ProjectTree | None = None,
+) -> tuple[list[tuple[str, dict[str, Any]]], list[str]]:
     packages: list[tuple[str, dict[str, Any]]] = []
     warnings: list[str] = []
     package_paths = sorted(
@@ -470,7 +431,12 @@ def load_packages(root: Path, files: Iterable[Path]) -> tuple[list[tuple[str, di
     for path in package_paths:
         rel = path.relative_to(root).as_posix()
         try:
-            raw = json.loads(_read_bounded_regular_bytes(path).decode("utf-8"))
+            encoded = (
+                tree.read_bytes(path, max_bytes=MAX_READ_BYTES)
+                if tree is not None
+                else _read_bounded_regular_bytes(path)
+            )
+            raw = json.loads(encoded.decode("utf-8"))
         except (
             OSError,
             RecursionError,
@@ -697,10 +663,17 @@ def brand_evidence_inventory(root: Path, files: Iterable[Path]) -> dict[str, Any
     }
 
 
-def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
-    files, truncated = collect_files(root, max_files)
+def _scan_open_tree(tree: ProjectTree, max_files: int) -> dict[str, Any]:
+    root = tree.root
+    files, truncated = tree.collect_files(
+        max_files,
+        max_directories=MAX_WALK_DIRECTORIES,
+        max_directory_entries=MAX_DIRECTORY_ENTRIES,
+        ignored_directories=IGNORED_DIRS,
+        is_sensitive=_is_sensitive,
+    )
     rel_paths = relative(root, files)
-    package_files, warnings = load_packages(root, files)
+    package_files, warnings = load_packages(root, files, tree=tree)
     packages: set[str] = set()
     for _, package in package_files:
         packages.update(package_names(package))
@@ -750,7 +723,10 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
     viewport_signal = False
 
     for path in code_files:
-        text = read_text(path)
+        try:
+            text = tree.read_text(path, max_bytes=MAX_READ_BYTES)
+        except ProjectIoError:
+            continue
         if not text:
             continue
         lowered = text.lower()
@@ -854,8 +830,21 @@ def scan(root: Path, max_files: int = 2_500) -> dict[str, Any]:
         "frontend_signals": {key: value for key, value in sorted(style_counts.items()) if value},
         "priority_files": candidate_files,
         "observations": warnings + observations,
-        "safety": "Skipped generated/dependency directories, symlinks, environment files, and likely credential paths.",
+        "io_protection": tree.protection,
+        "unsafe_entries_skipped": tree.skipped_unsafe_entries,
+        "safety": "Descriptor-anchored reads skipped generated/dependency directories, symlinks, environment files, likely credential paths, and entries that changed unsafely during the scan.",
     }
+
+
+def scan(
+    root: Path,
+    max_files: int = 2_500,
+    *,
+    authorized_root: Path | None = None,
+) -> dict[str, Any]:
+    boundary = authorized_root if authorized_root is not None else root
+    with open_project_tree(root, boundary) as tree:
+        return _scan_open_tree(tree, max_files)
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -985,15 +974,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
-        root = resolve_project_root(
+        report = scan(
             Path(args.root),
-            args.authorized_root if args.authorized_root is not None else Path.cwd(),
+            args.max_files,
+            authorized_root=args.authorized_root if args.authorized_root is not None else Path.cwd(),
         )
-    except ProjectRootError as error:
+    except ProjectIoError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
-    report = scan(root, args.max_files)
     if args.markdown:
         print(render_markdown(report))
     else:

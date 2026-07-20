@@ -164,17 +164,37 @@ def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any
     return findings
 
 
-def audit(root: Path, max_files: int = 2_500) -> dict[str, Any]:
-    files, truncated = project_scan.collect_files(root, max_files=max_files)
-    candidates = [path for path in files if path.suffix.lower() in SOURCE_EXTENSIONS]
-    findings: list[dict[str, Any]] = []
-    scanned = 0
-    for path in candidates:
-        text = project_scan.read_text(path)
-        if not text:
-            continue
-        scanned += 1
-        findings.extend(audit_text(text, path.relative_to(root).as_posix(), path.suffix.lower()))
+def audit(
+    root: Path,
+    max_files: int = 2_500,
+    *,
+    authorized_root: Path | None = None,
+) -> dict[str, Any]:
+    boundary = authorized_root if authorized_root is not None else root
+    with project_scan.open_project_tree(root, boundary) as tree:
+        files, truncated = tree.collect_files(
+            max_files,
+            max_directories=project_scan.MAX_WALK_DIRECTORIES,
+            max_directory_entries=project_scan.MAX_DIRECTORY_ENTRIES,
+            ignored_directories=project_scan.IGNORED_DIRS,
+            is_sensitive=project_scan._is_sensitive,
+        )
+        candidates = [path for path in files if path.suffix.lower() in SOURCE_EXTENSIONS]
+        findings: list[dict[str, Any]] = []
+        scanned = 0
+        for path in candidates:
+            try:
+                text = tree.read_text(path, max_bytes=project_scan.MAX_READ_BYTES)
+            except project_scan.ProjectIoError:
+                continue
+            if not text:
+                continue
+            scanned += 1
+            findings.extend(
+                audit_text(text, path.relative_to(tree.root).as_posix(), path.suffix.lower())
+            )
+        io_protection = tree.protection
+        unsafe_entries_skipped = tree.skipped_unsafe_entries
     findings.sort(key=lambda item: (item["path"], item["line"], item["code"]))
     return {
         "schema_version": 1,
@@ -182,6 +202,8 @@ def audit(root: Path, max_files: int = 2_500) -> dict[str, Any]:
         "claim_boundary": "Source risks only; rendered layout requires browser and screenshot evidence.",
         "scanned_files": scanned,
         "scan_truncated": truncated,
+        "io_protection": io_protection,
+        "unsafe_entries_skipped": unsafe_entries_skipped,
         "finding_count": len(findings),
         "findings": findings,
     }
@@ -197,9 +219,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_files < 1 or args.max_files > 50_000:
         parser.error("--max-files must be between 1 and 50000")
     try:
-        root = project_scan.resolve_project_root(args.project_root, args.authorized_root)
-        report = audit(root, max_files=args.max_files)
-    except (OSError, project_scan.ProjectRootError) as error:
+        report = audit(
+            args.project_root,
+            max_files=args.max_files,
+            authorized_root=args.authorized_root,
+        )
+    except (OSError, project_scan.ProjectIoError) as error:
         print(f"source layout audit failed: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, ensure_ascii=False, indent=2))
