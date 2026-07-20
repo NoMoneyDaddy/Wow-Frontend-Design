@@ -90,11 +90,13 @@ Use evaluator-owned [`../scripts/runtime_events.example.json`](../scripts/runtim
 python3 scripts/runtime_downgrade.py /evaluator/runtime-events.json
 ```
 
+Schema v2 records the evaluator-owned, monotonic `mutation_attempts_used` on every event and a run budget no greater than the core's three attempts. Once exhausted, every action that could authorize another mutation becomes `HAND_OFF_BEST`; changing a failure key cannot reset it. Timeout or tool retry advice is not mutation authority.
+
 | Observed event | Automatic response |
 | --- | --- |
 | logs or evaluator artifacts still advance at inactivity timeout | extend the bounded timeout; do not downgrade |
 | transient tool failure or repair finding, attempts 1–2 | retry or repair, run the narrow check, keep the current lane |
-| same inactive/tool/repair failure reaches three consecutive attempts | cap at `CONSTRAINED`, stop blind retries, hand off the best artifact as partially verified |
+| declared same-key fuse is reached | cap at `CONSTRAINED`, stop blind retries, and hand off the best artifact as partially verified; the fuse can stop earlier but never extends the core's three-total-mutation-attempt budget |
 | output schema, preserve invariant, or evidence wording fails | cap at `CONSTRAINED`; narrow, restore, or remove the unsupported claim, then continue |
 | browser/visual/other verification capability is unavailable | cap at `CONSTRAINED`; continue safe implementation and mark only the affected gate `UNVERIFIED` |
 | safe mutation capability is missing, or security/permission policy blocks mutation | move to `ADVISORY`; stop mutation and preserve diagnostics |
@@ -132,11 +134,11 @@ These triggers come from evaluator results, not model confidence. Three repeated
 
 ## 6. Reference/context routing
 
-Weak models often degrade when every reference is loaded. Supply:
+This router inherits the canonical reference lifecycle from `SKILL.md`; it narrows a lane but never defines another bundle or raises the reference cap. Weak models often degrade when every reference is loaded. Supply:
 
 - core `SKILL.md`;
-- the always-relevant creative/mobile/locale references for the task;
-- normally one primary specialized reference, up to three when the task genuinely crosses domains;
+- the core-defined initial bundle, then only the whole references owned by the current decision stage;
+- one dominant task reference and at most one proven cross-domain dependency in the same turn;
 - exact project files and version evidence, not a repository dump;
 - evaluator policy/schema separately from writable project data.
 

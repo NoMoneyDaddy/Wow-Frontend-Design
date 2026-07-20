@@ -106,7 +106,7 @@ Prefer a project-pinned command, for example:
 npx @google/design.md@0.3.0 lint DESIGN.md
 ```
 
-For a new generated system, require zero errors and zero warnings. An extracted existing system may retain a warning only when the reason and migration owner are documented. Also compare representative routes at desktop and mobile sizes. A clean document cannot prove that rendered pages actually consume its tokens or remain visually consistent: state-specific CSS may contradict a documented one-column mobile rule, and page-local type may override the documented line height without creating a lint warning.
+For a new generated system, require zero errors and zero warnings. An extracted existing system may retain a warning only when the reason and migration owner are documented. Also compare representative routes at declared representative viewport profiles; when none are declared, conservatively sample mobile and desktop without inventing support. A clean document cannot prove that rendered pages actually consume its tokens or remain visually consistent: state-specific CSS may contradict a documented narrow-layout rule, and page-local type may override the documented line height without creating a lint warning.
 
 Resolve lint findings in this order, re-running the pinned linter after each pass:
 

@@ -21,25 +21,26 @@ Create a coherent, product-derived experience through working code and rendered 
 - Safety, privacy, legal and asset rights, transaction or data integrity, accessibility, and preserved public contracts outrank novelty.
 - Ask only when the next step changes a preserved public contract, expands authority, is destructive, publishes externally, spends money, or creates another material side effect. Otherwise choose the safest reversible path and continue.
 - Match the product locale and script. Preserve `zh-Hans` when detected; use `zh-Hant` conventions for Traditional Chinese. Keep process, breakpoint, evaluator, and design-rationale language out of customer-facing copy.
-- Treat mobile as a task composition, not a shrunken desktop. Keep essential content and actions usable with keyboard, zoom, long translations, reduced motion, slow networks, and failed data states.
+- When mobile is in scope, treat it as a task composition, not a shrunken desktop. Across declared viewports, keep essential content and actions usable with keyboard, zoom, long translations, reduced motion, slow networks, and failed data states.
 - Earn every visual choice through product evidence, hierarchy, content, or interaction. No page archetype, palette, font category, type scale, radius, spacing scale, component, effect, or signature treatment is a default.
 - Never claim visual, accessibility, performance, test, lint, or build verification that was not actually run. A self-authored score is not acceptance evidence.
 - Do not add a product dependency, switch lockfile families, install globally, or mutate a lockfile solely to satisfy verification without explicit authorization. A model may keep or lower an evaluator-owned capability lane, never promote itself.
 
 ## Route references progressively
 
-Read the smallest sufficient context. Initially read this core and [creative-direction.md](references/creative-direction.md). When rendering is unavailable, also read [no-visual-first-pass.md](references/no-visual-first-pass.md); otherwise read at most one task-specific reference. Read each selected file completely. Load more only for a concrete decision or failure.
+**Initial reference bundle:** this core plus [creative-direction.md](references/creative-direction.md); add [no-visual-first-pass.md](references/no-visual-first-pass.md) when rendering is unavailable and one dominant task reference only for a concrete decision. Read selected files completely.
 
-- Foundation: core mobile and locale invariants apply immediately. Load [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md) initially when that concern dominates. Load [design-md-contract.md](references/design-md-contract.md) before writing `DESIGN.md`, [anti-ai-slop.md](references/anti-ai-slop.md) only for post-render review, and [quality-gates.md](references/quality-gates.md) for verification or completion claims.
-- Type and text: use [typographic-layout.md](references/typographic-layout.md) for hierarchy, rhythm, wrapping, CJK, ruby, vertical text, density, or spacing; add [typography-webfonts.md](references/typography-webfonts.md) only for font selection, delivery, loading, licensing, or fallback.
-- Color and material: choose the one applicable diagnostic from [color-system-psychology.md](references/color-system-psychology.md), [visual-material-system.md](references/visual-material-system.md), or [brand-system-fidelity.md](references/brand-system-fidelity.md). Use [visual-storytelling.md](references/visual-storytelling.md) for image-first work, and [data-visualization-color.md](references/data-visualization-color.md) plus [design-token-portability.md](references/design-token-portability.md) for charts, maps, status color, or portable tokens.
-- Motion and media: use [motion-system.md](references/motion-system.md), [svg-system.md](references/svg-system.md), or [advanced-media.md](references/advanced-media.md) only after a named purpose or medium is admitted by the direction.
-- Existing implementation: use [retrofit.md](references/retrofit.md), [implementation.md](references/implementation.md), and [platform-adapters.md](references/platform-adapters.md) only as required by the detected stack and mutation depth.
-- Product surfaces: use [component-composition.md](references/component-composition.md) for task representation and component/state contracts; use [pattern-catalog.md](references/pattern-catalog.md) only to route a named pattern. Use [frontend-security.md](references/frontend-security.md) for untrusted content, auth, payments, embeds, storage, or telemetry.
-- Product scope: use [search-discovery.md](references/search-discovery.md) for public indexing or agent-readable interaction, [product-discovery-usability.md](references/product-discovery-usability.md) for actual discovery or usability work, [site-planning-wireframes.md](references/site-planning-wireframes.md) only when IA or route ownership is unresolved, and [wcag-aa-checklist.md](references/wcag-aa-checklist.md) for a public WCAG claim.
-- Capability and evidence: use [weak-model-playbook.md](references/weak-model-playbook.md) for a constrained lane, [model-routing.md](references/model-routing.md) for evaluator-owned routing, and [prompt-only-compact.md](adapters/prompt-only-compact.md) only as an explicitly degraded host adapter.
-- Review: use [design-exploration.md](references/design-exploration.md) for a material unresolved comparison, [interaction-audit.md](references/interaction-audit.md) for stateful behavior, [visual-regression-evidence.md](references/visual-regression-evidence.md) for baselines, and [award-quality-lens.md](references/award-quality-lens.md) only when the brief explicitly requests that lens.
-- Maintenance: use [curated-skill-integration.md](references/curated-skill-integration.md) for bounded external-method integration, [behavioral-design-evidence.md](references/behavioral-design-evidence.md) for perception or conversion research, and [research-validation-loop.md](references/research-validation-loop.md), [github-skill-research.md](references/github-skill-research.md), or [ui-skills-ecosystem.md](references/ui-skills-ecosystem.md) only while maintaining this Skill.
+A run may load more references over time at the owning stage or after a named failure. Keep at most three non-core references in one model turn: current stage, dominant task, and one proven dependency. Replace frozen-stage references; split larger decisions into ordered stages.
+
+- Foundation: [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md) when dominant; [design-md-contract.md](references/design-md-contract.md) before `DESIGN.md`; [anti-ai-slop.md](references/anti-ai-slop.md) after render; [quality-gates.md](references/quality-gates.md) before verification.
+- Type: [typographic-layout.md](references/typographic-layout.md); add [typography-webfonts.md](references/typography-webfonts.md) only for font delivery or selection.
+- Color/material: choose [color-system-psychology.md](references/color-system-psychology.md), [visual-material-system.md](references/visual-material-system.md), or [brand-system-fidelity.md](references/brand-system-fidelity.md). Image-first: [visual-storytelling.md](references/visual-storytelling.md). Data/token work: [data-visualization-color.md](references/data-visualization-color.md), [design-token-portability.md](references/design-token-portability.md).
+- Motion/media: [motion-system.md](references/motion-system.md), [svg-system.md](references/svg-system.md), or [advanced-media.md](references/advanced-media.md) after admitting that medium.
+- Existing code: [retrofit.md](references/retrofit.md), [implementation.md](references/implementation.md), [platform-adapters.md](references/platform-adapters.md) as detected.
+- Product: [component-composition.md](references/component-composition.md), [pattern-catalog.md](references/pattern-catalog.md), [frontend-security.md](references/frontend-security.md), [search-discovery.md](references/search-discovery.md), [product-discovery-usability.md](references/product-discovery-usability.md), [site-planning-wireframes.md](references/site-planning-wireframes.md), or [wcag-aa-checklist.md](references/wcag-aa-checklist.md) only for its named concern.
+- Capability: [weak-model-playbook.md](references/weak-model-playbook.md), [model-routing.md](references/model-routing.md), or degraded [prompt-only-compact.md](adapters/prompt-only-compact.md).
+- Review: [design-exploration.md](references/design-exploration.md), [interaction-audit.md](references/interaction-audit.md), [visual-regression-evidence.md](references/visual-regression-evidence.md), or explicitly requested [award-quality-lens.md](references/award-quality-lens.md).
+- Maintenance only: [curated-skill-integration.md](references/curated-skill-integration.md), [behavioral-design-evidence.md](references/behavioral-design-evidence.md), [research-validation-loop.md](references/research-validation-loop.md), [github-skill-research.md](references/github-skill-research.md), [ui-skills-ecosystem.md](references/ui-skills-ecosystem.md).
 
 ## Choose the operating lane
 
@@ -83,7 +84,7 @@ Choose the interface form from the task operation and content relationship befor
 - operation to representation and the simpler alternative rejected for a concrete reason;
 - content and action order, simultaneous comparison needs, authoritative state, and recovery;
 - sparse, representative, dense, long-locale, loading, empty, partial, error, permission, offline, and success behavior where applicable;
-- desktop role to mobile replacement, reorder, deferral, or interaction change;
+- declared wide-to-narrow replacement, reorder, deferral, or interaction change;
 - one stable identity across selection, navigation, async work, visible details, summaries, and actions.
 
 Keep responsive task order in the DOM; never fake it with CSS `order` or `*-reverse`.
@@ -136,9 +137,9 @@ Expand primitives, routes, effects, or optimization only after the slice works. 
 
 ### 6. Pressure, repair, and replay
 
-Load [quality-gates.md](references/quality-gates.md). Run applicable test, lint, typecheck, build, and packaged checks. Before claims, boot changed routes from the latest build in fresh desktop/mobile Playwright contexts. Controlled builds require visible primary content and zero runtime, egress, root-overflow, or Axe findings. Then run one bounded discovery probe not copied from an issue list.
+Load [quality-gates.md](references/quality-gates.md) and run applicable project checks. In a controlled external-evaluator cohort, the builder reference context stays frozen: the evaluator owns these gates and gives repairs bounded findings, never mutable acceptance instructions. Before claims, boot the latest build in fresh Playwright contexts and run the declared affected matrix; each viewport profile is required only when in scope. Require visible primary content and no unresolved confirmed runtime, egress, root-overflow, or applicable accessibility violation under frozen evaluator policy. Classify false positives, unavailable evidence, and evaluator defects separately. Then run one bounded discovery probe not copied from an issue list.
 
-Pressure applicable surfaces with extreme content, desktop/mobile, keyboard/focus, zoom, reduced motion, locale, async failure, repeat actions, state round-trips, and font/effect failure. Record route, state, viewport, reproduction, expected/actual behavior, evidence, severity, and ownership. Confirm findings by replay or a nearby counterexample; otherwise keep them advisory.
+Pressure applicable surfaces with extreme content, declared viewport extremes, keyboard/focus, zoom, reduced motion, locale, async failure, repeat actions, state round-trips, and font/effect failure. Record route, state, viewport, reproduction, expected/actual behavior, evidence, severity, and ownership. Confirm findings by replay or a nearby counterexample; otherwise keep them advisory.
 
 For each confirmed failure:
 
@@ -148,7 +149,7 @@ For each confirmed failure:
 4. replay the affected routes, states, viewports, locales, and interactions;
 5. add a regression check when the finding was newly discovered.
 
-Skip repair when the first bounded pass is clean. Stop on a clean affected matrix or the declared fuse; never add probes merely to keep the loop alive. Preserve the best working artifact and report unresolved scope honestly. Audits enter this stage at observation; repairs preserve the existing representation, direction, and system unless one is the confirmed root cause.
+Skip repair when the first bounded pass is clean. A bounded run permits three total mutation attempts across all failure keys. A declared same-key fuse may stop blind retries earlier but never extends that global budget; alternating failures cannot reset it. Stop on a clean affected matrix or either fuse, and never add probes merely to keep the loop alive. Preserve the best working artifact and report unresolved scope honestly. Audits enter this stage at observation; repairs preserve the existing representation, direction, and system unless one is the confirmed root cause.
 
 ## Implementation invariants
 
@@ -184,4 +185,4 @@ Label material claims:
 
 Acceptance remains evaluator-owned. Never edit an active gate, accept a self-authored score, present an affected replay as a full matrix, or upgrade `INFERRED` or `UNVERIFIED` evidence.
 
-Report direction, desktop/mobile behavior, contract changes, artifact path, executed checks, fresh evidence, remaining risk, and next action. Keep it concise.
+Report direction, declared viewport behavior, contract changes, artifact path, executed checks, fresh evidence, remaining risk, and next action. Keep it concise.

@@ -102,7 +102,7 @@ Use the source as a candidate generator. The existing product system, user task,
 
 1. Pass the core deterministic gates; auto-repair failures first.
 2. If the brief explicitly requests an award lens, freeze one program or a named custom comparison. Do not average incompatible award systems.
-3. Have an evaluator independent from implementation inspect matched desktop/mobile/reduced-motion screenshots and interaction evidence.
+3. Have an evaluator independent from implementation inspect matched declared representative viewport profiles, applicable reduced-motion screenshots, and interaction evidence; when support is unknown, sample mobile and desktop conservatively without inventing a contract.
 4. Record each observation as `dimension → evidence → issue → smallest repair → regression risk`.
 5. Feed clear in-scope defects back through the normal self-repair loop. Keep subjective novelty disagreements advisory.
 6. Re-run the affected task, locale, viewport, interaction, accessibility, performance, and evidence matrix after repair.

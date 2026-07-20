@@ -11,6 +11,10 @@ from pathlib import Path
 SKILL = Path(__file__).resolve().parents[1] / "wow-frontend-design" / "SKILL.md"
 NO_VISUAL = SKILL.parent / "references" / "no-visual-first-pass.md"
 QUALITY_GATES = SKILL.parent / "references" / "quality-gates.md"
+MODEL_ROUTING = SKILL.parent / "references" / "model-routing.md"
+COMPACT = SKILL.parent / "adapters" / "prompt-only-compact.md"
+MATERIAL = SKILL.parent / "references" / "visual-material-system.md"
+SVG_SYSTEM = SKILL.parent / "references" / "svg-system.md"
 
 
 class SkillCoreContractTests(unittest.TestCase):
@@ -21,9 +25,103 @@ class SkillCoreContractTests(unittest.TestCase):
 
     def test_core_stays_within_progressive_disclosure_budget(self) -> None:
         self.assertLessEqual(len(self.raw), 20_000)
-        self.assertIn("When rendering is unavailable, also read", self.text)
-        self.assertIn("no-visual-first-pass.md", self.text)
-        self.assertIn("at most one task-specific reference", self.text)
+        for phrase in (
+            "Initial reference bundle",
+            "one dominant task reference",
+            "A run may load more references over time",
+            "at most three non-core references in one model turn",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+
+    def test_reference_lifecycle_has_one_owner(self) -> None:
+        routing = MODEL_ROUTING.read_text(encoding="utf-8")
+        self.assertIn("inherits the canonical reference lifecycle from `SKILL.md`", routing)
+        self.assertIn("controlled external-evaluator cohort", self.text)
+        self.assertIn("builder reference context stays frozen", self.text)
+        self.assertNotIn("up to three when the task genuinely crosses domains", routing)
+        self.assertNotIn("always-relevant creative/mobile/locale references", routing)
+
+    def test_repair_budget_is_global_and_adapters_cannot_extend_it(self) -> None:
+        compact = COMPACT.read_text(encoding="utf-8")
+        quality = QUALITY_GATES.read_text(encoding="utf-8")
+        for text in (self.text, compact, quality):
+            self.assertIn("three total mutation attempts", text)
+            self.assertIn("same-key fuse", text)
+            self.assertIn("never extends", text)
+        self.assertNotIn("After three consecutive failures", compact)
+
+    def test_completion_uses_declared_affected_matrix_not_fixed_viewports(self) -> None:
+        pressure = self.text.split("### 6. Pressure, repair, and replay", 1)[1].split(
+            "## Implementation invariants", 1
+        )[0]
+        for phrase in (
+            "declared affected matrix",
+            "only when in scope",
+            "unresolved confirmed",
+            "frozen evaluator policy",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, pressure)
+        self.assertNotIn("fresh desktop/mobile Playwright contexts", pressure)
+        self.assertNotIn("zero runtime, egress, root-overflow, or Axe findings", pressure)
+
+    def test_fixed_viewports_are_only_a_fallback_when_support_is_unknown(self) -> None:
+        compact = COMPACT.read_text(encoding="utf-8")
+        no_visual = NO_VISUAL.read_text(encoding="utf-8")
+        weak = (SKILL.parent / "references" / "weak-model-playbook.md").read_text(
+            encoding="utf-8"
+        )
+        quality = QUALITY_GATES.read_text(encoding="utf-8")
+        design_md = (SKILL.parent / "references" / "design-md-contract.md").read_text(
+            encoding="utf-8"
+        )
+        material = MATERIAL.read_text(encoding="utf-8")
+        typography = (SKILL.parent / "references" / "typographic-layout.md").read_text(
+            encoding="utf-8"
+        )
+        webfonts = (SKILL.parent / "references" / "typography-webfonts.md").read_text(
+            encoding="utf-8"
+        )
+        exploration = (SKILL.parent / "references" / "design-exploration.md").read_text(
+            encoding="utf-8"
+        )
+        patterns = (SKILL.parent / "references" / "pattern-catalog.md").read_text(
+            encoding="utf-8"
+        )
+        storytelling = (SKILL.parent / "references" / "visual-storytelling.md").read_text(
+            encoding="utf-8"
+        )
+        award = (SKILL.parent / "references" / "award-quality-lens.md").read_text(
+            encoding="utf-8"
+        )
+        for text in (compact, no_visual, weak):
+            self.assertIn("when no support matrix is declared", text.lower())
+        for text in (
+            quality, design_md, material, typography, webfonts,
+            exploration, patterns, storytelling, award,
+        ):
+            self.assertIn("declared representative viewport", text)
+        self.assertIn("affected viewport profiles", quality)
+        self.assertNotIn("one representative desktop and one true mobile", quality)
+        self.assertNotIn("representative routes at mobile and desktop widths", quality)
+        self.assertNotIn("every changed route at one representative mobile and desktop viewport", quality)
+        self.assertNotIn("Design at 320/390 CSS px", compact)
+
+    def test_compact_adapter_is_a_projection_not_a_second_standard(self) -> None:
+        compact = COMPACT.read_text(encoding="utf-8")
+        self.assertIn("compressed projection of the canonical core", compact)
+        self.assertIn("Rejection is optional", compact)
+        self.assertIn("Create only token roles consumed by the implementation", compact)
+        self.assertIn("`none`, `inherited`, or `unknown`", compact)
+
+    def test_material_and_svg_rules_share_one_asset_boundary(self) -> None:
+        material = MATERIAL.read_text(encoding="utf-8")
+        svg = SVG_SYSTEM.read_text(encoding="utf-8")
+        self.assertIn("authorized original non-factual SVG", material)
+        self.assertIn("provenance, accessibility, sanitization, fallback", material)
+        self.assertIn("Do not fake factual, product, brand, evidence, or standard semantic assets", material)
+        self.assertIn("authorized original non-factual", svg)
 
     def test_generation_first_stages_keep_their_order(self) -> None:
         headings = (

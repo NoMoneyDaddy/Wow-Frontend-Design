@@ -48,7 +48,7 @@ Cleanup deletes only the exact owned manifest after confirming no unowned files 
 
 Render each variant with the same:
 
-- mobile and desktop viewports plus the breakpoint where its composition changes;
+- the same declared representative viewport profiles plus affected composition transitions; when support is unknown, sample mobile and desktop conservatively without inventing a product contract;
 - default, loading, empty, error, success, long-content, and relevant interaction states;
 - keyboard/no-hover, reduced-motion, zoom/reflow, `zh-Hant`, expanded pseudo-locale, and claimed RTL context;
 - browser/runtime and fixture revision.

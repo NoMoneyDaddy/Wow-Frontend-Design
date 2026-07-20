@@ -33,7 +33,7 @@ Prefer product evidence, stable layout primitives, semantic tokens, native contr
 ## Three source passes
 
 1. **Skeleton:** landmarks, heading/order, real content shapes, native controls, links, labels, all required states, no decorative motion.
-2. **System:** tokens, type/fallback, grid/container, component state matrix, appearance tokens, 320/390/768/1440 rules, intrinsic sizing, overflow safeguards, focus and reduced/forced-color paths.
+2. **System:** tokens, type/fallback, grid/container, component state matrix, appearance tokens, declared viewport rules, intrinsic sizing, overflow safeguards, focus and reduced/forced-color paths. When no support matrix is declared, use 320/390/768/1440 only as conservative sampling.
 3. **Identity:** only the frozen brand/material/signature; remove any effect not traceable to meaning or safely degradable.
 
 After each pass, inspect the diff against the freeze card. This is self-correction, not independent evidence.
@@ -70,7 +70,7 @@ Return:
 2. exact files changed and behavior preserved;
 3. exact commands and their narrow results;
 4. a minimal preview command;
-5. the first screenshots/states needed: normally 390×844 and 1440×1000, light/dark as supported, plus one open overlay or error state;
+5. the first declared screenshots/states; when no support matrix is declared, start conservatively with 390×844 and 1440×1000, supported appearances, plus one consequential interaction or error state;
 6. a risk list labelled `INFERRED` or `UNVERIFIED`.
 
 If no later render is possible, ship only when the user accepts that evidence ceiling and the product's risk allows it. Formal accessibility, high-stakes transaction, security-sensitive overlay, complex motion/media, or award-level visual claims require real browser/human evidence before release.

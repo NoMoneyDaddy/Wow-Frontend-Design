@@ -13,7 +13,9 @@ from typing import Any
 SCHEMA_VERSION = 1
 MAX_FINDING_IDS = 16
 MAX_FEEDBACK_BYTES = 4096
-MAX_REPAIR_ROUNDS = 3
+# The initial build is mutation attempt 1; two repairs keep the bounded run at
+# the canonical three total mutation attempts.
+MAX_REPAIR_ROUNDS = 2
 
 _DESIGN_PATTERNS = (
     ("missing-yaml", r"(?:no|missing) yaml|frontmatter is required"),

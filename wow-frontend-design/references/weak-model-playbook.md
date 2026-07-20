@@ -76,7 +76,7 @@ Build content order, landmarks, headings, forms, links, and all states. No anima
 
 ### Checkpoint B — system
 
-Add tokens, typography, color roles, containers, focus, grid, and mobile mode changes. Confirm 320/390/768/1440 layouts and long text.
+Add only consumed tokens, typography, color roles, containers, focus, grid, and declared viewport transformations. When no support matrix is declared, use 320/390/768/1440 as conservative sampling. Confirm long text.
 
 ### Checkpoint C — identity
 
@@ -84,7 +84,7 @@ Add product-specific composition, media treatment, icon system, and any in-scope
 
 ### Checkpoint D — proof
 
-Run build/tests, capture mobile and desktop, check console, keyboard, zoom, reduced motion, `zh-Hant`, and failure states. Fix and re-run.
+Run build/tests and the declared affected matrix. When no support matrix is declared, sample mobile and desktop conservatively. Check applicable console, keyboard, zoom, reduced motion, `zh-Hant`, and failure states; fix and re-run.
 
 ## 5. Harden acceptance against reward hacking
 

@@ -15,7 +15,7 @@ Use this reference to verify and automatically repair a frontend before calling 
 Collect what the environment allows:
 
 - successful build, typecheck, lint, and focused tests;
-- screenshots of representative routes at mobile and desktop widths;
+- screenshots of representative routes at declared representative viewport profiles; when no support matrix exists, sample mobile and desktop conservatively without inventing support;
 - screenshot provenance and source/build freshness when visual baselines or documentation images are used; follow [visual-regression-evidence.md](visual-regression-evidence.md);
 - browser console and failed network request check;
 - keyboard path and focus order check;
@@ -50,7 +50,7 @@ Preserve a usable preview after every attempt. Classify findings before acting:
 
 Evidence-only visual issues remain page-result scoped: bind each to route/page, state, viewport, screenshot, and bounded error provenance. Never move one into a cross-page comparison record or infer a gap without its source record.
 
-Withhold only the `verified` claim while a repair-required finding remains. Do not hide, delete, or refuse to hand off the latest contract-valid artifact. Preserve exact `DESIGN.md` linter messages and case identity in evaluator-owned evidence before visual capture. Across an isolated repair boundary, pass only bounded rule/category IDs and counts; never copy raw brief text, URLs, selectors, console text, or private paths into a model prompt. The user never relays diagnostics or restarts the Skill between attempts. Stop after three total attempts, or earlier when the declared same-key fuse is reached. A normal workflow returns the retained artifact, screenshots, and logs as `PARTIALLY VERIFIED`; a controlled release runner instead keeps its publish target empty and quarantines that artifact with the exact unresolved evidence. Use `BLOCKED` only for unavailable required infrastructure, missing authority, unsafe action, or unrecoverable build/runtime failure.
+Withhold only the `verified` claim while a repair-required finding remains. Do not hide, delete, or refuse to hand off the latest contract-valid artifact. Preserve exact `DESIGN.md` linter messages and case identity in evaluator-owned evidence before visual capture. Across an isolated repair boundary, pass only bounded rule/category IDs and counts; never copy raw brief text, URLs, selectors, console text, or private paths into a model prompt. The user never relays diagnostics or restarts the Skill between attempts. Stop after three total mutation attempts across the bounded run. A declared same-key fuse may stop earlier but never extends that global budget, and a different failure key does not reset the total. A normal workflow returns the retained artifact, screenshots, and logs as `PARTIALLY VERIFIED`; a controlled release runner instead keeps its publish target empty and quarantines that artifact with the exact unresolved evidence. Use `BLOCKED` only for unavailable required infrastructure, missing authority, unsafe action, or unrecoverable build/runtime failure.
 
 Deduplicate repeated violations by root component, rule, and fix while retaining affected-route/instance counts. A scanner's severity is input, not release priority: order by user impact, reachability, task criticality, frequency, and confidence. Mark false-positive review and manual follow-up explicitly. Live-DOM source mappings, selectors, accessibility trees, and framework debug metadata are useful pointers, not proof that the proposed source edit is correct.
 
@@ -133,9 +133,11 @@ Run a final regression after fixes.
 
 Build a compact matrix for the routes in scope. Use three layers instead of claiming every cell for every change:
 
-1. **Smoke**: every changed route at one representative mobile and desktop viewport, primary task, console/network, keyboard path, and no unexpected overflow.
+1. **Smoke**: every changed route at its declared representative viewport profiles, primary task, console/network, keyboard path, and no unexpected overflow. When support is unknown, sample mobile and desktop conservatively without turning them into a product contract.
 2. **Risk regression**: breakpoints, locales, states, browsers, input modes, rendering paths, and failure cases affected by the diff or product risk.
 3. **Conformance/release**: the full declared support matrix and complete processes when making WCAG, browser-support, localization, performance, or public-release claims.
+
+The width columns below are a conservative fallback template only when no support matrix is declared; replace them with the product's actual profiles.
 
 | Route/state | 320 | 390 | 768 | 1024 | 1440 | Keyboard | zh-Hant/long | Reduced motion |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -146,13 +148,13 @@ Build a compact matrix for the routes in scope. Use three layers instead of clai
 
 Adapt rows to the product. Record why a row/cell is applicable, sampled, or excluded. Never test only the happy homepage, and never turn a sampled matrix into an all-routes or formal-conformance claim.
 
-Do not impose one screenshot quota on every user project. During an automatic repair, first recapture the failed route/state at one representative desktop and one true mobile browser profile. When that narrow result passes, run the affected breakpoints, states, locales, engines, and routes selected by the diff and declared support. A broad refactor expands the affected matrix because shared tokens, primitives, routing, state ownership, or layout foundations have greater blast radius. A release or formal support claim still requires the complete declared matrix.
+Do not impose one screenshot quota on every user project. During an automatic repair, first recapture the failed route/state in the affected viewport profiles. When that narrow result passes, run the affected breakpoints, states, locales, engines, and routes selected by the diff and declared support. A broad refactor expands the affected matrix because shared tokens, primitives, routing, state ownership, or layout foundations have greater blast radius. A release or formal support claim still requires the complete declared matrix.
 
 ### Bounded discovery artifact
 
 For a completion claim, bind `novel-discovery` to an evaluator-owned JSON report with schema `1`, not a successful command or arbitrary file. It contains a non-empty `probes` array and a `findings` array. Each probe records `id`, route, viewport, state, method, outcome (`pass`, `candidate`, or `blocked`), and non-empty evidence. Each finding records its `novel:<surface>:<state>:<symptom>` ID, severity, reproduction, expected and actual result, owner, and confirmation evidence. `clean_after_probes` has no findings; `findings` has at least one. A finding is confirmed only when `confirmation.replays >= 2`; otherwise it remains advisory. Empty, command-only, blocked, or unconfirmed evidence cannot support `VERIFIED`.
 
-When an independent project- or evaluator-provided Playwright discovery runner is available, freeze its plan to the first declared route, desktop and mobile profiles, and two fresh replays per profile. Check every reachable focusable control in each replay and accept only measurable non-color focus geometry. This Skill packages the report contract and validator, not a browser executable. Without an independent evaluator, fresh Playwright observations may guide repair but cannot become evaluator-owned acceptance or support `VERIFIED`; mark that acceptance scope `UNVERIFIED` instead of fabricating the report. A blocked probe is evaluator/infrastructure advisory, not a product repair finding. Disclose discovery advisories and keep acceptance out of a clean pass; only confirmed findings enter product repair.
+When an independent project- or evaluator-provided Playwright discovery runner is available, freeze its plan to the first declared route, the declared representative viewport profiles, and two fresh replays per profile. Check every reachable focusable control in each replay and accept only measurable non-color focus geometry. This Skill packages the report contract and validator, not a browser executable. Without an independent evaluator, fresh Playwright observations may guide repair but cannot become evaluator-owned acceptance or support `VERIFIED`; mark that acceptance scope `UNVERIFIED` instead of fabricating the report. A blocked probe is evaluator/infrastructure advisory, not a product repair finding. Disclose discovery advisories and keep acceptance out of a clean pass; only confirmed findings enter product repair.
 
 ## 4. Layered quality decision
 

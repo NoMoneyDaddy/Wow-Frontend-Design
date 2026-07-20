@@ -1,6 +1,6 @@
 # SVG system
 
-Treat SVG as structured markup, not a harmless image format. Choose its role, trust boundary, embedding, semantics, license, and verification before generating paths.
+Treat SVG as structured markup, not a harmless image format. Choose its role, trust boundary, embedding, semantics, license, and verification before generating paths. Do not fake factual, product, brand, evidence, or standard semantic assets. Prefer an approved source asset or matching licensed icon family for those roles; authored SVG is reserved for bounded interface geometry, data marks, or authorized original non-factual decoration and illustration whose provenance, accessibility, sanitization, fallback, and rendered behavior are controlled.
 
 ## Contents
 

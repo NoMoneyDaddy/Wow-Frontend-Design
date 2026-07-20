@@ -90,7 +90,7 @@ In a controlled run that supplies browser contract v2, bind the approved family 
 Test at minimum:
 
 - slow/blocked font, warm/cold cache, offline, and font-service failure;
-- 320 CSS px, short mobile, desktop, 200% text resize, and 400%/reflow;
+- declared representative viewport profiles, 200% text resize, and applicable 400%/320 CSS px equivalent reflow; when no support matrix is declared, sample short mobile and desktop conservatively;
 - `zh-Hant-TW`, claimed `zh-Hant-HK`, mixed Latin/numerals, long labels, rare/user names, and other shipped locales;
 - every shipped weight/style/axis and synthetic-style behavior;
 - fallback before/after swap: line count, control size, crop, focus, hit target, LCP and CLS;

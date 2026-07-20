@@ -89,7 +89,7 @@ Verify the selected pattern in its real composition—not only an isolated demo:
 
 - semantics/name/role/state and actual keyboard/focus/touch behavior;
 - empty/one/many/long/async/error/permission/offline and A→B→A cleanup;
-- 320/390/tablet/desktop plus adjacent transition widths, zoom, long `zh-Hant`, RTL claims;
+- declared representative viewport profiles plus affected transitions, zoom, long `zh-Hant`, and claimed RTL; when support is unknown, sample 320/390/tablet/desktop conservatively without inventing a contract;
 - reduced motion, forced colors, no-hover, slow/failed media/network;
 - security, privacy, rights, truth claims, console/network, build/hydration, lifecycle/performance;
 - existing design-system/API compatibility and no unnecessary new dependency.

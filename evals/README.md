@@ -17,7 +17,7 @@ npm run build:current -- \
 
 預設 forward-test builder 是 `gpt-5.4-mini`，reasoning effort 是 `high`。可用 `--model` 與 `--reasoning-effort low|medium|high|xhigh` 明示覆寫；receipt 只記錄請求值，不把它當成服務端已履行或品質已通過的證明。
 
-每次 initial build 固定載入 `references/creative-direction.md` 與 `references/no-visual-first-pass.md` 的完整內容作為 controlled Skill context；可額外提供一次 `--skill-reference references/<safe-name>.md`，但不能重複，也不能由 brief 或 seed 內容決定。選取只接受現行 Skill source 內已驗證的 regular non-symlink、strict UTF-8 Markdown；absolute path、`..`、未知路徑、NUL、單檔超過 64 KiB 或合計超過 128 KiB 都 fail closed。相同的 frozen context 會原樣帶進每輪 repair，且位於 untrusted product／output data 之前。
+每次 initial build 固定載入 `references/creative-direction.md` 與 `references/no-visual-first-pass.md` 的完整內容作為 controlled Skill context；可額外提供一次 `--skill-reference references/<safe-name>.md`，但不能重複，也不能由 brief 或 seed 內容決定。選取只接受現行 Skill source 內已驗證的 regular non-symlink、strict UTF-8 Markdown；absolute path、`..`、未知路徑、NUL、單檔超過 64 KiB 或合計超過 128 KiB 都 fail closed。這是核心 reference lifecycle 的 controlled external-evaluator 分支：builder context 原樣帶進每輪 repair，外部 evaluator 執行 quality gates 並只回傳 bounded findings，不把 gate reference 或 acceptance instructions 加入可寫模型 context。
 
 Receipt、每次 attempt 與 manifest 的 `skill_references` 只保存相對 path、bytes、SHA-256 與 `total_bytes`，不保存 reference 內容。`ExecutionSpec` 會把這組 provenance 與 source tree、ephemeral installed Skill snapshot 在執行前後逐項重驗；任何 selected content、path 或 hash drift 都拒絕結果，完整 Skill tree 的 mode 也在每次 execution 內前後重驗。Shell tool 仍存在，但契約只容許 inert no-op，任何其他 command 都會在 trace policy 拒絕且不得發布；network、外部讀取與其他整合維持停用。Raw evaluator trace 可能含模型自行複述的 Skill 文字，因此保持 private，Skill references 不應存放機密。
 
@@ -63,7 +63,7 @@ npm run build:current -- \
 }
 ```
 
-Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；一般 assertion 會在兩秒內 bounded polling，`animations-inactive-for` 則對整段明示的觀察窗做一次連續判定；scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate 與最多三輪 adaptive repair，不另建第二套 runner；同一完整 failure state 重現、形成 cycle，或 HTML 修復使 design gate 回歸都會立即停止，第三輪只在所有 contract case 與 generic finding 都不退步、且至少一項嚴格進步時開放。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 只保存 bounded case／step ID。失敗步驟的 evaluator-authored locator、accessible name，以及白名單化且 bounded 的 assertion／action 參數可進入 repair prompt，但不會進 receipt、manifest 或發布產物；raw runtime diagnostics、candidate DOM 與外部絕對路徑不會進 repair prompt。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
+Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` steps；可檢查 visible、attribute、text、count 及完全位於指定 viewport 內。`fully-visible-in-viewport` 必須排在所有互動前，語意才是未捲動的首屏；一般 assertion 會在兩秒內 bounded polling，`animations-inactive-for` 則對整段明示的觀察窗做一次連續判定；scenario 結束後另留 300ms 捕捉延遲 runtime error。它與 Axe、overflow、runtime error 使用同一個 Playwright gate；initial build 加最多兩輪 adaptive repair，共三次 mutation attempts，不另建第二套 runner。同一完整 failure state 重現、形成 cycle，或 HTML 修復使 design gate 回歸都會立即停止；不同 finding 也不能重設全域預算。Manifest 的 contract provenance 欄位只保存 schema、bytes、hash 與 case／step 數；HTML gate／repair history 只保存 bounded case／step ID。失敗步驟的 evaluator-authored locator、accessible name，以及白名單化且 bounded 的 assertion／action 參數可進入 repair prompt，但不會進 receipt、manifest 或發布產物；raw runtime diagnostics、candidate DOM 與外部絕對路徑不會進 repair prompt。Contract 是 evaluator 定義的 deterministic acceptance，不取代 fresh screenshot、獨立 craft review 或完整 E2E。
 
 先凍結 brief 支持的可觀察語意，再選不依賴候選 DOM 排列的最小 locator／assertion：
 

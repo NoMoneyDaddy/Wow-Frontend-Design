@@ -116,7 +116,7 @@ Hollow/outlined type is opt-in display treatment, not a global typography mode. 
 
 Inspect actual Traditional Chinese and Latin glyphs at the target font, weight, size, browser, DPR, zoom, background, and fallback font. A stroke that works on a large Latin display word may close counters, thin radicals, or disappear on CJK. Never make a transparent fill the only declaration; unsupported rendering must remain readable.
 
-Visible assets have a stricter boundary than abstract surface geometry. Do not fake products, people, places, logos, evidence, photographs, illustrations, or icons with CSS/div art, handcrafted SVG, text symbols, or placeholder boxes. Use approved source assets, generated image assets when authorized, or a matching icon library. CSS may form non-factual structural geometry such as a bounded divider, grid, mask, or material field when it has a named job and fallback.
+Visible assets have a stricter boundary than abstract surface geometry. Do not fake factual, product, brand, evidence, or standard semantic assets with CSS/div art, text symbols, placeholder boxes, or misleading handcrafted SVG. Use approved source assets, authorized generated image assets, or a matching licensed icon library. An authorized original non-factual SVG may provide product-specific decoration or illustration only under [svg-system.md](svg-system.md), with provenance, accessibility, sanitization, fallback, and rendered proof. CSS may form non-factual structural geometry such as a bounded divider, grid, mask, or material field when it has a named job and fallback.
 
 ## Motion belongs to the same physics
 
@@ -131,7 +131,7 @@ Record `purpose → origin/target → duration/easing → interrupt/reverse → 
 
 ## Craft audit
 
-Inspect rendered desktop and mobile states, not tokens alone:
+Inspect declared representative viewport states, not tokens alone; when no support matrix is declared, sample desktop and mobile conservatively:
 
 1. Blur the screenshot: are focal point and surface levels still clear?
 2. Convert to grayscale: do composition and hierarchy survive without destroying required color cues?
@@ -165,4 +165,4 @@ If two adjacent choices contradict this card, remove the less meaningful effect.
 - A continuous or expensive effect has no budget, pause/cleanup, reduced result, or static fallback.
 - Light/dark variants are mechanical inversions or are claimed without rendered inspection.
 - Hollow/outlined type is applied to required reading, form, error, legal, price, or transaction content; lacks a solid fallback; or becomes illegible in CJK, fallback fonts, forced colors, or supported DPR/zoom.
-- A visible factual or iconic asset is approximated with CSS/div art, text symbols, placeholder boxes, or handcrafted SVG.
+- A factual, product, brand, evidence, or standard semantic asset is approximated with CSS/div art, text symbols, placeholder boxes, or misleading handcrafted SVG; or an authorized original non-factual SVG lacks the required provenance, accessibility, sanitization, fallback, or rendered proof.

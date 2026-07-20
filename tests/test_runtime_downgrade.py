@@ -21,26 +21,44 @@ from runtime_downgrade import (
 )
 
 
-def payload(initial_lane="STANDARD", events=None):
+def payload(initial_lane="STANDARD", events=None, max_mutation_attempts=3):
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": "case-run",
         "initial_lane": initial_lane,
+        "max_mutation_attempts": max_mutation_attempts,
         "events": events or [],
     }
 
 
-def event(sequence, code, consecutive=1, progress=False, failure_key=None):
+def event(
+    sequence,
+    code,
+    consecutive=1,
+    progress=False,
+    failure_key=None,
+    mutation_attempts_used=1,
+):
     return {
         "sequence": sequence,
         "code": code,
         "failure_key": failure_key or code.lower().replace("_", "-"),
         "consecutive": consecutive,
         "progress_observed": progress,
+        "mutation_attempts_used": mutation_attempts_used,
     }
 
 
 class RuntimeDowngradeTests(unittest.TestCase):
+    def test_packaged_example_matches_schema_v2(self):
+        example = json.loads(
+            (ROOT / "wow-frontend-design" / "scripts" / "runtime_events.example.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        validate(example)
+        self.assertEqual(2, apply_events(example)["schema_version"])
+
     def test_cap_lane_never_promotes(self):
         self.assertEqual("CONSTRAINED", cap_lane("CONSTRAINED", "STANDARD"))
         self.assertEqual("STANDARD", cap_lane("EXPLORATORY", "STANDARD"))
@@ -123,15 +141,41 @@ class RuntimeDowngradeTests(unittest.TestCase):
         self.assertEqual("STANDARD", result["final_lane"])
         self.assertEqual([1, 1], [item["consecutive"] for item in result["transitions"]])
 
-    def test_interleaved_failure_keys_reset_the_streak(self):
+    def test_interleaved_failure_keys_do_not_reset_global_mutation_budget(self):
         result = apply_events(payload(events=[
-            event(1, "REPAIR_FINDING", 1, failure_key="layout:route-a"),
-            event(2, "REPAIR_FINDING", 1, failure_key="layout:route-b"),
-            event(3, "REPAIR_FINDING", 1, failure_key="layout:route-a"),
-            event(4, "REPAIR_FINDING", 2, failure_key="layout:route-a"),
+            event(1, "REPAIR_FINDING", 1, failure_key="layout:route-a", mutation_attempts_used=1),
+            event(2, "REPAIR_FINDING", 1, failure_key="layout:route-b", mutation_attempts_used=2),
+            event(3, "REPAIR_FINDING", 1, failure_key="layout:route-a", mutation_attempts_used=3),
         ]))
-        self.assertEqual("STANDARD", result["final_lane"])
-        self.assertEqual("REPAIR_AND_RECHECK", result["transitions"][-1]["action"])
+        self.assertEqual("CONSTRAINED", result["final_lane"])
+        self.assertEqual("HAND_OFF_BEST", result["transitions"][-1]["action"])
+        self.assertIn("global mutation budget", result["transitions"][-1]["reason"])
+
+    def test_mutation_attempt_count_must_be_monotonic_and_within_budget(self):
+        cases = (
+            [event(1, "REPAIR_FINDING", mutation_attempts_used=2),
+             event(2, "REPAIR_FINDING", 2, mutation_attempts_used=1)],
+            [event(1, "REPAIR_FINDING", mutation_attempts_used=4)],
+        )
+        for events in cases:
+            with self.subTest(events=events), self.assertRaisesRegex(
+                RuntimeDowngradeError, "mutation_attempts_used"
+            ):
+                validate(payload(events=events))
+
+    def test_mutation_budget_cannot_exceed_canonical_limit(self):
+        for maximum in (0, 4, True):
+            with self.subTest(maximum=maximum), self.assertRaisesRegex(
+                RuntimeDowngradeError, "max_mutation_attempts"
+            ):
+                validate(payload(max_mutation_attempts=maximum))
+
+    def test_mutating_contract_action_hands_off_when_budget_is_exhausted(self):
+        result = apply_events(payload(events=[
+            event(1, "OUTPUT_CONTRACT_FAILED", mutation_attempts_used=3),
+        ]))
+        self.assertEqual("CONSTRAINED", result["final_lane"])
+        self.assertEqual("HAND_OFF_BEST", result["transitions"][0]["action"])
 
     def test_progress_extension_does_not_consume_timeout_streak(self):
         result = apply_events(payload(events=[

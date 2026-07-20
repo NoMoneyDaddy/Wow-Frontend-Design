@@ -53,7 +53,7 @@ truthful content + task brief
 → select attributes, not a whole screenshot
 → extract tokens/layout/crop/asset/motion contracts
 → build semantic DOM and real states
-→ compose desktop and mobile independently
+→ compose each declared representative viewport profile independently where its task changes
 → compare rendered product to intent
 → verify interaction, localization, accessibility, performance, and rights
 ```

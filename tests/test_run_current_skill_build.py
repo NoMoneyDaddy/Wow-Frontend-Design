@@ -931,7 +931,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(hashlib.sha256(contract.read_bytes()).hexdigest(), receipt["browser_contract"]["sha256"])
             self.assertNotIn("#primary", json.dumps(receipt))
 
-    def test_distinct_contract_frontiers_unlock_bounded_third_repair(self) -> None:
+    def test_distinct_contract_frontiers_cannot_reset_global_mutation_budget(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             brief, target, capture, environment = self.fixture(root)
@@ -991,9 +991,11 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
                 policy.design_policy, "validate_local", return_value={"status": "passed", "findings": []}
             ), mock.patch.object(
-                policy, "_run_html_smoke", side_effect=[rejected(0), rejected(1), rejected(2), {"status": "passed"}]
+                policy, "_run_html_smoke", side_effect=[rejected(0), rejected(1), rejected(2)]
+            ), self.assertRaisesRegex(
+                policy.RunnerError, "html_smoke_rejection"
             ):
-                manifest = policy.run(
+                policy.run(
                     brief,
                     target,
                     hard_seconds=5,
@@ -1001,10 +1003,13 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     browser_contract=contract,
                 )
 
-            self.assertEqual("4", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
-            self.assertEqual(3, manifest["repair"]["rounds_used"])
-            self.assertEqual(4, len(manifest["repair"]["attempts"]))
-            self.assertNotIn("stop_reason", manifest["repair"])
+            self.assertEqual("3", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            receipt = json.loads(
+                (log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(2, receipt["repair"]["rounds_used"])
+            self.assertEqual(3, len(receipt["repair"]["attempts"]))
+            self.assertEqual("round_limit", receipt["repair"]["stop_reason"])
 
     def test_html_repair_that_regresses_design_stops_immediately(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

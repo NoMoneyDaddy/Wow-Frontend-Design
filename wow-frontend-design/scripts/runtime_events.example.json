@@ -1,21 +1,24 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "run_id": "replace-with-evaluator-owned-run-id",
   "initial_lane": "STANDARD",
+  "max_mutation_attempts": 3,
   "events": [
     {
       "sequence": 1,
       "code": "INACTIVITY_TIMEOUT",
       "failure_key": "capture:wind:attempt-1",
       "consecutive": 1,
-      "progress_observed": true
+      "progress_observed": true,
+      "mutation_attempts_used": 0
     },
     {
       "sequence": 2,
       "code": "REPAIR_FINDING",
       "failure_key": "layout:wind:heading-wrap",
       "consecutive": 1,
-      "progress_observed": false
+      "progress_observed": false,
+      "mutation_attempts_used": 1
     }
   ]
 }

@@ -1,6 +1,6 @@
 # WOW Frontend Design — compact prompt-only adapter
 
-Use only when the host cannot load the complete `SKILL.md` and whole selected references. This is a short-context fallback, not an equivalent copy of the full Skill and not evidence that the host/model has been benchmarked.
+Use only when the host cannot load the complete `SKILL.md` and whole selected references. This is a compressed projection of the canonical core for a short-context fallback, not an equivalent or independent standard and not evidence that the host/model has been benchmarked. Anything this projection cannot carry remains `UNVERIFIED`.
 
 ## Immutable run contract
 
@@ -29,7 +29,7 @@ Write one short line for each item. Then freeze the answers.
 1. User: who is doing what, in which context?
 2. Top task: the single most important completion.
 3. Proof: which real content/evidence makes the promise credible?
-4. Feel: two compatible adjectives; one adjective to reject.
+4. Feel: at most two compatible adjectives supported by evidence. Rejection is optional and must come from stated preference or observed contradiction; do not invent one.
 5. Grammar: derive the representation and composition from the content operation and task. Editorial narrative, precision instrument, material craft, archive/index, kinetic type, and spatial exhibition are examples, not a required catalogue; add a secondary grammar only for a named content need.
 6. Color: semantic roles, lightness ladder, chroma budget, supported appearances, non-color state cues, and any psychology claim status (`SUPPORTED | HYPOTHESIS | REJECTED | UNKNOWN`).
 7. Type: display, reading, functional/numeric roles; system fallback; long-locale behavior.
@@ -42,12 +42,12 @@ If changing the product name leaves evidence, grammar, composition, interaction,
 ## Build rules
 
 - Start with semantic HTML, landmarks, useful heading structure, native controls, visible labels, real links, complete keyboard path, and readable no-motion/no-JS states where applicable.
-- Create a small token system for color roles, typography, spacing, radii, borders, elevation, layers, motion duration/easing, focus, and containers. Do not make every section a rounded card.
+- Create only token roles consumed by the implementation; `none`, `inherited`, or `unknown` is valid for an unsupported category. Do not fill color, type, spacing, radii, borders, elevation, layers, motion, focus, or container categories merely to make a complete-looking system. Do not make every section a rounded card.
 - If theme switching is in scope, implement and separately tune `system | light | dark`, including persistence/live system changes, native controls, images/icons/charts, focus and forced colors. A copied inverse palette or lone dark media query is incomplete.
 - Freeze one material grammar for border roles, type roles/axes/fallback, component state colors, light/depth direction, effect budget/fallback, and motion physics. Remove effects that contradict it.
 - For a shared token pipeline, preserve the detected source of truth and freeze semantic/component layers, mode resolution, alias/type/collision failure, generated targets and drift checks. DTCG is an optional exchange format, not a forced migration.
 - In charts/maps, match sequential/diverging/categorical/cyclic color to actual data semantics; distinguish zero/missing/uncertainty, add non-color cues and truthful scales, and provide task-appropriate text/table access.
-- Mobile is a separate task composition. Design at 320/390 CSS px and awkward intermediate widths; keep touch targets, safe areas, thumb reach, input/keyboard behavior, content priority, and horizontal overflow explicit. Do not hide required actions merely to fit.
+- When mobile is declared, treat it as a separate task composition and test its declared representative viewport profiles plus awkward transitions. Keep touch targets, safe areas, thumb reach, input/keyboard behavior, content priority, and horizontal overflow explicit. Do not hide required actions merely to fit.
 - Traditional Chinese needs native `zh-Hant` copy, correct punctuation, line breaks, mixed Latin/CJK spacing, readable measure, appropriate fallbacks, and room for regional terminology. Do not insert spaces between every Han character.
 - Let ordinary paragraphs fill the intended content column and wrap normally. Do not force body-copy `<br>`, global `break-all`/`keep-all`, or a narrow text cap inside an otherwise empty wide card. A title/intro needs a real adjacent task peer before moving to a separate right-side track.
 - Respect reduced motion, contrast, zoom/reflow, forced colors where relevant, focus visibility, error recovery, loading/empty/error/success, and destructive-action confirmation.
@@ -68,7 +68,7 @@ Implement content order, landmarks, headings, controls, links, forms, all requir
 
 ### B — system and mobile
 
-Implement tokens, type, grid, focus, responsive transformations, long locale, 320/390/768/1440 layouts, and overflow safeguards.
+Implement only declared viewport support. Test representative boundaries; when no support matrix is declared, use 320/390/768/1440 as conservative sampling rather than a new product contract. Include tokens, type, grid, focus, responsive transformation, long locale, and overflow safeguards only as applicable.
 
 ### C — identity
 
@@ -87,9 +87,9 @@ UNVERIFIED: missing tool/check plus the remaining risk
 
 Your confidence and self-score are never acceptance. A successful syntax/build command does not prove interaction, browser rendering, accessibility, performance, security, localization, SEO, or visual quality. If you have no file, shell, browser, or image tool, generate the bounded deliverable and mark every unavailable check `UNVERIFIED`.
 
-Verification is an internal repair signal, not a rejection screen. Preserve the latest working artifact, feed exact file/route/viewport/state/evidence back into the smallest repair, run the narrow check, then the affected matrix. Do not make the user relay diagnostics or restart. After three consecutive failures with the same evaluator-owned key, stop blind retries and return the best artifact as `PARTIALLY VERIFIED`; use `BLOCKED` only for missing authority/infrastructure, unsafe action, or unrecoverable runtime failure.
+Verification is an internal repair signal, not a rejection screen. Preserve the latest working artifact, feed exact file/route/viewport/state/evidence back into the smallest repair, run the narrow check, then the affected matrix. Do not make the user relay diagnostics or restart. Allow three total mutation attempts across the bounded run; a declared same-key fuse may stop earlier but never extends or resets that global budget. Then return the best artifact as `PARTIALLY VERIFIED`; use `BLOCKED` only for missing authority/infrastructure, unsafe action, or unrecoverable runtime failure.
 
-If no render/screenshot/browser is available, freeze one low-entropy grammar, use stable native layout/control primitives and opaque text surfaces, avoid crop-dependent layouts and complex media/effects, run only available narrow source/build checks, and request 390×844 plus 1440×1000 captures with one interaction state. This improves the first pass but never certifies the render.
+If no render/screenshot/browser is available, freeze one low-entropy grammar, use stable native layout/control primitives and opaque text surfaces, avoid crop-dependent layouts and complex media/effects, and run available narrow checks. Request captures for the declared matrix; when no support matrix is declared, request 390×844 plus 1440×1000 and one interaction state as conservative evidence. This improves the first pass but never certifies the render.
 
 When screenshots are available, bind each observation to source/build, route/state, browser/OS, viewport/DPR, locale/theme/preferences, fonts/data/wait condition and a decodable image hash. Pixel diffs detect change; they do not decide design quality.
 

@@ -29,8 +29,21 @@ EVENT_CODES = {
     "UNSUPPORTED_CLAIM",
     "VERIFICATION_CAPABILITY_MISSING",
 }
-ROOT_KEYS = {"schema_version", "run_id", "initial_lane", "events"}
-EVENT_KEYS = {"sequence", "code", "failure_key", "consecutive", "progress_observed"}
+ROOT_KEYS = {
+    "schema_version", "run_id", "initial_lane", "max_mutation_attempts", "events"
+}
+EVENT_KEYS = {
+    "sequence", "code", "failure_key", "consecutive", "progress_observed",
+    "mutation_attempts_used",
+}
+MUTATION_AUTHORIZING_ACTIONS = {
+    "NARROW_AND_CONTINUE",
+    "REMOVE_CLAIM_AND_RECHECK",
+    "REPAIR_AND_RECHECK",
+    "RESTART_ISOLATED",
+    "RESTORE_AND_RECHECK",
+}
+CANONICAL_MAX_MUTATION_ATTEMPTS = 3
 MAX_EVENTS = 100
 MAX_INPUT_BYTES = 1_000_000
 
@@ -56,25 +69,34 @@ def _load(path: Path) -> dict[str, Any]:
 def validate(payload: dict[str, Any]) -> None:
     if set(payload) != ROOT_KEYS:
         raise RuntimeDowngradeError("runtime event input has missing or unexpected root keys")
-    if payload["schema_version"] != 1:
-        raise RuntimeDowngradeError("schema_version must equal 1")
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 2:
+        raise RuntimeDowngradeError("schema_version must equal 2")
     if not isinstance(payload["run_id"], str) or not payload["run_id"].strip():
         raise RuntimeDowngradeError("run_id must be a non-empty string")
-    if payload["initial_lane"] not in LANE_RANK:
+    if not isinstance(payload["initial_lane"], str) or payload["initial_lane"] not in LANE_RANK:
         raise RuntimeDowngradeError("initial_lane is invalid")
+    maximum = payload["max_mutation_attempts"]
+    if (
+        type(maximum) is not int
+        or not 1 <= maximum <= CANONICAL_MAX_MUTATION_ATTEMPTS
+    ):
+        raise RuntimeDowngradeError(
+            f"max_mutation_attempts must be within 1..{CANONICAL_MAX_MUTATION_ATTEMPTS}"
+        )
     events = payload["events"]
     if not isinstance(events, list) or len(events) > MAX_EVENTS:
         raise RuntimeDowngradeError(f"events must be an array with at most {MAX_EVENTS} entries")
 
     previous_failure_key: str | None = None
     previous_consecutive = 0
+    previous_mutation_attempts = 0
     for index, event in enumerate(events, start=1):
         label = f"events[{index - 1}]"
         if not isinstance(event, dict) or set(event) != EVENT_KEYS:
             raise RuntimeDowngradeError(f"{label} has missing or unexpected keys")
         if event["sequence"] != index:
             raise RuntimeDowngradeError(f"{label}.sequence must be contiguous and one-based")
-        if event["code"] not in EVENT_CODES:
+        if not isinstance(event["code"], str) or event["code"] not in EVENT_CODES:
             raise RuntimeDowngradeError(f"{label}.code is invalid")
         if not isinstance(event["failure_key"], str) or re.fullmatch(
             r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", event["failure_key"]
@@ -82,6 +104,16 @@ def validate(payload: dict[str, Any]) -> None:
             raise RuntimeDowngradeError(f"{label}.failure_key is invalid")
         if not isinstance(event["consecutive"], int) or isinstance(event["consecutive"], bool) or event["consecutive"] < 1:
             raise RuntimeDowngradeError(f"{label}.consecutive must be a positive integer")
+        if not isinstance(event["progress_observed"], bool):
+            raise RuntimeDowngradeError(f"{label}.progress_observed must be boolean")
+        attempts_used = event["mutation_attempts_used"]
+        if (
+            type(attempts_used) is not int
+            or not previous_mutation_attempts <= attempts_used <= maximum
+        ):
+            raise RuntimeDowngradeError(
+                f"{label}.mutation_attempts_used must be monotonic and within the run budget"
+            )
         if event["progress_observed"]:
             expected = 1
         elif event["failure_key"] == previous_failure_key:
@@ -90,8 +122,6 @@ def validate(payload: dict[str, Any]) -> None:
             expected = 1
         if event["consecutive"] != expected:
             raise RuntimeDowngradeError(f"{label}.consecutive disagrees with the event stream")
-        if not isinstance(event["progress_observed"], bool):
-            raise RuntimeDowngradeError(f"{label}.progress_observed must be boolean")
         if event["progress_observed"] and event["code"] != "INACTIVITY_TIMEOUT":
             raise RuntimeDowngradeError(
                 f"{label}.progress_observed is only valid for INACTIVITY_TIMEOUT"
@@ -102,6 +132,7 @@ def validate(payload: dict[str, Any]) -> None:
         else:
             previous_failure_key = event["failure_key"]
             previous_consecutive = event["consecutive"]
+        previous_mutation_attempts = attempts_used
 
 
 def cap_lane(current: str, maximum: str) -> str:
@@ -154,6 +185,13 @@ def apply_events(payload: dict[str, Any]) -> dict[str, Any]:
     for event in payload["events"]:
         before = current
         current, action, reason = transition(current, event)
+        if (
+            action in MUTATION_AUTHORIZING_ACTIONS
+            and event["mutation_attempts_used"] >= payload["max_mutation_attempts"]
+        ):
+            current = cap_lane(current, "CONSTRAINED")
+            action = "HAND_OFF_BEST"
+            reason = "the evaluator-owned global mutation budget is exhausted"
         if LANE_RANK[current] > LANE_RANK[before]:
             raise RuntimeDowngradeError("internal error: runtime transition attempted an upgrade")
         transitions.append({
@@ -164,9 +202,10 @@ def apply_events(payload: dict[str, Any]) -> dict[str, Any]:
             "reason": reason,
         })
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": payload["run_id"],
         "initial_lane": payload["initial_lane"],
+        "max_mutation_attempts": payload["max_mutation_attempts"],
         "final_lane": current,
         "automatic_upgrade_permitted": False,
         "transitions": transitions,
