@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import stat
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
+
+import project_scan
 
 
 TEXT_EXTENSIONS = {
@@ -26,7 +26,9 @@ TEXT_EXTENSIONS = {
     ".html",
     ".js",
     ".jsx",
+    ".less",
     ".liquid",
+    ".mdx",
     ".mjs",
     ".mustache",
     ".njk",
@@ -86,8 +88,9 @@ REDUCED_MOTION_BLOCK_PATTERN = re.compile(
     r"@media\s*\([^)]*prefers-reduced-motion\s*:\s*reduce[^)]*\)\s*\{(?P<body>.*?)\}",
     re.IGNORECASE | re.DOTALL,
 )
-CSS_DECLARATION_PATTERN = re.compile(
-    r"(?:^|[;{])\s*--?[A-Za-z_][\w-]*\s*:|(?:^|[;{])\s*[A-Za-z_][\w-]*\s*:"
+REDUCED_MOTION_DECLARATION_PATTERN = re.compile(
+    r"(?:^|[;{])\s*(?:animation(?:-[a-z-]+)?|transition(?:-[a-z-]+)?|scroll-behavior)\s*:",
+    re.IGNORECASE,
 )
 SVG_BLOCK_PATTERN = re.compile(r"<svg\b(?P<attrs>[^>]*)>(?P<body>.*?)</svg\s*>", re.IGNORECASE | re.DOTALL)
 OPEN_SVG_PATTERN = re.compile(r"<svg\b(?P<attrs>[^>]*)>", re.IGNORECASE | re.DOTALL)
@@ -112,72 +115,70 @@ def line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def iter_source_files(root: Path) -> Iterable[Path]:
-    if root.is_symlink():
-        raise AuditError(f"refusing symlink root: {root}")
-    if root.is_file():
-        if root.suffix.lower() in TEXT_EXTENSIONS:
-            yield root
-        return
-    if not root.is_dir():
-        raise AuditError(f"path is not a file or directory: {root}")
-
-    count = 0
-    for current, dirs, names in os.walk(root, followlinks=False):
-        dirs[:] = sorted(
-            name
-            for name in dirs
-            if name not in IGNORED_DIRS and not (Path(current) / name).is_symlink()
-        )
-        for name in sorted(names):
-            path = Path(current) / name
-            if path.is_symlink() or path.suffix.lower() not in TEXT_EXTENSIONS:
-                continue
-            count += 1
-            if count > MAX_FILES:
-                raise AuditError(f"file limit exceeded: {MAX_FILES}")
-            yield path
-
-
-def read_sources(root: Path) -> tuple[dict[Path, str], list[tuple[Path, str]]]:
+def read_sources(root: Path) -> tuple[dict[Path, str], list[tuple[Path, str]], Path]:
     sources: dict[Path, str] = {}
     skipped: list[tuple[Path, str]] = []
     total_bytes = 0
-    for path in iter_source_files(root):
-        try:
-            flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0)
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(path, flags)
-            try:
-                metadata = os.fstat(descriptor)
-                if not stat.S_ISREG(metadata.st_mode):
-                    skipped.append((path, "path is not a regular file"))
+    expanded = root.expanduser()
+    try:
+        mode = expanded.lstat().st_mode
+    except OSError as error:
+        raise AuditError(f"path is not readable: {expanded}: {error}") from error
+    if stat.S_ISLNK(mode):
+        raise AuditError(f"refusing symlink root: {expanded}")
+
+    if stat.S_ISREG(mode):
+        boundary = expanded.parent
+        requested = boundary
+        selected_name = expanded.name
+    elif stat.S_ISDIR(mode):
+        boundary = expanded
+        requested = expanded
+        selected_name = None
+    else:
+        raise AuditError(f"path is not a regular file or directory: {expanded}")
+
+    try:
+        with project_scan.open_project_tree(requested, boundary) as tree:
+            if selected_name is None:
+                files, truncated = tree.collect_files(
+                    MAX_FILES + 1,
+                    max_directories=project_scan.MAX_WALK_DIRECTORIES,
+                    max_directory_entries=project_scan.MAX_DIRECTORY_ENTRIES,
+                    ignored_directories=IGNORED_DIRS,
+                    is_sensitive=project_scan._is_sensitive,
+                )
+                candidates = [path for path in files if path.suffix.lower() in TEXT_EXTENSIONS]
+                if truncated or len(candidates) > MAX_FILES:
+                    skipped.append((tree.root, f"file limit exceeded: {MAX_FILES}"))
+                candidates = candidates[:MAX_FILES]
+                scan_root = tree.root
+            else:
+                target = tree.root / selected_name
+                candidates = [target] if target.suffix.lower() in TEXT_EXTENSIONS else []
+                scan_root = target
+
+            for path in candidates:
+                try:
+                    raw = tree.read_bytes(path, max_bytes=MAX_FILE_BYTES)
+                except project_scan.ProjectIoError as error:
+                    skipped.append((path, str(error)))
                     continue
-                if metadata.st_size > MAX_FILE_BYTES:
-                    skipped.append((path, f"file exceeds {MAX_FILE_BYTES} byte audit limit"))
-                    continue
-                chunks: list[bytes] = []
-                remaining = MAX_FILE_BYTES + 1
-                while remaining > 0:
-                    chunk = os.read(descriptor, min(65_536, remaining))
-                    if not chunk:
-                        break
-                    chunks.append(chunk)
-                    remaining -= len(chunk)
-                raw = b"".join(chunks)
-                if len(raw) > MAX_FILE_BYTES:
-                    skipped.append((path, f"file exceeds {MAX_FILE_BYTES} byte audit limit"))
-                    continue
-            finally:
-                os.close(descriptor)
-            total_bytes += len(raw)
-            if total_bytes > MAX_TOTAL_BYTES:
-                raise AuditError(f"aggregate source limit exceeded: {MAX_TOTAL_BYTES}")
-            sources[path] = raw.decode("utf-8")
-        except (OSError, UnicodeDecodeError) as error:
-            skipped.append((path, f"file could not be decoded/read: {error}"))
-    return sources, skipped
+                total_bytes += len(raw)
+                if total_bytes > MAX_TOTAL_BYTES:
+                    raise AuditError(f"aggregate source limit exceeded: {MAX_TOTAL_BYTES}")
+                try:
+                    sources[path] = raw.decode("utf-8")
+                except UnicodeDecodeError as error:
+                    skipped.append((path, f"file could not be decoded: {error}"))
+            if tree.skipped_unsafe_entries:
+                skipped.append(
+                    (scan_root, f"{tree.skipped_unsafe_entries} unsafe or changed entries were skipped")
+                )
+    except project_scan.ProjectIoError as error:
+        raise AuditError(str(error)) from error
+
+    return sources, skipped, scan_root
 
 
 def blank_comments(text: str, *, strip_line_comments: bool = True) -> str:
@@ -193,18 +194,52 @@ def blank_comments(text: str, *, strip_line_comments: bool = True) -> str:
 
 
 def has_runtime_reduced_motion_path(text: str) -> bool:
-    if re.search(r"useReducedMotion|matchMedia\s*\([^)]*prefers-reduced-motion", text, re.IGNORECASE):
+    if (
+        re.search(r"\bgsap\s*\.\s*matchMedia\s*\(", text, re.IGNORECASE)
+        and re.search(
+            r"\.add\s*\(\s*['\"][^'\"]*prefers-reduced-motion\s*:\s*reduce",
+            text,
+            re.IGNORECASE,
+        )
+    ):
         return True
-    return (
-        re.search(r"\bgsap\s*\.\s*matchMedia\s*\(", text, re.IGNORECASE) is not None
-        and re.search(r"prefers-reduced-motion\s*:\s*reduce", text, re.IGNORECASE) is not None
+    if re.search(
+        r"\bif\s*\(\s*matchMedia\s*\([^)]*prefers-reduced-motion[^)]*\)\s*\.matches\s*\)",
+        text,
+        re.IGNORECASE,
+    ):
+        return True
+    assignments = re.finditer(
+        r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*matchMedia\s*\([^)]*prefers-reduced-motion[^)]*\)",
+        text,
+        re.IGNORECASE,
     )
+    for match in assignments:
+        variable = re.escape(match.group(1))
+        if re.search(rf"\b{variable}\s*\.\s*matches\b", text[match.end():]):
+            return True
+    hooks = re.finditer(
+        r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*useReducedMotion\s*\(",
+        text,
+        re.IGNORECASE,
+    )
+    for match in hooks:
+        variable = re.escape(match.group(1))
+        if re.search(
+            rf"(?:\bif\s*\(\s*!?\s*{variable}\b|\b{variable}\s*[?&]|!\s*{variable}\b)",
+            text[match.end():],
+        ):
+            return True
+    return False
 
 
 def has_reduced_motion_path(text: str) -> bool:
     if has_runtime_reduced_motion_path(text):
         return True
-    return any(CSS_DECLARATION_PATTERN.search(match.group("body")) for match in REDUCED_MOTION_BLOCK_PATTERN.finditer(text))
+    return any(
+        REDUCED_MOTION_DECLARATION_PATTERN.search(match.group("body"))
+        for match in REDUCED_MOTION_BLOCK_PATTERN.finditer(text)
+    )
 
 
 def relative_path(path: Path, root: Path) -> str:
@@ -238,14 +273,13 @@ def add(
 
 def audit_motion(root: Path, sources: dict[Path, str], findings: list[Finding]) -> None:
     motion_locations: list[tuple[Path, str, re.Match[str]]] = []
+    runtime_locations: list[tuple[Path, str, re.Match[str]]] = []
     analyzed = {path: blank_comments(text) for path, text in sources.items()}
     combined = "\n".join(analyzed.values())
     has_reduced_motion = has_reduced_motion_path(combined)
-    has_runtime_reduced_motion = has_runtime_reduced_motion_path(combined)
     has_smooth_scroll = re.search(r"scroll-behavior\s*:\s*smooth", combined, re.IGNORECASE) is not None
     has_static_scroll_fallback = re.search(r"scroll-behavior\s*:\s*auto", combined, re.IGNORECASE) is not None
 
-    runtime_location: tuple[Path, str, re.Match[str]] | None = None
     for path, original in sources.items():
         text = analyzed[path]
         match = MOTION_PATTERN.search(text)
@@ -253,8 +287,8 @@ def audit_motion(root: Path, sources: dict[Path, str], findings: list[Finding]) 
             motion_locations.append((path, text, match))
 
         runtime_match = JS_RUNTIME_MOTION_PATTERN.search(text)
-        if runtime_match and runtime_location is None:
-            runtime_location = (path, text, runtime_match)
+        if runtime_match:
+            runtime_locations.append((path, text, runtime_match))
 
         gsap_match = GSAP_CALL_PATTERN.search(text)
         if gsap_match and path.suffix.lower() in {".astro", ".jsx", ".svelte", ".tsx", ".vue"}:
@@ -360,18 +394,18 @@ def audit_motion(root: Path, sources: dict[Path, str], findings: list[Finding]) 
             "Motion exists but no `prefers-reduced-motion: reduce` path was found in scanned source.",
         )
 
-    if runtime_location and not has_runtime_reduced_motion:
-        path, text, match = runtime_location
-        add(
-            findings,
-            "high",
-            "MOTION007",
-            path,
-            root,
-            text,
-            match.start(),
-            "JavaScript/runtime motion exists but no scanned runtime reduced-motion preference check was found; a CSS query alone cannot stop it.",
-        )
+    for path, text, match in runtime_locations:
+        if not has_runtime_reduced_motion_path(text):
+            add(
+                findings,
+                "high",
+                "MOTION007",
+                path,
+                root,
+                text,
+                match.start(),
+                "JavaScript/runtime motion exists but no co-located, consumed reduced-motion preference was found; static source cannot prove an imported guard, so verify the reduced browser profile.",
+            )
 
     if has_smooth_scroll and not has_static_scroll_fallback:
         for path, text in sources.items():
@@ -499,24 +533,22 @@ def audit_svg(root: Path, sources: dict[Path, str], findings: list[Finding]) -> 
 
 
 def audit(root: Path) -> tuple[list[Finding], int]:
-    expanded = root.expanduser()
-    if expanded.is_symlink():
-        raise AuditError(f"refusing symlink root: {expanded}")
-    resolved = expanded.resolve(strict=False)
-    sources, skipped = read_sources(resolved)
+    sources, skipped, scan_root = read_sources(root)
+    if not sources and not skipped:
+        skipped.append((scan_root, "no supported local source files were found"))
     findings: list[Finding] = []
     for path, reason in skipped:
         findings.append(
             Finding(
                 severity="medium",
                 rule="AUDIT001",
-                path=relative_path(path, resolved),
+                path=relative_path(path, scan_root),
                 line=1,
                 message=f"Static audit coverage is incomplete: {reason}.",
             )
         )
-    audit_motion(resolved, sources, findings)
-    audit_svg(resolved, sources, findings)
+    audit_motion(scan_root, sources, findings)
+    audit_svg(scan_root, sources, findings)
     findings.sort(key=lambda item: (-SEVERITY_RANK[item.severity], item.path, item.line, item.rule))
     return findings, len(sources)
 
@@ -541,6 +573,12 @@ def main(argv: list[str] | None = None) -> int:
     report = {
         "ok": not findings,
         "acceptance": "advisory_only",
+        "coverage": (
+            "incomplete"
+            if any(item.rule == "AUDIT001" for item in findings)
+            else "bounded_local_sources_scanned"
+        ),
+        "supported_extensions": sorted(TEXT_EXTENSIONS),
         "files_scanned": file_count,
         "finding_count": len(findings),
         "severity": {key: counts.get(key, 0) for key in ("high", "medium", "low")},

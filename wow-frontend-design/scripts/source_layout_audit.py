@@ -18,10 +18,12 @@ import project_scan
 
 
 SOURCE_EXTENSIONS = {
-    ".astro", ".css", ".htm", ".html", ".jsx", ".less", ".sass", ".scss",
+    ".astro", ".css", ".htm", ".html", ".jsx", ".less", ".mdx", ".sass", ".scss",
     ".svelte", ".tsx", ".vue",
 }
 STYLE_EXTENSIONS = {".css", ".less", ".sass", ".scss"}
+PARTIAL_STYLE_SYNTAX_EXTENSIONS = {".less", ".sass", ".scss"}
+UNSUPPORTED_RELEVANT_EXTENSIONS = {".pcss", ".styl", ".stylus"}
 STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style\s*>", re.IGNORECASE | re.DOTALL)
 CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 CSS_BLOCK = re.compile(r"([^{}]+)\{([^{}]*)\}", re.DOTALL)
@@ -31,10 +33,17 @@ INTENTIONAL_BREAK_ROLE = re.compile(
     r"(?:class|data-layout-role)\s*=\s*['\"][^'\"]*(?:address|poem|verse|lyrics|display|editorial)[^'\"]*['\"]",
     re.IGNORECASE,
 )
-PROSE_SELECTOR = re.compile(r"(?:^|[\s>,+~])p(?=[:.#\[\s>,+~]|$)", re.IGNORECASE)
-HEADING_SELECTOR = re.compile(r"(?:^|[\s>,+~])h[1-3](?=[:.#\[\s>,+~]|$)", re.IGNORECASE)
-TEXT_SELECTOR = re.compile(r"(?:^|[\s>,+~])(?:p|li|h[1-6])(?=[:.#\[\s>,+~]|$)", re.IGNORECASE)
 SCREEN_READER_SELECTOR = re.compile(r"(?:sr-only|visually-hidden|screen-reader)", re.IGNORECASE)
+EXTERNAL_STYLESHEET = re.compile(
+    r"<link\b(?=[^>]*\brel\s*=\s*['\"]?stylesheet)(?=[^>]*\bhref\s*=\s*['\"](?:https?:)?//)",
+    re.IGNORECASE,
+)
+EXTERNAL_CSS_IMPORT = re.compile(r"@import\s+(?:url\()?\s*['\"]?(?:https?:)?//", re.IGNORECASE)
+UNMODELED_SELECTOR = re.compile(r":(?:global|has|is|where)\s*\(|(?:^|,)\s*&", re.IGNORECASE)
+GLOBAL_SELECTOR = re.compile(
+    r"^(?:(?:html|body|:root)(?:[:.#\[].*)?|\*|(?:html|body|:root)\s+\*)$",
+    re.IGNORECASE,
+)
 
 
 class SourceLayoutAuditError(ValueError):
@@ -62,6 +71,43 @@ def _css_regions(text: str, suffix: str) -> Iterable[tuple[str, int]]:
         yield match.group(1), match.start(1)
 
 
+def _selector_subject(selector: str) -> str:
+    depth = 0
+    quote: str | None = None
+    subject_start = 0
+    for index, character in enumerate(selector):
+        if quote is not None:
+            if character == quote and (index == 0 or selector[index - 1] != "\\"):
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character in "([":
+            depth += 1
+        elif character in ")]" and depth > 0:
+            depth -= 1
+        elif depth == 0 and (character.isspace() or character in ">+~"):
+            subject_start = index + 1
+    return selector[subject_start:].strip()
+
+
+def _selector_targets(selector: str, element_pattern: re.Pattern[str]) -> bool:
+    if UNMODELED_SELECTOR.search(selector):
+        return False
+    return any(element_pattern.match(_selector_subject(group)) for group in selector.split(","))
+
+
+def _selector_is_global(selector: str) -> bool:
+    if UNMODELED_SELECTOR.search(selector):
+        return False
+    return any(GLOBAL_SELECTOR.fullmatch(group.strip()) for group in selector.split(","))
+
+
+PROSE_SUBJECT = re.compile(r"^(?:p|li)(?=[:.#\[]|$)", re.IGNORECASE)
+HEADING_SUBJECT = re.compile(r"^h[1-3](?=[:.#\[]|$)", re.IGNORECASE)
+TEXT_SUBJECT = re.compile(r"^(?:p|li|h[1-6])(?=[:.#\[]|$)", re.IGNORECASE)
+
+
 def _finding(
     code: str,
     severity: str,
@@ -82,7 +128,7 @@ def _finding(
 
 def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
-    if suffix in {".astro", ".htm", ".html", ".jsx", ".svelte", ".tsx", ".vue"}:
+    if suffix in {".astro", ".htm", ".html", ".jsx", ".mdx", ".svelte", ".tsx", ".vue"}:
         for match in PROSE_WITH_BREAK.finditer(text):
             if BR.search(match.group(3)) and not INTENTIONAL_BREAK_ROLE.search(match.group(2)):
                 findings.append(_finding(
@@ -111,10 +157,7 @@ def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any
             max_inline = _declaration_value(declarations, "max-inline-size")
             width = _declaration_value(declarations, "width")
 
-            global_selector = any(
-                re.search(pattern, selector, re.IGNORECASE)
-                for pattern in (r"(?:^|,)\s*(?:html|body|:root)(?:\s|,|$)", r"(?:^|,)\s*\*(?:\s|,|$)")
-            )
+            global_selector = _selector_is_global(selector)
             if global_selector and (word_break == "break-all" or line_break == "anywhere"):
                 findings.append(_finding(
                     "global_emergency_breaking",
@@ -125,7 +168,7 @@ def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any
                     "Remove the global rule; scope emergency breaking to verified unbroken data and render-test it.",
                 ))
 
-            if PROSE_SELECTOR.search(selector) and not SCREEN_READER_SELECTOR.search(selector):
+            if _selector_targets(selector, PROSE_SUBJECT) and not SCREEN_READER_SELECTOR.search(selector):
                 if white_space in {"nowrap", "pre"}:
                     findings.append(_finding(
                         "prose_wrap_disabled",
@@ -140,7 +183,7 @@ def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any
                 (value for value in (max_width, max_inline, width) if value and re.search(r"\b\d+(?:\.\d+)?ch\b", value)),
                 None,
             )
-            if HEADING_SELECTOR.search(selector) and heading_measure:
+            if _selector_targets(selector, HEADING_SUBJECT) and heading_measure:
                 findings.append(_finding(
                     "heading_latin_ch_measure",
                     "medium",
@@ -152,7 +195,7 @@ def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any
 
             clipped = (overflow in {"hidden", "clip"} or overflow_y in {"hidden", "clip"})
             fixed_block = next((value for value in (height, max_height) if value and value not in {"auto", "none"}), None)
-            if TEXT_SELECTOR.search(selector) and not SCREEN_READER_SELECTOR.search(selector) and clipped and fixed_block:
+            if _selector_targets(selector, TEXT_SUBJECT) and not SCREEN_READER_SELECTOR.search(selector) and clipped and fixed_block:
                 findings.append(_finding(
                     "fixed_text_clipping",
                     "high",
@@ -182,6 +225,8 @@ def audit(
         candidates = [path for path in files if path.suffix.lower() in SOURCE_EXTENSIONS]
         findings: list[dict[str, Any]] = []
         scanned = 0
+        unresolved_external_stylesheets = False
+        unmodeled_selector_count = 0
         for path in candidates:
             try:
                 text = tree.read_text(path, max_bytes=project_scan.MAX_READ_BYTES)
@@ -190,20 +235,58 @@ def audit(
             if not text:
                 continue
             scanned += 1
+            unresolved_external_stylesheets = unresolved_external_stylesheets or bool(
+                EXTERNAL_STYLESHEET.search(text) or EXTERNAL_CSS_IMPORT.search(text)
+            )
+            for css_text, _ in _css_regions(text, path.suffix.lower()):
+                clean = CSS_COMMENT.sub("", css_text)
+                unmodeled_selector_count += sum(
+                    1 for block in CSS_BLOCK.finditer(clean) if UNMODELED_SELECTOR.search(block.group(1))
+                )
             findings.extend(
                 audit_text(text, path.relative_to(tree.root).as_posix(), path.suffix.lower())
             )
         io_protection = tree.protection
         unsafe_entries_skipped = tree.skipped_unsafe_entries
+        unsupported_relevant_extensions = sorted(
+            {path.suffix.lower() for path in files if path.suffix.lower() in UNSUPPORTED_RELEVANT_EXTENSIONS}
+        )
+        partial_syntax_extensions = sorted(
+            {path.suffix.lower() for path in candidates if path.suffix.lower() in PARTIAL_STYLE_SYNTAX_EXTENSIONS}
+        )
+    coverage_incomplete = bool(
+        scanned == 0
+        or truncated
+        or unsafe_entries_skipped
+        or unresolved_external_stylesheets
+        or unmodeled_selector_count
+        or unsupported_relevant_extensions
+        or partial_syntax_extensions
+    )
     findings.sort(key=lambda item: (item["path"], item["line"], item["code"]))
     return {
         "schema_version": 1,
-        "status": "risks_found" if findings else "no_source_risks_observed",
+        "status": (
+            "risks_found"
+            if findings
+            else "coverage_incomplete"
+            if coverage_incomplete
+            else "no_source_risks_observed"
+        ),
         "claim_boundary": "Source risks only; rendered layout requires browser and screenshot evidence.",
         "scanned_files": scanned,
         "scan_truncated": truncated,
         "io_protection": io_protection,
         "unsafe_entries_skipped": unsafe_entries_skipped,
+        "coverage": {
+            "status": "incomplete" if coverage_incomplete else "bounded_supported_syntax_scanned",
+            "supported_extensions": sorted(SOURCE_EXTENSIONS),
+            "supported_files_scanned": scanned,
+            "unsupported_relevant_extensions": unsupported_relevant_extensions,
+            "partial_syntax_extensions": partial_syntax_extensions,
+            "unresolved_external_stylesheets": unresolved_external_stylesheets,
+            "unmodeled_selector_count": unmodeled_selector_count,
+        },
         "finding_count": len(findings),
         "findings": findings,
     }

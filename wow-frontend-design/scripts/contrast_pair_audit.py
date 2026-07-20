@@ -14,6 +14,11 @@ from typing import Any
 
 HEX_COLOR = re.compile(r"^#(?P<value>[0-9a-fA-F]{6})$")
 PAIR_KINDS = {"normal-text", "large-text", "non-text", "custom"}
+WCAG_RATIO_FLOORS = {
+    "normal-text": 4.5,
+    "large-text": 3.0,
+    "non-text": 3.0,
+}
 
 
 class ContrastManifestError(ValueError):
@@ -79,6 +84,12 @@ def audit(path: Path) -> list[dict[str, Any]]:
         required = float(required)
         if not math.isfinite(required) or not 1 <= required <= 21:
             raise ContrastManifestError(f"{prefix}.required_ratio must be between 1 and 21")
+        floor = WCAG_RATIO_FLOORS.get(kind)
+        if floor is not None and required < floor:
+            raise ContrastManifestError(
+                f"{prefix}.required_ratio must be at least {floor:g} for {kind}; "
+                "use kind=custom for a non-WCAG diagnostic policy"
+            )
 
         ratio = contrast_ratio(foreground, background)
         result = {
@@ -88,6 +99,7 @@ def audit(path: Path) -> list[dict[str, Any]]:
             "foreground": foreground.lower(),
             "background": background.lower(),
             "required_ratio": required,
+            "threshold_policy": "wcag-floor" if floor is not None else "custom",
             "actual_ratio": round(ratio, 3),
             "passed": ratio + 1e-9 >= required,
         }

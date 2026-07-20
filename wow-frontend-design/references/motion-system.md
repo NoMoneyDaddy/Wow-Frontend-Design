@@ -175,6 +175,8 @@ For JavaScript systems:
 - stop and dispose existing instances when it becomes `reduce`;
 - test the actual reduced path, not only the presence of a media query.
 
+The packaged `scripts/motion_svg_audit.py` is advisory source discovery only. It accepts a reduced-motion marker only when a motion-related declaration is present in the reduced CSS block or a runtime preference is consumed in the same scanned source; an unrelated query in another file cannot silence a runtime finding. Even a co-located candidate does not prove that imported effects stop, final state is correct, or preference changes are handled. Treat incomplete coverage as evidence unavailable and verify the reduced browser profile with the frozen interaction contract.
+
 [Motion's `useReducedMotion`](https://motion.dev/docs/react-use-reduced-motion) is one library-specific example; the contract applies regardless of runtime.
 
 ## 5. Protect mobile and scrolling

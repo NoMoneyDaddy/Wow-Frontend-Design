@@ -90,6 +90,56 @@ class ContrastPairAuditTests(unittest.TestCase):
             with self.assertRaises(contrast_pair_audit.ContrastManifestError):
                 contrast_pair_audit.audit(path)
 
+    def test_wcag_pair_kinds_cannot_lower_their_required_floor(self) -> None:
+        floors = {
+            "normal-text": 4.5,
+            "large-text": 3,
+            "non-text": 3,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for kind, floor in floors.items():
+                with self.subTest(kind=kind):
+                    path = self.write_manifest(
+                        root,
+                        [
+                            {
+                                "id": kind,
+                                "appearance": "light",
+                                "kind": kind,
+                                "foreground": "#777777",
+                                "background": "#777777",
+                                "required_ratio": floor - 0.5,
+                            }
+                        ],
+                    )
+                    with self.assertRaisesRegex(
+                        contrast_pair_audit.ContrastManifestError,
+                        "must be at least",
+                    ):
+                        contrast_pair_audit.audit(path)
+
+    def test_custom_policy_can_use_an_explicit_non_wcag_threshold(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_manifest(
+                Path(directory),
+                [
+                    {
+                        "id": "custom-diagnostic",
+                        "appearance": "light",
+                        "kind": "custom",
+                        "foreground": "#777777",
+                        "background": "#777777",
+                        "required_ratio": 1,
+                    }
+                ],
+            )
+
+            result = contrast_pair_audit.audit(path)[0]
+
+        self.assertTrue(result["passed"])
+        self.assertEqual("custom", result["threshold_policy"])
+
 
 if __name__ == "__main__":
     unittest.main()

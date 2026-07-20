@@ -185,8 +185,11 @@ class ProjectTree:
                                 if entry.name.startswith(".") and entry.name not in {".github", ".storybook"}:
                                     continue
                                 directories.append((*relative_directory, entry.name))
-                            elif entry.is_file(follow_symlinks=False) and not is_sensitive(relative):
-                                regular_files.append(self.root / relative)
+                            elif entry.is_file(follow_symlinks=False):
+                                if not is_sensitive(relative):
+                                    regular_files.append(self.root / relative)
+                            else:
+                                self.skipped_unsafe_entries += 1
                 finally:
                     os.close(descriptor)
             except OSError:

@@ -50,6 +50,13 @@ class MotionSvgAuditTests(unittest.TestCase):
             self.assertIn("MOTION002", rules)
             self.assertIn("MOTION003", rules)
 
+    def test_less_source_is_included_in_bounded_motion_discovery(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "styles.less", ".card { transition: all 300ms; }")
+
+            self.assertIn("MOTION002", self.rules(root))
+
     def test_comment_cannot_fake_reduced_motion_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -76,6 +83,41 @@ class MotionSvgAuditTests(unittest.TestCase):
             )
 
             self.assertIn("MOTION007", self.rules(root))
+
+    def test_runtime_guard_in_unrelated_file_does_not_suppress_finding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "scene.js", "requestAnimationFrame(tick);")
+            self.write(
+                root,
+                "unrelated.js",
+                "const reduced = matchMedia('(prefers-reduced-motion: reduce)'); if (reduced.matches) stop();",
+            )
+
+            self.assertIn("MOTION007", self.rules(root))
+
+    def test_unbound_match_media_marker_does_not_suppress_runtime_finding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(
+                root,
+                "scene.js",
+                "matchMedia('(prefers-reduced-motion: reduce)'); requestAnimationFrame(tick);",
+            )
+
+            self.assertIn("MOTION007", self.rules(root))
+
+    def test_unrelated_reduced_motion_declaration_does_not_suppress_css_finding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "motion.css", ".hero { animation: enter 1s; }")
+            self.write(
+                root,
+                "preference.css",
+                "@media (prefers-reduced-motion: reduce) { body { color: red; } }",
+            )
+
+            self.assertIn("MOTION001", self.rules(root))
 
     def test_arbitrary_raf_callback_and_empty_reduced_query_do_not_pass(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

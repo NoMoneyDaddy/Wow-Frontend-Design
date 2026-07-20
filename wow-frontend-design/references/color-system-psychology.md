@@ -30,7 +30,7 @@ An evaluator can freeze known opaque sRGB token pairs and run the included advis
 python3 <skill-dir>/scripts/contrast_pair_audit.py <evaluator-owned-pairs.json>
 ```
 
-The manifest must state the actual foreground/background appearance and required ratio. Missing pairs, alpha/compositing, media, browser rendering, and conformance remain outside this check; the implementation model must not edit the manifest to make a run pass.
+The manifest must state the actual foreground/background appearance, pair kind, and required ratio. The calculator enforces floors of `4.5` for `normal-text` and `3` for `large-text` or `non-text`; a stricter project threshold is valid. A lower or otherwise non-WCAG diagnostic threshold must use `custom`, and the result remains labelled `threshold_policy: custom` rather than being presented as conformance. Missing pairs, alpha/compositing, media, browser rendering, and conformance remain outside this check; the implementation model must not edit the manifest to make a run pass.
 
 Do not treat these as shortcuts:
 

@@ -69,6 +69,68 @@ h1 { max-inline-size: 18rem; }
         self.assertEqual("no_source_risks_observed", report["status"])
         self.assertEqual([], report["findings"])
 
+    def test_descendant_badge_is_not_treated_as_the_prose_subject(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "styles.css").write_text(
+                "p .badge { white-space: nowrap; }\np.copy { white-space: nowrap; }",
+                encoding="utf-8",
+            )
+
+            report = source_layout_audit.audit(root)
+
+        prose = [item for item in report["findings"] if item["code"] == "prose_wrap_disabled"]
+        self.assertEqual(1, len(prose))
+        self.assertIn("p.copy", prose[0]["evidence"])
+
+    def test_descendant_of_body_is_not_treated_as_a_global_selector(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "styles.css").write_text(
+                "body .code { word-break: break-all; }",
+                encoding="utf-8",
+            )
+
+            report = source_layout_audit.audit(root)
+
+        self.assertNotIn(
+            "global_emergency_breaking",
+            {item["code"] for item in report["findings"]},
+        )
+
+    def test_unresolved_external_stylesheet_makes_coverage_incomplete(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "index.html").write_text(
+                '<link rel="stylesheet" href="https://example.invalid/site.css"><main>內容</main>',
+                encoding="utf-8",
+            )
+
+            report = source_layout_audit.audit(root)
+
+        self.assertEqual("coverage_incomplete", report["status"])
+        self.assertTrue(report["coverage"]["unresolved_external_stylesheets"])
+
+    def test_unsupported_relevant_source_cannot_report_false_clean(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "styles.styl").write_text("p\n  white-space nowrap", encoding="utf-8")
+
+            report = source_layout_audit.audit(root)
+
+        self.assertEqual("coverage_incomplete", report["status"])
+        self.assertEqual([".styl"], report["coverage"]["unsupported_relevant_extensions"])
+
+    def test_preprocessor_syntax_is_scanned_without_claiming_complete_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "styles.less").write_text(".copy { color: inherit; }", encoding="utf-8")
+
+            report = source_layout_audit.audit(root)
+
+        self.assertEqual("coverage_incomplete", report["status"])
+        self.assertEqual([".less"], report["coverage"]["partial_syntax_extensions"])
+
     def test_cli_can_fail_only_on_high_confidence_findings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
