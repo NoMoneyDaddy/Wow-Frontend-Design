@@ -2471,6 +2471,89 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 ):
                     policy._receipt(status=status, classification=classification, **common)
 
+    def test_receipt_category_summaries_are_schema_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            common = {
+                "status": "failed",
+                "brief_bytes": b"brief",
+                "prompt": "prompt",
+                "model": "model",
+                "reasoning_effort": "high",
+                "case_mode": "greenfield",
+                "lane_contract": "BUILD",
+                "stdout_log": root / "trace.jsonl",
+                "stderr_log": root / "stderr.txt",
+                "execution": None,
+            }
+            gate_record = {"path": "gate.json", "bytes": 1, "sha256": "a" * 64}
+            quarantine = {
+                "directory": "quarantine",
+                "outputs": [{
+                    "path": "index.html", "bytes": 1, "mode": "0600", "sha256": "b" * 64,
+                }],
+            }
+            cases = (
+                {
+                    "classification": "html_smoke_rejection",
+                    "design_rejection": {"gate_receipt": gate_record, "quarantine": quarantine},
+                },
+                {
+                    "classification": "html_smoke_rejection",
+                    "html_smoke_rejection": {
+                        "gate_receipt": gate_record, "quarantine": quarantine, "private": "PRIVATE",
+                    },
+                },
+                {
+                    "classification": "html_smoke_rejection",
+                    "html_smoke_rejection": {
+                        "gate_receipt": {**gate_record, "private": "PRIVATE"},
+                        "quarantine": quarantine,
+                    },
+                },
+            )
+            for payload in cases:
+                with self.subTest(payload=tuple(payload)), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt category summaries"
+                ):
+                    policy._receipt(**common, **payload)
+
+            attempt = {
+                "number": 0,
+                "model": {},
+                "prompt": {},
+                "skill_snapshot": {},
+                "skill_references": {},
+                "configured_isolation": {},
+                "execution": {},
+                "trace_observed": {},
+                "tools": {},
+            }
+            receipt = policy._receipt(
+                **common,
+                classification="execution_infrastructure_failure",
+                repair={"max_rounds": 1, "rounds_used": 1, "attempts": [attempt]},
+            )
+            self.assertEqual(1, receipt["repair"]["max_rounds"])
+            with self.assertRaisesRegex(policy.RunnerError, "receipt category summaries"):
+                policy._receipt(
+                    **common,
+                    classification="execution_infrastructure_failure",
+                    repair={
+                        "max_rounds": 1,
+                        "rounds_used": 1,
+                        "attempts": [{**attempt, "private": "PRIVATE"}],
+                    },
+                )
+
+            self.assertEqual(
+                "execution_infrastructure_failure",
+                policy._classification(
+                    policy.RunnerError("DESIGN.md clean gate returned an invalid status"),
+                    None,
+                ),
+            )
+
     def test_log_directory_and_target_must_not_contain_one_another(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

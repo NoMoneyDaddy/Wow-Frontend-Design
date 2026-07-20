@@ -31,6 +31,7 @@ from codex_isolated_build_core import (
     prepare_skill_reference_context,
 )
 from current_skill_repair import (
+    MAX_FINDING_IDS,
     MAX_REPAIR_ROUNDS,
     build_repair_prompt,
     compile_design_feedback,
@@ -1151,14 +1152,173 @@ def _classification(error: BaseException, execution: dict[str, Any] | None) -> s
         return "execution_infrastructure_failure"
     if "HTML Playwright smoke gate rejected" in message:
         return "html_smoke_rejection"
-    if "DESIGN.md clean gate" in message:
+    if "DESIGN.md clean gate rejected output" in message:
         return "design_gate_rejection"
+    if "DESIGN.md clean gate returned an invalid status" in message:
+        return "execution_infrastructure_failure"
     if any(
         marker in message.casefold()
         for marker in ("output", "design.md", "index.html", "strict utf-8", "nul", "oversized")
     ):
         return "output_contract_rejection"
     return "execution_infrastructure_failure"
+
+
+def _safe_summary_path(value: Any, *, basename: bool = False) -> bool:
+    if not isinstance(value, str) or not 1 <= len(value.encode("utf-8")) <= 256:
+        return False
+    path = PurePosixPath(value)
+    return (
+        not path.is_absolute()
+        and path.as_posix() == value
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and (not basename or len(path.parts) == 1)
+    )
+
+
+def _valid_artifact_record(value: Any, *, output: bool = False) -> bool:
+    expected = {"path", "bytes", "sha256", "mode"} if output else {"path", "bytes", "sha256"}
+    return (
+        isinstance(value, dict)
+        and set(value) == expected
+        and _safe_summary_path(value.get("path"), basename=not output)
+        and type(value.get("bytes")) is int
+        and 0 < value["bytes"] <= FILE_LIMIT
+        and isinstance(value.get("sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is not None
+        and (
+            not output
+            or (
+                isinstance(value.get("mode"), str)
+                and re.fullmatch(r"0[0-7]{3}", value["mode"]) is not None
+            )
+        )
+    )
+
+
+def _valid_quarantine_summary(value: Any) -> bool:
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"directory", "outputs"}
+        or not _safe_summary_path(value.get("directory"), basename=True)
+        or not isinstance(value.get("outputs"), list)
+        or not 1 <= len(value["outputs"]) <= MAX_STAGE_ENTRIES
+    ):
+        return False
+    paths = [record.get("path") for record in value["outputs"] if isinstance(record, dict)]
+    return (
+        len(paths) == len(value["outputs"])
+        and len(set(paths)) == len(paths)
+        and all(_valid_artifact_record(record, output=True) for record in value["outputs"])
+    )
+
+
+def _validate_receipt_category_summaries(
+    status: str,
+    classification: str,
+    *,
+    design_rejection: Any,
+    html_smoke_rejection: Any,
+    html_smoke_unavailable: Any,
+    repair: Any,
+    repair_failure: Any,
+    failure_artifact: Any,
+) -> None:
+    valid = True
+    for summary, expected_classification in (
+        (design_rejection, "design_gate_rejection"),
+        (html_smoke_rejection, "html_smoke_rejection"),
+    ):
+        if summary is None:
+            valid = valid and classification != expected_classification
+            continue
+        valid = valid and (
+            classification == expected_classification
+            and isinstance(summary, dict)
+            and set(summary) == {"gate_receipt", "quarantine"}
+            and _valid_artifact_record(summary.get("gate_receipt"))
+            and _valid_quarantine_summary(summary.get("quarantine"))
+        )
+    for summary, allowed_classifications in (
+        (html_smoke_unavailable, {"execution_infrastructure_failure"}),
+        (failure_artifact, {"execution_infrastructure_failure", "output_contract_rejection"}),
+    ):
+        if summary is not None:
+            valid = valid and (
+                classification in allowed_classifications
+                and isinstance(summary, dict)
+                and set(summary) == {"quarantine"}
+                and _valid_quarantine_summary(summary.get("quarantine"))
+            )
+    if repair_failure is not None:
+        valid = valid and (
+            status == "failed"
+            and isinstance(repair_failure, dict)
+            and set(repair_failure) == {"round", "gate", "finding_ids", "quarantine"}
+            and type(repair_failure.get("round")) is int
+            and 1 <= repair_failure["round"] <= MAX_REPAIR_ROUNDS
+            and repair_failure.get("gate") in {"design", "html"}
+            and isinstance(repair_failure.get("finding_ids"), list)
+            and 1 <= len(repair_failure["finding_ids"]) <= MAX_FINDING_IDS
+            and len(set(repair_failure["finding_ids"])) == len(repair_failure["finding_ids"])
+            and all(
+                isinstance(identifier, str)
+                and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,127}", identifier) is not None
+                for identifier in repair_failure["finding_ids"]
+            )
+            and _valid_quarantine_summary(repair_failure.get("quarantine"))
+        )
+    if repair is not None:
+        valid_repair_keys = {"max_rounds", "rounds_used", "attempts"}
+        attempt_keys = {
+            "number", "model", "prompt", "skill_snapshot", "skill_references",
+            "configured_isolation", "execution", "trace_observed", "tools",
+        }
+        attempts = repair.get("attempts") if isinstance(repair, dict) else None
+        valid = valid and (
+            isinstance(repair, dict)
+            and set(repair) in (valid_repair_keys, {*valid_repair_keys, "stop_reason"})
+            and type(repair.get("max_rounds")) is int
+            and 1 <= repair["max_rounds"] <= MAX_REPAIR_ROUNDS
+            and type(repair.get("rounds_used")) is int
+            and 1 <= repair["rounds_used"] <= repair["max_rounds"]
+            and isinstance(attempts, list)
+            and 1 <= len(attempts) <= repair["rounds_used"] + 1
+            and all(
+                isinstance(attempt, dict)
+                and set(attempt) in (attempt_keys, {*attempt_keys, "trigger"})
+                and (
+                    "trigger" not in attempt
+                    or (
+                        isinstance(attempt["trigger"], dict)
+                        and set(attempt["trigger"]) == {"gate", "finding_ids", "counts", "truncated", "signature"}
+                    )
+                )
+                for attempt in attempts
+            )
+            and (
+                "stop_reason" not in repair
+                or repair["stop_reason"] in {
+                    "failure_cycle", "gate_regression", "no_strict_progress", "repeated_failure", "round_limit",
+                }
+            )
+        )
+    if status == "execution_passed" and any(
+        summary is not None
+        for summary in (
+            design_rejection, html_smoke_rejection, html_smoke_unavailable,
+            repair_failure, failure_artifact,
+        )
+        ):
+        valid = False
+    terminal_summaries = (
+        design_rejection, html_smoke_rejection, html_smoke_unavailable,
+        repair_failure, failure_artifact,
+    )
+    if sum(summary is not None for summary in terminal_summaries) > 1:
+        valid = False
+    if not valid:
+        raise RunnerError("receipt category summaries are not in the closed schema")
 
 
 def _receipt(
@@ -1186,6 +1346,16 @@ def _receipt(
 ) -> dict[str, Any]:
     if classification not in RECEIPT_CATEGORIES.get(status, set()):
         raise RunnerError("receipt status/classification is not in the closed schema")
+    _validate_receipt_category_summaries(
+        status,
+        classification,
+        design_rejection=design_rejection,
+        html_smoke_rejection=html_smoke_rejection,
+        html_smoke_unavailable=html_smoke_unavailable,
+        repair=repair,
+        repair_failure=repair_failure,
+        failure_artifact=failure_artifact,
+    )
     logs = {}
     if execution is not None:
         logs = {
