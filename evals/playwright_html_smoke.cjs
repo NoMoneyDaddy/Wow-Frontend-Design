@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { createHash } = require("node:crypto");
 const { AxeBuilder } = require("@axe-core/playwright");
 const { runLocalPageMatrix } = require("./playwright_browser_runtime.cjs");
 
@@ -17,6 +18,95 @@ const LOCATOR_ROLES = new Set([
   "listbox", "menuitem", "navigation", "option", "radio", "region", "searchbox",
   "slider", "spinbutton", "switch", "tab", "table", "textbox", "treeitem",
 ]);
+const MAX_AXE_TARGET_DESCRIPTORS = 32;
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function normalizedHexColor(value) {
+  if (typeof value !== "string") return null;
+  const match = value.trim().toLowerCase().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (!match) return null;
+  const hex = match[1];
+  return hex.length === 3
+    ? `#${[...hex].map((character) => character.repeat(2)).join("")}`
+    : `#${hex}`;
+}
+
+function ratioX100(value) {
+  const numeric = typeof value === "number"
+    ? value
+    : Number.parseFloat(typeof value === "string" ? value : "");
+  return Number.isFinite(numeric) && numeric >= 0 && numeric <= 21
+    ? Math.round(numeric * 100)
+    : null;
+}
+
+function contrastDescriptor(node) {
+  for (const check of [...(node.any || []), ...(node.all || []), ...(node.none || [])]) {
+    const data = check && typeof check === "object" ? check.data : null;
+    if (!data || typeof data !== "object") continue;
+    const foreground = normalizedHexColor(data.fgColor);
+    const background = normalizedHexColor(data.bgColor);
+    const actualRatio = ratioX100(data.contrastRatio);
+    const requiredRatio = ratioX100(data.expectedContrastRatio);
+    if (foreground && background && actualRatio !== null && requiredRatio !== null) {
+      return {
+        foreground,
+        background,
+        actual_ratio_x100: actualRatio,
+        required_ratio_x100: requiredRatio,
+      };
+    }
+  }
+  return null;
+}
+
+async function structuralTargetPath(page, target) {
+  if (!Array.isArray(target) || target.length !== 1 || typeof target[0] !== "string") return null;
+  try {
+    return await page.evaluate((selector) => globalThis.__wowEvaluatorRead?.structuralPath(selector) || null, target[0]);
+  } catch {
+    return null;
+  }
+}
+
+async function summarizeAxeTargets(page, violations) {
+  const identities = new Map();
+  for (const violation of violations) {
+    if (!violation || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(violation.id)
+      || !Array.isArray(violation.nodes)) continue;
+    for (const node of violation.nodes) {
+      const path = await structuralTargetPath(page, node?.target);
+      const fingerprintSource = path
+        ? JSON.stringify(path)
+        : JSON.stringify(Array.isArray(node?.target) ? node.target : []);
+      const targetSha256 = sha256(fingerprintSource);
+      const identity = `${violation.id}\0${targetSha256}`;
+      if (identities.has(identity)) continue;
+      let descriptor = null;
+      if (path) {
+        descriptor = { rule_id: violation.id, target_sha256: targetSha256, path };
+        const contrast = violation.id === "color-contrast" ? contrastDescriptor(node) : null;
+        if (contrast) descriptor.contrast = contrast;
+      }
+      identities.set(identity, descriptor);
+    }
+  }
+  const orderedIdentities = [...identities.keys()].sort();
+  const descriptors = orderedIdentities
+    .map((identity) => identities.get(identity))
+    .filter(Boolean)
+    .slice(0, MAX_AXE_TARGET_DESCRIPTORS);
+  const identityPairs = orderedIdentities.map((identity) => identity.split("\0"));
+  return {
+    axe_target_count: orderedIdentities.length,
+    axe_target_set_sha256: sha256(JSON.stringify(identityPairs)),
+    axe_targets_truncated: descriptors.length !== orderedIdentities.length,
+    axe_target_descriptors: descriptors,
+  };
+}
 
 function fail(message) {
   process.stderr.write(`html smoke infrastructure failure: ${message}\n`);
@@ -444,6 +534,7 @@ async function main() {
       const analysis = await new AxeBuilder({ page })
         .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
         .analyze();
+      const axeTargets = await summarizeAxeTargets(page, analysis.violations);
       const layoutHazards = await page.evaluate(() => {
         const visible = (element) => {
           let current = element;
@@ -558,6 +649,7 @@ async function main() {
       const inspection = {
         axe_violation_count: analysis.violations.length,
         axe_rule_ids: analysis.violations.map((violation) => violation.id).sort(),
+        ...axeTargets,
         layout_hazards: {
           hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
           fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
@@ -588,7 +680,7 @@ async function main() {
 
   const status = results.every((result) => result.status === "passed") ? "passed" : "rejected";
   const receipt = {
-    schema_version: 1,
+    schema_version: 2,
     status,
     tool: {
       package: "playwright",

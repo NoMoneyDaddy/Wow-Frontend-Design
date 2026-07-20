@@ -1087,6 +1087,51 @@ main { min-width: 360px; }
                 self.assertGreater(item["inspection"]["axe_violation_count"], 0)
                 self.assertNotIn("boot", json.dumps(item))
 
+    def test_axe_targets_are_structural_bounded_and_privacy_safe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Contrast</title></head><body>
+<main><h1>Contrast</h1><p><small style="color:#777;background:#fff;font-size:13px">PRIVATE-FIRST</small>
+<small style="color:#777;background:#fff;font-size:13px">PRIVATE-SECOND</small></p></main><script>
+Object.defineProperty(Element.prototype, 'localName', { configurable: true, get() { return 'private-element'; } });
+Object.defineProperty(Element.prototype, 'previousElementSibling', { configurable: true, get() { return null; } });
+</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual(2, receipt["schema_version"])
+            for result in receipt["results"]:
+                inspection = result["inspection"]
+                self.assertEqual(["color-contrast"], inspection["axe_rule_ids"])
+                self.assertEqual(2, inspection["axe_target_count"])
+                self.assertFalse(inspection["axe_targets_truncated"])
+                self.assertEqual(2, len(inspection["axe_target_descriptors"]))
+                self.assertRegex(inspection["axe_target_set_sha256"], r"^[0-9a-f]{64}$")
+                for descriptor in inspection["axe_target_descriptors"]:
+                    self.assertEqual(
+                        {"contrast", "path", "rule_id", "target_sha256"},
+                        set(descriptor),
+                    )
+                    self.assertEqual("color-contrast", descriptor["rule_id"])
+                    self.assertRegex(descriptor["target_sha256"], r"^[0-9a-f]{64}$")
+                    self.assertEqual(["html", 1], descriptor["path"][0])
+                    self.assertEqual("small", descriptor["path"][-1][0])
+                    self.assertEqual(
+                        {"actual_ratio_x100", "background", "foreground", "required_ratio_x100"},
+                        set(descriptor["contrast"]),
+                    )
+                    self.assertLess(
+                        descriptor["contrast"]["actual_ratio_x100"],
+                        descriptor["contrast"]["required_ratio_x100"],
+                    )
+            serialized = json.dumps(receipt)
+            self.assertNotIn("PRIVATE-FIRST", serialized)
+            self.assertNotIn("PRIVATE-SECOND", serialized)
+            self.assertNotIn("failureSummary", serialized)
+            self.assertNotIn('"html":', serialized)
+
     def test_delayed_failures_and_transient_popup_are_observed_within_settle_window(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

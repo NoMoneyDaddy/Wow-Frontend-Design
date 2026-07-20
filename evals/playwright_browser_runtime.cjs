@@ -110,9 +110,12 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const stringTrim = String.prototype.trim;
           const styleFunction = pageGlobal.getComputedStyle;
           const styleValue = CSSStyleDeclaration.prototype.getPropertyValue;
+          const elementPrototype = Element.prototype;
           const elementRect = Element.prototype.getBoundingClientRect;
           const elementAnimations = Element.prototype.getAnimations;
           const elementAttribute = Element.prototype.getAttribute;
+          const elementLocalName = descriptor(Element.prototype, "localName").get;
+          const elementPreviousSibling = descriptor(Element.prototype, "previousElementSibling").get;
           const htmlPrototype = HTMLElement.prototype;
           const htmlInnerText = descriptor(htmlPrototype, "innerText").get;
           const nodeText = descriptor(Node.prototype, "textContent").get;
@@ -126,6 +129,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const clientHeight = descriptor(Element.prototype, "clientHeight").get;
           const createRange = Document.prototype.createRange;
           const createTreeWalker = Document.prototype.createTreeWalker;
+          const documentQuerySelector = Document.prototype.querySelector;
           const treeNext = TreeWalker.prototype.nextNode;
           const rangeSelect = Range.prototype.selectNodeContents;
           const rangeStart = Range.prototype.setStart;
@@ -482,6 +486,34 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                 scrollHeight: apply(scrollHeight, element, []),
                 scrollWidth: apply(scrollWidth, element, []),
               });
+            },
+            structuralPath(selector) {
+              if (typeof selector !== "string") return null;
+              let element;
+              try {
+                element = apply(documentQuerySelector, pageDocument, [selector]);
+              } catch {
+                return null;
+              }
+              if (!element || !apply(isPrototypeOf, elementPrototype, [element])) return null;
+              const upward = [];
+              for (let current = element; current; current = apply(nodeParent, current, [])) {
+                if (upward.length >= 16) return null;
+                const tag = apply(elementLocalName, current, []);
+                if (apply(regexExec, /^[a-z][a-z0-9-]{0,63}$/, [tag]) === null) return null;
+                let position = 1;
+                for (let sibling = apply(elementPreviousSibling, current, []); sibling;
+                  sibling = apply(elementPreviousSibling, sibling, [])) {
+                  if (apply(elementLocalName, sibling, []) === tag) position += 1;
+                }
+                if (position > 10000) return null;
+                upward[upward.length] = freeze([tag, position]);
+              }
+              const path = [];
+              for (let index = upward.length - 1; index >= 0; index -= 1) {
+                path[path.length] = upward[index];
+              }
+              return path.length > 0 && path[0][0] === "html" ? freeze(path) : null;
             },
             segments(text, locale) {
               return segmentText(text, locale);

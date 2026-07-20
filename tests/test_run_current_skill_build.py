@@ -1159,6 +1159,154 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         }
         self.assertNotEqual(policy.repair_state_digest(alias_a), policy.repair_state_digest(alias_b))
 
+    def test_axe_target_identity_prevents_false_repeated_failure(self) -> None:
+        def receipt(target: str, profile: str = "desktop") -> dict[str, Any]:
+            descriptor = {
+                "rule_id": "color-contrast",
+                "target_sha256": target,
+                "path": [["html", 1], ["body", 1], ["main", 1], ["small", 1]],
+                "contrast": {
+                    "foreground": "#777777",
+                    "background": "#ffffff",
+                    "actual_ratio_x100": 447,
+                    "required_ratio_x100": 450,
+                },
+            }
+            return {
+                "status": "rejected",
+                "results": [{
+                    "page": "index.html",
+                    "profile": profile,
+                    "status": "rejected",
+                    "navigation": "passed",
+                    "visible_main": True,
+                    "visible_text": True,
+                    "visible_primary_content": True,
+                    "root_horizontal_overflow": False,
+                    "counters": {},
+                    "inspection": {
+                        "axe_violation_count": 1,
+                        "axe_rule_ids": ["color-contrast"],
+                        "axe_target_count": 1,
+                        "axe_target_set_sha256": target,
+                        "axe_targets_truncated": False,
+                        "axe_target_descriptors": [descriptor],
+                        "layout_hazards": {},
+                    },
+                }],
+            }
+
+        first = policy.compile_repair_state("html", receipt("a" * 64))
+        moved = policy.compile_repair_state("html", receipt("b" * 64))
+        self.assertNotEqual(first, moved)
+        self.assertIsNone(policy.repair_state_stop_reason([first], moved, 1))
+        self.assertEqual("repeated_failure", policy.repair_state_stop_reason([first], first, 1))
+
+        previous = {"gate": "html", "counts": {"axe-color-contrast": 2}, "cases": {}, "axe_routes": {
+            "a.html\0desktop": {"target_count": 3, "target_set_sha256": "a" * 64},
+            "b.html\0desktop": {"target_count": 1, "target_set_sha256": "b" * 64},
+        }}
+        regressed = {"gate": "html", "counts": {"axe-color-contrast": 2}, "cases": {}, "axe_routes": {
+            "a.html\0desktop": {"target_count": 1, "target_set_sha256": "c" * 64},
+            "b.html\0desktop": {"target_count": 2, "target_set_sha256": "d" * 64},
+        }}
+        self.assertFalse(policy.repair_state_strictly_progressed(previous, regressed))
+
+        raw = receipt("a" * 64)
+        raw["results"][0]["inspection"].update({
+            "raw_diagnostics": "PRIVATE-RUNTIME",
+            "failureSummary": "PRIVATE-SUMMARY",
+        })
+        feedback = policy.compile_html_feedback(raw)
+        self.assertEqual(1, len(feedback["axe_targets"]))
+        self.assertEqual("a" * 64, feedback["axe_targets"][0]["target_sha256"])
+        prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
+        self.assertIn("actual_ratio_x100", prompt)
+        self.assertIn('[["html",1],["body",1],["main",1],["small",1]]', prompt)
+        self.assertNotIn("PRIVATE-RUNTIME", prompt)
+        self.assertNotIn("PRIVATE-SUMMARY", prompt)
+
+    def test_axe_feedback_deduplicates_target_across_profiles(self) -> None:
+        target = "c" * 64
+
+        def result(profile: str, page: str = "index.html") -> dict[str, Any]:
+            return {
+                "page": page, "profile": profile, "status": "rejected",
+                "navigation": "passed", "visible_main": True, "visible_text": True,
+                "visible_primary_content": True, "root_horizontal_overflow": False,
+                "counters": {},
+                "inspection": {
+                    "axe_violation_count": 1,
+                    "axe_rule_ids": ["color-contrast"],
+                    "axe_target_count": 1,
+                    "axe_target_set_sha256": target,
+                    "axe_targets_truncated": False,
+                    "axe_target_descriptors": [{
+                        "rule_id": "color-contrast", "target_sha256": target,
+                        "path": [["html", 1], ["body", 1], ["small", 1]],
+                        "contrast": {
+                            "foreground": "#777777", "background": "#ffffff",
+                            "actual_ratio_x100": 447, "required_ratio_x100": 450,
+                        },
+                    }],
+                    "layout_hazards": {},
+                },
+            }
+
+        receipt = {"status": "rejected", "results": [
+            result("mobile"), result("desktop"), result("desktop", "secondary.html"),
+        ]}
+        feedback = policy.compile_html_feedback(receipt)
+        self.assertEqual(3, feedback["counts"]["axe-color-contrast"])
+        self.assertEqual(2, len(feedback["axe_targets"]))
+        self.assertEqual(["index.html", "secondary.html"], [item["page"] for item in feedback["axe_targets"]])
+        self.assertEqual(["desktop", "mobile"], feedback["axe_targets"][0]["profiles"])
+
+        truncated = result("desktop")
+        truncated["inspection"].update({
+            "axe_target_count": 2,
+            "axe_targets_truncated": True,
+            "axe_target_descriptors": [],
+        })
+        feedback = policy.compile_html_feedback({"results": [truncated]})
+        self.assertTrue(feedback["truncated"])
+        self.assertNotIn("axe_targets", feedback)
+
+    def test_axe_receipt_schema_rejects_unclosed_descriptor(self) -> None:
+        path = [["html", 1], ["body", 1], ["small", 1]]
+        target_sha256 = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
+        target_set_sha256 = hashlib.sha256(
+            json.dumps([["color-contrast", target_sha256]], separators=(",", ":")).encode()
+        ).hexdigest()
+        inspection = {
+            "axe_violation_count": 1,
+            "axe_rule_ids": ["color-contrast"],
+            "axe_target_count": 1,
+            "axe_target_set_sha256": target_set_sha256,
+            "axe_targets_truncated": False,
+            "axe_target_descriptors": [{
+                "rule_id": "color-contrast", "target_sha256": target_sha256,
+                "path": path,
+                "contrast": {
+                    "foreground": "#777777", "background": "#ffffff",
+                    "actual_ratio_x100": 447, "required_ratio_x100": 450,
+                },
+            }],
+            "layout_hazards": {
+                "hidden_attribute_visible_count": 0,
+                "fixed_content_obstruction_count": 0,
+            },
+            "typography_advisories": {
+                "heading_scan_count": 1,
+                "heading_scan_truncated": False,
+                "single_han_last_line_heading_count": 0,
+            },
+        }
+        policy._validate_axe_inspection(inspection)
+        inspection["axe_target_descriptors"][0]["html"] = "PRIVATE"
+        with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+            policy._validate_axe_inspection(inspection)
+
     def test_browser_contract_provenance_drift_is_rejected_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

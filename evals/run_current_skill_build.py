@@ -174,6 +174,103 @@ def _json_integer(value: Any) -> bool:
     )
 
 
+def _validate_axe_inspection(inspection: Any) -> None:
+    failure = "HTML Playwright smoke gate infrastructure failure"
+    if not isinstance(inspection, dict):
+        raise RunnerError(failure)
+    required = {
+        "axe_violation_count", "axe_rule_ids", "axe_target_count", "axe_target_set_sha256",
+        "axe_targets_truncated", "axe_target_descriptors", "layout_hazards", "typography_advisories",
+    }
+    keys = frozenset(inspection)
+    if keys not in {frozenset(required), frozenset({*required, "browser_contract"})}:
+        raise RunnerError(failure)
+    violation_count = inspection.get("axe_violation_count")
+    rule_ids = inspection.get("axe_rule_ids")
+    target_count = inspection.get("axe_target_count")
+    target_set_sha256 = inspection.get("axe_target_set_sha256")
+    truncated = inspection.get("axe_targets_truncated")
+    descriptors = inspection.get("axe_target_descriptors")
+    if (
+        type(violation_count) is not int or not 0 <= violation_count <= 1000
+        or not isinstance(rule_ids, list) or len(rule_ids) > 1000
+        or rule_ids != sorted(set(rule_ids)) or len(rule_ids) != violation_count
+        or any(not isinstance(item, str) or re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", item) is None for item in rule_ids)
+        or type(target_count) is not int or not 0 <= target_count <= 10000
+        or not isinstance(target_set_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", target_set_sha256) is None
+        or type(truncated) is not bool
+        or not isinstance(descriptors, list) or len(descriptors) > 32
+        or truncated != (len(descriptors) != target_count)
+    ):
+        raise RunnerError(failure)
+    identities: list[tuple[str, str]] = []
+    for descriptor in descriptors:
+        if not isinstance(descriptor, dict):
+            raise RunnerError(failure)
+        descriptor_keys = set(descriptor)
+        if descriptor_keys not in ({"rule_id", "target_sha256", "path"}, {"rule_id", "target_sha256", "path", "contrast"}):
+            raise RunnerError(failure)
+        rule_id = descriptor.get("rule_id")
+        target_sha256 = descriptor.get("target_sha256")
+        path = descriptor.get("path")
+        if (
+            rule_id not in rule_ids
+            or not isinstance(target_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", target_sha256) is None
+            or not isinstance(path, list) or not 1 <= len(path) <= 16
+        ):
+            raise RunnerError(failure)
+        normalized_path: list[list[Any]] = []
+        for segment in path:
+            if (
+                not isinstance(segment, list) or len(segment) != 2
+                or not isinstance(segment[0], str) or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", segment[0]) is None
+                or type(segment[1]) is not int or not 1 <= segment[1] <= 10000
+            ):
+                raise RunnerError(failure)
+            normalized_path.append(segment)
+        if normalized_path[0][0] != "html" or hashlib.sha256(
+            json.dumps(normalized_path, separators=(",", ":")).encode("utf-8")
+        ).hexdigest() != target_sha256:
+            raise RunnerError(failure)
+        contrast = descriptor.get("contrast")
+        if contrast is not None:
+            if not isinstance(contrast, dict) or set(contrast) != {
+                "foreground", "background", "actual_ratio_x100", "required_ratio_x100",
+            }:
+                raise RunnerError(failure)
+            if (
+                rule_id != "color-contrast"
+                or any(not isinstance(contrast.get(key), str) or re.fullmatch(r"#[0-9a-f]{6}", contrast[key]) is None
+                       for key in ("foreground", "background"))
+                or type(contrast.get("actual_ratio_x100")) is not int
+                or type(contrast.get("required_ratio_x100")) is not int
+                or not 0 <= contrast["actual_ratio_x100"] < contrast["required_ratio_x100"] <= 2100
+            ):
+                raise RunnerError(failure)
+        identities.append((rule_id, target_sha256))
+    if identities != sorted(set(identities)):
+        raise RunnerError(failure)
+    if not truncated and hashlib.sha256(
+        json.dumps([list(item) for item in identities], separators=(",", ":")).encode("utf-8")
+    ).hexdigest() != target_set_sha256:
+        raise RunnerError(failure)
+    layout = inspection.get("layout_hazards")
+    typography = inspection.get("typography_advisories")
+    if (
+        not isinstance(layout, dict)
+        or set(layout) != {"hidden_attribute_visible_count", "fixed_content_obstruction_count"}
+        or any(type(layout.get(key)) is not int or not 0 <= layout[key] <= 10000 for key in layout)
+        or not isinstance(typography, dict)
+        or set(typography) != {"heading_scan_count", "heading_scan_truncated", "single_han_last_line_heading_count"}
+        or type(typography.get("heading_scan_count")) is not int
+        or not 0 <= typography["heading_scan_count"] <= 16
+        or type(typography.get("heading_scan_truncated")) is not bool
+        or type(typography.get("single_han_last_line_heading_count")) is not int
+        or not 0 <= typography["single_han_last_line_heading_count"] <= typography["heading_scan_count"]
+    ):
+        raise RunnerError(failure)
+
+
 def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, dict[str, Any], dict[str, Any]]:
     source = _regular_absolute_file(path, "browser contract", BROWSER_CONTRACT_LIMIT)
     try:
@@ -832,7 +929,7 @@ def _run_html_smoke(
     aggregate_status = "passed" if result_statuses and all(status == "passed" for status in result_statuses) else "rejected"
     if (
         process.returncode != 0
-        or receipt.get("schema_version") != 1
+        or receipt.get("schema_version") != 2
         or receipt.get("status") not in {"passed", "rejected"}
         or tool.get("package") != "playwright"
         or tool.get("version") != version
@@ -843,6 +940,8 @@ def _run_html_smoke(
         or receipt.get("status") != aggregate_status
     ):
         raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+    for result in results:
+        _validate_axe_inspection(result.get("inspection"))
     contract_summary = receipt.get("browser_contract")
     if browser_contract is None:
         if contract_summary is not None:
