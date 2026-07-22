@@ -131,7 +131,7 @@ Implement one runnable route or task before expanding architecture. Use real or 
 - default plus at least one consequential pending, error, recovery, or success state when applicable;
 - one coherent native role/state/keyboard model per control, keyboard and focus behavior, valid composite-ARIA ownership, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
 - framework, route, API, state, analytics, and business-contract preservation.
-- short headings whose rendered wraps preserve semantic units and intentional rhythm at each viewport and fallback; fix measure, type, or approved copy instead of freezing one break.
+- Make rendered wraps preserve semantic units and intentional rhythm. Never cap CJK display headings in Latin `ch` or leave a one-Han final line; fix measure, type, or approved copy.
 
 Expand primitives, routes, effects, or optimization only after the slice works. Prefer semantic HTML, modern CSS, and minimal JavaScript. Do not rewrite a framework for a CSS problem.
 
