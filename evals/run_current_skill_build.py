@@ -1217,6 +1217,32 @@ def _valid_quarantine_summary(value: Any) -> bool:
     )
 
 
+def _valid_repair_trigger_summary(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "gate", "finding_ids", "counts", "truncated", "signature",
+    }:
+        return False
+    finding_ids = value.get("finding_ids")
+    counts = value.get("counts")
+    return (
+        value.get("gate") in {"design", "html"}
+        and isinstance(finding_ids, list)
+        and 1 <= len(finding_ids) <= MAX_FINDING_IDS
+        and all(
+            isinstance(identifier, str)
+            and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,127}", identifier) is not None
+            for identifier in finding_ids
+        )
+        and len(set(finding_ids)) == len(finding_ids)
+        and isinstance(counts, dict)
+        and set(counts) == set(finding_ids)
+        and all(type(count) is int and count > 0 for count in counts.values())
+        and type(value.get("truncated")) is bool
+        and isinstance(value.get("signature"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", value["signature"]) is not None
+    )
+
+
 def _validate_receipt_category_summaries(
     status: str,
     classification: str,
@@ -1293,10 +1319,7 @@ def _validate_receipt_category_summaries(
                 and set(attempt) in (attempt_keys, {*attempt_keys, "trigger"})
                 and (
                     "trigger" not in attempt
-                    or (
-                        isinstance(attempt["trigger"], dict)
-                        and set(attempt["trigger"]) == {"gate", "finding_ids", "counts", "truncated", "signature"}
-                    )
+                    or _valid_repair_trigger_summary(attempt["trigger"])
                 )
                 for attempt in attempts
             )

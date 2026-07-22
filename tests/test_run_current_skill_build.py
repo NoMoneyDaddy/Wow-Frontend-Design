@@ -2647,6 +2647,26 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 repair={"max_rounds": 1, "rounds_used": 1, "attempts": [attempt]},
             )
             self.assertEqual(1, receipt["repair"]["max_rounds"])
+            valid_trigger = {
+                "gate": "design",
+                "finding_ids": ["orphan-token"],
+                "counts": {"orphan-token": 1},
+                "truncated": False,
+                "signature": "0" * 64,
+            }
+            receipt = policy._receipt(
+                **common,
+                classification="execution_infrastructure_failure",
+                repair={
+                    "max_rounds": 1,
+                    "rounds_used": 1,
+                    "attempts": [
+                        attempt,
+                        {**attempt, "number": 1, "trigger": valid_trigger},
+                    ],
+                },
+            )
+            self.assertEqual(valid_trigger, receipt["repair"]["attempts"][1]["trigger"])
             with self.assertRaisesRegex(policy.RunnerError, "receipt category summaries"):
                 policy._receipt(
                     **common,
@@ -2657,6 +2677,37 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         "attempts": [{**attempt, "private": "PRIVATE"}],
                     },
                 )
+            invalid_triggers = (
+                {
+                    **valid_trigger,
+                    "counts": {"orphan-token": 1, "undeclared-private": 1},
+                },
+                {**valid_trigger, "finding_ids": [[]]},
+                {**valid_trigger, "gate": "visual"},
+                {
+                    **valid_trigger,
+                    "finding_ids": ["orphan-token", "orphan-token"],
+                },
+                {**valid_trigger, "counts": {"orphan-token": 0}},
+                {**valid_trigger, "truncated": 0},
+                {**valid_trigger, "signature": "A" * 64},
+            )
+            for invalid_trigger in invalid_triggers:
+                with self.subTest(trigger=invalid_trigger), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt category summaries"
+                ):
+                    policy._receipt(
+                        **common,
+                        classification="execution_infrastructure_failure",
+                        repair={
+                            "max_rounds": 1,
+                            "rounds_used": 1,
+                            "attempts": [
+                                attempt,
+                                {**attempt, "number": 1, "trigger": invalid_trigger},
+                            ],
+                        },
+                    )
 
             self.assertEqual(
                 "execution_infrastructure_failure",
