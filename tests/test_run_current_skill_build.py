@@ -2367,6 +2367,104 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(0o600, calls[0][1])
             self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
 
+    def test_raw_log_parent_swap_cannot_redirect_private_trace(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            logs = root / "logs"
+            logs.mkdir()
+            saved_logs = root / "saved-logs"
+            attacker = root / "attacker"
+            attacker.mkdir()
+            trace = logs / "trace.jsonl"
+            stderr = logs / "stderr.txt"
+            real_open = os.open
+            swapped = False
+
+            def swap_parent_before_create(
+                target: object,
+                flags: int,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> int:
+                nonlocal swapped
+                if flags & os.O_CREAT and not swapped:
+                    logs.rename(saved_logs)
+                    logs.symlink_to(attacker, target_is_directory=True)
+                    swapped = True
+                if dir_fd is None:
+                    return real_open(target, flags, mode)
+                return real_open(target, flags, mode, dir_fd=dir_fd)
+
+            command = [
+                sys.executable,
+                "-c",
+                "print('{\"type\":\"turn.completed\"}', flush=True)",
+            ]
+            with mock.patch.object(core.os, "open", side_effect=swap_parent_before_create):
+                with self.assertRaisesRegex(core.RunnerError, "log provenance drifted"):
+                    core._run_codex(command, "", os.environ.copy(), stage, trace, stderr, 2)
+
+            self.assertTrue(swapped)
+            self.assertEqual([], list(attacker.iterdir()))
+
+    def test_validated_log_parent_cannot_be_replaced_by_real_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            logs = root / "logs"
+            logs.mkdir()
+            trace = logs / "trace.jsonl"
+            stderr = logs / "stderr.txt"
+            spec = core.ExecutionSpec(stage, trace, stderr, root, "test-skill", "prompt")
+            initial_fingerprint, log_parents = core._execution_paths(spec)
+            logs.rename(root / "validated-logs")
+            logs.mkdir()
+            command = [
+                sys.executable,
+                "-c",
+                "print('{\"type\":\"turn.completed\"}', flush=True)",
+            ]
+
+            with self.assertRaisesRegex(core.RunnerError, "parent provenance drifted"):
+                core._run_codex(
+                    command,
+                    "",
+                    os.environ.copy(),
+                    stage,
+                    trace,
+                    stderr,
+                    2,
+                    initial_fingerprint=initial_fingerprint,
+                    expected_log_parents=log_parents,
+                )
+
+            self.assertEqual([], list(logs.iterdir()))
+
+    def test_private_log_directory_does_not_require_list_permission(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            logs = Path(directory).resolve() / "logs"
+            logs.mkdir(mode=0o300)
+            try:
+                descriptor = core._open_log_directory(logs)
+                os.close(descriptor)
+            finally:
+                logs.chmod(0o700)
+
+    def test_raw_log_fails_closed_without_required_descriptor_features(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            with mock.patch.object(core, "DESCRIPTOR_RELATIVE_LOGS", False):
+                with self.assertRaisesRegex(core.RunnerError, "descriptor-relative"):
+                    core._open_log_directory(root)
+            with mock.patch.object(core.os, "O_NOFOLLOW", 0):
+                with self.assertRaisesRegex(core.RunnerError, "O_NOFOLLOW"):
+                    core._open_private_log(root / "trace.jsonl")
+            self.assertFalse((root / "trace.jsonl").exists())
+
     def test_raw_log_replacement_during_execution_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

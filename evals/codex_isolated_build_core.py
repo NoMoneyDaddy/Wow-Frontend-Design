@@ -15,6 +15,7 @@ import stat
 import subprocess
 import tempfile
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -33,6 +34,11 @@ SKILL_REFERENCE_FILE_LIMIT = 64 * 1024
 SKILL_REFERENCE_TOTAL_LIMIT = 128 * 1024
 MAX_SKILL_REFERENCES = 3
 SKILL_REFERENCE_PATH = re.compile(r"references/[a-z0-9][a-z0-9-]{0,127}\.md")
+DESCRIPTOR_RELATIVE_LOGS = (
+    os.open in os.supports_dir_fd
+    and os.stat in os.supports_dir_fd
+    and os.stat in os.supports_follow_symlinks
+)
 
 
 def _module(name: str, path: Path) -> Any:
@@ -472,10 +478,52 @@ def _child_limits() -> None:
     resource.setrlimit(resource.RLIMIT_FSIZE, (2 * 1024 * 1024, 2 * 1024 * 1024))
 
 
-def _open_private_log(path: Path) -> Any:
+def _required_open_flag(name: str) -> int:
+    value = getattr(os, name, None)
+    if not isinstance(value, int) or value == 0:
+        raise RunnerError(f"{name} is required for private generation logs")
+    return value
+
+
+def _open_log_directory(path: Path, expected_identity: tuple[int, int] | None = None) -> int:
+    if not DESCRIPTOR_RELATIVE_LOGS:
+        raise RunnerError("descriptor-relative log operations are required")
+    access = getattr(os, "O_SEARCH", 0) or getattr(os, "O_PATH", 0) or os.O_RDONLY
+    flags = access | _required_open_flag("O_DIRECTORY") | _required_open_flag("O_NOFOLLOW")
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise RunnerError("generation log parent is unavailable or unsafe") from error
+    try:
+        descriptor_info = os.fstat(descriptor)
+        path_info = path.lstat()
+        if (
+            not stat.S_ISDIR(descriptor_info.st_mode)
+            or not stat.S_ISDIR(path_info.st_mode)
+            or path.resolve(strict=True) != path
+            or (descriptor_info.st_dev, descriptor_info.st_ino)
+            != (path_info.st_dev, path_info.st_ino)
+            or (
+                expected_identity is not None
+                and (descriptor_info.st_dev, descriptor_info.st_ino) != expected_identity
+            )
+        ):
+            raise RunnerError("generation log parent provenance drifted")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _open_private_log(path: Path, *, directory_fd: int | None = None) -> Any:
     flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
-    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags, 0o600)
+    flags |= getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    target: str | Path = path.name if directory_fd is not None else path
+    if directory_fd is None:
+        descriptor = os.open(target, flags, 0o600)
+    else:
+        descriptor = os.open(target, flags, 0o600, dir_fd=directory_fd)
     try:
         os.fchmod(descriptor, 0o600)
         return os.fdopen(descriptor, "w+b")
@@ -508,8 +556,25 @@ def _run_codex(
     hard_seconds: int,
     inactivity_seconds: int | None = None,
     initial_fingerprint: tuple[tuple[str, str, int, int], ...] = (),
+    expected_log_parents: dict[Path, tuple[int, int]] | None = None,
 ) -> tuple[int, str, int, bytes, bytes]:
-    with _open_private_log(stdout_log) as stdout, _open_private_log(stderr_log) as stderr:
+    with ExitStack() as resources:
+        parent_descriptors: dict[Path, int] = {}
+        for parent in sorted({stdout_log.parent, stderr_log.parent}, key=str):
+            expected_identity = None
+            if expected_log_parents is not None:
+                expected_identity = expected_log_parents.get(parent)
+                if expected_identity is None:
+                    raise RunnerError("generation log parent provenance is missing")
+            descriptor = _open_log_directory(parent, expected_identity)
+            resources.callback(os.close, descriptor)
+            parent_descriptors[parent] = descriptor
+        stdout = resources.enter_context(
+            _open_private_log(stdout_log, directory_fd=parent_descriptors[stdout_log.parent])
+        )
+        stderr = resources.enter_context(
+            _open_private_log(stderr_log, directory_fd=parent_descriptors[stderr_log.parent])
+        )
         process: subprocess.Popen[bytes] | None = None
         try:
             process = subprocess.Popen(
@@ -575,20 +640,24 @@ def _run_codex(
                 _terminate(process)
         stdout_info = os.fstat(stdout.fileno())
         stderr_info = os.fstat(stderr.fileno())
-        try:
-            stdout_path_info = stdout_log.lstat()
-            stderr_path_info = stderr_log.lstat()
-        except OSError as error:
-            raise RunnerError("generation log provenance drifted during execution") from error
-        if (
-            stdout_log.is_symlink()
-            or stderr_log.is_symlink()
-            or (stdout_info.st_dev, stdout_info.st_ino)
-            != (stdout_path_info.st_dev, stdout_path_info.st_ino)
-            or (stderr_info.st_dev, stderr_info.st_ino)
-            != (stderr_path_info.st_dev, stderr_path_info.st_ino)
-        ):
-            raise RunnerError("generation log provenance drifted during execution")
+        for path, handle_info in ((stdout_log, stdout_info), (stderr_log, stderr_info)):
+            parent_descriptor = parent_descriptors[path.parent]
+            try:
+                parent_descriptor_info = os.fstat(parent_descriptor)
+                parent_path_info = path.parent.lstat()
+                path_info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+                canonical_parent = path.parent.resolve(strict=True)
+            except OSError as error:
+                raise RunnerError("generation log provenance drifted during execution") from error
+            if (
+                not stat.S_ISDIR(parent_path_info.st_mode)
+                or canonical_parent != path.parent
+                or (parent_descriptor_info.st_dev, parent_descriptor_info.st_ino)
+                != (parent_path_info.st_dev, parent_path_info.st_ino)
+                or not stat.S_ISREG(path_info.st_mode)
+                or (handle_info.st_dev, handle_info.st_ino) != (path_info.st_dev, path_info.st_ino)
+            ):
+                raise RunnerError("generation log provenance drifted during execution")
         stdout_data = _read_fd_exact(stdout.fileno(), stdout_info.st_size)
         stderr_data = _read_fd_exact(stderr.fileno(), stderr_info.st_size)
     return exit_code, reason, progress_events, stdout_data, stderr_data
@@ -678,7 +747,9 @@ def _assert_file_tool_records(expected: dict[str, Any]) -> None:
         raise RunnerError("runner tool provenance drifted during execution")
 
 
-def _execution_paths(spec: ExecutionSpec) -> tuple[tuple[str, str, int, int], ...]:
+def _execution_paths(
+    spec: ExecutionSpec,
+) -> tuple[tuple[tuple[str, str, int, int], ...], dict[Path, tuple[int, int]]]:
     if not spec.stage.is_absolute():
         raise RunnerError("stage must be an absolute real directory")
     try:
@@ -693,15 +764,18 @@ def _execution_paths(spec: ExecutionSpec) -> tuple[tuple[str, str, int, int], ..
         raise RunnerError("initial stage byte quota exceeded")
     if spec.stdout_log == spec.stderr_log:
         raise RunnerError("stdout and stderr logs must be distinct")
+    log_parent_identities: dict[Path, tuple[int, int]] = {}
     for path, label in ((spec.stdout_log, "stdout log"), (spec.stderr_log, "stderr log")):
         if not path.is_absolute() or path.exists() or path.is_symlink():
             raise RunnerError(f"{label} must be an absolute nonexistent path")
         parent = path.parent.resolve(strict=True)
-        if parent != path.parent or not parent.is_dir():
+        parent_info = path.parent.lstat()
+        if parent != path.parent or not stat.S_ISDIR(parent_info.st_mode):
             raise RunnerError(f"{label} parent must be a real directory")
+        log_parent_identities[path.parent] = (parent_info.st_dev, parent_info.st_ino)
         if path == spec.stage or spec.stage in path.parents:
             raise RunnerError(f"{label} must be outside the writable stage")
-    return initial_fingerprint
+    return initial_fingerprint, log_parent_identities
 
 
 def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
@@ -709,7 +783,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
 
     if not isinstance(spec, ExecutionSpec):
         raise RunnerError("execute_isolated requires an ExecutionSpec")
-    initial_fingerprint = _execution_paths(spec)
+    initial_fingerprint, log_parent_identities = _execution_paths(spec)
     model = _validate_model(spec.model)
     reasoning_effort = _validate_reasoning_effort(spec.reasoning_effort)
     skill_references = _validated_skill_reference_records(spec.skill_references)
@@ -801,6 +875,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             spec.hard_seconds,
             spec.inactivity_seconds,
             initial_fingerprint,
+            log_parent_identities,
         )
         if len(stdout_data) + len(stderr_data) > LOG_LIMIT:
             raise RunnerError("generation log quota exceeded")
