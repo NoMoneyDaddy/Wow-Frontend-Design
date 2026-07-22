@@ -45,6 +45,8 @@ from current_skill_repair import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_SOURCE = ROOT / "wow-frontend-design"
+EXECUTION_CORE = ROOT / "evals" / "codex_isolated_build_core.py"
+TRACE_VALIDATOR = ROOT / "evals" / "validate_codex_log_policy.py"
 DESIGN_VALIDATOR = ROOT / "evals" / "validate_design_md_clean.py"
 HTML_SMOKE_VALIDATOR = ROOT / "evals" / "playwright_html_smoke.cjs"
 BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
@@ -1062,6 +1064,8 @@ def _wrapper_tool_records() -> dict[str, Any]:
     records: dict[str, Any] = {}
     for name, path in (
         ("current_policy", Path(__file__).resolve()),
+        ("core", EXECUTION_CORE),
+        ("trace_validator", TRACE_VALIDATOR),
         ("design_validator", DESIGN_VALIDATOR),
         ("html_smoke_validator", HTML_SMOKE_VALIDATOR),
         ("browser_runtime", BROWSER_RUNTIME),
@@ -2028,6 +2032,7 @@ def run(
             pass
         if trusted_wrapper_tools is None:
             error = RunnerError("current policy tool provenance drifted during failure handling")
+            execution = None
             design_rejection = None
             html_smoke_rejection = None
             html_smoke_unavailable = None

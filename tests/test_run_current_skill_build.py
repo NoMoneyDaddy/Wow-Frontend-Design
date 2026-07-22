@@ -1320,6 +1320,16 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("execution_infrastructure_failure", receipt["classification"])
             self.assertNotIn("#primary", json.dumps(receipt))
 
+    def test_wrapper_provenance_covers_execution_core_and_trace_auditor(self) -> None:
+        records = policy._wrapper_tool_records()
+        for name, path in (
+            ("core", CORE_PATH),
+            ("trace_validator", ROOT / "evals" / "validate_codex_log_policy.py"),
+        ):
+            with self.subTest(name=name):
+                self.assertIn(name, records)
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), records[name]["sha256"])
+
     def test_rejection_path_revalidates_wrapper_provenance_before_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -1328,7 +1338,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             log_dir.mkdir()
             baseline = policy._wrapper_tool_records()
             drifted = json.loads(json.dumps(baseline))
-            drifted["design_validator"]["sha256"] = "0" * 64
+            drifted["trace_validator"]["sha256"] = "0" * 64
             rejected = {
                 "status": "rejected",
                 "required_result": "zero-errors-zero-warnings",
@@ -1358,6 +1368,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("execution_infrastructure_failure", receipt["classification"])
             self.assertNotIn("tools", receipt)
             self.assertNotIn("design_rejection", receipt)
+            self.assertNotIn("execution", receipt)
+            self.assertNotIn("configured_isolation", receipt)
+            self.assertNotIn("trace_observed", receipt)
+            self.assertEqual({}, receipt["logs"])
 
     def test_generation_failure_only_trusts_fresh_wrapper_provenance(self) -> None:
         for drift in (False, True):
