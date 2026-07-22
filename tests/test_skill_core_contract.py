@@ -67,6 +67,31 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertNotIn("fresh desktop/mobile Playwright contexts", pressure)
         self.assertNotIn("zero runtime, egress, root-overflow, or Axe findings", pressure)
 
+    def test_project_verification_does_not_inherit_controlled_eval_overhead(self) -> None:
+        quality = QUALITY_GATES.read_text(encoding="utf-8")
+        for phrase in (
+            "`PROJECT_VERIFICATION`",
+            "`CONTROLLED_EVAL`",
+            "catalogue, not a mandatory checklist",
+            "review lenses, not three browser or capture passes",
+            "Reuse one fresh evidence set",
+            "Only `CONTROLLED_EVAL` requires evaluator-owned",
+            "In `CONTROLLED_EVAL`, a completion claim binds `novel-discovery`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, quality)
+        self.assertNotIn("| Route/state | 320 | 390 | 768 | 1024 | 1440 |", quality)
+        self.assertIn("Only a controlled cohort runs the bounded discovery probe.", self.text)
+        self.assertIn("In a controlled cohort, acceptance remains evaluator-owned.", self.text)
+
+    def test_convergence_review_does_not_create_an_inverse_house_style(self) -> None:
+        quality = QUALITY_GATES.read_text(encoding="utf-8")
+        self.assertIn(
+            "A repeated generic pattern becomes a finding only when product evidence supports a more specific alternative",
+            quality,
+        )
+        self.assertNotIn("the page does not converge on generic card-grid SaaS output", quality)
+
     def test_fixed_viewports_are_only_a_fallback_when_support_is_unknown(self) -> None:
         compact = COMPACT.read_text(encoding="utf-8")
         no_visual = NO_VISUAL.read_text(encoding="utf-8")
@@ -185,6 +210,23 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertIn("one coherent native role/state/keyboard model per control", self.text)
         self.assertIn("a live enabled focus target after re-render", self.text)
+
+    def test_design_md_is_created_only_for_shared_system_governance(self) -> None:
+        system = self.text.split("### 4. System", 1)[1].split("### 5. Vertical slice", 1)[0]
+        for phrase in (
+            "Create or update repository-root `DESIGN.md` only when",
+            "one already exists",
+            "the user requests the artifact",
+            "shared visual system across multiple routes or reusable components",
+            "For a route-local presentation change",
+            "do not create a governance artifact solely to satisfy verification",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, system)
+        self.assertNotIn(
+            "When implementation creates or changes a visual system, create or update",
+            system,
+        )
 
     def test_responsive_task_order_stays_semantic_and_reachable(self) -> None:
         representation = self.text.split("### 2. Representation", 1)[1].split(

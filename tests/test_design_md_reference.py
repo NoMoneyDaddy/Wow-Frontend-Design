@@ -50,6 +50,13 @@ class DesignMdReferenceTests(unittest.TestCase):
         self.assertIn("does not prove implementation, browser behavior, accessibility, product fit, or aesthetic quality", self.trace)
         self.assertIn("The pinned DESIGN.md linter validates supported syntax; it does not validate trace truth", self.trace)
 
+    def test_route_local_work_does_not_create_system_governance(self) -> None:
+        self.assertIn(
+            "A route-local presentation change without an existing contract keeps its consumed roles in runtime code and the task handoff",
+            self.reference,
+        )
+        self.assertIn("does not create `DESIGN.md`", self.reference)
+
 
 class DesignMdTemplateTests(unittest.TestCase):
     @classmethod

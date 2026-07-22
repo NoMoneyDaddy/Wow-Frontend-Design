@@ -61,6 +61,17 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.creative)
 
+    def test_thin_briefs_allow_one_reversible_authored_hypothesis(self) -> None:
+        for phrase in (
+            "one reversible authored hypothesis",
+            "`HYPOTHESIS`, never as product fact",
+            "identity carrier → expected task/content benefit → failure signal",
+            "cheapest disconfirming check → replacement rule",
+            "must not invent product facts, research, rights, assets, or user preference",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.creative)
+
     def test_external_methods_are_distilled_into_bounded_mother_rules(self) -> None:
         for phrase in (
             "reference instance → rhythm | density | navigation | type | material | imagery | motion",

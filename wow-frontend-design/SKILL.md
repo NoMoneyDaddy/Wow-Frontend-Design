@@ -107,7 +107,7 @@ Compare directions only for a material unresolved choice. When the user requests
 
 Create only roles the implementation consumes. `none`, `inherited`, and `unknown` are valid; never fill categories with invented tokens.
 
-When implementation creates or changes a visual system, create or update repository-root `DESIGN.md` and map its roles to shared runtime tokens or primitives. Run the project-pinned clean validator immediately when available. If it is unavailable and installation is not authorized, preserve the document/runtime mapping, continue to the runnable slice, and mark document validation `UNVERIFIED`; do not install or alter the lockfile merely to unblock composition. Document lint proves syntax, not rendered fidelity. Extend the existing system instead of creating a parallel one.
+Create or update repository-root `DESIGN.md` only when one already exists, the user requests the artifact, or the change establishes or materially changes a shared visual system across multiple routes or reusable components. For a route-local presentation change, keep consumed roles in runtime code and the handoff; do not create a governance artifact solely to satisfy verification. When in scope, map its roles to runtime tokens or primitives. Run the pinned validator if available; otherwise continue and mark document validation `UNVERIFIED` without changing the lockfile. Lint proves syntax, not rendered fidelity.
 
 When linked references are unavailable, `DESIGN.md` must still begin with this product-derived machine-readable frontmatter:
 
@@ -137,7 +137,7 @@ Expand primitives, routes, effects, or optimization only after the slice works. 
 
 ### 6. Pressure, repair, and replay
 
-Load [quality-gates.md](references/quality-gates.md) and run applicable project checks. In a controlled external-evaluator cohort, the builder reference context stays frozen: the evaluator owns these gates and gives repairs bounded findings, never mutable acceptance instructions. Before claims, boot the latest build in fresh Playwright contexts and run the declared affected matrix; each viewport profile is required only when in scope. Require visible primary content and no unresolved confirmed runtime, egress, root-overflow, or applicable accessibility violation under frozen evaluator policy. Classify false positives, unavailable evidence, and evaluator defects separately. Then run one bounded discovery probe not copied from an issue list.
+Load [quality-gates.md](references/quality-gates.md) and run applicable project checks. In a controlled external-evaluator cohort, the builder reference context stays frozen: the evaluator owns these gates and gives repairs bounded findings, never mutable acceptance instructions. Before claims, boot the latest build in fresh Playwright contexts and run the declared affected matrix; each viewport profile is required only when in scope. Require visible primary content and no unresolved confirmed runtime, egress, root-overflow, or applicable accessibility violation under frozen evaluator policy. Classify false positives, unavailable evidence, and evaluator defects separately. Only a controlled cohort runs the bounded discovery probe.
 
 Pressure applicable surfaces with extreme content, declared viewport extremes, keyboard/focus, zoom, reduced motion, locale, async failure, repeat actions, state round-trips, and font/effect failure. Record route, state, viewport, reproduction, expected/actual behavior, evidence, severity, and ownership. Confirm findings by replay or a nearby counterexample; otherwise keep them advisory.
 
@@ -183,6 +183,6 @@ Label material claims:
 - `INFERRED`: source inspection or reasoning supports the claim, but it was not executed or rendered.
 - `UNVERIFIED`: the check was not run, was blocked, or lacks adequate evidence.
 
-Acceptance remains evaluator-owned. Never edit an active gate, accept a self-authored score, present an affected replay as a full matrix, or upgrade `INFERRED` or `UNVERIFIED` evidence.
+In a controlled cohort, acceptance remains evaluator-owned. Never edit an active gate, accept a self-authored score, present an affected replay as a full matrix, or upgrade `INFERRED` or `UNVERIFIED` evidence.
 
 Report direction, declared viewport behavior, contract changes, artifact path, executed checks, fresh evidence, remaining risk, and next action. Keep it concise.

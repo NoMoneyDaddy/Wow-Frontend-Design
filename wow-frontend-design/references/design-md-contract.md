@@ -16,6 +16,7 @@ Third-party galleries are comparative research, not syntax authority. A polished
 - For a new visual system, create it after the design thesis and before page composition.
 - For an existing product, extract approved tokens, components, and rationale from production sources. Do not overwrite evidence with a new aesthetic guess.
 - For an audit, read and compare the file without mutating it. For a focused repair that neither changes the system nor has an existing file, do not manufacture unrelated documentation.
+- A route-local presentation change without an existing contract keeps its consumed roles in runtime code and the task handoff; it does not create `DESIGN.md`. Create governance only when the user requests it or the change establishes or materially alters rules shared across routes or reusable components.
 - Treat token frontmatter as normative visual values. Treat prose as rationale and application guidance. Runtime shared tokens and components implement the contract; page-local copies do not.
 
 ## Persist material decision traces without a new DSL

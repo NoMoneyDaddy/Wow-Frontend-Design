@@ -2,17 +2,19 @@
 
 Use this reference to verify and automatically repair a frontend before calling it verified. These gates steer the implementation loop; they are not a rejection UI for the user. Award-level intent does not excuse fragile implementation.
 
+Choose one mode before planning evidence. `PROJECT_VERIFICATION` is the normal product path: use repository checks plus fresh affected Playwright evidence, and label each claim to its executed scope. `CONTROLLED_EVAL` applies only when an external evaluator, frozen cohort, or benchmark explicitly supplies its policy and acceptance surface. Only `CONTROLLED_EVAL` requires evaluator-owned ledgers, policies, acceptance, `novel-discovery`, quarantines, blind reviewer floors, or benchmark validity records. Missing controlled infrastructure must not downgrade an otherwise supported project claim.
+
 ## Contents
 
 1. Required evidence
-2. Three-pass review
+2. Evidence-reuse review
 3. Viewport and state matrix
 4. Layered quality decision
 5. Internal completion gates
 
 ## 1. Required evidence
 
-Collect what the environment allows:
+Collect only evidence applicable to the active claim, diff risk, and selected mode. The bullets below are a catalogue, not a mandatory checklist:
 
 - successful build, typecheck, lint, and focused tests;
 - screenshots of representative routes at declared representative viewport profiles; when no support matrix exists, sample mobile and desktop conservatively without inventing support;
@@ -34,7 +36,7 @@ Collect what the environment allows:
 
 For every audit tool, record the exact version, browser/runtime, configuration, URL/build revision, authenticated state, wait condition, scope, timestamp, and raw artifact. Lighthouse, axe, browser engines, rule IDs, scoring, and report schemas change; do not hardcode removed audit names or compare scores across tool versions as if they were identical. Field Core Web Vitals and lab diagnostics remain different evidence classes.
 
-Record executable checks with an evaluator-initialized `scripts/evidence_ledger.py` run and frozen evidence policy when available. Use one evaluator-owned root containing sibling `ledger.json`, `policy.json`, `artifacts/`, and a child `workspace/`; the implementation model may write only `workspace/`. Every ledger `run` must pass `--cwd <evaluator-root>/workspace` (or a descendant), every policy command `cwd` must resolve inside that workspace, and observed artifacts must remain under the evaluator root but outside the workspace. Pass the same child to scorer `--workspace-root`; never place ledger or policy in the implementation checkout. In the handoff, mark every material claim `VERIFIED`, `OBSERVED`, `INFERRED`, or `UNVERIFIED`, plus its semantic `claim_type`. A self-issued score is never verification; subjective craft needs actual rendered review and benefits from an independent reviewer.
+In `CONTROLLED_EVAL`, record executable checks with an evaluator-initialized `scripts/evidence_ledger.py` run and frozen evidence policy. Use one evaluator-owned root containing sibling `ledger.json`, `policy.json`, `artifacts/`, and a child `workspace/`; the implementation model may write only `workspace/`. Every ledger `run` must pass `--cwd <evaluator-root>/workspace` (or a descendant), every policy command `cwd` must resolve inside that workspace, and observed artifacts must remain under the evaluator root but outside the workspace. Pass the same child to scorer `--workspace-root`; never place ledger or policy in the implementation checkout. In either mode, mark every material claim `VERIFIED`, `OBSERVED`, `INFERRED`, or `UNVERIFIED`, plus its semantic `claim_type`. A self-issued score is never verification; subjective craft needs actual rendered review and benefits from an independent reviewer.
 
 Keep acceptance independent from implementation. Freeze evaluator-owned tests and schemas before asking a weak model to edit the product. Prefer browser outcomes over source keywords; pair unavoidable static assertions with behavior checks, strip comments first, and include separately owned or undisclosed checks. Any attempt to edit the gate, insert test-only keywords, fabricate an artifact, or weaken an assertion is a failed evaluation even when the command exits zero. A failed check returns structured evidence to the repair loop automatically; it does not require the user to resubmit the request.
 
@@ -70,9 +72,11 @@ When an evaluator supplies browser contract v2, use its font, text-geometry, loc
 
 When rendering is unavailable, route through [no-visual-first-pass.md](no-visual-first-pass.md). Browserless checks may release a low-risk artifact only with an explicit evidence ceiling; they cannot earn rendered-visual, browser, touch, assistive-technology, or formal-conformance acceptance. A structured high-risk no-visual result must be `blocked` or match an `accepted_by_evaluator` record in the evaluator-owned policy; builder-authored acceptance is invalid.
 
-## 2. Three-pass review
+## 2. Evidence-reuse review
 
-### Pass 1 — comprehension and access
+The sections below are review lenses, not three browser or capture passes. Reuse one fresh evidence set across every applicable lens; capture or replay again only after the artifact changes or when a named claim requires another route, state, viewport, preference, or interaction.
+
+### Lens 1 — comprehension and access
 
 Verify:
 
@@ -88,7 +92,7 @@ Verify:
 
 Fix failures and capture the same view again.
 
-### Pass 2 — identity and craft
+### Lens 2 — identity and craft
 
 Apply [anti-ai-slop.md](anti-ai-slop.md) as an evidence-based convergence gate. Do not reward arbitrary weirdness, penalize familiar task-appropriate patterns, or let the implementing model certify its own taste.
 
@@ -107,18 +111,18 @@ Verify:
 - border roles, type axes, component state colors, light direction, shadows, transparency/effect budget, and motion physics agree with the declared material system;
 - any in-scope signature feels authored rather than library-default; focused repairs preserve identity without inventing a new effect;
 - motion timing has hierarchy and a meaningful reduced-motion equivalent;
-- the page does not converge on generic card-grid SaaS output.
+- A repeated generic pattern becomes a finding only when product evidence supports a more specific alternative and the rendered result weakens task hierarchy, preserved identity, or authored product fit. Familiar task-appropriate patterns remain valid; do not create an inverse house style by forcing novelty.
 - explicit brand invariants are preserved; inferred rules and unknowns are not presented as official brand truth; a campaign overlay does not overwrite product-system safety or semantics;
 
 Fix and compare in grayscale as well as color.
 
-### Pass 3 — mobile and resilience
+### Lens 3 — mobile and resilience
 
 Verify:
 
 - mobile transformation table is reflected in the rendered product;
 - touch targets, thumb reach, safe areas, virtual keyboard, and landscape work;
-- 320px, tablet, and wide screens have intentional compositions;
+- declared narrow, transition, and wide composition regimes have intentional behavior;
 - long locales, Traditional Chinese, mixed scripts, and RTL claims survive;
 - no accidental horizontal overflow or fixed-height clipping;
 - no first-paint menu, dialog, or sheet left open unintentionally, and no fixed/sticky control covering the primary task or focused content;
@@ -139,12 +143,12 @@ Build a compact matrix for the routes in scope. Use three layers instead of clai
 
 The width columns below are a conservative fallback template only when no support matrix is declared; replace them with the product's actual profiles.
 
-| Route/state | 320 | 390 | 768 | 1024 | 1440 | Keyboard | zh-Hant/long | Reduced motion |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Primary route/default |  |  |  |  |  |  |  |  |
-| Navigation open |  |  |  |  |  |  |  |  |
-| Loading/empty/error |  |  |  |  |  |  |  |  |
-| Key workflow complete |  |  |  |  |  |  |  |  |
+| Route/state | Narrow | Transition | Wide | Keyboard | zh-Hant/long | Reduced motion |
+| --- | --- | --- | --- | --- | --- | --- |
+| Primary route/default |  |  |  |  |  |  |
+| Navigation open |  |  |  |  |  |  |
+| Loading/empty/error |  |  |  |  |  |  |
+| Key workflow complete |  |  |  |  |  |  |
 
 Adapt rows to the product. Record why a row/cell is applicable, sampled, or excluded. Never test only the happy homepage, and never turn a sampled matrix into an all-routes or formal-conformance claim.
 
@@ -152,13 +156,13 @@ Do not impose one screenshot quota on every user project. During an automatic re
 
 ### Bounded discovery artifact
 
-For a completion claim, bind `novel-discovery` to an evaluator-owned JSON report with schema `1`, not a successful command or arbitrary file. It contains a non-empty `probes` array and a `findings` array. Each probe records `id`, route, viewport, state, method, outcome (`pass`, `candidate`, or `blocked`), and non-empty evidence. Each finding records its `novel:<surface>:<state>:<symptom>` ID, severity, reproduction, expected and actual result, owner, and confirmation evidence. `clean_after_probes` has no findings; `findings` has at least one. A finding is confirmed only when `confirmation.replays >= 2`; otherwise it remains advisory. Empty, command-only, blocked, or unconfirmed evidence cannot support `VERIFIED`.
+In `CONTROLLED_EVAL`, a completion claim binds `novel-discovery` to an evaluator-owned JSON report with schema `1`, not a successful command or arbitrary file. It contains a non-empty `probes` array and a `findings` array. Each probe records `id`, route, viewport, state, method, outcome (`pass`, `candidate`, or `blocked`), and non-empty evidence. Each finding records its `novel:<surface>:<state>:<symptom>` ID, severity, reproduction, expected and actual result, owner, and confirmation evidence. `clean_after_probes` has no findings; `findings` has at least one. A finding is confirmed only when `confirmation.replays >= 2`; otherwise it remains advisory. Empty, command-only, blocked, or unconfirmed evidence cannot support controlled release.
 
 When an independent project- or evaluator-provided Playwright discovery runner is available, freeze its plan to the first declared route, the declared representative viewport profiles, and two fresh replays per profile. Check every reachable focusable control in each replay and accept only measurable non-color focus geometry. This Skill packages the report contract and validator, not a browser executable. Without an independent evaluator, fresh Playwright observations may guide repair but cannot become evaluator-owned acceptance or support `VERIFIED`; mark that acceptance scope `UNVERIFIED` instead of fabricating the report. A blocked probe is evaluator/infrastructure advisory, not a product repair finding. Disclose discovery advisories and keep acceptance out of a clean pass; only confirmed findings enter product repair.
 
 ## 4. Layered quality decision
 
-Do not collapse validity, product quality, award comparison, and Skill efficiency into one score. They answer different questions and must remain separate.
+The structured layers below govern `CONTROLLED_EVAL`. `PROJECT_VERIFICATION` uses applicable repository gates and fresh affected evidence without requiring evaluator-owned infrastructure or an independent craft acceptance floor. Do not collapse validity, product quality, award comparison, and Skill efficiency into one score. They answer different questions and must remain separate.
 
 ### A. Run validity and infrastructure
 

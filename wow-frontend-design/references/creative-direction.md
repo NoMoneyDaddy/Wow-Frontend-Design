@@ -44,6 +44,15 @@ source and status → observation → direction decision → affected route/stat
 
 Treat design or behavioral research as a hypothesis with a transfer assumption. Use [behavioral-design-evidence.md](behavioral-design-evidence.md) when a claim invokes psychology, persuasion, attention, or conversion. If a material decision has no trace to product meaning, audience need, stated preference, preserved identity, or verified constraint, simplify it or leave it unresolved.
 
+For an empty `BUILD` or broad redesign whose product facts and task are sufficient but whose taste evidence is thin, commit to one reversible authored hypothesis instead of defaulting every open visual decision to neutral. Record it as `HYPOTHESIS`, never as product fact:
+
+```text
+identity carrier → expected task/content benefit → failure signal
+→ cheapest disconfirming check → replacement rule
+```
+
+Keep the hypothesis local to the affected direction and cheap to replace until rendered evidence supports it. It must not invent product facts, research, rights, assets, or user preference, override a frozen invariant, or turn a project-level rejection into a global style blacklist. If the hypothesis fails, replace the unsupported choice; do not add decoration to defend it.
+
 ## 2. Form the direction
 
 Compress the evidence into one working concept:
