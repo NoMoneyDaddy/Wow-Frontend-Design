@@ -67,6 +67,8 @@ Cleanup deletes only the exact owned manifest after confirming no unowned files 
 
 During the fast draft pass, render the shared minimum slice plus only the extra state, content extreme, or composition transition that could reverse the direction decision. Apply cheap exclusion checks for preserved content/actions, obvious overflow, unreadable contrast, unusable focus, and impossible mobile transformation. Run the full affected state and viewport matrix only for the selected direction.
 
+With two or more independently generated candidates, route matched surface, viewport, and state observations through the optional `scripts/cross_output_template_audit.cjs` telemetry in [research-validation-loop.md](research-validation-loop.md). Treat its candidates as advisory prompts for product evidence and paired rendered review; never make a match a release blocker or a non-match proof of originality.
+
 For the selected direction, render with the same frozen conditions and cover:
 
 - the same declared representative viewport profiles plus affected composition transitions; when support is unknown, sample mobile and desktop conservatively without inventing a product contract;
