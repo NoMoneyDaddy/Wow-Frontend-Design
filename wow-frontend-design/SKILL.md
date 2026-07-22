@@ -10,7 +10,7 @@ metadata:
 
 # WOW Frontend Design
 
-Create a coherent, product-derived experience through working code and rendered evidence. Make the product useful first; make its identity specific without turning a style into a default.
+Create a coherent, product-derived experience through working code and rendered evidence. Make it useful and specific without turning a style into a default.
 
 ## Contract
 
@@ -28,19 +28,19 @@ Create a coherent, product-derived experience through working code and rendered 
 
 ## Route references progressively
 
-**Initial reference bundle:** this core plus [creative-direction.md](references/creative-direction.md); add [no-visual-first-pass.md](references/no-visual-first-pass.md) when rendering is unavailable and one dominant task reference only for a concrete decision. Read selected files completely.
+**Initial reference bundle:** this core. Add [creative-direction.md](references/creative-direction.md) for `BUILD`, broad `RETROFIT`, or an explicitly unresolved direction. `POLISH`, `REPAIR`, and `AUDIT` do not load creative direction by default. Load [no-visual-first-pass.md](references/no-visual-first-pass.md) only when rendering is unavailable; add one dominant task reference only for a concrete decision. Read selected files completely.
 
-A run may load more references over time at the owning stage or after a named failure. Keep at most three non-core references in one model turn: current stage, dominant task, and one proven dependency. Replace frozen-stage references; split larger decisions into ordered stages.
+A run may load more references over time only at the owning stage or after a named failure. Keep at most three non-core references in one model turn: stage, task, dependency. Replace frozen-stage references; split larger decisions.
 
-- Foundation: [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md) when dominant; [design-md-contract.md](references/design-md-contract.md) before `DESIGN.md`; [anti-ai-slop.md](references/anti-ai-slop.md) after render; [quality-gates.md](references/quality-gates.md) before verification.
-- Type: [typographic-layout.md](references/typographic-layout.md); add [typography-webfonts.md](references/typography-webfonts.md) only for font delivery or selection.
-- Color/material: choose [color-system-psychology.md](references/color-system-psychology.md), [visual-material-system.md](references/visual-material-system.md), or [brand-system-fidelity.md](references/brand-system-fidelity.md). Image-first: [visual-storytelling.md](references/visual-storytelling.md). Data/token work: [data-visualization-color.md](references/data-visualization-color.md), [design-token-portability.md](references/design-token-portability.md).
-- Motion/media: [motion-system.md](references/motion-system.md), [svg-system.md](references/svg-system.md), or [advanced-media.md](references/advanced-media.md) after admitting that medium.
-- Implementation: [implementation.md](references/implementation.md) during formal production; add [retrofit.md](references/retrofit.md) or [platform-adapters.md](references/platform-adapters.md) as detected.
-- Product: [component-composition.md](references/component-composition.md), [pattern-catalog.md](references/pattern-catalog.md), [frontend-security.md](references/frontend-security.md), [search-discovery.md](references/search-discovery.md), [product-discovery-usability.md](references/product-discovery-usability.md), [site-planning-wireframes.md](references/site-planning-wireframes.md), or [wcag-aa-checklist.md](references/wcag-aa-checklist.md) only for its named concern.
-- Capability: [weak-model-playbook.md](references/weak-model-playbook.md), [model-routing.md](references/model-routing.md), or degraded [prompt-only-compact.md](adapters/prompt-only-compact.md).
+- Foundation: dominant [mobile-responsive.md](references/mobile-responsive.md) or [localization.md](references/localization.md); [design-md-contract.md](references/design-md-contract.md) before `DESIGN.md`; [anti-ai-slop.md](references/anti-ai-slop.md) after render; [quality-gates.md](references/quality-gates.md) for verification.
+- Type: [typographic-layout.md](references/typographic-layout.md); [typography-webfonts.md](references/typography-webfonts.md) for font delivery or selection.
+- Color/material: [color-system-psychology.md](references/color-system-psychology.md), [visual-material-system.md](references/visual-material-system.md), or [brand-system-fidelity.md](references/brand-system-fidelity.md); image: [visual-storytelling.md](references/visual-storytelling.md); data/token: [data-visualization-color.md](references/data-visualization-color.md), [design-token-portability.md](references/design-token-portability.md).
+- Admitted motion/media: [motion-system.md](references/motion-system.md), [svg-system.md](references/svg-system.md), or [advanced-media.md](references/advanced-media.md).
+- Implementation: [implementation.md](references/implementation.md) during formal production; [retrofit.md](references/retrofit.md) or [platform-adapters.md](references/platform-adapters.md) when detected.
+- Product concern: [component-composition.md](references/component-composition.md), [pattern-catalog.md](references/pattern-catalog.md), [frontend-security.md](references/frontend-security.md), [search-discovery.md](references/search-discovery.md), [product-discovery-usability.md](references/product-discovery-usability.md), [site-planning-wireframes.md](references/site-planning-wireframes.md), or [wcag-aa-checklist.md](references/wcag-aa-checklist.md).
+- Capability: [weak-model-playbook.md](references/weak-model-playbook.md), [model-routing.md](references/model-routing.md), or [prompt-only-compact.md](adapters/prompt-only-compact.md).
 - Review: [design-exploration.md](references/design-exploration.md), [interaction-audit.md](references/interaction-audit.md), [visual-regression-evidence.md](references/visual-regression-evidence.md), or explicitly requested [award-quality-lens.md](references/award-quality-lens.md).
-- Maintenance only: [curated-skill-integration.md](references/curated-skill-integration.md), [behavioral-design-evidence.md](references/behavioral-design-evidence.md), [research-validation-loop.md](references/research-validation-loop.md), [github-skill-research.md](references/github-skill-research.md), [ui-skills-ecosystem.md](references/ui-skills-ecosystem.md).
+- Maintenance: [curated-skill-integration.md](references/curated-skill-integration.md), [behavioral-design-evidence.md](references/behavioral-design-evidence.md), [research-validation-loop.md](references/research-validation-loop.md), [github-skill-research.md](references/github-skill-research.md), [ui-skills-ecosystem.md](references/ui-skills-ecosystem.md).
 
 ## Choose the operating lane
 
@@ -107,7 +107,7 @@ Compare directions only for a material unresolved choice. When the user requests
 
 Create only roles the implementation consumes. `none`, `inherited`, and `unknown` are valid; never fill categories with invented tokens.
 
-Create or update repository-root `DESIGN.md` only when one already exists, the user requests the artifact, or the change establishes or materially changes a shared visual system across multiple routes or reusable components. For a route-local presentation change, keep consumed roles in runtime code and the handoff; do not create a governance artifact solely to satisfy verification. When in scope, map its roles to runtime tokens or primitives. Run the pinned validator if available; otherwise continue and mark document validation `UNVERIFIED` without changing the lockfile. Lint proves syntax, not rendered fidelity.
+Create or update repository-root `DESIGN.md` only when one already exists, the user requests the artifact, or the change establishes or materially changes a shared visual system across multiple routes or reusable components. For a route-local presentation change, keep roles in runtime code and the handoff; do not create a governance artifact solely to satisfy verification. When in scope, map roles and run the pinned validator; if unavailable, mark document validation `UNVERIFIED` without changing the lockfile. Lint proves syntax, not rendered fidelity.
 
 When linked references are unavailable, `DESIGN.md` must still begin with this product-derived machine-readable frontmatter:
 
@@ -137,7 +137,7 @@ Expand primitives, routes, effects, or optimization only after the slice works. 
 
 ### 6. Pressure, repair, and replay
 
-Load [quality-gates.md](references/quality-gates.md) and run applicable project checks. In a controlled external-evaluator cohort, the builder reference context stays frozen: the evaluator owns these gates and gives repairs bounded findings, never mutable acceptance instructions. Before claims, boot the latest build in fresh Playwright contexts and run the declared affected matrix; each viewport profile is required only when in scope. Require visible primary content and no unresolved confirmed runtime, egress, root-overflow, or applicable accessibility violation under frozen evaluator policy. Classify false positives, unavailable evidence, and evaluator defects separately. Only a controlled cohort runs the bounded discovery probe.
+Load [quality-gates.md](references/quality-gates.md) and run applicable checks. Replay the declared affected matrix on the latest build in fresh Playwright contexts; each profile is required only when in scope. Require visible primary content and no unresolved confirmed runtime, egress, root-overflow, or applicable accessibility failure under frozen evaluator policy. In a controlled external-evaluator cohort (`CONTROLLED_EVAL`), builder reference context stays frozen; accept only bounded findings and run the discovery probe. Classify unavailable evidence and evaluator defects separately.
 
 Pressure applicable surfaces with extreme content, declared viewport extremes, keyboard/focus, zoom, reduced motion, locale, async failure, repeat actions, state round-trips, and font/effect failure. Record route, state, viewport, reproduction, expected/actual behavior, evidence, severity, and ownership. Confirm findings by replay or a nearby counterexample; otherwise keep them advisory.
 

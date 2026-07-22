@@ -25,7 +25,7 @@ class SkillCoreContractTests(unittest.TestCase):
         cls.text = cls.raw.decode("utf-8")
 
     def test_core_stays_within_progressive_disclosure_budget(self) -> None:
-        self.assertLessEqual(len(self.raw), 20_000)
+        self.assertLessEqual(len(self.raw), 19_800)
         for phrase in (
             "Initial reference bundle",
             "one dominant task reference",
@@ -34,6 +34,20 @@ class SkillCoreContractTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text)
+
+    def test_initial_reference_bundle_is_lane_specific(self) -> None:
+        routing = self.text.split("## Route references progressively", 1)[1].split(
+            "## Choose the operating lane", 1
+        )[0]
+        for phrase in (
+            "`BUILD`, broad `RETROFIT`, or an explicitly unresolved direction",
+            "`POLISH`, `REPAIR`, and `AUDIT` do not load creative direction by default",
+            "Load [no-visual-first-pass.md](references/no-visual-first-pass.md) only when rendering is unavailable",
+            "one dominant task reference only for a concrete decision",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, routing)
+        self.assertNotIn("this core plus [creative-direction.md]", routing)
 
     def test_reference_lifecycle_has_one_owner(self) -> None:
         routing = MODEL_ROUTING.read_text(encoding="utf-8")
@@ -81,7 +95,8 @@ class SkillCoreContractTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, quality)
         self.assertNotIn("| Route/state | 320 | 390 | 768 | 1024 | 1440 |", quality)
-        self.assertIn("Only a controlled cohort runs the bounded discovery probe.", self.text)
+        self.assertIn("controlled external-evaluator cohort (`CONTROLLED_EVAL`)", self.text)
+        self.assertIn("run the discovery probe", self.text)
         self.assertIn("In a controlled cohort, acceptance remains evaluator-owned.", self.text)
 
     def test_convergence_review_does_not_create_an_inverse_house_style(self) -> None:
