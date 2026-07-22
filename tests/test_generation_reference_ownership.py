@@ -100,6 +100,8 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             "brand, value statement, required decision context, and primary action",
             "Defer every non-required block below that action",
             "repeated summary cards displace it",
+            "rendered candidate directions in the same frozen comparison cohort",
+            "whether produced in one batch or isolated runs",
             "scripts/cross_output_template_audit.cjs",
             "matched surface, viewport, and state",
             "paired rendered review",
