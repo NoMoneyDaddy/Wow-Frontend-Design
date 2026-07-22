@@ -19,6 +19,21 @@ Write a variant manifest:
 variant id → hypothesis → changed axes → held-constant axes → expected benefit → risk → states/viewports → selection evidence
 ```
 
+### Fast multi-direction draft pass
+
+When the user requests multiple direction drafts to confirm style, or a named high-impact ambiguity would make a full build wasteful, run a fast multi-direction draft pass before production. Each draft is a coherent direction group, not a colorway or a single tile. Use the smallest decisive set: normally three groups for an explicit open style choice, two for a binary hypothesis, and a fourth only when it answers another named question.
+
+Hold the product truth, task, real or representative content, data fixture, required behavior, brand invariants, and comparison conditions constant. Each group must express a different product hypothesis through several compatible changed axes—such as composition, typography, density, material, imagery, and motion character—not through palette or decoration alone. Require this minimum comparable slice from every group:
+
+- the same representative route at a declared desktop profile;
+- the mobile transformation of that route;
+- one decision-critical state or interaction specimen;
+- a terse rationale naming product evidence, changed and held axes, identity carrier, implementation risk, and what would disqualify it.
+
+Build only to the fidelity needed to make the visual and interaction direction observable. Reuse deterministic content fixtures and existing preview infrastructure, but do not let a shared shell force the candidates into one composition. Do not build three production implementations, connect production services, complete every route, extract speculative shared abstractions, or polish expensive motion before selection. A draft may simplify data plumbing; it may not fake factual content, hide a required action, or become a screenshot-only facade.
+
+Use fresh project-pinned Playwright captures under the same browser, fixture revision, locale, theme, viewport, and preference settings. Show individual captures at readable size and optionally assemble a labelled overview board for navigation; the overview does not replace the source captures. If rendering is unavailable, report that style confirmation is blocked rather than treating prose, code, or an old screenshot as visual proof.
+
 Preserve the first faithful/current-state render as an immutable baseline. Every candidate records its parent and changed axes; never overwrite the baseline or let a mutable “latest” artifact become ancestry. A wireframe, canvas draft, or decision specimen helps compare a material ambiguity, but it is not implementation or acceptance evidence.
 
 Define exclusion gates and decision criteria before revealing candidate identities. When specialist judgments are independent, collect them independently before discussion; a reviewer should score only dimensions supported by their evidence. Keep disagreement and unresolved criteria instead of manufacturing consensus.
@@ -50,7 +65,9 @@ Cleanup deletes only the exact owned manifest after confirming no unowned files 
 
 ## 4. Compare rendered behavior, not thumbnails alone
 
-Render each variant with the same:
+During the fast draft pass, render the shared minimum slice plus only the extra state, content extreme, or composition transition that could reverse the direction decision. Apply cheap exclusion checks for preserved content/actions, obvious overflow, unreadable contrast, unusable focus, and impossible mobile transformation. Run the full affected state and viewport matrix only for the selected direction.
+
+For the selected direction, render with the same frozen conditions and cover:
 
 - the same declared representative viewport profiles plus affected composition transitions; when support is unknown, sample mobile and desktop conservatively without inventing a product contract;
 - default, loading, empty, error, success, long-content, and relevant interaction states;
@@ -74,6 +91,8 @@ Choose one direction or an explicitly compatible synthesis. Do not combine every
 ```text
 selected thesis → kept axes → rejected axes and why → invariants → implementation delta → verification plan
 ```
+
+When the user requested style confirmation, present the fresh groups before production work and treat selection as the material direction checkpoint. If the user delegated selection, apply the predeclared product-fit and task criteria and record the reason instead of pausing. Freeze a selected style contract covering composition, typography, density, color roles, material, imagery, motion character, mobile transformation, preserved behaviors, and forbidden drift. Later production evidence must compare the selected implementation with this contract; do not reuse the draft captures as release evidence.
 
 Implement through the real design system and production route only after selection. Re-run the normal release gates; a working lab is not evidence that production integration works.
 

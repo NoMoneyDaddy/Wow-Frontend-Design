@@ -135,6 +135,14 @@ class SkillCoreContractTests(unittest.TestCase):
         offsets = [self.text.index(heading) for heading in headings]
         self.assertEqual(offsets, sorted(offsets))
 
+    def test_requested_multi_direction_drafts_route_to_fast_style_calibration(self) -> None:
+        direction = self.text.split("### 3. Direction", 1)[1].split(
+            "### 4. System", 1
+        )[0]
+        self.assertIn("multiple direction drafts to confirm style", direction)
+        self.assertIn("fast calibration pass", direction)
+        self.assertIn("design-exploration.md", direction)
+
     def test_restricted_hosts_still_receive_the_minimum_design_md_contract(self) -> None:
         self.assertIn("machine-readable frontmatter", self.text)
         for field in ("version: alpha", "name:", "description:"):

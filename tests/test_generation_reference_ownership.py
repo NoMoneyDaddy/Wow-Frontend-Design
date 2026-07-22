@@ -77,6 +77,21 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn("fresh source-bound artifacts under neutral candidate IDs", self.visual)
         self.assertIn("rendered geometry/computed styles, and a stable semantic locator", self.visual)
 
+    def test_exploration_supports_fast_multi_direction_style_calibration(self) -> None:
+        for phrase in (
+            "fast multi-direction draft pass",
+            "coherent direction group, not a colorway or a single tile",
+            "representative route at a declared desktop profile",
+            "mobile transformation of that route",
+            "one decision-critical state or interaction specimen",
+            "Do not build three production implementations",
+            "Run the full affected state and viewport matrix only for the selected direction",
+            "fresh project-pinned Playwright captures",
+            "selected style contract",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.exploration)
+
     def test_component_reference_owns_behavior_not_visual_or_agent_orchestration(self) -> None:
         for stale_section in (
             "## 6. Build material and surface hierarchy",
