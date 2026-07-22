@@ -28,7 +28,7 @@ Carry the selected style contract, frozen product contract, fixtures, and implem
 
 Use a dependency-ordered production pass: first semantics and data/state ownership, then responsive composition and access behavior, then only consumed system roles and reusable primitives, then visual finish and admitted motion, and finally expansion to related routes. Complete one task path across these layers before polishing disconnected regions; extract shared structure only after repeated task roles prove it.
 
-Run the cheapest owning-layer check after each bounded edit and a fresh targeted Playwright replay after each coherent batch. Run project gates and the full declared affected matrix at the release candidate, then replay any scope touched by a repair. Do not rerun every expensive gate after an unrelated small edit. Never use a green narrow loop as release evidence or skip the final fresh matrix.
+Run the cheapest owning-layer check after each bounded edit and a fresh targeted Playwright replay after each coherent batch. Compare fresh production evidence with only the selected-contract axes affected by that batch; compare it with the full selected style contract at the release candidate. If production drifts, repair the owning production layer instead of rewriting the frozen contract unless new evidence invalidates it. Run project gates and the full declared affected matrix at the release candidate, then replay any scope touched by a repair. Do not rerun every expensive gate after an unrelated small edit. Never use a green narrow loop as release evidence or skip the final fresh matrix.
 
 ## 2. Build durable foundations
 

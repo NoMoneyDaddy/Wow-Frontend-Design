@@ -206,6 +206,15 @@ class SkillCoreContractTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, implementation)
 
+    def test_formal_production_replays_are_bounded_to_the_selected_contract(self) -> None:
+        implementation = IMPLEMENTATION.read_text(encoding="utf-8")
+        for phrase in (
+            "only the selected-contract axes affected by that batch",
+            "the full selected style contract at the release candidate",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, implementation)
+
     def test_restricted_hosts_still_receive_the_minimum_design_md_contract(self) -> None:
         self.assertIn("machine-readable frontmatter", self.text)
         for field in ("version: alpha", "name:", "description:"):
