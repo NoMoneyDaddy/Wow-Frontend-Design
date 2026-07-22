@@ -15,6 +15,7 @@ MODEL_ROUTING = SKILL.parent / "references" / "model-routing.md"
 COMPACT = SKILL.parent / "adapters" / "prompt-only-compact.md"
 MATERIAL = SKILL.parent / "references" / "visual-material-system.md"
 SVG_SYSTEM = SKILL.parent / "references" / "svg-system.md"
+IMPLEMENTATION = SKILL.parent / "references" / "implementation.md"
 
 
 class SkillCoreContractTests(unittest.TestCase):
@@ -142,6 +143,28 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertIn("multiple direction drafts to confirm style", direction)
         self.assertIn("fast calibration pass", direction)
         self.assertIn("design-exploration.md", direction)
+
+    def test_formal_build_uses_layered_feedback_without_skipping_release_gates(self) -> None:
+        implementation = IMPLEMENTATION.read_text(encoding="utf-8")
+        self.assertIn(
+            "[implementation.md](references/implementation.md) during formal production",
+            self.text,
+        )
+        for phrase in (
+            "Carry the selected style contract",
+            "do not restart discovery or direction",
+            "dependency-ordered production pass",
+            "semantics and data/state ownership",
+            "responsive composition",
+            "system roles and reusable primitives",
+            "visual finish and admitted motion",
+            "Run the cheapest owning-layer check",
+            "fresh targeted Playwright replay after each coherent batch",
+            "full declared affected matrix at the release candidate",
+            "Never use a green narrow loop as release evidence",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, implementation)
 
     def test_restricted_hosts_still_receive_the_minimum_design_md_contract(self) -> None:
         self.assertIn("machine-readable frontmatter", self.text)

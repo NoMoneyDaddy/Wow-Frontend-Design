@@ -22,6 +22,14 @@ Use this reference while turning the design thesis into maintainable code.
 
 If starting from zero, choose the smallest stack that satisfies routing, content, state, deployment, and team needs. A single page may need only HTML/CSS/JS; a product app may justify a framework.
 
+### Formal production cadence
+
+Carry the selected style contract, frozen product contract, fixtures, and implementation delta into formal work; do not restart discovery or direction unless new evidence invalidates them. Reuse compatible draft source through the real architecture, but never preserve disposable markup merely because it is already rendered.
+
+Use a dependency-ordered production pass: first semantics and data/state ownership, then responsive composition and access behavior, then only consumed system roles and reusable primitives, then visual finish and admitted motion, and finally expansion to related routes. Complete one task path across these layers before polishing disconnected regions; extract shared structure only after repeated task roles prove it.
+
+Run the cheapest owning-layer check after each bounded edit and a fresh targeted Playwright replay after each coherent batch. Run project gates and the full declared affected matrix at the release candidate, then replay any scope touched by a repair. Do not rerun every expensive gate after an unrelated small edit. Never use a green narrow loop as release evidence or skip the final fresh matrix.
+
 ## 2. Build durable foundations
 
 Define semantic tokens, not component-specific color names:
