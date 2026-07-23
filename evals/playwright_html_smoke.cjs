@@ -659,7 +659,9 @@ async function main() {
         let cjkHeadingExplicitNarrowCount = 0;
         let headingScanCount = 0;
         let headingScanTruncated = false;
-        const displayHeadings = Array.from(document.querySelectorAll("h1,[role='heading'][aria-level='1']"));
+        const displayHeadings = Array.from(document.querySelectorAll(
+          "h1,h2,[role='heading'][aria-level='1'],[role='heading'][aria-level='2']",
+        ));
         if (displayHeadings.length > 16) headingScanTruncated = true;
         for (let index = 0; index < displayHeadings.length && index < 16; index += 1) {
           const heading = displayHeadings[index];

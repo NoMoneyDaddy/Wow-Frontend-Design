@@ -641,6 +641,22 @@ RegExp.prototype.exec = function(value) {
             self.assertNotIn("價格", json.dumps(receipt, ensure_ascii=False))
 
             (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>次標題詞組換行</title><style>
+.broken span { display: block; }
+</style></head><body><main>
+<h1>產品標題</h1><h2 class="broken"><span>更</span><span>新</span></h2><p>產品內容</p>
+</main></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            self.assertTrue(all(
+                result["inspection"]["layout_hazards"]["cjk_heading_split_word_count"] == 1
+                for result in receipt["results"]
+            ))
+            self.assertNotIn("更新", json.dumps(receipt, ensure_ascii=False))
+
+            (stage / "index.html").write_text(
                 '''<!doctype html><html lang="zh-Hant"><head><title>完整詞組</title></head><body>
 <main><h1>價格透明，<br>安心選購</h1><p>產品內容</p></main></body></html>''',
                 encoding="utf-8",

@@ -610,6 +610,18 @@ def build_repair_prompt(
     output_list = json.dumps(outputs, ensure_ascii=False, separators=(",", ":"))
     editable = outputs if case_mode == "greenfield" else allowed_changes
     editable_list = json.dumps(editable, ensure_ascii=False, separators=(",", ":"))
+    heading_repair = ""
+    if "cjk-heading-split-word" in feedback.get("finding_ids", ()):
+        heading_repair = (
+            "For `cjk-heading-split-word`, preserve approved copy. Do not rewrite or shorten approved "
+            "product copy solely to clear `cjk-heading-split-word`, and do not paraphrase, delete, change "
+            "product facts, or insert invisible break controls; repair its owning inline space or type sizing "
+            "first, including its container track, available measure, composition, or spacing. If a known "
+            "compact semantic unit must still stay intact, wrap only that existing unit in one scoped inline "
+            "span with a responsive no-overflow fallback. Keep adjacent terminal punctuation with that unit. "
+            "Never disable wrapping for the whole heading or use global `keep-all` or per-character spans. "
+            "Verify the same copy across every declared profile.\n"
+        )
     return (
         "Repair the existing controlled frontend build in place. Activate and follow $wow-frontend-design "
         "from the isolated skill snapshot. Preserve the product intent and apply the smallest complete fix "
@@ -634,6 +646,7 @@ def build_repair_prompt(
         "axe-label-content-name-mismatch, keep each control's complete visible label inside its accessible name "
         "across every rendered state. If an exact stable name is required, keep the visible label stable and "
         "expose changing details in adjacent text. Do not remove unrelated labels.\n"
+        f"{heading_repair}"
         f"{skill_reference_context}"
         f"--- UNTRUSTED CURRENT OUTPUT JSON: BEGIN ---\n{context}\n"
         "--- UNTRUSTED CURRENT OUTPUT JSON: END ---\n"

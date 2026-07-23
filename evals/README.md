@@ -224,7 +224,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 
 這些是 deterministic proof，不會自行挑選字體、判定排版漂亮或操縱 GSAP、Lottie、Rive、View Transition 等 runtime 的內部 timeline。候選字體、fallback、長文、resize 與具體 motion frame 仍須由 evaluator 提供固定 fixture，並以 fresh rendered craft review 收口。
 
-Generic HTML smoke 會額外記錄 visible horizontal `h1`／level-one ARIA heading 的 `single_han_last_line_heading_count`。每頁／profile 最多掃描前 16 個 matching elements、每個最多 512 UTF-16 code units，並以 `heading_scan_count` 與 `heading_scan_truncated` 明示 coverage。它由實際 rendered grapheme geometry 得出，只是 novel-discovery advisory：不影響 gate status、不回傳文字，也不觸發自動修復。若 fresh screenshot 確認固定文案真的有孤字，再由 evaluator contract 明示 `last-line-graphemes-at-least` 或 exact `text-segment-on-one-line`。
+Generic HTML smoke 會額外記錄 visible horizontal `h1`／`h2` 與 level-one／level-two ARIA heading 的 `single_han_last_line_heading_count`。每頁／profile 最多掃描前 16 個 matching elements、每個最多 512 UTF-16 code units，並以 `heading_scan_count` 與 `heading_scan_truncated` 明示 coverage。它由實際 rendered grapheme geometry 得出，只是 novel-discovery advisory：不影響 gate status、不回傳文字，也不觸發自動修復。若 fresh screenshot 確認固定文案真的有孤字，再由 evaluator contract 明示 `last-line-graphemes-at-least` 或 exact `text-segment-on-one-line`。
 
 同一份 bounded scan 另以 evaluator 啟動時封存的 `Intl.Segmenter` 詞界與 grapheme 行框計算 `cjk_heading_split_word_count`。它只回傳計數；當一個至少兩個 Han grapheme 的詞跨越實際行框時拒絕該 route/profile，並觸發最小修復。這不是以字串規則猜詞，也不讓 candidate 覆寫 browser primitive 後繞過。
 

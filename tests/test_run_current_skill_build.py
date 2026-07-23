@@ -3263,6 +3263,21 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )["prompt"]
             for private_value in ("PRIVATE-URL", "PRIVATE-SELECTOR", "PRIVATE-CONSOLE", "UNIQUE-BRIEF-CONTENT"):
                 self.assertNotIn(private_value, repair_prompt)
+            self.assertIn(
+                "Do not rewrite or shorten approved product copy solely to clear "
+                "`cjk-heading-split-word`",
+                repair_prompt,
+            )
+            self.assertIn(
+                "repair its owning inline space or type sizing first",
+                repair_prompt,
+            )
+            self.assertIn(
+                "Never disable wrapping for the whole heading",
+                repair_prompt,
+            )
+            self.assertIn("invisible break controls", repair_prompt)
+            self.assertIn("global `keep-all` or per-character spans", repair_prompt)
             self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
 
     def test_real_html_gate_converges_after_one_repair(self) -> None:
