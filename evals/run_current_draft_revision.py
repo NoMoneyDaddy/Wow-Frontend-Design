@@ -266,6 +266,49 @@ def _require_fresh_child_pair(
         )
 
 
+def _browser_contract_identity(
+    path: Path, expected: dict[str, Any]
+) -> tuple[int, int]:
+    try:
+        before = path.lstat()
+        raw = path.read_bytes()
+        after = path.lstat()
+    except OSError as error:
+        raise DraftRevisionError(
+            "draft revision browser contract provenance is invalid"
+        ) from error
+    stable_before = (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_nlink,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    stable_after = (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_nlink,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if (
+        stable_before != stable_after
+        or not stat.S_ISREG(before.st_mode)
+        or path.is_symlink()
+        or before.st_nlink != 1
+        or before.st_size != expected["bytes"]
+        or _digest_bytes(raw) != expected["sha256"]
+    ):
+        raise DraftRevisionError(
+            "draft revision browser contract provenance is invalid"
+        )
+    return before.st_dev, before.st_ino
+
+
 def run(
     brief_path: Path,
     cohort_root: Path,
@@ -280,6 +323,7 @@ def run(
     hard_seconds: int = 1800,
     inactivity_seconds: int | None = None,
     max_repair_rounds: int = current_build.MAX_REPAIR_ROUNDS,
+    browser_contract: Path | None = None,
 ) -> dict[str, Any]:
     if (
         type(max_repair_rounds) is not int
@@ -297,6 +341,28 @@ def run(
     revision_log_dir = _as_revision_error(
         cohort._real_empty_directory, revision_log_dir, "revision log directory"
     )
+    browser_contract_path: Path | None = None
+    browser_contract_record: dict[str, Any] | None = None
+    browser_contract_identity: tuple[int, int] | None = None
+    if browser_contract is not None:
+        try:
+            (
+                browser_contract_path,
+                _browser_contract_data,
+                browser_contract_record,
+            ) = current_build._load_browser_contract(
+                browser_contract, ("DESIGN.md", parent["child_page"])
+            )
+        except (OSError, current_build.RunnerError) as error:
+            raise DraftRevisionError("draft revision browser contract is invalid") from error
+        _as_revision_error(
+            cohort._outside_authoring_repository,
+            browser_contract_path,
+            "draft revision browser contract",
+        )
+        browser_contract_identity = _browser_contract_identity(
+            browser_contract_path, browser_contract_record
+        )
     for path, label in (
         (revision_root, "revision root"),
         (revision_log_dir, "revision log directory"),
@@ -310,6 +376,22 @@ def run(
         (revision_log_dir, cohort_log_dir, "revision log and parent log"),
     ):
         _as_revision_error(cohort._separate, left, right, label)
+    if browser_contract_path is not None:
+        for boundary, label in (
+            (brief_path, "brief"),
+            (cohort_root, "parent cohort"),
+            (cohort_log_dir, "parent log"),
+            (decision_path, "decision input"),
+            (decision_receipt_path, "decision receipt"),
+            (revision_root, "revision root"),
+            (revision_log_dir, "revision log"),
+        ):
+            _as_revision_error(
+                cohort._separate,
+                browser_contract_path,
+                boundary,
+                f"draft revision browser contract and {label}",
+            )
     tools_before = _tool_records()
 
     def assert_current() -> None:
@@ -324,6 +406,25 @@ def run(
             or _tool_records() != tools_before
         ):
             raise DraftRevisionError("draft revision source drifted during execution")
+        try:
+            current_build._browser_contract_unchanged(
+                browser_contract_path, browser_contract_record
+            )
+        except (OSError, current_build.RunnerError) as error:
+            raise DraftRevisionError(
+                "draft revision browser contract drifted during execution"
+            ) from error
+        if (
+            browser_contract_path is not None
+            and browser_contract_record is not None
+            and _browser_contract_identity(
+                browser_contract_path, browser_contract_record
+            )
+            != browser_contract_identity
+        ):
+            raise DraftRevisionError(
+                "draft revision browser contract drifted during execution"
+            )
 
     with cohort._PinnedDirectory(revision_root, "revision root") as root_pin:
         with cohort._PinnedDirectory(revision_log_dir, "revision log directory") as log_pin:
@@ -361,6 +462,7 @@ def run(
                         case_mode="retrofit",
                         seed_root=seed_root,
                         allow_changes=("DESIGN.md", parent["child_page"]),
+                        browser_contract=browser_contract_path,
                         skill_reference="references/design-exploration.md",
                     )
                 except (OSError, current_build.RunnerError) as error:
@@ -373,6 +475,10 @@ def run(
             child_path = workspace / parent["child_page"]
             child_record = _record(child_path)
             seed_files = manifest.get("seed_snapshot", {}).get("files", [])
+            if manifest.get("browser_contract") != browser_contract_record:
+                raise DraftRevisionError(
+                    "draft revision browser contract provenance is invalid"
+                )
             if (
                 child_record["sha256"] == seed_record["sha256"]
                 or parent["child_page"] not in manifest.get("mutation", {}).get("observed_changes", [])
@@ -469,6 +575,7 @@ def run(
                 },
                 "build": {
                     "case_mode": "retrofit",
+                    "browser_contract": browser_contract_record,
                     "mutation": manifest["mutation"],
                     "repair_rounds": manifest.get("repair", {}).get("rounds_used", 0),
                 },
@@ -513,6 +620,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--hard-seconds", type=int, default=1800)
     parser.add_argument("--inactivity-seconds", type=int)
+    parser.add_argument("--browser-contract", type=Path)
     parser.add_argument(
         "--max-repair-rounds", type=int, default=current_build.MAX_REPAIR_ROUNDS
     )
@@ -531,6 +639,7 @@ def main(argv: list[str] | None = None) -> int:
             hard_seconds=args.hard_seconds,
             inactivity_seconds=args.inactivity_seconds,
             max_repair_rounds=args.max_repair_rounds,
+            browser_contract=args.browser_contract,
         )
     except (OSError, DraftRevisionError) as error:
         print(f"current draft revision failed: {error}", file=sys.stderr)

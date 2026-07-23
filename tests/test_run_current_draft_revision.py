@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import stat
 import sys
 import tempfile
@@ -221,6 +222,11 @@ class CurrentDraftRevisionTests(unittest.TestCase):
             },
             "outputs": outputs,
         }
+        if kwargs.get("browser_contract") is not None:
+            _, _, browser_contract_record = revision.current_build._load_browser_contract(
+                Path(kwargs["browser_contract"]), tuple(str(item) for item in kwargs["outputs"])
+            )
+            manifest["browser_contract"] = browser_contract_record
         manifest["seed_snapshot"]["files"] = [
             {"path": path.relative_to(seed).as_posix(), **revision._record(path)}
             for path in sorted(seed.rglob("*"))
@@ -288,6 +294,34 @@ class CurrentDraftRevisionTests(unittest.TestCase):
             "capture_labels": labels,
         }
 
+    def browser_contract(self) -> Path:
+        child_page = f"directions/revision-{digest(self.decision_receipt)[:12]}.html"
+        contract = self.root / "revision-browser-contract.json"
+        contract.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "cases": [
+                        {
+                            "id": "mobile-first-room",
+                            "page": child_page,
+                            "profile": "mobile",
+                            "steps": [
+                                {
+                                    "id": "first-room-price-in-first-viewport",
+                                    "action": "assert",
+                                    "selector": "#room-0 [data-current-price]",
+                                    "expect": "fully-visible-in-viewport",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return contract
+
     def run_success(self) -> dict[str, object]:
         with (
             mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
@@ -346,6 +380,148 @@ class CurrentDraftRevisionTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(revision.DraftRevisionError, "fresh child pair"):
             revision._require_fresh_child_pair(validated, "directions/child.html")
+
+    def test_browser_contract_is_validated_bound_and_passed_to_the_builder(self) -> None:
+        child_page = f"directions/revision-{digest(self.decision_receipt)[:12]}.html"
+        contract = self.browser_contract()
+        with (
+            mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
+            mock.patch.object(revision.decision, "validate_decision_receipt", return_value=self.revise_source()),
+            mock.patch.object(revision.current_build, "run", side_effect=self.fake_build) as build,
+            mock.patch.object(revision.cohort, "run_capture", side_effect=self.fake_capture),
+            mock.patch.object(
+                revision,
+                "validate_current_capture_evidence",
+                side_effect=lambda workspace, *_args: self.validated_capture(workspace),
+            ),
+        ):
+            result = revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+                browser_contract=contract,
+            )
+        self.assertEqual(contract, build.call_args.kwargs["browser_contract"])
+        self.assertEqual(
+            revision.current_build._load_browser_contract(
+                contract, ("DESIGN.md", child_page)
+            )[2],
+            result["build"]["browser_contract"],
+        )
+
+    def test_invalid_browser_contract_fails_before_any_side_effect(self) -> None:
+        contract = self.browser_contract()
+        payload = json.loads(contract.read_text(encoding="utf-8"))
+        payload["cases"][0]["page"] = "directions/unknown.html"
+        contract.write_text(json.dumps(payload), encoding="utf-8")
+        with (
+            mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
+            mock.patch.object(revision.decision, "validate_decision_receipt", return_value=self.revise_source()),
+            mock.patch.object(revision.current_build, "run") as build,
+            self.assertRaisesRegex(revision.DraftRevisionError, "browser contract"),
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+                browser_contract=contract,
+            )
+        build.assert_not_called()
+        self.assertEqual([], list(self.revision_root.iterdir()))
+        self.assertEqual([], list(self.revision_logs.iterdir()))
+
+    def test_hardlinked_browser_contract_fails_before_any_side_effect(self) -> None:
+        contract = self.browser_contract()
+        alias = self.root / "revision-browser-contract-alias.json"
+        os.link(contract, alias)
+        with (
+            mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
+            mock.patch.object(revision.decision, "validate_decision_receipt", return_value=self.revise_source()),
+            mock.patch.object(revision.current_build, "run") as build,
+            self.assertRaisesRegex(revision.DraftRevisionError, "provenance"),
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+                browser_contract=contract,
+            )
+        build.assert_not_called()
+        self.assertEqual([], list(self.revision_root.iterdir()))
+
+    def test_browser_contract_drift_after_build_blocks_capture(self) -> None:
+        contract = self.browser_contract()
+
+        def drifting_build(
+            brief: Path, workspace: Path, **kwargs: object
+        ) -> dict[str, object]:
+            manifest = self.fake_build(brief, workspace, **kwargs)
+            contract.write_text(contract.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            return manifest
+
+        with (
+            mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
+            mock.patch.object(revision.decision, "validate_decision_receipt", return_value=self.revise_source()),
+            mock.patch.object(revision.current_build, "run", side_effect=drifting_build),
+            mock.patch.object(revision.cohort, "run_capture") as capture,
+            self.assertRaisesRegex(revision.DraftRevisionError, "contract drifted"),
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+                browser_contract=contract,
+            )
+        capture.assert_not_called()
+        self.assertFalse((self.revision_root / "draft-revision-receipt.json").exists())
+
+    def test_browser_contract_must_be_bound_by_the_build_manifest(self) -> None:
+        contract = self.browser_contract()
+
+        def unbound_build(
+            brief: Path, workspace: Path, **kwargs: object
+        ) -> dict[str, object]:
+            manifest = self.fake_build(brief, workspace, **kwargs)
+            manifest.pop("browser_contract")
+            (workspace / "run-manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            return manifest
+
+        with (
+            mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
+            mock.patch.object(revision.decision, "validate_decision_receipt", return_value=self.revise_source()),
+            mock.patch.object(revision.current_build, "run", side_effect=unbound_build),
+            mock.patch.object(revision.cohort, "run_capture") as capture,
+            self.assertRaisesRegex(revision.DraftRevisionError, "provenance"),
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+                browser_contract=contract,
+            )
+        capture.assert_not_called()
 
     def test_capture_drift_before_receipt_is_rejected(self) -> None:
         first = None

@@ -101,6 +101,8 @@ npm run drafts:revise -- \
 
 Runner 只把 frozen `DESIGN.md` 與 base HTML 交給既有 retrofit builder，不讀取或複製舊 PNG；child HTML 必須實際改變，再由專案固定 Playwright 取得恰好一組 fresh desktop/mobile screenshots。它沿用 builder 的最多兩輪 repair 熔斷，沒有新一套重試政策。成功 receipt 只證明這次 style calibration，必須回到相同 decision checkpoint；接受結果時仍以原 base variant 加上已確認 adjustments 記錄 `select`，child HTML／PNG 本身不會被 promotion。它不是 selected production artifact、production handoff 或 release evidence。
 
+若調整含可量測的首屏、文字、狀態或互動要求，可加上 evaluator-owned `--browser-contract /absolute/evaluator-root/revision-browser-contract.json`。Contract 必須直接指向 deterministic child page，會由既有 HTML gate 在 fresh capture 前驗證並觸發同一 repair fuse；未提供時不得把自然語言調整假裝成 machine-verified。
+
 選定後，把四個來源參數一起交給唯一的 `build:current`。只接受 greenfield 的 `select`／`BUILD` handoff；缺少任一參數、`revise`、`stop` 或來源漂移都會在建立 target、log 或呼叫模型前拒絕：
 
 ```bash
