@@ -159,6 +159,22 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn("scripts/cross_output_template_audit.cjs", self.research)
         self.assertIn("evaluator-only advisory telemetry", self.research)
 
+    def test_fresh_screenshots_are_shown_when_the_host_can_render_them(self) -> None:
+        for phrase in (
+            "authorized for user-visible handoff",
+            "privacy-bounded",
+            "show the actual fresh screenshots",
+            "do not make the user ask for them",
+            "smallest representative set",
+            "host-safe links or evaluator-root-relative artifact paths",
+            "Do not expose private evaluator roots",
+            "Never present a stale, prior, or reference capture as current evidence",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.research)
+        self.assertNotIn("desktop/mobile pair", self.research)
+        self.assertNotIn("provide exact artifact paths", self.research)
+
 
 if __name__ == "__main__":
     unittest.main()

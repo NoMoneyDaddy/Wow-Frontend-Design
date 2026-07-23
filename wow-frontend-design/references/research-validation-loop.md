@@ -199,6 +199,8 @@ Useful hypotheses are screenshot QA, requirement-coverage checks, localization/r
 
 The case-study discussion disagrees on a universal word count. Its durable signal is layered editorial hierarchy: lead with outcome and decision, make evidence scannable, and let interested readers expand into process detail instead of forcing every reader through one long narrative.
 
+When fresh screenshot artifacts are authorized for user-visible handoff, privacy-bounded, and the host output supports inline images or attachments, show the actual fresh screenshots in the handoff; do not make the user ask for them. Show the smallest representative set of affected states and viewports, and pair each image with its evidence identity; keep the complete matrix in the receipt. Otherwise provide host-safe links or evaluator-root-relative artifact paths and state that inline preview is unavailable. Do not expose private evaluator roots, account names, secrets, or unrelated captured data. Never present a stale, prior, or reference capture as current evidence; label any comparison image as historical/reference with its original run identity, and do not use it to support a current claim.
+
 ## Close the loop
 
 ```text
