@@ -23,7 +23,16 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from codex_isolated_build_core import (
+    LOG_LIMIT,
+    MAX_SKILL_ENTRIES,
+    MAX_SKILL_REFERENCES,
     MAX_STAGE_ENTRIES,
+    PROMPT_LIMIT,
+    SKILL_FILE_LIMIT,
+    SKILL_LIMIT,
+    SKILL_REFERENCE_FILE_LIMIT,
+    SKILL_REFERENCE_PATH,
+    SKILL_REFERENCE_TOTAL_LIMIT,
     STAGE_LIMIT,
     ExecutionSpec,
     RunnerError,
@@ -1577,6 +1586,285 @@ def _valid_repair_trigger_summary(value: Any) -> bool:
     )
 
 
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _valid_projection_path(value: Any) -> bool:
+    if not isinstance(value, str) or not 1 <= len(value.encode("utf-8")) <= 4096:
+        return False
+    path = PurePosixPath(value)
+    return (
+        not path.is_absolute()
+        and path.as_posix() == value
+        and all(part not in {"", ".", ".."} for part in path.parts)
+    )
+
+
+def _valid_skill_snapshot_summary(value: Any) -> bool:
+    if (
+        not isinstance(value, dict)
+        or set(value) != {
+            "name", "entry_count", "file_count", "bytes", "tree_sha256", "inventory",
+        }
+        or not isinstance(value.get("name"), str)
+        or not 1 <= len(value["name"].encode("utf-8")) <= 128
+        or not isinstance(value.get("inventory"), list)
+        or not 1 <= len(value["inventory"]) <= MAX_SKILL_ENTRIES
+    ):
+        return False
+    total_bytes = 0
+    file_count = 0
+    paths: list[str] = []
+    for record in value["inventory"]:
+        if not isinstance(record, dict) or record.get("kind") not in {"directory", "file"}:
+            return False
+        expected = {"path", "kind", "mode"}
+        if record["kind"] == "file":
+            expected.update({"bytes", "sha256"})
+        if (
+            set(record) != expected
+            or not _valid_projection_path(record.get("path"))
+            or not isinstance(record.get("mode"), str)
+            or re.fullmatch(r"[0-7]{4}", record["mode"]) is None
+        ):
+            return False
+        paths.append(record["path"])
+        if record["kind"] == "file":
+            if (
+                type(record.get("bytes")) is not int
+                or not 0 <= record["bytes"] <= SKILL_FILE_LIMIT
+                or not _valid_sha256(record.get("sha256"))
+            ):
+                return False
+            file_count += 1
+            total_bytes += record["bytes"]
+    encoded = json.dumps(
+        value["inventory"], ensure_ascii=True, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    return (
+        len(paths) == len(set(paths))
+        and any(
+            record.get("path") == "SKILL.md" and record.get("kind") == "file"
+            for record in value["inventory"]
+        )
+        and type(value.get("entry_count")) is int
+        and value["entry_count"] == len(value["inventory"])
+        and type(value.get("file_count")) is int
+        and value["file_count"] == file_count
+        and type(value.get("bytes")) is int
+        and value["bytes"] == total_bytes <= SKILL_LIMIT
+        and _valid_sha256(value.get("tree_sha256"))
+        and value["tree_sha256"] == _digest_bytes(encoded)
+    )
+
+
+def _valid_skill_reference_summary(value: Any) -> bool:
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"files", "total_bytes"}
+        or not isinstance(value.get("files"), list)
+        or len(value["files"]) > MAX_SKILL_REFERENCES
+    ):
+        return False
+    paths: list[str] = []
+    total_bytes = 0
+    for record in value["files"]:
+        if (
+            not isinstance(record, dict)
+            or set(record) != {"path", "bytes", "sha256"}
+            or not isinstance(record.get("path"), str)
+            or SKILL_REFERENCE_PATH.fullmatch(record["path"]) is None
+            or type(record.get("bytes")) is not int
+            or not 1 <= record["bytes"] <= SKILL_REFERENCE_FILE_LIMIT
+            or not _valid_sha256(record.get("sha256"))
+        ):
+            return False
+        paths.append(record["path"].casefold())
+        total_bytes += record["bytes"]
+    return (
+        len(paths) == len(set(paths))
+        and total_bytes <= SKILL_REFERENCE_TOTAL_LIMIT
+        and type(value.get("total_bytes")) is int
+        and value["total_bytes"] == total_bytes
+    )
+
+
+def _valid_configured_isolation_summary(value: Any) -> bool:
+    return value == {
+        "ephemeral_codex_home": True,
+        "first_party_chatgpt_login_required": True,
+        "workspace_write": True,
+        "sandbox_network": False,
+        "apps_plugins_mcp": False,
+        "browser_computer_image": False,
+        "subagents": False,
+        "shell_tool_available": True,
+        "shell_commands_allowed_by_contract": False,
+        "shell_command_prevention": False,
+        "shell_command_acceptance": "inert_noop_only_other_commands_post_trace_rejection",
+        "filesystem_profile": "minimal-read-workspace-write",
+        "process_environment_inheritance": "none",
+    }
+
+
+def _valid_execution_summary(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "exit_code", "reason", "hard_timeout_seconds", "inactivity_timeout_seconds",
+        "progress_events", "initial_stage", "trace", "stderr",
+    }:
+        return False
+    initial = value.get("initial_stage")
+    if (
+        not isinstance(initial, dict)
+        or set(initial) != {"entry_count", "bytes", "fingerprint_sha256"}
+        or type(initial.get("entry_count")) is not int
+        or not 0 <= initial["entry_count"] <= MAX_STAGE_ENTRIES
+        or type(initial.get("bytes")) is not int
+        or not 0 <= initial["bytes"] <= STAGE_LIMIT
+        or not _valid_sha256(initial.get("fingerprint_sha256"))
+    ):
+        return False
+    for key in ("trace", "stderr"):
+        record = value.get(key)
+        if (
+            not isinstance(record, dict)
+            or set(record) != {"bytes", "sha256"}
+            or type(record.get("bytes")) is not int
+            or not 0 <= record["bytes"] <= LOG_LIMIT
+            or not _valid_sha256(record.get("sha256"))
+        ):
+            return False
+    if value["trace"]["bytes"] + value["stderr"]["bytes"] > LOG_LIMIT:
+        return False
+    inactivity = value.get("inactivity_timeout_seconds")
+    return (
+        type(value.get("exit_code")) is int
+        and value.get("reason") in {
+            "completed", "hard_timeout", "inactivity_timeout", "resource_quota",
+        }
+        and type(value.get("hard_timeout_seconds")) is int
+        and value["hard_timeout_seconds"] > 0
+        and (
+            inactivity is None
+            or (type(inactivity) is int and 0 < inactivity <= value["hard_timeout_seconds"])
+        )
+        and type(value.get("progress_events")) is int
+        and value["progress_events"] >= 0
+    )
+
+
+def _valid_trace_observation_summary(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "policy", "event_count", "command_event_count", "successful_terminal_event",
+        "completed_item_counts", "terminal_usage",
+    }:
+        return False
+    event_count = value.get("event_count")
+    command_count = value.get("command_event_count")
+    completed = value.get("completed_item_counts")
+    usage = value.get("terminal_usage")
+    if (
+        value.get("policy") != "passed"
+        or type(event_count) is not int
+        or event_count < 0
+        or type(command_count) is not int
+        or not 0 <= command_count <= event_count
+        or type(value.get("successful_terminal_event")) is not bool
+        or not isinstance(completed, dict)
+        or set(completed) != {"file_change", "agent_message"}
+        or any(type(count) is not int or count < 0 for count in completed.values())
+        or not isinstance(usage, dict)
+    ):
+        return False
+    usage_keys = {
+        "input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens",
+    }
+    if usage.get("status") == "unreported":
+        return set(usage) == {"status"}
+    reported = set(usage) - {"status"}
+    return (
+        usage.get("status") == "reported"
+        and bool(reported)
+        and reported <= usage_keys
+        and all(type(usage[key]) is int and usage[key] >= 0 for key in reported)
+    )
+
+
+def _valid_tools_summary(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {"codex", "core", "trace_validator"}:
+        return False
+    for key in ("codex", "core", "trace_validator"):
+        record = value.get(key)
+        expected = {"bytes", "mode", "sha256", "version"} if key == "codex" else {
+            "bytes", "mode", "sha256",
+        }
+        if (
+            not isinstance(record, dict)
+            or set(record) != expected
+            or type(record.get("bytes")) is not int
+            or record["bytes"] <= 0
+            or not isinstance(record.get("mode"), str)
+            or re.fullmatch(r"[0-7]{4}", record["mode"]) is None
+            or not _valid_sha256(record.get("sha256"))
+        ):
+            return False
+    version = value["codex"].get("version")
+    return (
+        isinstance(version, str)
+        and re.fullmatch(r"codex-cli [A-Za-z0-9.+_-]{1,100}", version) is not None
+    )
+
+
+def _valid_attempt_summary(
+    attempt: Any,
+    attempt_keys: set[str],
+    decision_lineage: dict[str, Any] | None,
+) -> bool:
+    model = attempt.get("model") if isinstance(attempt, dict) else None
+    prompt = attempt.get("prompt") if isinstance(attempt, dict) else None
+    model_keys = {
+        "requested_identifier", "resolution_status", "resolved_backend_snapshot",
+    }
+    return (
+        isinstance(attempt, dict)
+        and set(attempt) in (attempt_keys, {*attempt_keys, "trigger"})
+        and type(attempt.get("number")) is int
+        and 0 <= attempt["number"] <= MAX_REPAIR_ROUNDS
+        and isinstance(model, dict)
+        and set(model) in (model_keys, {*model_keys, "requested_reasoning_effort"})
+        and isinstance(model.get("requested_identifier"), str)
+        and 1 <= len(model["requested_identifier"]) <= 128
+        and model.get("resolution_status") == "not_observed"
+        and model.get("resolved_backend_snapshot") is None
+        and (
+            "requested_reasoning_effort" not in model
+            or model["requested_reasoning_effort"] in {"low", "medium", "high", "xhigh"}
+        )
+        and isinstance(prompt, dict)
+        and set(prompt) == {"bytes", "sha256"}
+        and type(prompt.get("bytes")) is int
+        and 0 < prompt["bytes"] <= (
+            PROMPT_LIMIT if attempt["number"] == 0 else REPAIR_PROMPT_LIMIT
+        )
+        and _valid_sha256(prompt.get("sha256"))
+        and _valid_skill_snapshot_summary(attempt.get("skill_snapshot"))
+        and _valid_skill_reference_summary(attempt.get("skill_references"))
+        and _valid_configured_isolation_summary(attempt.get("configured_isolation"))
+        and _valid_execution_summary(attempt.get("execution"))
+        and _valid_trace_observation_summary(attempt.get("trace_observed"))
+        and _valid_tools_summary(attempt.get("tools"))
+        and (
+            decision_lineage is None
+            or attempt.get("draft_decision_lineage") == decision_lineage
+        )
+        and (
+            "trigger" not in attempt
+            or _valid_repair_trigger_summary(attempt["trigger"])
+        )
+    )
+
+
 def _validate_receipt_category_summaries(
     status: str,
     classification: str,
@@ -1654,16 +1942,7 @@ def _validate_receipt_category_summaries(
             and isinstance(attempts, list)
             and 1 <= len(attempts) <= repair["rounds_used"] + 1
             and all(
-                isinstance(attempt, dict)
-                and set(attempt) in (attempt_keys, {*attempt_keys, "trigger"})
-                and (
-                    decision_lineage is None
-                    or attempt.get("draft_decision_lineage") == decision_lineage
-                )
-                and (
-                    "trigger" not in attempt
-                    or _valid_repair_trigger_summary(attempt["trigger"])
-                )
+                _valid_attempt_summary(attempt, attempt_keys, decision_lineage)
                 for attempt in attempts
             )
             and (

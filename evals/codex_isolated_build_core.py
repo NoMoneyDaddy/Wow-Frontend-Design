@@ -30,6 +30,7 @@ SKILL_FILE_LIMIT = 1_048_576
 MAX_STAGE_ENTRIES = 16
 MAX_SKILL_ENTRIES = 512
 MODEL_LIMIT = 128
+PROMPT_LIMIT = 1024 * 1024
 SKILL_REFERENCE_FILE_LIMIT = 64 * 1024
 SKILL_REFERENCE_TOTAL_LIMIT = 128 * 1024
 MAX_SKILL_REFERENCES = 3
@@ -802,7 +803,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
     ):
         raise RunnerError("inactivity timeout must be within 1..hard timeout seconds")
     prompt_bytes = spec.prompt.encode("utf-8")
-    if not prompt_bytes or len(prompt_bytes) > 1024 * 1024 or "\x00" in spec.prompt:
+    if not prompt_bytes or len(prompt_bytes) > PROMPT_LIMIT or "\x00" in spec.prompt:
         raise RunnerError("prompt must be bounded UTF-8 text without NUL")
 
     tool_before = _file_tool_records()

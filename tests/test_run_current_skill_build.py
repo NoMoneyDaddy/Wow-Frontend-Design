@@ -32,6 +32,84 @@ SAFE_HTML = "<!doctype html><html lang=\"en\"><head><title>Test</title></head><b
 SAFE_DESIGN = "---\nversion: alpha\nname: Runner Test\n---\n# Runner Test\n"
 
 
+def attempt_execution_projection() -> dict[str, object]:
+    inventory = [
+        {"path": "references", "kind": "directory", "mode": "0755"},
+        {
+            "path": "SKILL.md",
+            "kind": "file",
+            "mode": "0644",
+            "bytes": 1,
+            "sha256": "a" * 64,
+        },
+    ]
+    return {
+        "model": {
+            "requested_identifier": "gpt-5.4-mini",
+            "requested_reasoning_effort": "high",
+            "resolution_status": "not_observed",
+            "resolved_backend_snapshot": None,
+        },
+        "prompt": {"bytes": 1, "sha256": "b" * 64},
+        "skill_snapshot": core._tree_summary(inventory, "wow-frontend-design"),
+        "skill_references": {
+            "files": [{
+                "path": "references/creative-direction.md",
+                "bytes": 1,
+                "sha256": "c" * 64,
+            }],
+            "total_bytes": 1,
+        },
+        "configured_isolation": {
+            "ephemeral_codex_home": True,
+            "first_party_chatgpt_login_required": True,
+            "workspace_write": True,
+            "sandbox_network": False,
+            "apps_plugins_mcp": False,
+            "browser_computer_image": False,
+            "subagents": False,
+            "shell_tool_available": True,
+            "shell_commands_allowed_by_contract": False,
+            "shell_command_prevention": False,
+            "shell_command_acceptance": "inert_noop_only_other_commands_post_trace_rejection",
+            "filesystem_profile": "minimal-read-workspace-write",
+            "process_environment_inheritance": "none",
+        },
+        "execution": {
+            "exit_code": 0,
+            "reason": "completed",
+            "hard_timeout_seconds": 1200,
+            "inactivity_timeout_seconds": 600,
+            "progress_events": 1,
+            "initial_stage": {
+                "entry_count": 0,
+                "bytes": 0,
+                "fingerprint_sha256": "d" * 64,
+            },
+            "trace": {"bytes": 1, "sha256": "e" * 64},
+            "stderr": {"bytes": 0, "sha256": "f" * 64},
+        },
+        "trace_observed": {
+            "policy": "passed",
+            "event_count": 1,
+            "command_event_count": 0,
+            "successful_terminal_event": True,
+            "completed_item_counts": {"file_change": 0, "agent_message": 0},
+            "terminal_usage": {"status": "unreported"},
+        },
+        "tools": {
+            "codex": {
+                "bytes": 1,
+                "mode": "0755",
+                "sha256": "1" * 64,
+                "version": "codex-cli 0.144.6",
+            },
+            "core": {"bytes": 1, "mode": "0755", "sha256": "2" * 64},
+            "trace_validator": {"bytes": 1, "mode": "0644", "sha256": "3" * 64},
+        },
+    }
+
+
 class CurrentSkillBuildTests(unittest.TestCase):
     def observe_trace(self, events: list[dict[str, object]]) -> dict[str, object]:
         with tempfile.TemporaryDirectory() as directory:
@@ -2775,10 +2853,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "skill_tree_sha256": "e" * 64,
                 "draft_evidence_policy": "style_calibration_only_not_release_evidence",
             }
-            execution = {
-                "model": {}, "prompt": {}, "skill_snapshot": {}, "skill_references": {},
-                "configured_isolation": {}, "execution": {}, "trace_observed": {}, "tools": {},
-            }
+            execution = attempt_execution_projection()
             compact_lineage = policy._decision_lineage(lineage)
             attempt = policy._attempt_summary(0, execution, None, compact_lineage)
             receipt = policy._receipt(
@@ -2997,17 +3072,9 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 ):
                     policy._receipt(**common, **payload)
 
-            attempt = {
-                "number": 0,
-                "model": {},
-                "prompt": {},
-                "skill_snapshot": {},
-                "skill_references": {},
-                "configured_isolation": {},
-                "execution": {},
-                "trace_observed": {},
-                "tools": {},
-            }
+            attempt = policy._attempt_summary(
+                0, attempt_execution_projection(), None
+            )
             receipt = policy._receipt(
                 **common,
                 classification="execution_infrastructure_failure",
@@ -3083,6 +3150,151 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     None,
                 ),
             )
+
+    def test_repair_attempt_nested_summaries_are_schema_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            common = {
+                "status": "failed",
+                "classification": "execution_infrastructure_failure",
+                "brief_bytes": b"brief",
+                "prompt": "prompt",
+                "model": "model",
+                "reasoning_effort": "high",
+                "case_mode": "greenfield",
+                "lane_contract": "BUILD",
+                "stdout_log": root / "trace.jsonl",
+                "stderr_log": root / "stderr.txt",
+                "execution": None,
+            }
+            attempt = policy._attempt_summary(
+                0, attempt_execution_projection(), None
+            )
+            receipt = policy._receipt(
+                **common,
+                repair={"max_rounds": 1, "rounds_used": 1, "attempts": [attempt]},
+            )
+            self.assertEqual(1, receipt["repair"]["rounds_used"])
+
+            nested_paths = (
+                ("model",),
+                ("prompt",),
+                ("skill_snapshot",),
+                ("skill_snapshot", "inventory", 0),
+                ("skill_references",),
+                ("skill_references", "files", 0),
+                ("configured_isolation",),
+                ("execution",),
+                ("execution", "initial_stage"),
+                ("execution", "trace"),
+                ("execution", "stderr"),
+                ("trace_observed",),
+                ("trace_observed", "completed_item_counts"),
+                ("trace_observed", "terminal_usage"),
+                ("tools",),
+                ("tools", "codex"),
+                ("tools", "core"),
+                ("tools", "trace_validator"),
+            )
+            for nested_path in nested_paths:
+                invalid = json.loads(json.dumps(attempt))
+                target = invalid
+                for part in nested_path:
+                    target = target[part]
+                target["private"] = "PRIVATE"
+                with self.subTest(path=nested_path), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt category summaries"
+                ):
+                    policy._receipt(
+                        **common,
+                        repair={
+                            "max_rounds": 1,
+                            "rounds_used": 1,
+                            "attempts": [invalid],
+                        },
+                    )
+
+            consistency_cases = (
+                ("skill_snapshot", "entry_count", 3),
+                ("skill_snapshot", "tree_sha256", "0" * 64),
+                ("skill_references", "total_bytes", 2),
+            )
+            for section, key, value in consistency_cases:
+                invalid = json.loads(json.dumps(attempt))
+                invalid[section][key] = value
+                with self.subTest(section=section, key=key), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt category summaries"
+                ):
+                    policy._receipt(
+                        **common,
+                        repair={
+                            "max_rounds": 1,
+                            "rounds_used": 1,
+                            "attempts": [invalid],
+                        },
+                    )
+
+            large_initial = json.loads(json.dumps(attempt))
+            large_initial["prompt"]["bytes"] = 600 * 1024
+            policy._receipt(
+                **common,
+                repair={
+                    "max_rounds": 1,
+                    "rounds_used": 1,
+                    "attempts": [large_initial],
+                },
+            )
+            large_repair = json.loads(json.dumps(large_initial))
+            large_repair["number"] = 1
+            with self.assertRaisesRegex(policy.RunnerError, "receipt category summaries"):
+                policy._receipt(
+                    **common,
+                    repair={
+                        "max_rounds": 1,
+                        "rounds_used": 1,
+                        "attempts": [large_repair],
+                    },
+                )
+
+            special_mode = json.loads(json.dumps(attempt))
+            special_mode_inventory = special_mode["skill_snapshot"]["inventory"]
+            special_mode_inventory[0]["mode"] = "4755"
+            special_mode["skill_snapshot"] = core._tree_summary(
+                special_mode_inventory, "wow-frontend-design"
+            )
+            special_mode["tools"]["core"]["mode"] = "4755"
+            policy._receipt(
+                **common,
+                repair={
+                    "max_rounds": 1,
+                    "rounds_used": 1,
+                    "attempts": [special_mode],
+                },
+            )
+
+            missing_skill = json.loads(json.dumps(attempt))
+            missing_skill["skill_snapshot"] = core._tree_summary(
+                [{"path": "references", "kind": "directory", "mode": "0755"}],
+                "wow-frontend-design",
+            )
+            oversized_logs = json.loads(json.dumps(attempt))
+            oversized_logs["execution"]["trace"]["bytes"] = core.LOG_LIMIT
+            oversized_logs["execution"]["stderr"]["bytes"] = 1
+            for label, invalid in (
+                ("missing-skill", missing_skill),
+                ("combined-log-quota", oversized_logs),
+            ):
+                with self.subTest(label=label), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt category summaries"
+                ):
+                    policy._receipt(
+                        **common,
+                        repair={
+                            "max_rounds": 1,
+                            "rounds_used": 1,
+                            "attempts": [invalid],
+                        },
+                    )
 
     def test_log_directory_and_target_must_not_contain_one_another(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
