@@ -552,6 +552,66 @@ def _read_fd_exact(descriptor: int, size: int) -> bytes:
     return b"".join(chunks)
 
 
+def _private_log_fingerprint(info: os.stat_result) -> tuple[int, ...]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        stat.S_IMODE(info.st_mode),
+        info.st_nlink,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
+def _assert_private_log_provenance(
+    path: Path,
+    descriptor: int,
+    parent_descriptor: int,
+    expected: os.stat_result | None = None,
+) -> os.stat_result:
+    try:
+        handle_before = os.fstat(descriptor)
+        parent_descriptor_before = os.fstat(parent_descriptor)
+        parent_path_before = path.parent.lstat()
+        path_info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        handle_after = os.fstat(descriptor)
+        parent_descriptor_after = os.fstat(parent_descriptor)
+        parent_path_after = path.parent.lstat()
+        canonical_parent = path.parent.resolve(strict=True)
+    except OSError as error:
+        raise RunnerError("generation log provenance drifted during execution") from error
+    if (
+        not stat.S_ISDIR(parent_descriptor_before.st_mode)
+        or not stat.S_ISDIR(parent_descriptor_after.st_mode)
+        or not stat.S_ISDIR(parent_path_before.st_mode)
+        or not stat.S_ISDIR(parent_path_after.st_mode)
+        or canonical_parent != path.parent
+        or (parent_descriptor_before.st_dev, parent_descriptor_before.st_ino)
+        != (parent_descriptor_after.st_dev, parent_descriptor_after.st_ino)
+        or (parent_descriptor_after.st_dev, parent_descriptor_after.st_ino)
+        != (parent_path_before.st_dev, parent_path_before.st_ino)
+        or (parent_path_before.st_dev, parent_path_before.st_ino)
+        != (parent_path_after.st_dev, parent_path_after.st_ino)
+        or not stat.S_ISREG(handle_before.st_mode)
+        or not stat.S_ISREG(handle_after.st_mode)
+        or not stat.S_ISREG(path_info.st_mode)
+        or _private_log_fingerprint(handle_before)
+        != _private_log_fingerprint(path_info)
+        or _private_log_fingerprint(path_info)
+        != _private_log_fingerprint(handle_after)
+        or stat.S_IMODE(handle_after.st_mode) != 0o600
+        or handle_after.st_nlink != 1
+        or (
+            expected is not None
+            and _private_log_fingerprint(handle_after)
+            != _private_log_fingerprint(expected)
+        )
+    ):
+        raise RunnerError("generation log provenance drifted during execution")
+    return handle_after
+
+
 def _run_codex(
     command: list[str],
     prompt: str,
@@ -644,28 +704,30 @@ def _run_codex(
         finally:
             if process is not None:
                 _terminate(process)
-        stdout_info = os.fstat(stdout.fileno())
-        stderr_info = os.fstat(stderr.fileno())
-        for path, handle_info in ((stdout_log, stdout_info), (stderr_log, stderr_info)):
-            parent_descriptor = parent_descriptors[path.parent]
-            try:
-                parent_descriptor_info = os.fstat(parent_descriptor)
-                parent_path_info = path.parent.lstat()
-                path_info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
-                canonical_parent = path.parent.resolve(strict=True)
-            except OSError as error:
-                raise RunnerError("generation log provenance drifted during execution") from error
-            if (
-                not stat.S_ISDIR(parent_path_info.st_mode)
-                or canonical_parent != path.parent
-                or (parent_descriptor_info.st_dev, parent_descriptor_info.st_ino)
-                != (parent_path_info.st_dev, parent_path_info.st_ino)
-                or not stat.S_ISREG(path_info.st_mode)
-                or (handle_info.st_dev, handle_info.st_ino) != (path_info.st_dev, path_info.st_ino)
-            ):
-                raise RunnerError("generation log provenance drifted during execution")
+        stdout_info = _assert_private_log_provenance(
+            stdout_log,
+            stdout.fileno(),
+            parent_descriptors[stdout_log.parent],
+        )
+        stderr_info = _assert_private_log_provenance(
+            stderr_log,
+            stderr.fileno(),
+            parent_descriptors[stderr_log.parent],
+        )
         stdout_data = _read_fd_exact(stdout.fileno(), stdout_info.st_size)
         stderr_data = _read_fd_exact(stderr.fileno(), stderr_info.st_size)
+        _assert_private_log_provenance(
+            stdout_log,
+            stdout.fileno(),
+            parent_descriptors[stdout_log.parent],
+            stdout_info,
+        )
+        _assert_private_log_provenance(
+            stderr_log,
+            stderr.fileno(),
+            parent_descriptors[stderr_log.parent],
+            stderr_info,
+        )
     return exit_code, reason, progress_events, stdout_data, stderr_data
 
 

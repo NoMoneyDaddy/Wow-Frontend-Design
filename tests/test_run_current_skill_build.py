@@ -2658,6 +2658,154 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertFalse(replacer.is_alive())
             self.assertEqual([], replacement_errors)
 
+    def test_raw_log_late_permission_or_hardlink_drift_fails_closed(self) -> None:
+        for mutation in ("permission", "hardlink"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                stage = root / "stage"
+                stage.mkdir()
+                trace = root / "trace.jsonl"
+                stderr = root / "stderr.txt"
+                alias = root / "trace-alias.jsonl"
+                real_terminate = core._terminate
+                mutated = False
+
+                def mutate_after_run(process: object) -> None:
+                    nonlocal mutated
+                    real_terminate(process)
+                    if mutated:
+                        return
+                    if mutation == "permission":
+                        trace.chmod(0o644)
+                    else:
+                        os.link(trace, alias)
+                    mutated = True
+
+                command = [
+                    sys.executable,
+                    "-c",
+                    "print('{\"type\":\"turn.completed\"}', flush=True)",
+                ]
+                with (
+                    mock.patch.object(core, "_terminate", side_effect=mutate_after_run),
+                    self.assertRaisesRegex(core.RunnerError, "log provenance drifted"),
+                ):
+                    core._run_codex(
+                        command, "", os.environ.copy(), stage, trace, stderr, 2
+                    )
+                self.assertTrue(mutated)
+
+    def test_private_log_helper_rejects_handle_path_size_race(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = root / "trace.jsonl"
+            parent_descriptor = core._open_log_directory(root)
+            try:
+                with core._open_private_log(
+                    path, directory_fd=parent_descriptor
+                ) as handle:
+                    handle.write(b"abc")
+                    handle.flush()
+                    real_stat = os.stat
+                    mutated = False
+
+                    def append_before_path_stat(
+                        target: object, *args: object, **kwargs: object
+                    ) -> os.stat_result:
+                        nonlocal mutated
+                        if kwargs.get("dir_fd") == parent_descriptor and not mutated:
+                            handle.seek(0, os.SEEK_END)
+                            handle.write(b"d")
+                            handle.flush()
+                            mutated = True
+                        return real_stat(target, *args, **kwargs)
+
+                    with (
+                        mock.patch.object(
+                            core.os, "stat", side_effect=append_before_path_stat
+                        ),
+                        self.assertRaisesRegex(
+                            core.RunnerError, "log provenance drifted"
+                        ),
+                    ):
+                        core._assert_private_log_provenance(
+                            path, handle.fileno(), parent_descriptor
+                        )
+                    self.assertTrue(mutated)
+            finally:
+                os.close(parent_descriptor)
+
+    def test_raw_log_privacy_drift_during_snapshot_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            trace = root / "trace.jsonl"
+            stderr = root / "stderr.txt"
+            real_read = core._read_fd_exact
+            mutated = False
+
+            def mutate_after_read(descriptor: int, size: int) -> bytes:
+                nonlocal mutated
+                data = real_read(descriptor, size)
+                if not mutated:
+                    trace.chmod(0o644)
+                    mutated = True
+                return data
+
+            command = [
+                sys.executable,
+                "-c",
+                "print('{\"type\":\"turn.completed\"}', flush=True)",
+            ]
+            with (
+                mock.patch.object(core, "_read_fd_exact", side_effect=mutate_after_read),
+                self.assertRaisesRegex(core.RunnerError, "log provenance drifted"),
+            ):
+                core._run_codex(
+                    command, "", os.environ.copy(), stage, trace, stderr, 2
+                )
+            self.assertTrue(mutated)
+
+    def test_raw_log_same_size_rewrite_during_snapshot_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            stage = root / "stage"
+            stage.mkdir()
+            trace = root / "trace.jsonl"
+            stderr = root / "stderr.txt"
+            real_read = core._read_fd_exact
+            mutated = False
+
+            def rewrite_after_read(descriptor: int, size: int) -> bytes:
+                nonlocal mutated
+                data = real_read(descriptor, size)
+                if not mutated:
+                    before = trace.stat()
+                    with trace.open("r+b") as handle:
+                        handle.write(b"x" * len(data))
+                        handle.flush()
+                    os.utime(
+                        trace,
+                        ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+                    )
+                    mutated = True
+                return data
+
+            command = [
+                sys.executable,
+                "-c",
+                "print('{\"type\":\"turn.completed\"}', flush=True)",
+            ]
+            with (
+                mock.patch.object(core, "_read_fd_exact", side_effect=rewrite_after_read),
+                self.assertRaisesRegex(core.RunnerError, "log provenance drifted"),
+            ):
+                core._run_codex(
+                    command, "", os.environ.copy(), stage, trace, stderr, 2
+                )
+            self.assertTrue(mutated)
+
     def test_raw_log_snapshot_reads_exactly_across_short_preads(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory).resolve() / "trace.jsonl"
