@@ -42,6 +42,8 @@ Keep one compact trace:
 source and status → observation → direction decision → affected route/state → proof required
 ```
 
+Name the observable comparison set before making a difference or originality claim. Without a supplied baseline, cohort, or lineage, do not claim cross-run novelty or difference from unseen generations. Instead, trace the current choice to product evidence; if it survives only as a familiar default, replace it with one product-supported alternative inside the current decision. Do not generate variants when the material choice is already resolved.
+
 Treat design or behavioral research as a hypothesis with a transfer assumption. Use [behavioral-design-evidence.md](behavioral-design-evidence.md) when a claim invokes psychology, persuasion, attention, or conversion. If a material decision has no trace to product meaning, audience need, stated preference, preserved identity, or verified constraint, simplify it or leave it unresolved.
 
 For an empty `BUILD` or broad redesign whose product facts and task are sufficient but whose taste evidence is thin, commit to one reversible authored hypothesis instead of defaulting every open visual decision to neutral. Record it as `HYPOTHESIS`, never as product fact:

@@ -72,6 +72,17 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.creative)
 
+    def test_direction_claims_stay_within_the_observable_comparison_set(self) -> None:
+        for phrase in (
+            "Name the observable comparison set",
+            "do not claim cross-run novelty or difference from unseen generations",
+            "Without a supplied baseline, cohort, or lineage",
+            "trace the current choice to product evidence",
+            "product-supported alternative inside the current decision",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.creative)
+
     def test_external_methods_are_distilled_into_bounded_mother_rules(self) -> None:
         for phrase in (
             "reference instance → rhythm | density | navigation | type | material | imagery | motion",

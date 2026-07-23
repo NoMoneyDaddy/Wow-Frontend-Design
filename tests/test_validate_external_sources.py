@@ -21,7 +21,7 @@ class SourceLockTests(unittest.TestCase):
         count = validate_external_sources.validate(
             root / "wow-frontend-design" / "references" / "external-sources.lock.json"
         )
-        self.assertEqual(count, 98)
+        self.assertEqual(count, 99)
 
     def test_user_provided_repositories_have_review_decisions(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -60,6 +60,7 @@ class SourceLockTests(unittest.TestCase):
             "ibelick/ui-skills",
             "jamiemill/layers-skills",
             "jezweb/claude-skills",
+            "justinwetch/skills",
             "majiayu000/claude-skill-registry",
             "mastepanoski/claude-skills",
             "mattpocock/skills",

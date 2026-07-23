@@ -108,7 +108,7 @@ Adopted boundary: a clean `DESIGN.md` is necessary contract evidence, not runtim
 
 ## Evidence from model-tier testing
 
-[Anthropic Skills PR #210](https://github.com/anthropics/skills/pull/210) describes a community A/B study across 50 prompts and three model tiers using anonymized screenshots and a blind judge. Its reported direction—explicit guidance helping the smaller model most—is useful, but the judge was still a model and the change was not a universal benchmark.
+[Anthropic Skills PR #210](https://github.com/anthropics/skills/pull/210), Justin Wetch's [method write-up](https://www.justinwetch.com/blog/improvingclaudefrontend), and its [fixed fork revision](https://github.com/justinwetch/skills/blob/70f9ae7bcc0779df92ea97bffef3fe8a9fde68b8/skills/frontend-design/SKILL.md) describe a community A/B study across 50 prompts and three model tiers using anonymized screenshots and a blind judge. Its reported direction—actionable instructions helping the smaller model most—is useful, but the judge was still a model and the change was not a universal benchmark. Adopt the bounded epistemic rule: a model may compare only baselines, candidates, or lineage supplied in the current run. Do not port its font blacklist, style menu, effects catalogue, library preference, or award-language pressure; those choices remain product-, runtime-, rights-, accessibility-, and evidence-dependent.
 
 Adopt the stronger method:
 
