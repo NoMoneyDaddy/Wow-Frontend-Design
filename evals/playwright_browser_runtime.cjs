@@ -158,6 +158,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const segmentIteratorNext = Object.getPrototypeOf(segmentIteratorSample).next;
           const hanGrapheme = /^\p{Script=Han}\p{M}*$/u;
           const punctuationGrapheme = /^\p{P}+$/u;
+          const formatControlGrapheme = /^[\u200b\u200c\u200d\u2060\ufeff]$/u;
 
           const normalizeFamily = (value) => {
             let normalized = apply(stringTrim, value, []);
@@ -248,12 +249,12 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             }
             return true;
           };
-          const segmentText = (text, locale) => {
+          const segmentText = (text, locale, granularity = "grapheme") => {
             let segmenter;
             try {
-              segmenter = construct(segmentConstructor, [locale || undefined, { granularity: "grapheme" }]);
+              segmenter = construct(segmentConstructor, [locale || undefined, { granularity }]);
             } catch {
-              segmenter = construct(segmentConstructor, [undefined, { granularity: "grapheme" }]);
+              segmenter = construct(segmentConstructor, [undefined, { granularity }]);
             }
             const segmented = apply(segmentMethod, segmenter, [text]);
             const iterator = apply(segmentIterator, segmented, []);
@@ -324,9 +325,11 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               if (!node) break;
               const value = apply(nodeText, node, []) || "";
               const owner = parentOf(node);
-              if (apply(stringTrim, value, []).length === 0 || !visible(owner)) continue;
-              nodes[nodes.length] = { node, owner, start: combined.length, end: combined.length + value.length };
+              if (!visible(owner)) continue;
+              const start = combined.length;
               combined += value;
+              if (apply(stringTrim, value, []).length === 0) continue;
+              nodes[nodes.length] = { node, owner, start, end: combined.length };
             }
             const segments = segmentText(combined, apply(elementAttribute, pageDocument.documentElement, ["lang"]));
             const records = [];
@@ -370,6 +373,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                   end: record.end,
                   line: lineIndex,
                 });
+                record.line = lineIndex;
                 if (record.han) hanGraphemes += 1;
                 if (lineIndex === lines.length - 1) {
                   lastLineGraphemes += 1;
@@ -378,9 +382,39 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                 }
               }
             }
+            let splitHanWordCount = 0;
+            for (let segmentIndex = 1; segmentIndex + 1 < segments.length; segmentIndex += 1) {
+              const segment = segments[segmentIndex];
+              if (apply(regexExec, formatControlGrapheme, [segment.value]) === null) continue;
+              const previous = segments[segmentIndex - 1];
+              const next = segments[segmentIndex + 1];
+              if (apply(regexExec, hanGrapheme, [previous.value]) !== null
+                && apply(regexExec, hanGrapheme, [next.value]) !== null) splitHanWordCount += 1;
+            }
+            const words = segmentText(
+              combined,
+              apply(elementAttribute, pageDocument.documentElement, ["lang"]),
+              "word",
+            );
+            for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
+              const word = words[wordIndex];
+              const wordEnd = word.index + word.value.length;
+              let hanCount = 0;
+              let firstLine = -1;
+              let spansLines = false;
+              for (let recordIndex = 0; recordIndex < records.length; recordIndex += 1) {
+                const record = records[recordIndex];
+                if (!record.han || record.start < word.index || record.end > wordEnd) continue;
+                if (hanCount === 0) firstLine = record.line;
+                else if (record.line !== firstLine) spansLines = true;
+                hanCount += 1;
+              }
+              if (hanCount >= 2 && spansLines) splitHanWordCount += 1;
+            }
             return freeze({
               lineCount: lines.length,
               hanGraphemes,
+              splitHanWordCount,
               lastLineGraphemes,
               lastLineHanGraphemes,
               lastLinePunctuationGraphemes,

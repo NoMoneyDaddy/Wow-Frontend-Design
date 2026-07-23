@@ -267,13 +267,13 @@ function validateBrowserContract(value, pages) {
 
 function validateSourceLayoutRisks(value, pages) {
   if (!value || typeof value !== "object" || Array.isArray(value)
-    || !exactKeys(value, ["heading_latin_ch_pages", "schema_version"])
-    || value.schema_version !== 1
-    || !Array.isArray(value.heading_latin_ch_pages)
-    || value.heading_latin_ch_pages.length > pages.length
-    || value.heading_latin_ch_pages.some((item) => typeof item !== "string" || !pages.includes(item))
-    || value.heading_latin_ch_pages.join("\0")
-      !== [...new Set(value.heading_latin_ch_pages)].sort().join("\0")) {
+    || !exactKeys(value, ["heading_explicit_narrow_pages", "schema_version"])
+    || value.schema_version !== 2
+    || !Array.isArray(value.heading_explicit_narrow_pages)
+    || value.heading_explicit_narrow_pages.length > pages.length
+    || value.heading_explicit_narrow_pages.some((item) => typeof item !== "string" || !pages.includes(item))
+    || value.heading_explicit_narrow_pages.join("\0")
+      !== [...new Set(value.heading_explicit_narrow_pages)].sort().join("\0")) {
     throw new Error("invalid source layout risks");
   }
   return value;
@@ -592,7 +592,7 @@ async function main() {
     : validateBrowserContract(rawBrowserContract, pages);
   const sourceLayoutRisks = process.argv.length === 7
     ? validateSourceLayoutRisks(JSON.parse(process.argv[6]), pages)
-    : { schema_version: 1, heading_latin_ch_pages: [] };
+    : { schema_version: 2, heading_explicit_narrow_pages: [] };
   const profiles = browserContract?.cases.some((item) => item.profile === "mobile-motion")
     ? [...VIEWPORTS, MOBILE_MOTION_VIEWPORT]
     : VIEWPORTS;
@@ -606,7 +606,7 @@ async function main() {
         .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
         .analyze();
       const axeTargets = await summarizeAxeTargets(page, analysis.violations);
-      const headingLatinChRisk = sourceLayoutRisks.heading_latin_ch_pages.includes(relativePage);
+      const headingExplicitNarrowRisk = sourceLayoutRisks.heading_explicit_narrow_pages.includes(relativePage);
       const layoutHazards = await page.evaluate(({ inspectCjkHeadingWidth }) => {
         const visible = (element) => {
           let current = element;
@@ -655,7 +655,8 @@ async function main() {
           .filter(visible).length;
         const trusted = globalThis.__wowEvaluatorRead;
         let singleHanLastLineHeadingCount = 0;
-        let cjkHeadingLatinChNarrowCount = 0;
+        let cjkHeadingSplitWordCount = 0;
+        let cjkHeadingExplicitNarrowCount = 0;
         let headingScanCount = 0;
         let headingScanTruncated = false;
         const displayHeadings = Array.from(document.querySelectorAll("h1,[role='heading'][aria-level='1']"));
@@ -670,13 +671,13 @@ async function main() {
           const profile = trusted?.renderedLineProfile(heading);
           if (!profile) continue;
           headingScanCount += 1;
+          cjkHeadingSplitWordCount += profile.splitHanWordCount;
           if (inspectCjkHeadingWidth && profile.lineCount >= 2 && profile.hanGraphemes > 0) {
             const headingBox = trusted?.rect(heading);
-            const mainElement = document.querySelector("main");
-            const mainBox = mainElement ? trusted?.rect(mainElement) : null;
-            if (headingBox?.width > 0 && mainBox?.width > 0
-              && headingBox.width / mainBox.width < 0.65) {
-              cjkHeadingLatinChNarrowCount += 1;
+            const parentBox = heading.parentElement ? trusted?.rect(heading.parentElement) : null;
+            if (headingBox?.width > 0 && parentBox?.width > 0
+              && headingBox.width / parentBox.width < 0.8) {
+              cjkHeadingExplicitNarrowCount += 1;
             }
           }
           if (profile.lineCount >= 2
@@ -718,13 +719,14 @@ async function main() {
         return {
           hidden_attribute_visible_count: hiddenAttributeVisible,
           fixed_content_obstruction_count: fixedContentObstructions,
-          cjk_heading_latin_ch_narrow_count: cjkHeadingLatinChNarrowCount,
+          cjk_heading_explicit_narrow_count: cjkHeadingExplicitNarrowCount,
+          cjk_heading_split_word_count: cjkHeadingSplitWordCount,
           heading_scan_count: headingScanCount,
           heading_scan_truncated: headingScanTruncated,
           single_han_last_line_heading_count: singleHanLastLineHeadingCount,
         };
       }, {
-        inspectCjkHeadingWidth: headingLatinChRisk && ["mobile", "narrow"].includes(profile.name),
+        inspectCjkHeadingWidth: headingExplicitNarrowRisk,
       });
       const matchingContract = browserContract?.cases.find((item) =>
         item.page === relativePage && item.profile === profile.name);
@@ -738,7 +740,8 @@ async function main() {
         layout_hazards: {
           hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
           fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
-          cjk_heading_latin_ch_narrow_count: layoutHazards.cjk_heading_latin_ch_narrow_count,
+          cjk_heading_explicit_narrow_count: layoutHazards.cjk_heading_explicit_narrow_count,
+          cjk_heading_split_word_count: layoutHazards.cjk_heading_split_word_count,
         },
         typography_advisories: {
           heading_scan_count: layoutHazards.heading_scan_count,
@@ -760,7 +763,8 @@ async function main() {
       && result.inspection.axe_violation_count === 0
       && result.inspection.layout_hazards.hidden_attribute_visible_count === 0
       && result.inspection.layout_hazards.fixed_content_obstruction_count === 0
-      && result.inspection.layout_hazards.cjk_heading_latin_ch_narrow_count === 0
+      && result.inspection.layout_hazards.cjk_heading_explicit_narrow_count === 0
+      && result.inspection.layout_hazards.cjk_heading_split_word_count === 0
       && (!("browser_contract" in result.inspection) || result.inspection.browser_contract.status === "passed");
     result.status = passed ? "passed" : "rejected";
   }

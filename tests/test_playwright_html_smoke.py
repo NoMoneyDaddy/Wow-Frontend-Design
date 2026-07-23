@@ -40,7 +40,7 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         return json.loads(completed.stdout)
 
-    def test_latin_ch_source_signal_requires_fresh_narrow_cjk_geometry(self) -> None:
+    def test_explicit_narrow_source_signal_requires_fresh_cjk_parent_geometry(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
             (stage / "index.html").write_text(
@@ -51,8 +51,8 @@ h1 { max-inline-size: 8ch; font-size: 36px; }
                 encoding="utf-8",
             )
             risks = {
-                "schema_version": 1,
-                "heading_latin_ch_pages": ["index.html"],
+                "schema_version": 2,
+                "heading_explicit_narrow_pages": ["index.html"],
             }
             receipt = self.invoke(
                 stage,
@@ -61,16 +61,64 @@ h1 { max-inline-size: 8ch; font-size: 36px; }
                 source_risks=risks,
             )
             results = {item["profile"]: item for item in receipt["results"]}
-            self.assertEqual("passed", results["desktop"]["status"])
+            self.assertEqual("rejected", results["desktop"]["status"])
             self.assertEqual("rejected", results["mobile"]["status"])
             self.assertEqual("rejected", results["narrow"]["status"])
             self.assertEqual(
                 1,
+                results["desktop"]["inspection"]["layout_hazards"][
+                    "cjk_heading_explicit_narrow_count"
+                ],
+            )
+            self.assertEqual(
+                1,
                 results["mobile"]["inspection"]["layout_hazards"][
-                    "cjk_heading_latin_ch_narrow_count"
+                    "cjk_heading_explicit_narrow_count"
                 ],
             )
             self.assertEqual(risks, receipt["source_layout_risks"])
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>比例標題</title><style>
+main { inline-size: 100%; }
+.hero { inline-size: 50%; }
+h1 { width: 72%; font-size: 36px; }
+</style></head><body><main><section class="hero"><h1>讓每一晚都能隨著不同生活階段重新組裝與調整</h1><p>產品內容</p></section><aside>功能內容</aside></main></body></html>''',
+                encoding="utf-8",
+            )
+            percentage_heading = self.invoke(
+                stage,
+                ["index.html"],
+                ["index.html"],
+                source_risks=risks,
+            )
+            self.assertEqual("rejected", percentage_heading["status"])
+            percentage_results = {
+                item["profile"]: item for item in percentage_heading["results"]
+            }
+            self.assertEqual(
+                1,
+                percentage_results["desktop"]["inspection"]["layout_hazards"][
+                    "cjk_heading_explicit_narrow_count"
+                ],
+            )
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>合法分欄</title><style>
+main { inline-size: 100%; }
+.hero { inline-size: 50%; }
+h1 { width: 100%; font-size: 36px; }
+h1 span { display: block; }
+</style></head><body><main><section class="hero"><h1><span>甲</span> <span>乙</span></h1><p>產品內容</p></section><aside>功能內容</aside></main></body></html>''',
+                encoding="utf-8",
+            )
+            full_parent_heading = self.invoke(
+                stage,
+                ["index.html"],
+                ["index.html"],
+                source_risks=risks,
+            )
+            self.assertEqual("passed", full_parent_heading["status"])
 
             (stage / "index.html").write_text(
                 '''<!doctype html><html lang="zh-Hant"><head><title>短標題</title><style>
@@ -94,14 +142,15 @@ h1 { max-inline-size: 8ch; font-size: 36px; }
             )
             self.assertEqual("passed", without_signal["status"])
 
-    def test_editorial_narrow_heading_without_latin_ch_signal_remains_valid(self) -> None:
+    def test_editorial_narrow_heading_without_source_signal_remains_valid(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
             (stage / "index.html").write_text(
                 '''<!doctype html><html lang="zh-Hant"><head><title>編輯式標題</title><style>
 main { inline-size: 100%; }
 h1 { max-inline-size: 12rem; font-size: 36px; }
-</style></head><body><main><h1>讓每一晚都能隨生活重新組裝</h1><p>產品內容</p></main></body></html>''',
+h1 span { display: block; }
+</style></head><body><main><h1><span>讓每一晚</span> <span>隨生活重組</span></h1><p>產品內容</p></main></body></html>''',
                 encoding="utf-8",
             )
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
@@ -571,6 +620,49 @@ RegExp.prototype.exec = function(value) {
                 for result in receipt["results"]
             ))
             self.assertNotIn("不回傳這段固定標題", json.dumps(receipt, ensure_ascii=False))
+
+    def test_generic_smoke_rejects_fresh_rendered_han_word_split(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>詞組換行</title><style>
+.broken span { display: block; }
+</style></head><body><main>
+<h1 class="broken"><span>價</span><span>格</span></h1><p>產品內容</p>
+</main><script>Intl.Segmenter = function() { throw new Error("poisoned"); };</script></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            self.assertTrue(all(
+                result["inspection"]["layout_hazards"]["cjk_heading_split_word_count"] == 1
+                for result in receipt["results"]
+            ))
+            self.assertNotIn("價格", json.dumps(receipt, ensure_ascii=False))
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>完整詞組</title></head><body>
+<main><h1>價格透明，<br>安心選購</h1><p>產品內容</p></main></body></html>''',
+                encoding="utf-8",
+            )
+            self.assertEqual("passed", self.invoke(stage, ["index.html"], ["index.html"])["status"])
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>空白分詞</title><style>
+.separate span { display: block; }
+</style></head><body><main><h1 class="separate"><span>價</span> <span>格</span></h1>
+<p>產品內容</p></main></body></html>''',
+                encoding="utf-8",
+            )
+            self.assertEqual("passed", self.invoke(stage, ["index.html"], ["index.html"])["status"])
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>零寬繞過</title><style>
+h1 { inline-size: 1em; }
+</style></head><body><main><h1>價​格</h1><p>產品內容</p></main></body></html>''',
+                encoding="utf-8",
+            )
+            self.assertEqual("rejected", self.invoke(stage, ["index.html"], ["index.html"])["status"])
 
     def test_heading_tail_advisory_discloses_bounded_scan_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1384,7 +1476,8 @@ main { position: relative; min-height: 100vh; }
                     {
                         "hidden_attribute_visible_count": 0,
                         "fixed_content_obstruction_count": 0,
-                        "cjk_heading_latin_ch_narrow_count": 0,
+                        "cjk_heading_explicit_narrow_count": 0,
+                        "cjk_heading_split_word_count": 0,
                     },
                     item["inspection"]["layout_hazards"],
                 )

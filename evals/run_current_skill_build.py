@@ -275,7 +275,8 @@ def _validate_axe_inspection(inspection: Any) -> None:
         or set(layout) != {
             "hidden_attribute_visible_count",
             "fixed_content_obstruction_count",
-            "cjk_heading_latin_ch_narrow_count",
+            "cjk_heading_explicit_narrow_count",
+            "cjk_heading_split_word_count",
         }
         or any(type(layout.get(key)) is not int or not 0 <= layout[key] <= 10000 for key in layout)
         or not isinstance(typography, dict)
@@ -932,7 +933,7 @@ def _run_html_smoke(
     outputs: tuple[str, ...],
     timeout: int,
     browser_contract: dict[str, Any] | None = None,
-    heading_latin_ch_pages: tuple[str, ...] = (),
+    heading_explicit_narrow_pages: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     html_outputs = [name for name in outputs if name.casefold().endswith(".html")]
     node_raw = shutil.which("node", path=design_policy.SYSTEM_PATH)
@@ -972,8 +973,8 @@ def _run_html_smoke(
             environment[name] = os.environ[name]
     try:
         source_layout_risks = {
-            "schema_version": 1,
-            "heading_latin_ch_pages": list(heading_latin_ch_pages),
+            "schema_version": 2,
+            "heading_explicit_narrow_pages": list(heading_explicit_narrow_pages),
         }
         command = [
             str(node),
@@ -1147,7 +1148,7 @@ def _run_html_smoke(
     return receipt
 
 
-def _heading_latin_ch_pages(
+def _heading_explicit_narrow_pages(
     stage: Path,
     outputs: tuple[str, ...],
     timeout: int,
@@ -1221,7 +1222,7 @@ def _heading_latin_ch_pages(
             or finding["line"] < 1
         ):
             raise RunnerError("source layout audit infrastructure failure")
-        if finding["code"] != "heading_latin_ch_measure":
+        if finding["code"] != "heading_explicit_narrow_measure":
             continue
         if finding["path"] in html_outputs:
             affected.add(finding["path"])
@@ -2314,7 +2315,7 @@ def run(
             if design_gate.get("status") != "passed":
                 raise RunnerError("DESIGN.md clean gate returned an invalid status")
             try:
-                heading_latin_ch_pages = _heading_latin_ch_pages(
+                heading_explicit_narrow_pages = _heading_explicit_narrow_pages(
                     stage,
                     output_names,
                     min(120, max(15, hard_seconds)),
@@ -2327,7 +2328,7 @@ def run(
                     output_names,
                     min(120, max(15, hard_seconds)),
                     browser_contract_data,
-                    heading_latin_ch_pages,
+                    heading_explicit_narrow_pages,
                 )
                 _assert_wrapper_tool_records(wrapper_tools)
             except RunnerError:

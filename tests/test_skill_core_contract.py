@@ -346,9 +346,9 @@ class SkillCoreContractTests(unittest.TestCase):
             "When evidence calls for identity",
             "`none` remains valid when identity would harm the task",
             "a softened or renamed version still fails source and rendered review",
-            "rendered wraps preserve semantic units and intentional rhythm",
-            "Never cap CJK display headings in Latin `ch`",
-            "leave a one-Han final line",
+            "Give CJK headings their full track",
+            "Never cap them in Latin `ch` or arbitrary fractions",
+            "avoid one-Han tails",
             "cannot cover, bypass, or weaken required evidence",
         ):
             with self.subTest(phrase=phrase):

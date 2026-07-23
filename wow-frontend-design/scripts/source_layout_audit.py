@@ -63,6 +63,21 @@ def _declaration_value(declarations: str, property_name: str) -> str | None:
     return " ".join(match.group(1).split()).lower() if match else None
 
 
+def _explicit_narrow_heading_measure(values: Iterable[str | None]) -> str | None:
+    for value in values:
+        if not value:
+            continue
+        if re.search(r"\b\d+(?:\.\d+)?ch\b", value):
+            return value
+        percentages = [
+            float(match.group(1))
+            for match in re.finditer(r"(?<![\w.-])(\d+(?:\.\d+)?)%(?![\w.-])", value)
+        ]
+        if any(percentage < 100 for percentage in percentages):
+            return value
+    return None
+
+
 def _css_regions(text: str, suffix: str) -> Iterable[tuple[str, int]]:
     if suffix in STYLE_EXTENSIONS:
         yield text, 0
@@ -179,18 +194,15 @@ def audit_text(text: str, relative_path: str, suffix: str) -> list[dict[str, Any
                         "Confirm computed style and overflow at mobile, zoom, and expanded locale widths.",
                     ))
 
-            heading_measure = next(
-                (value for value in (max_width, max_inline, width) if value and re.search(r"\b\d+(?:\.\d+)?ch\b", value)),
-                None,
-            )
+            heading_measure = _explicit_narrow_heading_measure((max_width, max_inline, width))
             if _selector_targets(selector, HEADING_SUBJECT) and heading_measure:
                 findings.append(_finding(
-                    "heading_latin_ch_measure",
+                    "heading_explicit_narrow_measure",
                     "medium",
                     relative_path,
                     line,
                     f"{selector} {{ measure: {heading_measure}; }}",
-                    "Measure CJK line fragments in the browser; Latin ch is only a risk signal, not a failure by itself.",
+                    "Compare fresh CJK heading geometry with its owning container; source measure is only a risk signal.",
                 ))
 
             clipped = (overflow in {"hidden", "clip"} or overflow_y in {"hidden", "clip"})

@@ -151,6 +151,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
             file_context=(),
         )
         self.assertIn("never infer multiple DOM targets from a count alone", prompt)
+        self.assertIn("Resolve every finding category", prompt)
         self.assertIn("keep each control's complete visible label inside its accessible name", prompt)
         self.assertIn("keep the visible label stable", prompt)
         self.assertIn("Do not remove unrelated labels", prompt)
@@ -184,7 +185,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
             documentation,
         )
 
-    def test_source_latin_ch_signal_is_projected_only_to_affected_html(self) -> None:
+    def test_source_explicit_narrow_signal_is_projected_only_to_affected_html(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory).resolve()
             (stage / "index.html").write_text(
@@ -197,7 +198,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
             )
             self.assertEqual(
                 ("index.html",),
-                policy._heading_latin_ch_pages(
+                policy._heading_explicit_narrow_pages(
                     stage,
                     ("DESIGN.md", "index.html", "details.html"),
                     30,
@@ -210,7 +211,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
             )
             self.assertEqual(
                 ("index.html",),
-                policy._heading_latin_ch_pages(
+                policy._heading_explicit_narrow_pages(
                     stage,
                     (
                         "DESIGN.md",
@@ -218,6 +219,19 @@ class CurrentSkillBuildTests(unittest.TestCase):
                         "details.html",
                         "shared.css",
                     ),
+                    30,
+                ),
+            )
+
+            (stage / "index.html").write_text(
+                '<!doctype html><style>h1{width:72%}</style><main><h1>品牌標題</h1></main>',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                ("index.html",),
+                policy._heading_explicit_narrow_pages(
+                    stage,
+                    ("DESIGN.md", "index.html", "details.html", "shared.css"),
                     30,
                 ),
             )
@@ -1343,7 +1357,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,
-                "cjk_heading_latin_ch_narrow_count": 0,
+                "cjk_heading_explicit_narrow_count": 0,
+                "cjk_heading_split_word_count": 0,
             },
             "typography_advisories": {
                 "heading_scan_count": 1,
@@ -3212,7 +3227,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         "layout_hazards": {
                             "hidden_attribute_visible_count": 1,
                             "fixed_content_obstruction_count": 2,
-                            "cjk_heading_latin_ch_narrow_count": 1,
+                            "cjk_heading_explicit_narrow_count": 1,
+                            "cjk_heading_split_word_count": 3,
                         },
                     },
                 }],
@@ -3231,7 +3247,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(
                 [
                     "axe-heading-order",
-                    "cjk-heading-latin-ch-narrow",
+                    "cjk-heading-explicit-narrow",
+                    "cjk-heading-split-word",
                     "console-errors",
                     "fixed-content-obstruction",
                     "visible-hidden-attribute",
@@ -3239,7 +3256,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 trigger["finding_ids"],
             )
             self.assertEqual(2, trigger["counts"]["fixed-content-obstruction"])
-            self.assertEqual(1, trigger["counts"]["cjk-heading-latin-ch-narrow"])
+            self.assertEqual(1, trigger["counts"]["cjk-heading-explicit-narrow"])
+            self.assertEqual(3, trigger["counts"]["cjk-heading-split-word"])
             repair_prompt = json.loads(
                 (capture / "invocation-2.json").read_text(encoding="utf-8")
             )["prompt"]

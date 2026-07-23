@@ -27,6 +27,7 @@ class SourceLayoutAuditTests(unittest.TestCase):
 body { word-break: break-all; }
 p.copy { white-space: nowrap; }
 h1 { max-inline-size: 12ch; }
+h2 { width: 72%; }
 p.clipped { height: 40px; overflow: hidden; }
 </style>
 <p>這是一般正文<br>不應由來源碼控制斷行。</p>
@@ -41,7 +42,7 @@ p.clipped { height: 40px; overflow: hidden; }
                 "fixed_text_clipping",
                 "forced_body_break",
                 "global_emergency_breaking",
-                "heading_latin_ch_measure",
+                "heading_explicit_narrow_measure",
                 "prose_wrap_disabled",
             },
             codes,
@@ -56,6 +57,7 @@ p.clipped { height: 40px; overflow: hidden; }
                 """.tag { white-space: nowrap; }
 .data { overflow-wrap: anywhere; }
 h1 { max-inline-size: 18rem; }
+h2 { width: 100%; }
 .card { min-height: 20rem; overflow: visible; }
 """,
                 encoding="utf-8",
