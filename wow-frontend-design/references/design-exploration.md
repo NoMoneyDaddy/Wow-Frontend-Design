@@ -30,6 +30,10 @@ Hold the product truth, task, real or representative content, data fixture, requ
 - one decision-critical state or interaction specimen;
 - a terse rationale naming product evidence, changed and held axes, identity carrier, implementation risk, and what would disqualify it.
 
+Before implementation, record a composition proof for each group: protagonist, first-viewport region order, primary interaction placement, and mobile transformation. Every pair of groups must differ materially in at least two of those four fields. Held facts and functions do not require the same region order, hero, or shell. If the candidates can be produced by restyling one hero-selector-summary sequence, the comparison has collapsed; revise the composition contracts before coding.
+
+Keep hypotheses, changed axes, implementation commentary, evaluator criteria, and explanations of page or CTA placement in the rationale record only. Rendered UI copy must address the product audience and perform a product, navigation, status, instruction, or decision-support job. Do not expose phrases such as “this variant,” “this page prioritizes,” “the CTA remains visible,” or other design-process narration as customer content.
+
 Build only to the fidelity needed to make the visual and interaction direction observable. Reuse deterministic content fixtures and existing preview infrastructure, but do not let a shared shell force the candidates into one composition. Do not build three production implementations, connect production services, complete every route, extract speculative shared abstractions, or polish expensive motion before selection. A draft may simplify data plumbing; it may not fake factual content, hide a required action, or become a screenshot-only facade.
 
 When comparison conditions freeze a first-viewport contract, budget the vertical stack before styling: brand, value statement, required decision context, and primary action. Defer every non-required block below that action; do not let repeated summary cards displace it. Keep required safety, consent, or comparison evidence before the action when the decision depends on it.

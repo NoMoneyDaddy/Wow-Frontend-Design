@@ -266,6 +266,22 @@ class CurrentDraftCohortTests(unittest.TestCase):
             self.assertIn('"locale":"zh-Hant"', effective)
             self.assertIn('"surface":"marketplace-home"', effective)
             self.assertIn("Do not build production integrations", effective)
+            self.assertIn(
+                "protagonist, first-viewport region order, primary interaction placement, and mobile transformation",
+                effective,
+            )
+            self.assertIn(
+                "The same facts and functions do not require the same region order or shell",
+                effective,
+            )
+            self.assertIn(
+                "Keep design rationale in DESIGN.md only",
+                effective,
+            )
+            self.assertIn(
+                "HTML copy must address the product audience",
+                effective,
+            )
 
             invalid = self.valid_plan()
             invalid["private"] = True
