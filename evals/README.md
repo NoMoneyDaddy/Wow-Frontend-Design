@@ -86,6 +86,21 @@ npm run drafts:decide -- \
 
 成功時以 `0600` 建立 `draft-decision-receipt.json`，自動綁定原 cohort receipt、capture set、選定方向的 desktop/mobile labels、held constants、selection criteria 與 convergence summary。它只建立 selection lineage：只有 `select` 交給唯一的 production `BUILD` lane；`revise` 只要求一個 bounded fresh child 並回到同一 checkpoint，`stop` 不進 production。草稿 HTML 與 PNG 都不得升級成 release evidence。
 
+若 decision 是 `revise`，以同一份 brief、cohort 與 decision lineage 產生唯一一個 bounded child：
+
+```bash
+npm run drafts:revise -- \
+  --brief /absolute/evaluator-root/brief.md \
+  --cohort-root /absolute/evaluator-root/cohort-output \
+  --cohort-log-dir /absolute/evaluator-root/private-logs \
+  --decision /absolute/evaluator-root/draft-decision.json \
+  --decision-receipt /absolute/evaluator-root/decision-output/draft-decision-receipt.json \
+  --revision-root /absolute/evaluator-root/revision-output \
+  --revision-log-dir /absolute/evaluator-root/revision-logs
+```
+
+Runner 只把 frozen `DESIGN.md` 與 base HTML 交給既有 retrofit builder，不讀取或複製舊 PNG；child HTML 必須實際改變，再由專案固定 Playwright 取得恰好一組 fresh desktop/mobile screenshots。它沿用 builder 的最多兩輪 repair 熔斷，沒有新一套重試政策。成功 receipt 只證明這次 style calibration，必須回到相同 decision checkpoint；接受結果時仍以原 base variant 加上已確認 adjustments 記錄 `select`，child HTML／PNG 本身不會被 promotion。它不是 selected production artifact、production handoff 或 release evidence。
+
 選定後，把四個來源參數一起交給唯一的 `build:current`。只接受 greenfield 的 `select`／`BUILD` handoff；缺少任一參數、`revise`、`stop` 或來源漂移都會在建立 target、log 或呼叫模型前拒絕：
 
 ```bash
