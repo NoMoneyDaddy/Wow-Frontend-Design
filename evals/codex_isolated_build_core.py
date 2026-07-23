@@ -153,6 +153,11 @@ def _tree_summary(records: list[dict[str, Any]], name: str) -> dict[str, Any]:
     }
 
 
+def skill_tree_summary(source: Path, name: str) -> dict[str, Any]:
+    """Return the validated current tree summary for an evaluator-owned Skill source."""
+    return _tree_summary(_tree_records(source), name)
+
+
 def _validated_skill_reference_records(
     records: tuple[tuple[str, int, str], ...],
 ) -> tuple[tuple[str, int, str], ...]:

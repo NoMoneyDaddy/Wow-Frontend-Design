@@ -2559,6 +2559,308 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(expected_trace, receipt["logs"]["trace"])
             self.assertEqual(expected_stderr, receipt["logs"]["stderr"])
 
+    def test_draft_decision_prompt_context_is_metadata_only(self) -> None:
+        source = {
+            "action": "select",
+            "cohort_id": "marketplace-directions-1",
+            "authority": "user_delegated",
+            "authority_assurance": "caller_attested_not_identity_verified",
+            "variant": {
+                "id": "editorial-index",
+                "hypothesis": "Editorial hierarchy supports scanning.",
+                "changed_axes": ["composition", "typography"],
+                "expected_benefit": "Clearer task priority.",
+                "risk": "Lower information density.",
+                "disqualifier": "Primary action is hidden.",
+            },
+            "reason": "The hierarchy best supports the main task.",
+            "adjustments": ["Strengthen the primary action."],
+            "held_constant_axes": ["product-facts", "content-fixture", "functional-behavior", "comparison-conditions"],
+            "selection_criteria": ["task clarity", "brand distinction"],
+            "receipt": {"bytes": 10, "mode": "0600", "sha256": "a" * 64},
+            "decision_input": {"bytes": 10, "mode": "0600", "sha256": "b" * 64},
+            "cohort_receipt": {"bytes": 10, "mode": "0600", "sha256": "c" * 64},
+            "capture_set_sha256": "d" * 64,
+            "capture_labels": ["editorial-index-desktop-default", "editorial-index-mobile-default"],
+            "skill_tree_sha256": "e" * 64,
+            "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+        }
+        context = policy._draft_decision_prompt_context(source)
+        self.assertIn("Editorial hierarchy supports scanning.", context)
+        self.assertIn("caller_attested_not_identity_verified", context)
+        for forbidden in ("directions/editorial-index.html", ".png", "capture_labels", "capture_set_sha256"):
+            self.assertNotIn(forbidden, context)
+
+    def test_draft_decision_projection_removes_source_paths(self) -> None:
+        tree = core.skill_tree_summary(policy.SKILL_SOURCE, "wow-frontend-design")
+        record = {"bytes": 10, "mode": "0600", "sha256": "a" * 64}
+        receipt = {
+            "status": "recorded",
+            "classification": "draft_direction_selected",
+            "claim_boundary": "selection_lineage_only_no_release_acceptance",
+            "source": {
+                "cohort_id": "marketplace-directions-1",
+                "decision_input": {**record, "sha256": "b" * 64},
+                "cohort_receipt": {"path": "draft-cohort-receipt.json", **record, "sha256": "c" * 64},
+                "capture_set_sha256": "d" * 64,
+                "skill_tree_sha256": tree["tree_sha256"],
+            },
+            "decision": {
+                "action": "select", "authority": "user_delegated", "reason": "Best task fit.",
+                "adjustments": [],
+                "variant": {
+                    "id": "editorial-index", "hypothesis": "Editorial hierarchy.",
+                    "changed_axes": ["composition", "typography"], "expected_benefit": "Clear priority.",
+                    "risk": "Lower density.", "disqualifier": "Hidden action.",
+                },
+                "capture_labels": ["editorial-index-desktop-default", "editorial-index-mobile-default"],
+            },
+            "handoff": {
+                "production_lane": "BUILD", "next_step": "implement_selected_direction",
+                "held_constant_axes": ["product-facts", "content-fixture", "functional-behavior", "comparison-conditions"],
+                "selection_criteria": ["task clarity", "brand distinction"],
+                "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+            },
+        }
+        module = mock.Mock()
+        module.validate_decision_receipt.return_value = {
+            "receipt": receipt, "receipt_record": record, "skill_tree_sha256": tree["tree_sha256"],
+        }
+        with mock.patch.object(policy, "_module", return_value=module):
+            summary = policy._validate_draft_decision_source(
+                Path("/tmp/receipt"), Path("/tmp/decision"), Path("/tmp/cohort"), Path("/tmp/logs")
+            )
+        self.assertNotIn("path", summary["cohort_receipt"])
+        self.assertTrue(policy._valid_decision_source(summary))
+
+    def test_draft_decision_revise_is_rejected_before_target_side_effect(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief = root / "brief.md"
+            brief.write_text("Build a page.\n", encoding="utf-8")
+            target = root / "target"
+            target.mkdir()
+            logs = root / "logs"
+            logs.mkdir()
+            paths = tuple(root / name for name in ("receipt.json", "decision.json", "cohort", "cohort-logs"))
+            for path in paths[:2]:
+                path.write_text("{}\n", encoding="utf-8")
+            for path in paths[2:]:
+                path.mkdir()
+            rejected = {"action": "revise"}
+            with (
+                mock.patch.object(policy, "_validate_draft_decision_source", return_value=rejected),
+                mock.patch.object(policy, "_fresh_target") as fresh_target,
+                self.assertRaisesRegex(policy.RunnerError, "select"),
+            ):
+                policy.run(
+                    brief,
+                    target,
+                    log_dir=logs,
+                    draft_decision_receipt=paths[0],
+                    draft_decision_input=paths[1],
+                    draft_cohort_root=paths[2],
+                    draft_cohort_log_dir=paths[3],
+                )
+            fresh_target.assert_not_called()
+
+    def test_draft_decision_source_arguments_are_all_or_none(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief = root / "brief.md"
+            brief.write_text("Build a page.\n", encoding="utf-8")
+            target = root / "target"
+            target.mkdir()
+            logs = root / "logs"
+            logs.mkdir()
+            with (
+                mock.patch.object(policy, "_fresh_target") as fresh_target,
+                mock.patch.object(policy, "_validate_draft_decision_source") as validate,
+                self.assertRaisesRegex(policy.RunnerError, "supplied together"),
+            ):
+                policy.run(
+                    brief,
+                    target,
+                    log_dir=logs,
+                    draft_decision_receipt=root / "receipt.json",
+                )
+            fresh_target.assert_not_called()
+            validate.assert_not_called()
+
+    def test_decision_enabled_receipt_and_repair_attempt_share_exact_lineage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            lineage = {
+                "action": "select",
+                "cohort_id": "marketplace-directions-1",
+                "authority": "user_delegated",
+                "authority_assurance": "caller_attested_not_identity_verified",
+                "variant": {
+                    "id": "editorial-index", "hypothesis": "A", "changed_axes": ["composition", "typography"],
+                    "expected_benefit": "B", "risk": "C", "disqualifier": "D",
+                },
+                "reason": "Selected against declared criteria.", "adjustments": [],
+                "held_constant_axes": ["product-facts", "content-fixture", "functional-behavior", "comparison-conditions"],
+                "selection_criteria": ["task clarity", "brand distinction"],
+                "receipt": {"bytes": 10, "mode": "0600", "sha256": "a" * 64},
+                "decision_input": {"bytes": 10, "mode": "0600", "sha256": "b" * 64},
+                "cohort_receipt": {"bytes": 10, "mode": "0600", "sha256": "c" * 64},
+                "capture_set_sha256": "d" * 64,
+                "capture_labels": ["editorial-index-desktop-default", "editorial-index-mobile-default"],
+                "skill_tree_sha256": "e" * 64,
+                "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+            }
+            execution = {
+                "model": {}, "prompt": {}, "skill_snapshot": {}, "skill_references": {},
+                "configured_isolation": {}, "execution": {}, "trace_observed": {}, "tools": {},
+            }
+            compact_lineage = policy._decision_lineage(lineage)
+            attempt = policy._attempt_summary(0, execution, None, compact_lineage)
+            receipt = policy._receipt(
+                status="execution_passed", classification="publication_pending", brief_bytes=b"brief",
+                prompt="prompt", model="model", reasoning_effort="high", case_mode="greenfield",
+                lane_contract="BUILD", stdout_log=root / "trace", stderr_log=root / "stderr",
+                execution={"execution": {"trace": {}, "stderr": {}}, "configured_isolation": {}, "trace_observed": {}},
+                repair={"max_rounds": 1, "rounds_used": 1, "attempts": [attempt]},
+                decision_lineage=compact_lineage,
+            )
+            self.assertEqual(compact_lineage, receipt["draft_decision_lineage"])
+            self.assertEqual(
+                compact_lineage,
+                receipt["repair"]["attempts"][0]["draft_decision_lineage"],
+            )
+            serialized = json.dumps(receipt, ensure_ascii=False)
+            self.assertNotIn(lineage["reason"], serialized)
+            self.assertNotIn(lineage["variant"]["hypothesis"], serialized)
+
+    def test_user_delegated_selection_is_revalidated_and_bound_without_draft_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            inputs = tuple(root / name for name in ("receipt.json", "decision.json", "cohort", "cohort-logs"))
+            for path in inputs[:2]:
+                path.write_text("{}\n", encoding="utf-8")
+            for path in inputs[2:]:
+                path.mkdir()
+            tree = core.skill_tree_summary(policy.SKILL_SOURCE, "wow-frontend-design")
+            lineage = {
+                "action": "select", "cohort_id": "marketplace-directions-1",
+                "authority": "user_delegated",
+                "authority_assurance": "caller_attested_not_identity_verified",
+                "variant": {
+                    "id": "editorial-index", "hypothesis": "Editorial hierarchy supports scanning.",
+                    "changed_axes": ["composition", "typography"], "expected_benefit": "Clearer task priority.",
+                    "risk": "Lower information density.", "disqualifier": "Primary action is hidden.",
+                },
+                "reason": "Best supports the declared task.", "adjustments": ["Strengthen the primary action."],
+                "held_constant_axes": ["product-facts", "content-fixture", "functional-behavior", "comparison-conditions"],
+                "selection_criteria": ["task clarity", "brand distinction"],
+                "receipt": {"bytes": 10, "mode": "0600", "sha256": "a" * 64},
+                "decision_input": {"bytes": 10, "mode": "0600", "sha256": "b" * 64},
+                "cohort_receipt": {"bytes": 10, "mode": "0600", "sha256": "c" * 64},
+                "capture_set_sha256": "d" * 64,
+                "capture_labels": ["editorial-index-desktop-default", "editorial-index-mobile-default"],
+                "skill_tree_sha256": tree["tree_sha256"],
+                "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+            }
+            with (
+                mock.patch.dict(os.environ, environment, clear=True),
+                mock.patch.object(policy, "_validate_draft_decision_source", return_value=lineage) as validate,
+            ):
+                manifest = policy.run(
+                    brief,
+                    target,
+                    hard_seconds=5,
+                    log_dir=log_dir,
+                    draft_decision_receipt=inputs[0],
+                    draft_decision_input=inputs[1],
+                    draft_cohort_root=inputs[2],
+                    draft_cohort_log_dir=inputs[3],
+                )
+            self.assertGreaterEqual(validate.call_count, 3)
+            compact_lineage = policy._decision_lineage(lineage)
+            self.assertEqual(compact_lineage, manifest["draft_decision_lineage"])
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual(compact_lineage, receipt["draft_decision_lineage"])
+            for published in (manifest, receipt):
+                serialized = json.dumps(published, ensure_ascii=False)
+                self.assertNotIn(lineage["reason"], serialized)
+                self.assertNotIn(lineage["variant"]["hypothesis"], serialized)
+            prompt = json.loads((capture / "invocation.json").read_text(encoding="utf-8"))["prompt"]
+            self.assertIn("Editorial hierarchy supports scanning.", prompt)
+            self.assertIn("caller_attested_not_identity_verified", prompt)
+            reference_paths = [item["path"] for item in manifest["skill_references"]["files"]]
+            self.assertIn("references/implementation.md", reference_paths)
+            self.assertNotIn("references/no-visual-first-pass.md", reference_paths)
+            for forbidden in ("directions/editorial-index.html", ".png", "capture_labels", "capture_set_sha256"):
+                self.assertNotIn(forbidden, prompt)
+
+    def test_drift_after_repair_omits_untrusted_decision_lineage_from_failure_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            inputs = tuple(root / name for name in ("receipt.json", "decision.json", "cohort", "cohort-logs"))
+            for path in inputs[:2]:
+                path.write_text("{}\n", encoding="utf-8")
+            for path in inputs[2:]:
+                path.mkdir()
+            tree = core.skill_tree_summary(policy.SKILL_SOURCE, "wow-frontend-design")
+            source = {
+                "action": "select", "cohort_id": "marketplace-directions-1",
+                "authority": "user_confirmed",
+                "authority_assurance": "caller_attested_not_identity_verified",
+                "variant": {
+                    "id": "editorial-index", "hypothesis": "Editorial hierarchy.",
+                    "changed_axes": ["composition", "typography"], "expected_benefit": "Clear priority.",
+                    "risk": "Lower density.", "disqualifier": "Hidden action.",
+                },
+                "reason": "Selected against the criteria.", "adjustments": [],
+                "held_constant_axes": ["product-facts", "content-fixture", "functional-behavior", "comparison-conditions"],
+                "selection_criteria": ["task clarity", "brand distinction"],
+                "receipt": {"bytes": 10, "mode": "0600", "sha256": "a" * 64},
+                "decision_input": {"bytes": 10, "mode": "0600", "sha256": "b" * 64},
+                "cohort_receipt": {"bytes": 10, "mode": "0600", "sha256": "c" * 64},
+                "capture_set_sha256": "d" * 64,
+                "capture_labels": ["editorial-index-desktop-default", "editorial-index-mobile-default"],
+                "skill_tree_sha256": tree["tree_sha256"],
+                "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+            }
+            rejected = {"status": "rejected", "findings": [{"message": "No YAML content found."}]}
+            passed = {"status": "passed", "findings": []}
+            drift = policy.RunnerError("draft decision source drifted")
+            with (
+                mock.patch.dict(os.environ, environment, clear=True),
+                mock.patch.object(
+                    policy, "_validate_draft_decision_source",
+                    side_effect=[source, source, source, drift, drift],
+                ),
+                mock.patch.object(policy.design_policy, "validate_local", side_effect=[rejected, passed]),
+                mock.patch.object(policy, "_run_html_smoke", return_value={"status": "passed"}),
+                self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"),
+            ):
+                policy.run(
+                    brief,
+                    target,
+                    hard_seconds=5,
+                    log_dir=log_dir,
+                    draft_decision_receipt=inputs[0],
+                    draft_decision_input=inputs[1],
+                    draft_cohort_root=inputs[2],
+                    draft_cohort_log_dir=inputs[3],
+                )
+            receipt = json.loads((log_dir / "current-skill-build.execution.json").read_text(encoding="utf-8"))
+            self.assertEqual("execution_infrastructure_failure", receipt["classification"])
+            self.assertNotIn("draft_decision_lineage", receipt)
+            self.assertEqual(1, receipt["repair"]["rounds_used"])
+            self.assertTrue(all(
+                "draft_decision_lineage" not in attempt for attempt in receipt["repair"]["attempts"]
+            ))
+            self.assertEqual([], list(target.iterdir()))
+
     def test_receipt_rejects_unknown_or_mismatched_categories(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

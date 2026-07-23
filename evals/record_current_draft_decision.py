@@ -23,6 +23,10 @@ RECEIPT_KEYS = {
     "schema_version", "status", "classification", "claim_boundary", "cohort",
     "source", "configuration", "evidence", "tools",
 }
+DECISION_RECEIPT_KEYS = {
+    "schema_version", "status", "classification", "claim_boundary", "source",
+    "decision", "handoff", "tools",
+}
 COHORT_KEYS = {
     "cohort_id", "partition", "locale", "surface", "decision_question",
     "held_constant_axes", "selection_criteria", "variant_count", "variants",
@@ -298,15 +302,10 @@ def load_decision(path: Path) -> dict[str, Any]:
     }
 
 
-def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path) -> dict[str, Any]:
-    tools_before = _decision_tool_records()
-    source = validate_cohort_source(cohort_root, log_dir)
-    decision_before = _digest_record(decision_path)
-    if decision_before["mode"] != "0600":
-        raise DraftDecisionError("draft decision must use private mode 0600")
-    item = load_decision(decision_path)
-    if item["cohort_id"] != source["cohort"]["cohort_id"]:
-        raise DraftDecisionError("draft decision does not match the cohort")
+def _decision_receipt_payload(
+    source: dict[str, Any], item: dict[str, Any], decision_record: dict[str, Any],
+    tools: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     variants = {variant["id"]: variant for variant in source["cohort"]["variants"]}
     variant = None if item["variant_id"] is None else variants.get(item["variant_id"])
     if item["variant_id"] is not None and variant is None:
@@ -321,10 +320,6 @@ def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path
     ) if page else []
     if page and len(labels) != 2:
         raise DraftDecisionError("selected variant lacks a fresh desktop/mobile capture pair")
-    _, decision_raw_after = _read_json(decision_path, "draft decision", DECISION_LIMIT)
-    if _digest_record(decision_path) != decision_before or cohort._digest_bytes(decision_raw_after) != decision_before["sha256"]:
-        raise DraftDecisionError("draft decision drifted during validation")
-
     classification = {
         "select": "draft_direction_selected",
         "revise": "draft_direction_revision_requested",
@@ -340,15 +335,14 @@ def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path
         "revise": ["one fresh desktop/mobile revision pair", "return to this decision checkpoint"],
         "stop": [],
     }[item["action"]]
-    production_lane = "BUILD" if item["action"] == "select" else None
-    receipt = {
+    return {
         "schema_version": 1,
         "status": "recorded",
         "classification": classification,
         "claim_boundary": CLAIM_BOUNDARY,
         "source": {
             "cohort_receipt": source["receipt_record"],
-            "decision_input": decision_before,
+            "decision_input": decision_record,
             "cohort_id": source["cohort"]["cohort_id"],
             "capture_set_sha256": source["receipt"]["evidence"]["capture_set_sha256"],
             "skill_tree_sha256": source["receipt"]["source"]["skill_tree_sha256"],
@@ -365,14 +359,80 @@ def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path
             "variant": variant, "capture_labels": labels,
         },
         "handoff": {
-            "next_step": next_step, "production_lane": production_lane, "base_variant_id": item["variant_id"],
-            "source_page": page, "held_constant_axes": source["cohort"]["held_constant_axes"],
+            "next_step": next_step,
+            "production_lane": "BUILD" if item["action"] == "select" else None,
+            "base_variant_id": item["variant_id"], "source_page": page,
+            "held_constant_axes": source["cohort"]["held_constant_axes"],
             "selection_criteria": source["cohort"]["selection_criteria"],
             "draft_evidence_policy": "style_calibration_only_not_release_evidence",
             "required_revalidation": revalidation,
         },
-        "tools": tools_before,
+        "tools": tools,
     }
+
+
+def validate_decision_receipt(
+    cohort_root: Path, log_dir: Path, decision_path: Path, receipt_path: Path,
+) -> dict[str, Any]:
+    """Revalidate a recorded draft decision and every mutable source it binds."""
+    tools_before = _decision_tool_records()
+    source = validate_cohort_source(cohort_root, log_dir)
+    decision_record = _digest_record(decision_path)
+    if decision_record["mode"] != "0600":
+        raise DraftDecisionError("draft decision must use private mode 0600")
+    item = load_decision(decision_path)
+    if item["cohort_id"] != source["cohort"]["cohort_id"]:
+        raise DraftDecisionError("draft decision does not match the cohort")
+    expected = _decision_receipt_payload(source, item, decision_record, tools_before)
+    receipt, receipt_raw_before = _read_json(receipt_path, "draft decision receipt", RECEIPT_LIMIT)
+    _as_decision_error(cohort._outside_authoring_repository, receipt_path, "draft decision receipt")
+    if stat.S_IMODE(receipt_path.stat().st_mode) != 0o600:
+        raise DraftDecisionError("draft decision receipt must use private mode 0600")
+    receipt = _exact(receipt, DECISION_RECEIPT_KEYS, "draft decision receipt")
+    if receipt != expected:
+        raise DraftDecisionError("draft decision receipt provenance is invalid")
+    receipt_record = {
+        "bytes": len(receipt_raw_before),
+        "mode": "0600",
+        "sha256": cohort._digest_bytes(receipt_raw_before),
+    }
+
+    source_again = validate_cohort_source(cohort_root, log_dir)
+    _, decision_raw_after = _read_json(decision_path, "draft decision", DECISION_LIMIT)
+    receipt_after, receipt_raw_after = _read_json(receipt_path, "draft decision receipt", RECEIPT_LIMIT)
+    if (
+        source_again["receipt"] != source["receipt"]
+        or source_again["receipt_record"] != source["receipt_record"]
+        or source_again["capture"]["capture_set_sha256"] != source["capture"]["capture_set_sha256"]
+        or _digest_record(decision_path) != decision_record
+        or cohort._digest_bytes(decision_raw_after) != decision_record["sha256"]
+        or receipt_raw_after != receipt_raw_before
+        or receipt_after != receipt
+        or _digest_record(receipt_path) != receipt_record
+        or _decision_tool_records() != tools_before
+    ):
+        raise DraftDecisionError("draft decision source drifted during validation")
+    return {
+        "receipt": receipt,
+        "receipt_record": receipt_record,
+        "skill_tree_sha256": receipt["source"]["skill_tree_sha256"],
+    }
+
+
+def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path) -> dict[str, Any]:
+    tools_before = _decision_tool_records()
+    source = validate_cohort_source(cohort_root, log_dir)
+    decision_before = _digest_record(decision_path)
+    if decision_before["mode"] != "0600":
+        raise DraftDecisionError("draft decision must use private mode 0600")
+    item = load_decision(decision_path)
+    if item["cohort_id"] != source["cohort"]["cohort_id"]:
+        raise DraftDecisionError("draft decision does not match the cohort")
+    _, decision_raw_after = _read_json(decision_path, "draft decision", DECISION_LIMIT)
+    if _digest_record(decision_path) != decision_before or cohort._digest_bytes(decision_raw_after) != decision_before["sha256"]:
+        raise DraftDecisionError("draft decision drifted during validation")
+
+    receipt = _decision_receipt_payload(source, item, decision_before, tools_before)
     source_again = validate_cohort_source(cohort_root, log_dir)
     if (
         source_again["receipt"] != source["receipt"]

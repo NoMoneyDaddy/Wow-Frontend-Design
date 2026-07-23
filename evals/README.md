@@ -86,6 +86,21 @@ npm run drafts:decide -- \
 
 成功時以 `0600` 建立 `draft-decision-receipt.json`，自動綁定原 cohort receipt、capture set、選定方向的 desktop/mobile labels、held constants、selection criteria 與 convergence summary。它只建立 selection lineage：只有 `select` 交給唯一的 production `BUILD` lane；`revise` 只要求一個 bounded fresh child 並回到同一 checkpoint，`stop` 不進 production。草稿 HTML 與 PNG 都不得升級成 release evidence。
 
+選定後，把四個來源參數一起交給唯一的 `build:current`。只接受 greenfield 的 `select`／`BUILD` handoff；缺少任一參數、`revise`、`stop` 或來源漂移都會在建立 target、log 或呼叫模型前拒絕：
+
+```bash
+npm run build:current -- \
+  --brief /absolute/evaluator-root/brief.md \
+  --target /absolute/evaluator-root/production-output \
+  --log-dir /absolute/evaluator-root/production-logs \
+  --draft-decision-receipt /absolute/evaluator-root/decision-output/draft-decision-receipt.json \
+  --draft-decision-input /absolute/evaluator-root/draft-decision.json \
+  --draft-cohort-root /absolute/evaluator-root/cohort-output \
+  --draft-cohort-log-dir /absolute/evaluator-root/private-logs
+```
+
+正式 builder 只把 bounded thesis、changed axes、理由與 0–3 個微調當成 untrusted design metadata，並改載入 `references/creative-direction.md` 與 `references/implementation.md`；不讀取或複製草稿 HTML、PNG、capture path。可發布 manifest、success/failure receipt 與 repair attempts 只保存 schema-closed hash lineage，不保存這些決策文字。正式產物仍須重新實作、重新取得 Playwright screenshots，並跑完整 affected release matrix；草稿 evidence 只用於 style calibration。
+
 ## 受控建置
 
 ```bash
@@ -99,7 +114,7 @@ npm run build:current -- \
 
 預設 forward-test builder 是 `gpt-5.4-mini`，reasoning effort 是 `high`。可用 `--model` 與 `--reasoning-effort low|medium|high|xhigh` 明示覆寫；receipt 只記錄請求值，不把它當成服務端已履行或品質已通過的證明。
 
-每次 initial build 固定載入 `references/creative-direction.md` 與 `references/no-visual-first-pass.md` 的完整內容作為 controlled Skill context；可額外提供一次 `--skill-reference references/<safe-name>.md`，但不能重複，也不能由 brief 或 seed 內容決定。選取只接受現行 Skill source 內已驗證的 regular non-symlink、strict UTF-8 Markdown；absolute path、`..`、未知路徑、NUL、單檔超過 64 KiB 或合計超過 128 KiB 都 fail closed。這是核心 reference lifecycle 的 controlled external-evaluator 分支：builder context 原樣帶進每輪 repair，外部 evaluator 執行 quality gates 並只回傳 bounded findings，不把 gate reference 或 acceptance instructions 加入可寫模型 context。
+一般 initial build 固定載入 `references/creative-direction.md` 與 `references/no-visual-first-pass.md`；帶有效 selected-direction handoff 時，改載入 `references/creative-direction.md` 與 `references/implementation.md` 的完整內容作為 controlled Skill context。兩者都可額外提供一次 `--skill-reference references/<safe-name>.md`，但不能重複，也不能由 brief 或 seed 內容決定。選取只接受現行 Skill source 內已驗證的 regular non-symlink、strict UTF-8 Markdown；absolute path、`..`、未知路徑、NUL、單檔超過 64 KiB 或合計超過 128 KiB 都 fail closed。這是核心 reference lifecycle 的 controlled external-evaluator 分支：builder context 原樣帶進每輪 repair，外部 evaluator 執行 quality gates 並只回傳 bounded findings，不把 gate reference 或 acceptance instructions 加入可寫模型 context。
 
 Receipt、每次 attempt 與 manifest 的 `skill_references` 只保存相對 path、bytes、SHA-256 與 `total_bytes`，不保存 reference 內容。`ExecutionSpec` 會把這組 provenance 與 source tree、ephemeral installed Skill snapshot 在執行前後逐項重驗；任何 selected content、path 或 hash drift 都拒絕結果，完整 Skill tree 的 mode 也在每次 execution 內前後重驗。Shell tool 仍存在，但契約只容許 inert no-op，任何其他 command 都會在 trace policy 拒絕且不得發布；network、外部讀取與其他整合維持停用。Raw evaluator trace 可能含模型自行複述的 Skill 文字，因此保持 private，Skill references 不應存放機密。
 

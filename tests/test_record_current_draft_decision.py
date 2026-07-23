@@ -221,6 +221,41 @@ class CurrentDraftDecisionTests(unittest.TestCase):
         )
         self.assertEqual(0o600, stat.S_IMODE(output.stat().st_mode))
 
+    def test_public_validator_rechecks_receipt_and_original_sources(self) -> None:
+        receipt_value = self.cohort_receipt()
+        self.write_cohort_receipt(payload=receipt_value)
+        self.decision_path.write_text(json.dumps(self.valid_decision()), encoding="utf-8")
+        self.decision_path.chmod(0o600)
+        with (
+            mock.patch.object(decision, "validate_current_capture_evidence", return_value=self.validated_capture()),
+            mock.patch.object(decision.cohort, "_convergence_summary", return_value=self.convergence()),
+            mock.patch.object(decision.cohort, "_tool_records", return_value=receipt_value["tools"]),
+        ):
+            recorded = decision.run(self.cohort_root, self.log_dir, self.decision_path, self.output_root)
+            validated = decision.validate_decision_receipt(
+                self.cohort_root,
+                self.log_dir,
+                self.decision_path,
+                self.output_root / "draft-decision-receipt.json",
+            )
+        self.assertEqual(recorded, validated["receipt"])
+        self.assertEqual("0600", validated["receipt_record"]["mode"])
+
+        self.decision_path.write_text(json.dumps(self.valid_decision(reason="另一個理由。")), encoding="utf-8")
+        self.decision_path.chmod(0o600)
+        with (
+            mock.patch.object(decision, "validate_current_capture_evidence", return_value=self.validated_capture()),
+            mock.patch.object(decision.cohort, "_convergence_summary", return_value=self.convergence()),
+            mock.patch.object(decision.cohort, "_tool_records", return_value=receipt_value["tools"]),
+            self.assertRaisesRegex(decision.DraftDecisionError, "receipt provenance"),
+        ):
+            decision.validate_decision_receipt(
+                self.cohort_root,
+                self.log_dir,
+                self.decision_path,
+                self.output_root / "draft-decision-receipt.json",
+            )
+
     def test_revise_and_stop_have_bounded_distinct_handoffs(self) -> None:
         revise = self.run_with_source(self.valid_decision(action="revise", adjustments=["改變資訊層級。"]))
         self.assertEqual("draft_direction_revision_requested", revise["classification"])
