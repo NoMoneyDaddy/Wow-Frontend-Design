@@ -9,6 +9,7 @@ import os
 import stat
 import sys
 import tempfile
+import traceback
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -380,6 +381,103 @@ class CurrentDraftRevisionTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(revision.DraftRevisionError, "fresh child pair"):
             revision._require_fresh_child_pair(validated, "directions/child.html")
+
+    def test_build_failure_classification_is_closed_and_redacted(self) -> None:
+        for classification in revision.current_build.RECEIPT_CATEGORIES["failed"]:
+            with self.subTest(classification=classification):
+                error = revision.current_build.RunnerError(
+                    f"{classification}; logs=/private/example/secret.log"
+                )
+                self.assertEqual(
+                    classification,
+                    revision._safe_build_failure_classification(error),
+                )
+        self.assertEqual(
+            "execution_infrastructure_failure",
+            revision._safe_build_failure_classification(
+                revision.current_build.RunnerError(
+                    "unexpected private detail /private/example/secret.log"
+                )
+            ),
+        )
+
+    def test_build_failure_reports_only_the_closed_classification(self) -> None:
+        error = revision.current_build.RunnerError(
+            "html_smoke_rejection; logs=/private/example/secret.log"
+        )
+        with (
+            mock.patch.object(
+                revision.decision,
+                "validate_cohort_source",
+                return_value=self.cohort_source(),
+            ),
+            mock.patch.object(
+                revision.decision,
+                "validate_decision_receipt",
+                return_value=self.revise_source(),
+            ),
+            mock.patch.object(revision.current_build, "run", side_effect=error),
+            mock.patch.object(revision.cohort, "run_capture") as capture,
+            self.assertRaises(revision.DraftRevisionError) as raised,
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+            )
+        self.assertEqual(
+            "draft revision build failed: html_smoke_rejection",
+            str(raised.exception),
+        )
+        self.assertNotIn(
+            "secret.log",
+            "".join(traceback.TracebackException.from_exception(raised.exception).format()),
+        )
+        self.assertTrue(raised.exception.__suppress_context__)
+        capture.assert_not_called()
+
+    def test_unknown_build_exception_fails_closed_without_private_traceback(self) -> None:
+        error = RuntimeError(
+            "html_smoke_rejection; spoofed private detail /private/example/secret.log"
+        )
+        with (
+            mock.patch.object(
+                revision.decision,
+                "validate_cohort_source",
+                return_value=self.cohort_source(),
+            ),
+            mock.patch.object(
+                revision.decision,
+                "validate_decision_receipt",
+                return_value=self.revise_source(),
+            ),
+            mock.patch.object(revision.current_build, "run", side_effect=error),
+            mock.patch.object(revision.cohort, "run_capture") as capture,
+            self.assertRaises(revision.DraftRevisionError) as raised,
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+            )
+        self.assertEqual(
+            "draft revision build failed: execution_infrastructure_failure",
+            str(raised.exception),
+        )
+        self.assertNotIn(
+            "secret.log",
+            "".join(traceback.TracebackException.from_exception(raised.exception).format()),
+        )
+        self.assertTrue(raised.exception.__suppress_context__)
+        capture.assert_not_called()
 
     def test_browser_contract_is_validated_bound_and_passed_to_the_builder(self) -> None:
         child_page = f"directions/revision-{digest(self.decision_receipt)[:12]}.html"

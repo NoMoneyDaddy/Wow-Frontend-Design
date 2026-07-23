@@ -68,6 +68,14 @@ def _as_revision_error(callback: Any, *args: Any) -> Any:
         raise DraftRevisionError("draft revision source validation failed") from error
 
 
+def _safe_build_failure_classification(error: BaseException) -> str:
+    if isinstance(error, current_build.RunnerError):
+        classification = str(error).partition(";")[0].strip()
+        if classification in current_build.RECEIPT_CATEGORIES["failed"]:
+            return classification
+    return "execution_infrastructure_failure"
+
+
 def _validate_parent(
     brief_path: Path,
     cohort_root: Path,
@@ -465,10 +473,11 @@ def run(
                         browser_contract=browser_contract_path,
                         skill_reference="references/design-exploration.md",
                     )
-                except (OSError, current_build.RunnerError) as error:
+                except Exception as error:
+                    classification = _safe_build_failure_classification(error)
                     raise DraftRevisionError(
-                        "draft revision build failed; inspect the bounded current-build receipt"
-                    ) from error
+                        f"draft revision build failed: {classification}"
+                    ) from None
             finally:
                 shutil.rmtree(seed_root, ignore_errors=True)
             assert_current()
