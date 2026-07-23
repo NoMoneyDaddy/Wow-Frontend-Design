@@ -440,6 +440,92 @@ class CurrentDraftRevisionTests(unittest.TestCase):
         self.assertTrue(raised.exception.__suppress_context__)
         capture.assert_not_called()
 
+    def test_build_failure_tool_drift_overrides_reported_classification(self) -> None:
+        stable = revision._tool_records()
+        drifted = [dict(item) for item in stable]
+        drifted[0]["sha256"] = "0" * 64
+        error = revision.current_build.RunnerError(
+            "html_smoke_rejection; logs=/private/example/secret.log"
+        )
+        with (
+            mock.patch.object(
+                revision.decision,
+                "validate_cohort_source",
+                return_value=self.cohort_source(),
+            ),
+            mock.patch.object(
+                revision.decision,
+                "validate_decision_receipt",
+                return_value=self.revise_source(),
+            ),
+            mock.patch.object(
+                revision, "_tool_records", side_effect=[stable, stable, stable, drifted]
+            ),
+            mock.patch.object(revision.current_build, "run", side_effect=error),
+            self.assertRaises(revision.DraftRevisionError) as raised,
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+            )
+        self.assertEqual(
+            "draft revision build failed: execution_infrastructure_failure",
+            str(raised.exception),
+        )
+        self.assertNotIn(
+            "secret.log",
+            "".join(traceback.TracebackException.from_exception(raised.exception).format()),
+        )
+
+    def test_capture_failure_auditor_drift_fails_as_infrastructure(self) -> None:
+        stable = revision._tool_records()
+        drifted = [dict(item) for item in stable]
+        drifted[-1]["sha256"] = "0" * 64
+        error = RuntimeError("capture failed at /private/example/secret.png")
+        with (
+            mock.patch.object(
+                revision.decision,
+                "validate_cohort_source",
+                return_value=self.cohort_source(),
+            ),
+            mock.patch.object(
+                revision.decision,
+                "validate_decision_receipt",
+                return_value=self.revise_source(),
+            ),
+            mock.patch.object(
+                revision,
+                "_tool_records",
+                side_effect=[stable, stable, stable, stable, stable, drifted],
+            ),
+            mock.patch.object(revision.current_build, "run", side_effect=self.fake_build),
+            mock.patch.object(revision.cohort, "run_capture", side_effect=error),
+            self.assertRaises(revision.DraftRevisionError) as raised,
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+            )
+        self.assertEqual(
+            "draft revision capture failed: execution_infrastructure_failure",
+            str(raised.exception),
+        )
+        self.assertNotIn(
+            "secret.png",
+            "".join(traceback.TracebackException.from_exception(raised.exception).format()),
+        )
+        self.assertTrue(raised.exception.__suppress_context__)
+
     def test_unknown_build_exception_fails_closed_without_private_traceback(self) -> None:
         error = RuntimeError(
             "html_smoke_rejection; spoofed private detail /private/example/secret.log"

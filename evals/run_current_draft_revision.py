@@ -475,6 +475,10 @@ def run(
                     )
                 except Exception as error:
                     classification = _safe_build_failure_classification(error)
+                    try:
+                        assert_current()
+                    except DraftRevisionError:
+                        classification = "execution_infrastructure_failure"
                     raise DraftRevisionError(
                         f"draft revision build failed: {classification}"
                     ) from None
@@ -513,7 +517,16 @@ def run(
             )
             evidence = revision_root / "evidence"
             assert_current()
-            cohort.run_capture(workspace, case_path, evidence, None)
+            try:
+                cohort.run_capture(workspace, case_path, evidence, None)
+            except Exception:
+                try:
+                    assert_current()
+                except DraftRevisionError:
+                    pass
+                raise DraftRevisionError(
+                    "draft revision capture failed: execution_infrastructure_failure"
+                ) from None
             assert_current()
             capture_receipt = evidence / "capture-receipt.json"
             try:
