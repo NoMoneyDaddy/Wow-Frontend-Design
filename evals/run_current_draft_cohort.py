@@ -379,6 +379,35 @@ def direction_outputs(plan: dict[str, Any]) -> tuple[str, ...]:
     return ("DESIGN.md", *(f"directions/{variant['id']}.html" for variant in plan["variants"]))
 
 
+def _validate_interaction_witnesses(
+    plan: dict[str, Any],
+    browser_contract: dict[str, Any] | None,
+) -> None:
+    interactive_pages = {
+        f"directions/{variant['id']}.html"
+        for variant in plan["variants"]
+        if "interaction-emphasis" in variant["changed_axes"]
+    }
+    if not interactive_pages:
+        return
+    cases = browser_contract.get("cases", []) if isinstance(browser_contract, dict) else []
+    for page in sorted(interactive_pages):
+        witnessed = False
+        for case in cases:
+            if case["page"] != page:
+                continue
+            action_seen = False
+            for step in case["steps"]:
+                if step["action"] == "assert":
+                    witnessed = witnessed or action_seen
+                else:
+                    action_seen = True
+        if not witnessed:
+            raise DraftCohortError(
+                f"interaction-emphasis requires an action followed by a result assertion: {page}"
+            )
+
+
 def effective_brief(base_brief: str, plan: dict[str, Any]) -> str:
     payload = {
         "cohort_id": plan["cohort_id"],
@@ -705,13 +734,14 @@ def run(
     plan, plan_record = load_plan(plan_path)
     outputs = direction_outputs(plan)
     browser_contract_path: Path | None = None
+    browser_contract_data: dict[str, Any] | None = None
     browser_contract_record: dict[str, Any] | None = None
     browser_contract_identity: tuple[int, int] | None = None
     if browser_contract is not None:
         try:
             (
                 browser_contract_path,
-                _browser_contract_data,
+                browser_contract_data,
                 browser_contract_record,
             ) = current_build._load_browser_contract(browser_contract, outputs)
         except (OSError, current_build.RunnerError) as error:
@@ -722,6 +752,7 @@ def run(
         browser_contract_identity = _browser_contract_identity(
             browser_contract_path, browser_contract_record
         )
+    _validate_interaction_witnesses(plan, browser_contract_data)
     try:
         brief_text = brief_raw.decode("utf-8")
     except UnicodeError as error:

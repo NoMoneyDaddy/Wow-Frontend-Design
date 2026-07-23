@@ -54,7 +54,7 @@ npm run drafts:current -- \
   --browser-contract /absolute/evaluator-root/draft-browser-contract.json
 ```
 
-`--browser-contract` 是選用但建議的 evaluator-owned 共用驗收：同一份 schema-closed contract 可各自指向 2–3 個方向頁面。Runner 會在第一次生成前提供完整 closed contract，要求直接實作穩定 locator 與結果狀態，再於截圖前以同一個 Playwright gate 驗證 brief 已凍結的首屏、標題 measure、狀態與互動；失敗時沿用單一 repair fuse，避免先猜 DOM、失敗後才逐層補 selector。Contract 必須位於 authoring repository、cohort、log、plan 與 brief 之外，且每個 case 只驗證一個明示頁面／profile；不應把所有網站硬套成相同 hero。若 brief 刻意採用窄欄 editorial 標題，就不要加入寬度下限。
+`--browser-contract` 是選用但建議的 evaluator-owned 共用驗收；若任一方向的 `changed_axes` 明確包含 `interaction-emphasis`，該方向則必須有同頁 action 後的結果 assertion，不能以預設狀態截圖冒充互動差異。同一份 schema-closed contract 可各自指向 2–3 個方向頁面。Runner 會在第一次生成前提供完整 closed contract，要求直接實作穩定 locator 與結果狀態，再於截圖前以同一個 Playwright gate 驗證 brief 已凍結的首屏、標題 measure、狀態與互動；失敗時沿用單一 repair fuse，避免先猜 DOM、失敗後才逐層補 selector。Contract 必須位於 authoring repository、cohort、log、plan 與 brief 之外，且每個 case 只驗證一個明示頁面／profile；不應把所有網站硬套成相同 hero。若 brief 刻意採用窄欄 editorial 標題，就不要加入寬度下限。
 
 成功時最後才以 `0600` 建立 `draft-cohort-receipt.json`。Receipt 綁定 plan、base/effective brief、Skill tree、run manifest、outputs、capture receipt、capture matrix、macro observations、template audit 與 evaluator tools，但不保存 brief 內容或絕對私人路徑。Convergence summary 固定列出四類 advisory 數量、受影響方向與 `advisory_only` policy；任一 build、fresh capture、provenance 或 telemetry drift 失敗都不產生成功 receipt。草稿 PNG 只能支持這次方向選擇；選定後仍須重新正式實作、重新截圖並執行 affected release matrix。
 

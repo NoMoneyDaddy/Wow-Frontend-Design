@@ -54,7 +54,7 @@ class CurrentDraftCohortTests(unittest.TestCase):
                 {
                     "id": "task-led-market",
                     "hypothesis": "先以使用者任務與快速比較縮短選擇路徑。",
-                    "changed_axes": ["information-hierarchy", "interaction-emphasis", "mobile-transformation"],
+                    "changed_axes": ["information-hierarchy", "task-priority", "mobile-transformation"],
                     "expected_benefit": "更快抵達可比較且可採取行動的結果。",
                     "risk": "任務導向可能降低品牌敘事的記憶點。",
                     "disqualifier": "方向退化成一般 SaaS dashboard 或卡片牆。",
@@ -299,6 +299,8 @@ class CurrentDraftCohortTests(unittest.TestCase):
         self.assertIn("`drafts:current` 是 `build:current` 的 style-calibration wrapper", documentation)
         self.assertIn("npm run drafts:current --", documentation)
         self.assertIn("草稿 PNG 只能支持這次方向選擇", documentation)
+        self.assertIn("`interaction-emphasis`", documentation)
+        self.assertIn("action 後的結果 assertion", documentation)
 
     def test_plan_rejects_invalid_counts_duplicate_ids_and_weak_axis_deltas(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -404,6 +406,73 @@ class CurrentDraftCohortTests(unittest.TestCase):
                 )[2],
                 receipt["configuration"]["browser_contract"],
             )
+
+    def test_interaction_emphasis_requires_an_action_result_witness_before_build(self) -> None:
+        for mode in ("missing-contract", "static-only"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                plan, brief, cohort_root, logs = self.write_inputs(root)
+                payload = json.loads(plan.read_text(encoding="utf-8"))
+                payload["variants"][1]["changed_axes"][1] = "interaction-emphasis"
+                plan.write_text(json.dumps(payload), encoding="utf-8")
+                contract = self.browser_contract(root) if mode == "static-only" else None
+                validated = {
+                    "capture_count": 4,
+                    "capture_set_sha256": "c" * 64,
+                    "capture_standard": cohort.CAPTURE_STANDARD,
+                }
+                with (
+                    mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build) as build,
+                    mock.patch.object(cohort, "run_capture", side_effect=self.fake_capture),
+                    mock.patch.object(
+                        cohort,
+                        "validate_current_capture_evidence",
+                        return_value=validated,
+                    ),
+                    self.assertRaisesRegex(
+                        cohort.DraftCohortError,
+                        "interaction-emphasis",
+                    ),
+                ):
+                    cohort.run(
+                        plan,
+                        brief,
+                        cohort_root,
+                        logs,
+                        browser_contract=contract,
+                    )
+                build.assert_not_called()
+                self.assertEqual([], list(cohort_root.iterdir()))
+                self.assertEqual([], list(logs.iterdir()))
+
+    def test_interaction_emphasis_accepts_a_normalized_action_result_witness(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            contract = self.browser_contract(root)
+            payload = json.loads(contract.read_text(encoding="utf-8"))
+            payload["cases"][1]["steps"] = [
+                {
+                    "id": "choose-primary-path",
+                    "action": "click",
+                    "selector": "[data-primary-action]",
+                },
+                {
+                    "id": "primary-path-selected",
+                    "action": "assert",
+                    "selector": "[data-primary-action]",
+                    "expect": "attribute-equals",
+                    "attribute": "aria-pressed",
+                    "value": "true",
+                },
+            ]
+            contract.write_text(json.dumps(payload), encoding="utf-8")
+            plan = self.valid_plan()
+            plan["variants"][1]["changed_axes"][1] = "interaction-emphasis"
+            _, normalized, _ = cohort.current_build._load_browser_contract(
+                contract,
+                cohort.direction_outputs(plan),
+            )
+            cohort._validate_interaction_witnesses(plan, normalized)
 
     def test_invalid_or_hardlinked_browser_contract_fails_before_build(self) -> None:
         for mode in ("invalid", "hardlinked"):
