@@ -73,9 +73,18 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
         case_path.write_text(json.dumps(case), encoding="utf-8")
         return target, case_path, case
 
-    def invoke(self, target: Path, case: Path, evidence: Path) -> subprocess.CompletedProcess[str]:
+    def invoke(
+        self,
+        target: Path,
+        case: Path,
+        evidence: Path,
+        convergence: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        command = ["node", str(CAPTURE), str(target), str(case), str(evidence)]
+        if convergence is not None:
+            command.append(str(convergence))
         return subprocess.run(
-            ["node", str(CAPTURE), str(target), str(case), str(evidence)],
+            command,
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -96,6 +105,8 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             self.assertEqual({"1440x1000", "390x844"}, {item["context"]["viewport"] for item in receipt["captures"]})
             self.assertEqual(2, len(list((evidence / "artifacts").glob("*.png"))))
             self.assertFalse((evidence / ".source-snapshot").exists())
+            self.assertFalse((evidence / "macro-observations.json").exists())
+            self.assertFalse((evidence / "cross-output-template-audit.json").exists())
             self.assertEqual(digest(target / "run-manifest.json"), receipt["source"]["run_manifest_sha256"])
             for item in receipt["captures"]:
                 artifact = evidence / item["path"]
@@ -124,6 +135,61 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             completed = self.invoke(target, case_path, evidence)
             self.assertEqual(1, completed.returncode)
             self.assertIn("bounded regular non-symlink", completed.stderr)
+            self.assertFalse(evidence.exists())
+
+    def test_optional_draft_convergence_uses_the_same_capture_matrix(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, _ = self.fixture(root)
+            second = target / "other.html"
+            second.write_text((target / "index.html").read_text(encoding="utf-8"), encoding="utf-8")
+            manifest_path = target / "run-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["outputs"].append({
+                "path": "other.html",
+                "bytes": second.stat().st_size,
+                "mode": f"{stat.S_IMODE(second.stat().st_mode):04o}",
+                "sha256": digest(second),
+            })
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            convergence = root / "convergence.json"
+            convergence.write_text(json.dumps({
+                "schema_version": 1,
+                "cohort_id": "private-validation-case",
+                "surface": "primary",
+                "variants": [
+                    {"id": "index", "page": "index.html"},
+                    {"id": "other", "page": "other.html"},
+                ],
+            }), encoding="utf-8")
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, convergence)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            observations_path = evidence / "macro-observations.json"
+            audit_path = evidence / "cross-output-template-audit.json"
+            observations = json.loads(observations_path.read_text(encoding="utf-8"))
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            self.assertEqual(4, len(observations["observations"]))
+            self.assertEqual(digest(observations_path), audit["observations"]["sha256"])
+            self.assertEqual("advisories_present", audit["result"]["status"])
+            self.assertTrue(audit["result"]["advisories"])
+            self.assertEqual(0o600, stat.S_IMODE(observations_path.stat().st_mode))
+            self.assertEqual(0o600, stat.S_IMODE(audit_path.stat().st_mode))
+            self.assertNotIn(str(root), observations_path.read_text(encoding="utf-8"))
+            self.assertNotIn(str(root), audit_path.read_text(encoding="utf-8"))
+
+    def test_draft_convergence_contract_symlink_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, _ = self.fixture(root)
+            convergence = root / "convergence.json"
+            convergence.write_text("{}", encoding="utf-8")
+            linked = root / "linked-convergence.json"
+            linked.symlink_to(convergence)
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, linked)
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("unaliased", completed.stderr)
             self.assertFalse(evidence.exists())
 
     def test_case_from_a_different_brief_fails_before_capture(self) -> None:

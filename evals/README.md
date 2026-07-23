@@ -8,6 +8,8 @@
 
 `drafts:current` 是 `build:current` 的 style-calibration wrapper，不是第二套 builder。它在同一次受控 BUILD 內產生 2–3 個方向頁面，固定使用 `references/design-exploration.md`，再呼叫現行 final-only capture 取得同一 manifest 下的 fresh desktop/mobile PNG。這個流程只支援 greenfield 草稿；不做 production integration、release acceptance、勝者判定或 award claim。
 
+草稿 wrapper 會在同一次 Playwright capture matrix 內同步取得 rendered macro fingerprints，並重用現行 `cross_output_template_audit.cjs` 產生跨稿結構與低解析視覺語法 telemetry。它不多開一次 browser；advisory 只把 `review_required` 設為 true，不能自動淘汰方向、觸發 release failure，或證明原創、美感與產品適配。原本 final capture 未提供 draft convergence contract 時，不產生這兩個 sidecar，receipt schema 維持不變。
+
 計畫檔必須是 evaluator-owned、schema-closed JSON：
 
 ```json
@@ -51,7 +53,7 @@ npm run drafts:current -- \
   --log-dir /absolute/evaluator-root/private-logs
 ```
 
-成功時最後才以 `0600` 建立 `draft-cohort-receipt.json`。Receipt 綁定 plan、base/effective brief、Skill tree、run manifest、outputs、capture receipt、capture matrix 與 evaluator tools，但不保存 brief 內容或絕對私人路徑。任一 build、fresh capture、provenance 或 tool drift 失敗都不產生成功 receipt。草稿 PNG 只能支持這次方向選擇；選定後仍須重新正式實作、重新截圖並執行 affected release matrix。
+成功時最後才以 `0600` 建立 `draft-cohort-receipt.json`。Receipt 綁定 plan、base/effective brief、Skill tree、run manifest、outputs、capture receipt、capture matrix、macro observations、template audit 與 evaluator tools，但不保存 brief 內容或絕對私人路徑。Convergence summary 固定列出四類 advisory 數量、受影響方向與 `advisory_only` policy；任一 build、fresh capture、provenance 或 telemetry drift 失敗都不產生成功 receipt。草稿 PNG 只能支持這次方向選擇；選定後仍須重新正式實作、重新截圖並執行 affected release matrix。
 
 ## 受控建置
 

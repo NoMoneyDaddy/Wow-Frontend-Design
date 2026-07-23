@@ -20,6 +20,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "wow-frontend-design"
 CAPTURE = ROOT / "evals" / "capture_current_visual_evidence.cjs"
+CROSS_OUTPUT_AUDITOR = SKILL_ROOT / "scripts" / "cross_output_template_audit.cjs"
 PLAN_LIMIT = 64 * 1024
 BRIEF_LIMIT = 128 * 1024
 TEXT_LIMIT = 2 * 1024
@@ -64,6 +65,18 @@ CAPTURE_STANDARD = {
     "network": "local-output-only",
 }
 CLAIM_BOUNDARY = "style_calibration_only"
+CONVERGENCE_CODES = {
+    "cross_output_template_candidate",
+    "near_cross_output_template_candidate",
+    "cross_output_visual_grammar_candidate",
+    "cross_output_partial_visual_grammar_candidate",
+}
+AUDIT_RECOMPUTE_SOURCE = (
+    "const fs=require('node:fs');"
+    "const {auditCrossOutputTemplates}=require(process.argv[1]);"
+    "const input=JSON.parse(fs.readFileSync(0,'utf8'));"
+    "process.stdout.write(JSON.stringify(auditCrossOutputTemplates(input)));"
+)
 
 if str(ROOT / "evals") not in sys.path:
     sys.path.insert(0, str(ROOT / "evals"))
@@ -113,6 +126,7 @@ def _regular_absolute_file(path: Path, label: str, limit: int) -> tuple[Path, by
         not stat.S_ISREG(info.st_mode)
         or path.is_symlink()
         or canonical != path
+        or info.st_nlink != 1
         or not 1 <= info.st_size <= limit
     ):
         raise DraftCohortError(f"{label} must be a bounded unaliased regular file")
@@ -352,10 +366,18 @@ def effective_brief(base_brief: str, plan: dict[str, Any]) -> str:
     )
 
 
-def run_capture(workspace: Path, case_path: Path, evidence: Path) -> None:
+def run_capture(
+    workspace: Path,
+    case_path: Path,
+    evidence: Path,
+    convergence_path: Path | None = None,
+) -> None:
+    command = ["node", str(CAPTURE), str(workspace), str(case_path), str(evidence)]
+    if convergence_path is not None:
+        command.append(str(convergence_path))
     try:
         process = subprocess.Popen(
-            ["node", str(CAPTURE), str(workspace), str(case_path), str(evidence)],
+            command,
             cwd=ROOT,
             text=True,
             stdout=subprocess.PIPE,
@@ -382,11 +404,206 @@ def _tool_records() -> list[dict[str, Any]]:
         Path(__file__).resolve(),
         Path(current_build.__file__).resolve(),
         CAPTURE.resolve(),
+        CROSS_OUTPUT_AUDITOR.resolve(),
         (ROOT / "evals" / "playwright_browser_runtime.cjs").resolve(),
         (ROOT / "evals" / "validate_current_craft_acceptance.py").resolve(),
     ):
         records.append({"path": path.relative_to(ROOT).as_posix(), **_record(path)})
     return records
+
+
+def _exact_object(value: object, keys: set[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != keys:
+        raise DraftCohortError(f"{label} schema is invalid")
+    return value
+
+
+def _recompute_template_audit(observations_raw: bytes) -> dict[str, Any]:
+    try:
+        process = subprocess.Popen(
+            ["node", "-e", AUDIT_RECOMPUTE_SOURCE, str(CROSS_OUTPUT_AUDITOR)],
+            cwd=ROOT,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        try:
+            stdout, _ = process.communicate(input=observations_raw, timeout=30)
+        except subprocess.TimeoutExpired as error:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+            raise DraftCohortError("template audit recomputation failed") from error
+    except OSError as error:
+        raise DraftCohortError("template audit recomputation failed") from error
+    if process.returncode != 0 or not 1 <= len(stdout) <= 2_000_000:
+        raise DraftCohortError("template audit recomputation failed")
+    try:
+        value = json.loads(stdout.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise DraftCohortError("template audit recomputation returned invalid JSON") from error
+    if not isinstance(value, dict):
+        raise DraftCohortError("template audit recomputation returned an invalid result")
+    return value
+
+
+def _convergence_summary(plan: dict[str, Any], evidence: Path) -> dict[str, Any]:
+    observations_path, observations_raw = _regular_absolute_file(
+        evidence / "macro-observations.json", "macro observations", 2_000_000
+    )
+    audit_path, audit_raw = _regular_absolute_file(
+        evidence / "cross-output-template-audit.json", "template audit", 2_000_000
+    )
+    try:
+        observation_mode = stat.S_IMODE(observations_path.stat().st_mode)
+        audit_mode = stat.S_IMODE(audit_path.stat().st_mode)
+    except OSError as error:
+        raise DraftCohortError("draft convergence evidence identity drifted") from error
+    if observation_mode != 0o600 or audit_mode != 0o600:
+        raise DraftCohortError("draft convergence evidence must be private mode 0600")
+    try:
+        observations = json.loads(observations_raw.decode("utf-8"))
+        audit_envelope = json.loads(audit_raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise DraftCohortError("draft convergence evidence must be strict UTF-8 JSON") from error
+    observations = _exact_object(
+        observations, {"schemaVersion", "cohort", "observations"}, "macro observations"
+    )
+    if (
+        type(observations["schemaVersion"]) is not int
+        or observations["schemaVersion"] != 1
+        or observations["cohort"] != plan["cohort_id"]
+        or not isinstance(observations["observations"], list)
+    ):
+        raise DraftCohortError("macro observation identity is invalid")
+    variants = {variant["id"]: f"directions/{variant['id']}.html" for variant in plan["variants"]}
+    expected_matrix = {
+        (identifier, page, profile)
+        for identifier, page in variants.items()
+        for profile in ("desktop-default", "mobile-default")
+    }
+    observed_matrix: set[tuple[str, str, str]] = set()
+    for index, item in enumerate(observations["observations"]):
+        item = _exact_object(
+            item,
+            {"caseId", "route", "surface", "viewport", "state", "macroFingerprint"},
+            f"macro observations[{index}]",
+        )
+        if any(
+            not isinstance(item[field], str)
+            for field in ("caseId", "route", "surface", "viewport", "state")
+        ):
+            raise DraftCohortError("draft convergence observation identity is invalid")
+        identifier = item["caseId"]
+        page = variants.get(identifier)
+        identity = (identifier, page or "", item["viewport"])
+        if (
+            page is None
+            or item["route"] != f"/{page}"
+            or item["surface"] != plan["surface"]
+            or item["state"] != "default"
+            or item["viewport"] not in {"desktop-default", "mobile-default"}
+            or not isinstance(item["macroFingerprint"], dict)
+            or identity in observed_matrix
+        ):
+            raise DraftCohortError("draft convergence observation matrix is invalid")
+        observed_matrix.add(identity)
+    if observed_matrix != expected_matrix:
+        raise DraftCohortError("draft convergence observation matrix is incomplete")
+
+    audit_envelope = _exact_object(
+        audit_envelope, {"schema_version", "observations", "result"}, "template audit envelope"
+    )
+    observation_record = _exact_object(
+        audit_envelope["observations"], {"bytes", "sha256"}, "template audit observations"
+    )
+    if (
+        type(audit_envelope["schema_version"]) is not int
+        or audit_envelope["schema_version"] != 1
+        or observation_record != {
+            "bytes": len(observations_raw),
+            "sha256": _digest_bytes(observations_raw),
+        }
+    ):
+        raise DraftCohortError("template audit does not bind the macro observations")
+    result = _exact_object(
+        audit_envelope["result"],
+        {"schemaVersion", "cohort", "status", "observationCount", "advisories", "claimBoundary"},
+        "template audit result",
+    )
+    if (
+        type(result["schemaVersion"]) is not int
+        or result["schemaVersion"] != 1
+        or result["cohort"] != plan["cohort_id"]
+        or type(result["observationCount"]) is not int
+        or result["observationCount"] != len(expected_matrix)
+        or not isinstance(result["advisories"], list)
+        or len(result["advisories"]) > 100
+        or not isinstance(result["claimBoundary"], str)
+        or not result["claimBoundary"].strip()
+    ):
+        raise DraftCohortError("template audit result identity is invalid")
+    if result != _recompute_template_audit(observations_raw):
+        raise DraftCohortError("template audit does not match the recomputed current result")
+    counts = {code: 0 for code in sorted(CONVERGENCE_CODES)}
+    affected: set[str] = set()
+    detail_keys = {
+        "cross_output_template_candidate": {
+            "code", "caseIds", "fingerprintSha256", "observations", "confirmation"
+        },
+        "near_cross_output_template_candidate": {
+            "code", "caseIds", "dominantFingerprintSha256", "exactFingerprintCount", "observations", "confirmation"
+        },
+        "cross_output_visual_grammar_candidate": {
+            "code", "caseIds", "visualGrammarSha256", "observations", "confirmation"
+        },
+        "cross_output_partial_visual_grammar_candidate": {
+            "code", "caseIds", "sharedAxes", "observations", "confirmation"
+        },
+    }
+    for index, raw_advisory in enumerate(result["advisories"]):
+        if not isinstance(raw_advisory, dict) or raw_advisory.get("code") not in CONVERGENCE_CODES:
+            raise DraftCohortError("template audit advisory category is invalid")
+        code = raw_advisory["code"]
+        advisory = _exact_object(raw_advisory, detail_keys[code], f"template advisory[{index}]")
+        case_ids = advisory["caseIds"]
+        if (
+            not isinstance(case_ids, list)
+            or len(case_ids) < 2
+            or any(not isinstance(identifier, str) for identifier in case_ids)
+            or any(identifier not in variants for identifier in case_ids)
+            or len(set(case_ids)) != len(case_ids)
+        ):
+            raise DraftCohortError("template audit advisory variants are invalid")
+        counts[code] += 1
+        affected.update(case_ids)
+    expected_status = "advisories_present" if result["advisories"] else "no_exact_template_candidates"
+    if result["status"] != expected_status:
+        raise DraftCohortError("template audit status is inconsistent")
+    return {
+        "status": "completed",
+        "result": result["status"],
+        "policy": "advisory_only",
+        "profiles": ["desktop-default", "mobile-default"],
+        "observation_count": len(expected_matrix),
+        "advisory_count": len(result["advisories"]),
+        "advisory_counts": counts,
+        "affected_variant_ids": sorted(affected),
+        "review_required": bool(result["advisories"]),
+        "observations": {
+            "path": "evidence/macro-observations.json",
+            "bytes": len(observations_raw),
+            "mode": "0600",
+            "sha256": _digest_bytes(observations_raw),
+        },
+        "audit": {
+            "path": "evidence/cross-output-template-audit.json",
+            "bytes": len(audit_raw),
+            "mode": "0600",
+            "sha256": _digest_bytes(audit_raw),
+        },
+        "claim_boundary": result["claimBoundary"],
+    }
 
 
 def _assert_execution_guards(
@@ -525,10 +742,22 @@ def _run_pinned(
 
     case_raw = (json.dumps(_case(plan, manifest), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     case_path, case_record = log_pin.write_exclusive("draft-cohort-case.json", case_raw)
+    convergence_raw = (json.dumps({
+        "schema_version": 1,
+        "cohort_id": plan["cohort_id"],
+        "surface": plan["surface"],
+        "variants": [
+            {"id": variant["id"], "page": f"directions/{variant['id']}.html"}
+            for variant in plan["variants"]
+        ],
+    }, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    convergence_path, convergence_config_record = log_pin.write_exclusive(
+        "draft-cohort-convergence.json", convergence_raw
+    )
     evidence = cohort_root / "evidence"
     _assert_execution_guards(cohort_pin, log_pin, tools_before)
     try:
-        run_capture(workspace, case_path, evidence)
+        run_capture(workspace, case_path, evidence, convergence_path)
     except DraftCohortError:
         _assert_execution_guards(cohort_pin, log_pin, tools_before)
         raise
@@ -544,11 +773,23 @@ def _run_pinned(
     except CurrentCraftError as error:
         _assert_execution_guards(cohort_pin, log_pin, tools_before)
         raise DraftCohortError("fresh capture provenance validation failed") from error
+    try:
+        convergence = _convergence_summary(plan, evidence)
+    except DraftCohortError:
+        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        raise
 
     _, plan_after = _regular_absolute_file(plan_path, "plan", PLAN_LIMIT)
     _, brief_after = _regular_absolute_file(brief_path, "brief", BRIEF_LIMIT)
-    if _digest_bytes(plan_after) != plan_record["sha256"] or _digest_bytes(brief_after) != _digest_bytes(brief_raw):
-        raise DraftCohortError("plan or brief provenance drifted during the cohort run")
+    _, convergence_after = _regular_absolute_file(
+        convergence_path, "draft convergence contract", PLAN_LIMIT
+    )
+    if (
+        _digest_bytes(plan_after) != plan_record["sha256"]
+        or _digest_bytes(brief_after) != _digest_bytes(brief_raw)
+        or _digest_bytes(convergence_after) != convergence_config_record["sha256"]
+    ):
+        raise DraftCohortError("plan, brief, or convergence provenance drifted during the cohort run")
     _assert_execution_guards(cohort_pin, log_pin, tools_before)
 
     validated = {
@@ -567,9 +808,10 @@ def _run_pinned(
             capture_receipt,
             manifest_path,
         )
+        convergence_again = _convergence_summary(plan, evidence)
         manifest_record = _record(manifest_path)
         capture_record = _record(capture_receipt)
-    except (OSError, CurrentCraftError) as error:
+    except (OSError, CurrentCraftError, DraftCohortError) as error:
         _assert_execution_guards(cohort_pin, log_pin, tools_before)
         raise DraftCohortError("draft cohort final provenance validation failed") from error
     validated_again_projection = {
@@ -581,6 +823,7 @@ def _run_pinned(
         manifest_record_before != manifest_record
         or capture_record_before != capture_record
         or validated_again_projection != validated
+        or convergence_again != convergence
     ):
         raise DraftCohortError("draft cohort final provenance drifted")
     _assert_execution_guards(cohort_pin, log_pin, tools_before)
@@ -605,6 +848,7 @@ def _run_pinned(
             "base_brief": {"bytes": len(brief_raw), "sha256": _digest_bytes(brief_raw)},
             "effective_brief": effective_record,
             "case": case_record,
+            "convergence_config": convergence_config_record,
             "run_manifest": {"path": "workspace/run-manifest.json", **manifest_record},
             "capture_receipt": {"path": "evidence/capture-receipt.json", **capture_record},
             "skill_tree_sha256": manifest["skill_snapshot"]["tree_sha256"],
@@ -617,7 +861,7 @@ def _run_pinned(
             "skill_reference": "references/design-exploration.md",
             "capture_standard": CAPTURE_STANDARD,
         },
-        "evidence": validated,
+        "evidence": {**validated, "convergence": convergence},
         "tools": tools_before,
     }
     try:

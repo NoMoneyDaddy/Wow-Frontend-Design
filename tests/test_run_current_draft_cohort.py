@@ -106,7 +106,13 @@ class CurrentDraftCohortTests(unittest.TestCase):
         (workspace / "run-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         return manifest
 
-    def fake_capture(self, workspace: Path, case_path: Path, evidence: Path) -> None:
+    def fake_capture(
+        self,
+        workspace: Path,
+        case_path: Path,
+        evidence: Path,
+        convergence_path: Path | None = None,
+    ) -> None:
         evidence.mkdir()
         (evidence / "artifacts").mkdir()
         case = json.loads(case_path.read_text(encoding="utf-8"))
@@ -138,6 +144,58 @@ class CurrentDraftCohortTests(unittest.TestCase):
             "captures": [],
         }
         (evidence / "capture-receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
+        if convergence_path is not None:
+            convergence = json.loads(convergence_path.read_text(encoding="utf-8"))
+            observations = {
+                "schemaVersion": 1,
+                "cohort": convergence["cohort_id"],
+                "observations": [
+                    {
+                        "caseId": variant["id"],
+                        "route": f"/{variant['page']}",
+                        "surface": convergence["surface"],
+                        "viewport": profile,
+                        "state": "default",
+                        "macroFingerprint": {
+                            "version": 2,
+                            "landmarks": [],
+                            "mainFlow": {
+                                "display": "block",
+                                "flexDirection": "row",
+                                "gridTracks": [],
+                                "gap": 0,
+                            },
+                            "regions": [],
+                            "representationHistogram": [],
+                            "visualGrammar": {
+                                "displayFamily": "sans",
+                                "displayScale": "display",
+                                "majorRadius": "large",
+                                "pillDensity": "many",
+                            },
+                        },
+                    }
+                    for variant in convergence["variants"]
+                    for profile in ("desktop-default", "mobile-default")
+                ],
+            }
+            observations_raw = (
+                json.dumps(observations, ensure_ascii=False, indent=2) + "\n"
+            ).encode("utf-8")
+            observations_path = evidence / "macro-observations.json"
+            observations_path.write_bytes(observations_raw)
+            observations_path.chmod(0o600)
+            audit = {
+                "schema_version": 1,
+                "observations": {
+                    "bytes": len(observations_raw),
+                    "sha256": hashlib.sha256(observations_raw).hexdigest(),
+                },
+                "result": cohort._recompute_template_audit(observations_raw),
+            }
+            audit_path = evidence / "cross-output-template-audit.json"
+            audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            audit_path.chmod(0o600)
 
     def test_plan_is_schema_closed_and_build_contract_has_two_distinct_directions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -235,6 +293,8 @@ class CurrentDraftCohortTests(unittest.TestCase):
             self.assertEqual("draft_cohort_captured", receipt["classification"])
             self.assertEqual("style_calibration_only", receipt["claim_boundary"])
             self.assertEqual(2, receipt["cohort"]["variant_count"])
+            self.assertEqual("advisory_only", receipt["evidence"]["convergence"]["policy"])
+            self.assertTrue(receipt["evidence"]["convergence"]["review_required"])
             self.assertEqual(
                 "references/design-exploration.md",
                 build.call_args.kwargs["skill_reference"],
@@ -254,6 +314,96 @@ class CurrentDraftCohortTests(unittest.TestCase):
                 side_effect=cohort.current_build.RunnerError("design_gate_rejection"),
             ):
                 with self.assertRaisesRegex(cohort.DraftCohortError, "build failed"):
+                    cohort.run(plan, brief, cohort_root, logs)
+            self.assertFalse((cohort_root / "draft-cohort-receipt.json").exists())
+
+    def test_rendered_convergence_advisory_requires_review_but_does_not_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            validated = {
+                "capture_count": 4,
+                "capture_set_sha256": "c" * 64,
+                "capture_standard": cohort.CAPTURE_STANDARD,
+            }
+
+            def advisory_capture(*args: object, **kwargs: object) -> None:
+                self.fake_capture(*args, **kwargs)
+
+            with (
+                mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build),
+                mock.patch.object(cohort, "run_capture", side_effect=advisory_capture),
+                mock.patch.object(cohort, "validate_current_capture_evidence", return_value=validated),
+            ):
+                receipt = cohort.run(plan, brief, cohort_root, logs)
+            convergence = receipt["evidence"]["convergence"]
+            self.assertEqual("captured", receipt["status"])
+            self.assertTrue(convergence["review_required"])
+            self.assertGreaterEqual(convergence["advisory_count"], 2)
+            self.assertEqual(
+                2,
+                convergence["advisory_counts"]["cross_output_visual_grammar_candidate"],
+            )
+            self.assertEqual(
+                ["editorial-index", "task-led-market"],
+                convergence["affected_variant_ids"],
+            )
+
+    def test_unknown_convergence_category_cannot_be_reported_as_clean(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            validated = {
+                "capture_count": 4,
+                "capture_set_sha256": "c" * 64,
+                "capture_standard": cohort.CAPTURE_STANDARD,
+            }
+
+            def invalid_capture(*args: object, **kwargs: object) -> None:
+                self.fake_capture(*args, **kwargs)
+                audit_path = Path(args[2]) / "cross-output-template-audit.json"
+                audit = json.loads(audit_path.read_text(encoding="utf-8"))
+                audit["result"]["status"] = "advisories_present"
+                audit["result"]["advisories"] = [{
+                    "code": "unknown_convergence_score",
+                    "caseIds": ["editorial-index", "task-led-market"],
+                }]
+                audit_path.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+                audit_path.chmod(0o600)
+
+            with (
+                mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build),
+                mock.patch.object(cohort, "run_capture", side_effect=invalid_capture),
+                mock.patch.object(cohort, "validate_current_capture_evidence", return_value=validated),
+            ):
+                with self.assertRaisesRegex(cohort.DraftCohortError, "does not match the recomputed"):
+                    cohort.run(plan, brief, cohort_root, logs)
+            self.assertFalse((cohort_root / "draft-cohort-receipt.json").exists())
+
+    def test_forged_convergence_claim_is_recomputed_and_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            validated = {
+                "capture_count": 4,
+                "capture_set_sha256": "c" * 64,
+                "capture_standard": cohort.CAPTURE_STANDARD,
+            }
+
+            def forged_capture(*args: object, **kwargs: object) -> None:
+                self.fake_capture(*args, **kwargs)
+                audit_path = Path(args[2]) / "cross-output-template-audit.json"
+                audit = json.loads(audit_path.read_text(encoding="utf-8"))
+                audit["result"]["claimBoundary"] = "award-winning and release approved"
+                audit_path.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+                audit_path.chmod(0o600)
+
+            with (
+                mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build),
+                mock.patch.object(cohort, "run_capture", side_effect=forged_capture),
+                mock.patch.object(cohort, "validate_current_capture_evidence", return_value=validated),
+            ):
+                with self.assertRaisesRegex(cohort.DraftCohortError, "does not match the recomputed"):
                     cohort.run(plan, brief, cohort_root, logs)
             self.assertFalse((cohort_root / "draft-cohort-receipt.json").exists())
 

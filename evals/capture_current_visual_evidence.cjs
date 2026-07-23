@@ -11,6 +11,7 @@ const MAX_CAPTURE_BYTES = 8_000_000;
 const MAX_TOTAL_CAPTURE_BYTES = 64_000_000;
 const HASH = /^[a-f0-9]{64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const DRAFT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PROFILE_STANDARD = [
   { name: "desktop-default", viewport: { width: 1440, height: 1000 }, reducedMotion: "no-preference", dpr: 1 },
   { name: "mobile-default", viewport: { width: 390, height: 844 }, reducedMotion: "reduce", dpr: 1 },
@@ -35,6 +36,35 @@ function readJson(file, label) {
     throw new Error(`${label} must be a bounded regular file`);
   }
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function readUnaliasedJson(file, label) {
+  if (!path.isAbsolute(file) || fs.realpathSync(file) !== file) {
+    throw new Error(`${label} must be an absolute unaliased file`);
+  }
+  const info = fs.lstatSync(file);
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || info.size > MAX_JSON_BYTES) {
+    throw new Error(`${label} must be a bounded unaliased file`);
+  }
+  return readJson(file, label);
+}
+
+function secureExclusiveJson(file, value) {
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL
+    | (fs.constants.O_NOFOLLOW || 0);
+  const encoded = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+  const descriptor = fs.openSync(file, flags, 0o600);
+  try {
+    fs.writeFileSync(descriptor, encoded);
+    fs.fsyncSync(descriptor);
+    const info = fs.fstatSync(descriptor);
+    if (!info.isFile() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600) {
+      throw new Error("private convergence evidence identity is invalid");
+    }
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  return { bytes: encoded.length, sha256: sha256Bytes(encoded) };
 }
 
 function sha256Bytes(value) {
@@ -117,6 +147,31 @@ function validateManifest(target, manifest) {
   return { outputs, pages };
 }
 
+function validateDraftConvergence(value, pages) {
+  exactKeys(value, ["schema_version", "cohort_id", "surface", "variants"], "draft convergence");
+  if (value.schema_version !== 1 || typeof value.cohort_id !== "string" || !DRAFT_ID.test(value.cohort_id)
+    || typeof value.surface !== "string" || !DRAFT_ID.test(value.surface)
+    || !Array.isArray(value.variants) || value.variants.length < 2 || value.variants.length > 3) {
+    throw new Error("draft convergence contract is invalid");
+  }
+  const ids = new Set();
+  const configuredPages = new Set();
+  for (const [index, variant] of value.variants.entries()) {
+    exactKeys(variant, ["id", "page"], `draft convergence.variants[${index}]`);
+    const page = safeRelative(variant.page, `draft convergence.variants[${index}].page`);
+    if (typeof variant.id !== "string" || !DRAFT_ID.test(variant.id)
+      || ids.has(variant.id) || configuredPages.has(page)) {
+      throw new Error("draft convergence variants are invalid");
+    }
+    ids.add(variant.id);
+    configuredPages.add(page);
+  }
+  if (configuredPages.size !== pages.length || pages.some((page) => !configuredPages.has(page))) {
+    throw new Error("draft convergence pages do not match current HTML outputs");
+  }
+  return value;
+}
+
 function pngDimensions(file) {
   const data = fs.readFileSync(file);
   if (data.length < 24 || data.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a"
@@ -152,11 +207,16 @@ function snapshotOutputs(source, destination, outputs) {
 }
 
 async function main() {
-  if (process.argv.length !== 5) throw new Error("expected target, evaluator case and fresh evidence directory");
+  if (![5, 6].includes(process.argv.length)) {
+    throw new Error("expected target, evaluator case, fresh evidence directory and optional draft convergence contract");
+  }
   const targetArg = process.argv[2];
   const caseArg = process.argv[3];
   const evidenceArg = process.argv[4];
-  if (![targetArg, caseArg, evidenceArg].every(path.isAbsolute)) throw new Error("all paths must be absolute");
+  const convergenceArg = process.argv[5] || null;
+  if (![targetArg, caseArg, evidenceArg, ...(convergenceArg ? [convergenceArg] : [])].every(path.isAbsolute)) {
+    throw new Error("all paths must be absolute");
+  }
 
   const target = fs.realpathSync(targetArg);
   const caseArgInfo = fs.lstatSync(caseArg);
@@ -178,6 +238,12 @@ async function main() {
   const manifest = readJson(manifestFile, "run manifest");
   const manifestBytes = fs.readFileSync(manifestFile);
   const before = validateManifest(target, manifest);
+  const convergence = convergenceArg
+    ? validateDraftConvergence(readUnaliasedJson(convergenceArg, "draft convergence contract"), before.pages)
+    : null;
+  const convergenceTools = convergence
+    ? require("../wow-frontend-design/scripts/cross_output_template_audit.cjs")
+    : null;
   if (JSON.stringify(caseData.brief) !== JSON.stringify(manifest.brief)) {
     throw new Error("case brief does not match the current build");
   }
@@ -185,6 +251,7 @@ async function main() {
   const artifacts = path.join(evidence, "artifacts");
   const sourceSnapshot = path.join(evidence, ".source-snapshot");
   const captures = [];
+  const macroObservations = [];
   let ordinal = 0;
   try {
     fs.mkdirSync(evidence, { mode: 0o700 });
@@ -230,6 +297,17 @@ async function main() {
             wait_condition: caseData.capture_plan.wait_condition,
           },
         });
+        if (convergence) {
+          const variant = convergence.variants.find((item) => item.page === meta.relativePage);
+          macroObservations.push({
+            caseId: variant.id,
+            route: `/${meta.relativePage}`,
+            surface: convergence.surface,
+            viewport: meta.profile.name,
+            state: caseData.capture_plan.state,
+            macroFingerprint: await page.evaluate(convergenceTools.collectMacroFingerprint),
+          });
+        }
         return { capture: relative };
       },
     });
@@ -244,6 +322,25 @@ async function main() {
     const after = validateManifest(target, readJson(manifestFile, "run manifest"));
     if (!afterManifest.equals(manifestBytes) || JSON.stringify(after.outputs) !== JSON.stringify(before.outputs)) {
       throw new Error("current build drifted during capture");
+    }
+    if (convergence) {
+      if (macroObservations.length !== convergence.variants.length * PROFILE_STANDARD.length) {
+        throw new Error("draft convergence matrix is incomplete");
+      }
+      const observationInput = {
+        schemaVersion: 1,
+        cohort: convergence.cohort_id,
+        observations: macroObservations,
+      };
+      const audit = convergenceTools.auditCrossOutputTemplates(observationInput);
+      const observationRecord = secureExclusiveJson(
+        path.join(evidence, "macro-observations.json"), observationInput,
+      );
+      secureExclusiveJson(path.join(evidence, "cross-output-template-audit.json"), {
+        schema_version: 1,
+        observations: observationRecord,
+        result: audit,
+      });
     }
     fs.rmSync(sourceSnapshot, { recursive: true });
     const receipt = {

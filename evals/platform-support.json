@@ -106,8 +106,8 @@
       "requirements": ["Node.js 22", "Pinned Playwright", "Pinned Playwright Chromium", "Pinned @axe-core/playwright"],
       "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_run", "browser": "passed", "visual": "passed"},
       "source_ids": ["playwright-installation", "playwright-browsers"],
-      "artifacts": ["package-lock.json", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "evals/capture_current_visual_evidence.cjs", "tests/test_playwright_html_smoke.py", "tests/test_capture_current_visual_evidence.py", "tests/test_browser_egress_controls.py"],
-      "boundary": "Observed evidence covers deterministic smoke and fresh viewport PNG capture mechanics in the pinned Chromium revision; it does not prove independent craft judgment, user outcomes, physical devices or commercial release."
+      "artifacts": ["package-lock.json", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "evals/capture_current_visual_evidence.cjs", "wow-frontend-design/scripts/cross_output_template_audit.cjs", "tests/test_playwright_html_smoke.py", "tests/test_capture_current_visual_evidence.py", "tests/test_browser_egress_controls.py"],
+      "boundary": "Observed evidence covers deterministic smoke, fresh viewport PNG capture mechanics and optional same-matrix draft convergence telemetry in the pinned Chromium revision; convergence findings remain advisory and do not prove independent craft judgment, originality, user outcomes, physical devices or commercial release."
     }
   ]
 }
