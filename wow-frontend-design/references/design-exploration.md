@@ -88,6 +88,10 @@ variant + route + viewport + state + region → keep/change/remove → reason �
 
 Do not collect only “A/B/C” votes. Record which hypothesis succeeded, which invariant failed, and whether feedback concerns content, hierarchy, identity, interaction, accessibility, or implementation cost.
 
+Keep the user-facing checkpoint short. Accept a single response such as `select B | reason: clearest hierarchy | adjust: strengthen the primary action`, then derive route, viewport, state, evidence labels, held axes, and verification context from the frozen cohort rather than asking the user to repeat them. Require only an explicit action and a reason; default adjustments and cross-direction borrowing to none. A selected base may carry up to three minor adjustments that preserve its thesis and can be verified in the fresh production implementation. If feedback needs another draft view, borrows from another direction, or changes the thesis, record a revision against one base instead. If the request would replace most of the thesis, treat it as a replacement, not a selected direction with cosmetic edits.
+
+Offer exactly three outcomes: select one base, revise one base, or stop before production. A revision admits one child with one to three named changes and must return with fresh rendered evidence; it cannot directly select an unrendered collage. When convergence telemetry requires review, show the paired captures and record acknowledgement before select or revise, while keeping the finding advisory-only. If a bounded revision still does not resolve the decision, stop instead of adding candidates.
+
 ## 5. Select and synthesize without reward hacking
 
 The implementing model may summarize tradeoffs but cannot declare its own visual score authoritative. Use deterministic failures as exclusions, rendered evidence for observed craft, user preference for subjective fit, and specialist/human review for high-risk domains.

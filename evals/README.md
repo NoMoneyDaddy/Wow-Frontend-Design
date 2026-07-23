@@ -55,6 +55,37 @@ npm run drafts:current -- \
 
 成功時最後才以 `0600` 建立 `draft-cohort-receipt.json`。Receipt 綁定 plan、base/effective brief、Skill tree、run manifest、outputs、capture receipt、capture matrix、macro observations、template audit 與 evaluator tools，但不保存 brief 內容或絕對私人路徑。Convergence summary 固定列出四類 advisory 數量、受影響方向與 `advisory_only` policy；任一 build、fresh capture、provenance 或 telemetry drift 失敗都不產生成功 receipt。草稿 PNG 只能支持這次方向選擇；選定後仍須重新正式實作、重新截圖並執行 affected release matrix。
 
+### 兩分鐘決策 checkpoint
+
+先以可讀尺寸展示同批 fresh captures。使用者只需回覆一行，例如：`選 editorial-index｜原因：資訊層級最清楚｜調整：主操作再突出`。執行代理把這句話轉成 evaluator-owned、schema-closed JSON；不要要求使用者重填 route、viewport、state 或 evidence label，也不要把 `review_required` 當成自動淘汰。
+
+```json
+{
+  "schema_version": 1,
+  "cohort_id": "marketplace-directions-1",
+  "action": "select",
+  "variant_id": "editorial-index",
+  "authority": "user_confirmed",
+  "reason": "資訊層級最清楚。",
+  "adjustments": ["主操作再突出。"],
+  "convergence_reviewed": true
+}
+```
+
+`action` 只允許 `select`、`revise`、`stop`。`select` 可帶 0–3 個不改變 thesis、可在正式實作後以 fresh evidence 驗證的微調。需要再次看草稿、跨稿借用或改變 thesis 時才用 `revise`；它必須指定一個 base variant 與 1–3 個具體調整，先形成一個 fresh child，不能直接把未渲染拼貼宣稱為 selected。`stop` 的 `variant_id` 必須是 `null`。若 convergence 有 advisory，繼續選稿或修稿前必須看過 paired captures 並明示 `convergence_reviewed: true`；這仍不是缺陷、排名或 release gate。
+
+將 decision JSON 設為 `0600`，另建一個新的空 output directory，然後記錄不可覆寫的決策。`authority` 只允許 `user_confirmed`、`human_reviewer_confirmed` 或使用者明示委派的 `user_delegated`；這是決策來源聲明，不證明真實身份或獨立性：
+
+```bash
+npm run drafts:decide -- \
+  --cohort-root /absolute/evaluator-root/cohort-output \
+  --log-dir /absolute/evaluator-root/private-logs \
+  --decision /absolute/evaluator-root/draft-decision.json \
+  --output-root /absolute/evaluator-root/decision-output
+```
+
+成功時以 `0600` 建立 `draft-decision-receipt.json`，自動綁定原 cohort receipt、capture set、選定方向的 desktop/mobile labels、held constants、selection criteria 與 convergence summary。它只建立 selection lineage：只有 `select` 交給唯一的 production `BUILD` lane；`revise` 只要求一個 bounded fresh child 並回到同一 checkpoint，`stop` 不進 production。草稿 HTML 與 PNG 都不得升級成 release evidence。
+
 ## 受控建置
 
 ```bash

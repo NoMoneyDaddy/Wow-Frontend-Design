@@ -1,0 +1,423 @@
+#!/usr/bin/env python3
+"""Record one human-owned decision against a freshly captured draft cohort."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import stat
+import sys
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DECISION_LIMIT = 32 * 1024
+RECEIPT_LIMIT = 256 * 1024
+CLAIM_BOUNDARY = "selection_lineage_only_no_release_acceptance"
+DECISION_KEYS = {
+    "schema_version", "cohort_id", "action", "variant_id", "authority",
+    "reason", "adjustments", "convergence_reviewed",
+}
+RECEIPT_KEYS = {
+    "schema_version", "status", "classification", "claim_boundary", "cohort",
+    "source", "configuration", "evidence", "tools",
+}
+COHORT_KEYS = {
+    "cohort_id", "partition", "locale", "surface", "decision_question",
+    "held_constant_axes", "selection_criteria", "variant_count", "variants",
+}
+SOURCE_KEYS = {
+    "plan", "base_brief", "effective_brief", "case", "convergence_config",
+    "run_manifest", "capture_receipt", "skill_tree_sha256", "outputs",
+}
+CONFIGURATION_KEYS = {
+    "model", "reasoning_effort", "max_repair_rounds", "skill_reference", "capture_standard",
+}
+EVIDENCE_KEYS = {"capture_count", "capture_set_sha256", "capture_standard", "convergence"}
+CONVERGENCE_KEYS = {
+    "status", "result", "policy", "profiles", "observation_count", "advisory_count",
+    "advisory_counts", "affected_variant_ids", "review_required", "observations",
+    "audit", "claim_boundary",
+}
+
+if str(ROOT / "evals") not in sys.path:
+    sys.path.insert(0, str(ROOT / "evals"))
+
+import run_current_draft_cohort as cohort  # noqa: E402
+from validate_current_craft_acceptance import (  # noqa: E402
+    CurrentCraftError,
+    validate_current_capture_evidence,
+)
+
+
+class DraftDecisionError(ValueError):
+    """Raised when a draft decision cannot be bound to current evidence."""
+
+
+def _exact(value: object, keys: set[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != keys:
+        raise DraftDecisionError(f"{label} schema is invalid")
+    return value
+
+
+def _as_decision_error(callable_: Any, *args: Any) -> Any:
+    try:
+        return callable_(*args)
+    except (OSError, TypeError, KeyError, cohort.DraftCohortError) as error:
+        raise DraftDecisionError(str(error)) from error
+
+
+def _digest_record(path: Path) -> dict[str, Any]:
+    info = path.stat()
+    return {
+        "bytes": info.st_size,
+        "mode": f"{stat.S_IMODE(info.st_mode):04o}",
+        "sha256": cohort._digest(path),
+    }
+
+
+def _decision_tool_records() -> dict[str, dict[str, Any]]:
+    return {
+        "recorder": {
+            "path": "evals/record_current_draft_decision.py",
+            **_digest_record(Path(__file__).resolve()),
+        },
+        "capture_validator": {
+            "path": "evals/validate_current_craft_acceptance.py",
+            **_digest_record(ROOT / "evals" / "validate_current_craft_acceptance.py"),
+        },
+    }
+
+
+def _real_directory(path: Path, label: str) -> Path:
+    if not path.is_absolute():
+        raise DraftDecisionError(f"{label} must be an absolute real directory")
+    try:
+        info = path.lstat()
+        canonical = path.resolve(strict=True)
+    except OSError as error:
+        raise DraftDecisionError(f"{label} must be an absolute real directory") from error
+    if not stat.S_ISDIR(info.st_mode) or path.is_symlink() or canonical != path:
+        raise DraftDecisionError(f"{label} must be an absolute real directory")
+    _as_decision_error(cohort._outside_authoring_repository, path, label)
+    return path
+
+
+def _read_json(path: Path, label: str, limit: int) -> tuple[dict[str, Any], bytes]:
+    try:
+        path, raw = cohort._regular_absolute_file(path, label, limit)
+        value = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, cohort.DraftCohortError) as error:
+        raise DraftDecisionError(f"{label} must be bounded strict UTF-8 JSON") from error
+    if not isinstance(value, dict):
+        raise DraftDecisionError(f"{label} must be a JSON object")
+    return value, raw
+
+
+def _assert_record(
+    path: Path,
+    expected: object,
+    label: str,
+    *,
+    has_mode: bool,
+    expected_path: str | None = None,
+) -> None:
+    keys = {"bytes", "sha256", *( ("mode",) if has_mode else () )}
+    if not isinstance(expected, dict):
+        raise DraftDecisionError(f"{label} provenance is invalid")
+    if "path" in expected:
+        keys.add("path")
+    if set(expected) != keys:
+        raise DraftDecisionError(f"{label} provenance schema is invalid")
+    if expected_path is not None and expected.get("path") != expected_path:
+        raise DraftDecisionError(f"{label} provenance path is invalid")
+    try:
+        _, raw = cohort._regular_absolute_file(path, label, RECEIPT_LIMIT)
+        mode = f"{stat.S_IMODE(path.stat().st_mode):04o}"
+    except cohort.DraftCohortError as error:
+        raise DraftDecisionError(f"{label} provenance is invalid") from error
+    actual = {"bytes": len(raw), "sha256": cohort._digest_bytes(raw)}
+    if has_mode:
+        actual["mode"] = mode
+    elif mode != "0600":
+        raise DraftDecisionError(f"{label} must use private mode 0600")
+    if any(expected.get(key) != value for key, value in actual.items()):
+        raise DraftDecisionError(f"{label} provenance is invalid")
+
+
+def _normalize_cohort(receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    metadata = _exact(receipt["cohort"], COHORT_KEYS, "cohort receipt.cohort")
+    variants_raw = metadata["variants"]
+    if not isinstance(variants_raw, list) or not 2 <= len(variants_raw) <= 3:
+        raise DraftDecisionError("cohort variants are invalid")
+    variants = []
+    for index, raw in enumerate(variants_raw):
+        variant = _exact(raw, cohort.VARIANT_KEYS, f"cohort variant[{index}]")
+        variants.append({
+            "id": _as_decision_error(cohort._identifier, variant["id"], f"variant[{index}].id"),
+            "hypothesis": _as_decision_error(cohort._bounded_text, variant["hypothesis"], f"variant[{index}].hypothesis"),
+            "changed_axes": _as_decision_error(cohort._identifier_list, variant["changed_axes"], f"variant[{index}].changed_axes", 2, 6),
+            "expected_benefit": _as_decision_error(cohort._bounded_text, variant["expected_benefit"], f"variant[{index}].expected_benefit"),
+            "risk": _as_decision_error(cohort._bounded_text, variant["risk"], f"variant[{index}].risk"),
+            "disqualifier": _as_decision_error(cohort._bounded_text, variant["disqualifier"], f"variant[{index}].disqualifier"),
+        })
+    if len({variant["id"] for variant in variants}) != len(variants) or metadata["variant_count"] != len(variants):
+        raise DraftDecisionError("cohort variant identity is invalid")
+    normalized = {
+        "cohort_id": _as_decision_error(cohort._identifier, metadata["cohort_id"], "cohort id"),
+        "surface": _as_decision_error(cohort._identifier, metadata["surface"], "cohort surface"),
+        "held_constant_axes": _as_decision_error(cohort._identifier_list, metadata["held_constant_axes"], "held constant axes", 4, 16),
+        "selection_criteria": _as_decision_error(cohort._text_list, metadata["selection_criteria"], "selection criteria", 2, 8),
+        "variants": variants,
+    }
+    source = _exact(receipt["source"], SOURCE_KEYS, "cohort receipt.source")
+    _exact(receipt["configuration"], CONFIGURATION_KEYS, "cohort receipt.configuration")
+    evidence = _exact(receipt["evidence"], EVIDENCE_KEYS, "cohort receipt.evidence")
+    _exact(evidence["convergence"], CONVERGENCE_KEYS, "cohort convergence")
+    if (
+        receipt["configuration"]["skill_reference"] != "references/design-exploration.md"
+        or receipt["configuration"]["capture_standard"] != cohort.CAPTURE_STANDARD
+        or evidence["capture_standard"] != cohort.CAPTURE_STANDARD
+        or evidence["capture_count"] != len(variants) * 2
+        or evidence["convergence"]["policy"] != "advisory_only"
+        or type(evidence["convergence"]["review_required"]) is not bool
+    ):
+        raise DraftDecisionError("cohort evidence contract is invalid")
+    return normalized, source
+
+
+def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
+    root = _real_directory(cohort_root, "cohort root")
+    logs = _real_directory(log_dir, "cohort log directory")
+    _as_decision_error(cohort._separate, root, logs, "cohort root and log directory")
+    receipt_path = root / "draft-cohort-receipt.json"
+    receipt, raw_before = _read_json(receipt_path, "cohort receipt", RECEIPT_LIMIT)
+    if stat.S_IMODE(receipt_path.stat().st_mode) != 0o600:
+        raise DraftDecisionError("cohort receipt must use private mode 0600")
+    receipt = _exact(receipt, RECEIPT_KEYS, "cohort receipt")
+    if (
+        type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1
+        or receipt["status"] != "captured"
+        or receipt["classification"] != "draft_cohort_captured"
+        or receipt["claim_boundary"] != cohort.CLAIM_BOUNDARY
+    ):
+        raise DraftDecisionError("cohort receipt identity is invalid")
+    metadata, source = _normalize_cohort(receipt)
+    if receipt["tools"] != cohort._tool_records():
+        raise DraftDecisionError("current draft cohort tool provenance drifted")
+
+    _assert_record(logs / "draft-cohort-effective-brief.md", source["effective_brief"], "effective brief", has_mode=False)
+    _assert_record(logs / "draft-cohort-case.json", source["case"], "draft cohort case", has_mode=False)
+    _assert_record(logs / "draft-cohort-convergence.json", source["convergence_config"], "draft convergence contract", has_mode=False)
+    manifest_path = root / "workspace" / "run-manifest.json"
+    capture_path = root / "evidence" / "capture-receipt.json"
+    _assert_record(
+        manifest_path,
+        source["run_manifest"],
+        "run manifest",
+        has_mode=True,
+        expected_path="workspace/run-manifest.json",
+    )
+    _assert_record(
+        capture_path,
+        source["capture_receipt"],
+        "capture receipt",
+        has_mode=True,
+        expected_path="evidence/capture-receipt.json",
+    )
+    try:
+        validated = validate_current_capture_evidence(
+            root / "workspace", logs / "draft-cohort-case.json", capture_path, manifest_path
+        )
+    except CurrentCraftError as error:
+        raise DraftDecisionError("current draft capture provenance is invalid") from error
+    evidence = receipt["evidence"]
+    if any(validated[key] != evidence[key] for key in ("capture_count", "capture_set_sha256", "capture_standard")):
+        raise DraftDecisionError("current draft capture evidence drifted")
+    manifest = validated["manifest"]
+    if (
+        manifest.get("outputs") != source["outputs"]
+        or manifest.get("skill_snapshot", {}).get("tree_sha256") != source["skill_tree_sha256"]
+    ):
+        raise DraftDecisionError("cohort receipt and validated manifest projection drifted")
+    try:
+        convergence = cohort._convergence_summary(metadata, root / "evidence")
+    except cohort.DraftCohortError as error:
+        raise DraftDecisionError("current draft convergence evidence is invalid") from error
+    if convergence != evidence["convergence"]:
+        raise DraftDecisionError("current draft convergence evidence drifted")
+    receipt_after, raw_after = _read_json(receipt_path, "cohort receipt", RECEIPT_LIMIT)
+    if raw_after != raw_before or receipt_after != receipt:
+        raise DraftDecisionError("cohort receipt drifted during decision validation")
+    return {
+        "receipt": receipt,
+        "receipt_record": {"path": "draft-cohort-receipt.json", **_digest_record(receipt_path)},
+        "cohort": metadata,
+        "capture": validated,
+    }
+
+
+def load_decision(path: Path) -> dict[str, Any]:
+    item, _ = _read_json(path, "draft decision", DECISION_LIMIT)
+    item = _exact(item, DECISION_KEYS, "draft decision")
+    action = item["action"]
+    if (
+        type(item["schema_version"]) is not int
+        or item["schema_version"] != 1
+        or not isinstance(action, str)
+        or action not in {"select", "revise", "stop"}
+    ):
+        raise DraftDecisionError("draft decision identity is invalid")
+    if (
+        not isinstance(item["authority"], str)
+        or item["authority"] not in {"user_confirmed", "human_reviewer_confirmed", "user_delegated"}
+    ):
+        raise DraftDecisionError("draft decision requires human authority or explicit user delegation")
+    if action == "stop":
+        if item["variant_id"] is not None:
+            raise DraftDecisionError("stop decisions cannot name a variant")
+        variant_id = None
+    else:
+        variant_id = _as_decision_error(cohort._identifier, item["variant_id"], "decision variant id")
+    adjustments = _as_decision_error(cohort._text_list, item["adjustments"], "decision adjustments", 0, 3)
+    if action == "revise" and not adjustments:
+        raise DraftDecisionError("revise decisions require at least one bounded adjustment")
+    if action == "stop" and adjustments:
+        raise DraftDecisionError("stop decisions cannot include adjustments")
+    if type(item["convergence_reviewed"]) is not bool:
+        raise DraftDecisionError("convergence_reviewed must be boolean")
+    return {
+        "action": action,
+        "cohort_id": _as_decision_error(cohort._identifier, item["cohort_id"], "decision cohort id"),
+        "variant_id": variant_id,
+        "authority": item["authority"],
+        "reason": _as_decision_error(cohort._bounded_text, item["reason"], "decision reason"),
+        "adjustments": adjustments,
+        "convergence_reviewed": item["convergence_reviewed"],
+    }
+
+
+def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path) -> dict[str, Any]:
+    tools_before = _decision_tool_records()
+    source = validate_cohort_source(cohort_root, log_dir)
+    decision_before = _digest_record(decision_path)
+    if decision_before["mode"] != "0600":
+        raise DraftDecisionError("draft decision must use private mode 0600")
+    item = load_decision(decision_path)
+    if item["cohort_id"] != source["cohort"]["cohort_id"]:
+        raise DraftDecisionError("draft decision does not match the cohort")
+    variants = {variant["id"]: variant for variant in source["cohort"]["variants"]}
+    variant = None if item["variant_id"] is None else variants.get(item["variant_id"])
+    if item["variant_id"] is not None and variant is None:
+        raise DraftDecisionError("draft decision variant does not exist in the cohort")
+    convergence = source["receipt"]["evidence"]["convergence"]
+    if item["action"] != "stop" and convergence["review_required"] and not item["convergence_reviewed"]:
+        raise DraftDecisionError("the advisory-only convergence finding must be reviewed before proceeding")
+    page = None if variant is None else f"directions/{variant['id']}.html"
+    labels = sorted(
+        capture["label"] for capture in source["capture"]["receipt"]["captures"]
+        if capture.get("page") == page
+    ) if page else []
+    if page and len(labels) != 2:
+        raise DraftDecisionError("selected variant lacks a fresh desktop/mobile capture pair")
+    _, decision_raw_after = _read_json(decision_path, "draft decision", DECISION_LIMIT)
+    if _digest_record(decision_path) != decision_before or cohort._digest_bytes(decision_raw_after) != decision_before["sha256"]:
+        raise DraftDecisionError("draft decision drifted during validation")
+
+    classification = {
+        "select": "draft_direction_selected",
+        "revise": "draft_direction_revision_requested",
+        "stop": "draft_direction_stopped",
+    }[item["action"]]
+    next_step = {
+        "select": "implement_selected_direction",
+        "revise": "render_one_bounded_revision",
+        "stop": "stop_before_production",
+    }[item["action"]]
+    revalidation = {
+        "select": ["production implementation", "fresh Playwright capture", "affected release matrix"],
+        "revise": ["one fresh desktop/mobile revision pair", "return to this decision checkpoint"],
+        "stop": [],
+    }[item["action"]]
+    production_lane = "BUILD" if item["action"] == "select" else None
+    receipt = {
+        "schema_version": 1,
+        "status": "recorded",
+        "classification": classification,
+        "claim_boundary": CLAIM_BOUNDARY,
+        "source": {
+            "cohort_receipt": source["receipt_record"],
+            "decision_input": decision_before,
+            "cohort_id": source["cohort"]["cohort_id"],
+            "capture_set_sha256": source["receipt"]["evidence"]["capture_set_sha256"],
+            "skill_tree_sha256": source["receipt"]["source"]["skill_tree_sha256"],
+            "convergence": {
+                "policy": "advisory_only",
+                "review_required": convergence["review_required"],
+                "advisory_counts": convergence["advisory_counts"],
+                "affected_variant_ids": convergence["affected_variant_ids"],
+            },
+        },
+        "decision": {
+            "action": item["action"], "authority": item["authority"], "reason": item["reason"],
+            "adjustments": item["adjustments"], "convergence_reviewed": item["convergence_reviewed"],
+            "variant": variant, "capture_labels": labels,
+        },
+        "handoff": {
+            "next_step": next_step, "production_lane": production_lane, "base_variant_id": item["variant_id"],
+            "source_page": page, "held_constant_axes": source["cohort"]["held_constant_axes"],
+            "selection_criteria": source["cohort"]["selection_criteria"],
+            "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+            "required_revalidation": revalidation,
+        },
+        "tools": tools_before,
+    }
+    source_again = validate_cohort_source(cohort_root, log_dir)
+    if (
+        source_again["receipt"] != source["receipt"]
+        or source_again["receipt_record"] != source["receipt_record"]
+        or source_again["capture"]["capture_set_sha256"] != source["capture"]["capture_set_sha256"]
+    ):
+        raise DraftDecisionError("current draft cohort drifted before decision finalization")
+    _, decision_raw_final = _read_json(decision_path, "draft decision", DECISION_LIMIT)
+    if _digest_record(decision_path) != decision_before or cohort._digest_bytes(decision_raw_final) != decision_before["sha256"]:
+        raise DraftDecisionError("draft decision drifted before finalization")
+    if _decision_tool_records() != tools_before:
+        raise DraftDecisionError("draft decision tool provenance drifted before finalization")
+    encoded = (json.dumps(receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    try:
+        with cohort._PinnedDirectory(output_root, "draft decision output root") as output:
+            cohort._outside_authoring_repository(output.path, "draft decision output root")
+            cohort._separate(output.path, _real_directory(cohort_root, "cohort root"), "decision output and cohort root")
+            cohort._separate(output.path, _real_directory(log_dir, "cohort log directory"), "decision output and log directory")
+            output.write_exclusive("draft-decision-receipt.json", encoded)
+    except (OSError, cohort.DraftCohortError) as error:
+        try:
+            tools_after_failure = _decision_tool_records()
+        except OSError as provenance_error:
+            raise DraftDecisionError("draft decision tool provenance failed during finalization") from provenance_error
+        if tools_after_failure != tools_before:
+            raise DraftDecisionError("draft decision tool provenance drifted during failed finalization") from error
+        raise DraftDecisionError("draft decision receipt could not be created") from error
+    return receipt
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cohort-root", required=True, type=Path)
+    parser.add_argument("--log-dir", required=True, type=Path)
+    parser.add_argument("--decision", required=True, type=Path)
+    parser.add_argument("--output-root", required=True, type=Path)
+    args = parser.parse_args(argv)
+    try:
+        run(args.cohort_root, args.log_dir, args.decision, args.output_root)
+    except (OSError, DraftDecisionError) as error:
+        print(f"current draft decision failed: {error}", file=sys.stderr)
+        return 1
+    print("current draft decision recorded")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
