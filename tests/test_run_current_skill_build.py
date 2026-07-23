@@ -184,6 +184,44 @@ class CurrentSkillBuildTests(unittest.TestCase):
             documentation,
         )
 
+    def test_source_latin_ch_signal_is_projected_only_to_affected_html(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            (stage / "index.html").write_text(
+                '<!doctype html><style>h1{max-width:10ch}</style><main><h1>品牌標題</h1></main>',
+                encoding="utf-8",
+            )
+            (stage / "details.html").write_text(
+                '<!doctype html><style>h1{max-width:18rem}</style><main><h1>內容標題</h1></main>',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                ("index.html",),
+                policy._heading_latin_ch_pages(
+                    stage,
+                    ("DESIGN.md", "index.html", "details.html"),
+                    30,
+                ),
+            )
+
+            (stage / "shared.css").write_text(
+                "h1{max-inline-size:11ch}",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                ("index.html",),
+                policy._heading_latin_ch_pages(
+                    stage,
+                    (
+                        "DESIGN.md",
+                        "index.html",
+                        "details.html",
+                        "shared.css",
+                    ),
+                    30,
+                ),
+            )
+
     def test_attempt_summary_does_not_publish_repair_segment(self) -> None:
         execution = {
             "model": {},
@@ -1305,6 +1343,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,
+                "cjk_heading_latin_ch_narrow_count": 0,
             },
             "typography_advisories": {
                 "heading_scan_count": 1,
@@ -3173,6 +3212,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         "layout_hazards": {
                             "hidden_attribute_visible_count": 1,
                             "fixed_content_obstruction_count": 2,
+                            "cjk_heading_latin_ch_narrow_count": 1,
                         },
                     },
                 }],
@@ -3189,10 +3229,17 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             trigger = manifest["repair"]["attempts"][1]["trigger"]
             self.assertEqual("html", trigger["gate"])
             self.assertEqual(
-                ["axe-heading-order", "console-errors", "fixed-content-obstruction", "visible-hidden-attribute"],
+                [
+                    "axe-heading-order",
+                    "cjk-heading-latin-ch-narrow",
+                    "console-errors",
+                    "fixed-content-obstruction",
+                    "visible-hidden-attribute",
+                ],
                 trigger["finding_ids"],
             )
             self.assertEqual(2, trigger["counts"]["fixed-content-obstruction"])
+            self.assertEqual(1, trigger["counts"]["cjk-heading-latin-ch-narrow"])
             repair_prompt = json.loads(
                 (capture / "invocation-2.json").read_text(encoding="utf-8")
             )["prompt"]
@@ -3555,12 +3602,14 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
                 policy.design_policy, "validate_local", side_effect=gate
             ), mock.patch.object(
-                policy, "_wrapper_tool_records", side_effect=[baseline, baseline, baseline, baseline, drifted]
+                policy,
+                "_wrapper_tool_records",
+                side_effect=[baseline, baseline, baseline, baseline, baseline, drifted],
             ) as provenance, self.assertRaisesRegex(
                 policy.RunnerError, "execution_infrastructure_failure"
             ):
                 policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
-            self.assertEqual(5, provenance.call_count)
+            self.assertEqual(6, provenance.call_count)
             publication = json.loads(
                 (log_dir / "current-skill-build.publication-failure.json").read_text(encoding="utf-8")
             )

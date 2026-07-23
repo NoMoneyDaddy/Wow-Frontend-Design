@@ -16,9 +16,18 @@ SMOKE = ROOT / "evals" / "playwright_html_smoke.cjs"
 
 
 class PlaywrightHtmlSmokeTests(unittest.TestCase):
-    def invoke(self, stage: Path, pages: list[str], outputs: list[str], contract: dict | None = None) -> dict:
+    def invoke(
+        self,
+        stage: Path,
+        pages: list[str],
+        outputs: list[str],
+        contract: dict | None = None,
+        source_risks: dict | None = None,
+    ) -> dict:
         command = ["node", str(SMOKE), str(stage), json.dumps(pages), json.dumps(outputs)]
-        if contract is not None:
+        if source_risks is not None:
+            command.extend((json.dumps(contract), json.dumps(source_risks)))
+        elif contract is not None:
             command.append(json.dumps(contract))
         completed = subprocess.run(
             command,
@@ -30,6 +39,73 @@ class PlaywrightHtmlSmokeTests(unittest.TestCase):
         )
         self.assertEqual(0, completed.returncode, completed.stderr)
         return json.loads(completed.stdout)
+
+    def test_latin_ch_source_signal_requires_fresh_narrow_cjk_geometry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>標題寬度</title><style>
+main { inline-size: 100%; }
+h1 { max-inline-size: 8ch; font-size: 36px; }
+</style><script>RegExp.prototype.test = () => false;</script></head><body><main><h1>讓每一晚都能隨生活重新組裝</h1><p>產品內容</p></main></body></html>''',
+                encoding="utf-8",
+            )
+            risks = {
+                "schema_version": 1,
+                "heading_latin_ch_pages": ["index.html"],
+            }
+            receipt = self.invoke(
+                stage,
+                ["index.html"],
+                ["index.html"],
+                source_risks=risks,
+            )
+            results = {item["profile"]: item for item in receipt["results"]}
+            self.assertEqual("passed", results["desktop"]["status"])
+            self.assertEqual("rejected", results["mobile"]["status"])
+            self.assertEqual("rejected", results["narrow"]["status"])
+            self.assertEqual(
+                1,
+                results["mobile"]["inspection"]["layout_hazards"][
+                    "cjk_heading_latin_ch_narrow_count"
+                ],
+            )
+            self.assertEqual(risks, receipt["source_layout_risks"])
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>短標題</title><style>
+main { inline-size: 100%; }
+h1 { max-inline-size: 8ch; font-size: 36px; }
+</style></head><body><main><h1>新品</h1><p>產品內容</p></main></body></html>''',
+                encoding="utf-8",
+            )
+            short_heading = self.invoke(
+                stage,
+                ["index.html"],
+                ["index.html"],
+                source_risks=risks,
+            )
+            self.assertEqual("passed", short_heading["status"])
+
+            without_signal = self.invoke(
+                stage,
+                ["index.html"],
+                ["index.html"],
+            )
+            self.assertEqual("passed", without_signal["status"])
+
+    def test_editorial_narrow_heading_without_latin_ch_signal_remains_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>編輯式標題</title><style>
+main { inline-size: 100%; }
+h1 { max-inline-size: 12rem; font-size: 36px; }
+</style></head><body><main><h1>讓每一晚都能隨生活重新組裝</h1><p>產品內容</p></main></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", receipt["status"])
 
     def test_browser_contract_rejects_mobile_task_below_first_viewport_without_autoscroll(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1305,7 +1381,11 @@ main { position: relative; min-height: 100vh; }
             self.assertEqual("passed", receipt["status"])
             for item in receipt["results"]:
                 self.assertEqual(
-                    {"hidden_attribute_visible_count": 0, "fixed_content_obstruction_count": 0},
+                    {
+                        "hidden_attribute_visible_count": 0,
+                        "fixed_content_obstruction_count": 0,
+                        "cjk_heading_latin_ch_narrow_count": 0,
+                    },
                     item["inspection"]["layout_hazards"],
                 )
 

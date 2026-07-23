@@ -166,6 +166,7 @@ def _generic_html_counts(result: dict[str, Any]) -> Counter[str]:
         for key, identifier in (
             ("hidden_attribute_visible_count", "visible-hidden-attribute"),
             ("fixed_content_obstruction_count", "fixed-content-obstruction"),
+            ("cjk_heading_latin_ch_narrow_count", "cjk-heading-latin-ch-narrow"),
         ):
             value = layout_hazards.get(key)
             if type(value) is int and value > 0:

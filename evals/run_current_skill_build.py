@@ -53,6 +53,9 @@ HTML_SMOKE_VALIDATOR = ROOT / "evals" / "playwright_html_smoke.cjs"
 BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
 REPAIR_POLICY = ROOT / "evals" / "current_skill_repair.py"
 DECISION_RECORDER = ROOT / "evals" / "record_current_draft_decision.py"
+SOURCE_LAYOUT_AUDIT = SKILL_SOURCE / "scripts" / "source_layout_audit.py"
+PROJECT_SCAN = SKILL_SOURCE / "scripts" / "project_scan.py"
+SAFE_PROJECT_IO = SKILL_SOURCE / "scripts" / "safe_project_io.py"
 EXPECTED_OUTPUTS = ("DESIGN.md", "index.html")
 BRIEF_LIMIT = 128 * 1024
 BROWSER_CONTRACT_LIMIT = 32 * 1024
@@ -269,7 +272,11 @@ def _validate_axe_inspection(inspection: Any) -> None:
     typography = inspection.get("typography_advisories")
     if (
         not isinstance(layout, dict)
-        or set(layout) != {"hidden_attribute_visible_count", "fixed_content_obstruction_count"}
+        or set(layout) != {
+            "hidden_attribute_visible_count",
+            "fixed_content_obstruction_count",
+            "cjk_heading_latin_ch_narrow_count",
+        }
         or any(type(layout.get(key)) is not int or not 0 <= layout[key] <= 10000 for key in layout)
         or not isinstance(typography, dict)
         or set(typography) != {"heading_scan_count", "heading_scan_truncated", "single_han_last_line_heading_count"}
@@ -925,6 +932,7 @@ def _run_html_smoke(
     outputs: tuple[str, ...],
     timeout: int,
     browser_contract: dict[str, Any] | None = None,
+    heading_latin_ch_pages: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     html_outputs = [name for name in outputs if name.casefold().endswith(".html")]
     node_raw = shutil.which("node", path=design_policy.SYSTEM_PATH)
@@ -963,9 +971,19 @@ def _run_html_smoke(
         if name in os.environ:
             environment[name] = os.environ[name]
     try:
-        command = [str(node), str(validator), str(stage), json.dumps(html_outputs), json.dumps(list(outputs))]
-        if browser_contract is not None:
-            command.append(json.dumps(browser_contract, ensure_ascii=False, separators=(",", ":")))
+        source_layout_risks = {
+            "schema_version": 1,
+            "heading_latin_ch_pages": list(heading_latin_ch_pages),
+        }
+        command = [
+            str(node),
+            str(validator),
+            str(stage),
+            json.dumps(html_outputs),
+            json.dumps(list(outputs)),
+            json.dumps(browser_contract, ensure_ascii=False, separators=(",", ":")),
+            json.dumps(source_layout_risks, separators=(",", ":")),
+        ]
         process = subprocess.Popen(
             command,
             cwd=ROOT,
@@ -1012,6 +1030,8 @@ def _run_html_smoke(
         raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     for result in results:
         _validate_axe_inspection(result.get("inspection"))
+    if receipt.get("source_layout_risks") != source_layout_risks:
+        raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     contract_summary = receipt.get("browser_contract")
     if browser_contract is None:
         if contract_summary is not None:
@@ -1127,6 +1147,87 @@ def _run_html_smoke(
     return receipt
 
 
+def _heading_latin_ch_pages(
+    stage: Path,
+    outputs: tuple[str, ...],
+    timeout: int,
+) -> tuple[str, ...]:
+    html_outputs = sorted(
+        name for name in outputs if name.casefold().endswith((".htm", ".html"))
+    )
+    if not html_outputs:
+        return ()
+    environment = {
+        "PATH": design_policy.SYSTEM_PATH,
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+    }
+    try:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                str(SOURCE_LAYOUT_AUDIT),
+                str(stage),
+                "--authorized-root",
+                str(stage),
+                "--max-files",
+                str(MAX_STAGE_ENTRIES),
+            ],
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        stdout, _stderr = _communicate_process_group(process, timeout)
+        report = json.loads(stdout)
+    except (OSError, json.JSONDecodeError) as error:
+        raise RunnerError("source layout audit infrastructure failure") from error
+    findings = report.get("findings") if isinstance(report, dict) else None
+    if (
+        process.returncode != 0
+        or not isinstance(report, dict)
+        or set(report)
+        != {
+            "schema_version",
+            "status",
+            "claim_boundary",
+            "scanned_files",
+            "scan_truncated",
+            "io_protection",
+            "unsafe_entries_skipped",
+            "coverage",
+            "finding_count",
+            "findings",
+        }
+        or report.get("schema_version") != 1
+        or not isinstance(findings, list)
+        or len(findings) > MAX_STAGE_ENTRIES * 8
+        or report.get("finding_count") != len(findings)
+    ):
+        raise RunnerError("source layout audit infrastructure failure")
+    output_set = set(outputs)
+    affected: set[str] = set()
+    for finding in findings:
+        if (
+            not isinstance(finding, dict)
+            or set(finding)
+            != {"code", "severity", "path", "line", "evidence", "confirmation"}
+            or not isinstance(finding.get("code"), str)
+            or not isinstance(finding.get("path"), str)
+            or finding["path"] not in output_set
+            or type(finding.get("line")) is not int
+            or finding["line"] < 1
+        ):
+            raise RunnerError("source layout audit infrastructure failure")
+        if finding["code"] != "heading_latin_ch_measure":
+            continue
+        if finding["path"] in html_outputs:
+            affected.add(finding["path"])
+    return tuple(sorted(affected))
+
+
 def _wrapper_tool_records() -> dict[str, Any]:
     records: dict[str, Any] = {}
     for name, path in (
@@ -1138,6 +1239,9 @@ def _wrapper_tool_records() -> dict[str, Any]:
         ("browser_runtime", BROWSER_RUNTIME),
         ("repair_policy", REPAIR_POLICY),
         ("draft_decision_policy", DECISION_RECORDER),
+        ("source_layout_audit", SOURCE_LAYOUT_AUDIT),
+        ("project_scan", PROJECT_SCAN),
+        ("safe_project_io", SAFE_PROJECT_IO),
     ):
         info = path.stat()
         records[name] = {
@@ -2210,11 +2314,20 @@ def run(
             if design_gate.get("status") != "passed":
                 raise RunnerError("DESIGN.md clean gate returned an invalid status")
             try:
+                heading_latin_ch_pages = _heading_latin_ch_pages(
+                    stage,
+                    output_names,
+                    min(120, max(15, hard_seconds)),
+                )
+                _assert_wrapper_tool_records(wrapper_tools)
+                if validate_candidate() != output_records:
+                    raise RunnerError("output content or mode drifted during source layout validation")
                 html_smoke_gate = _run_html_smoke(
                     stage,
                     output_names,
                     min(120, max(15, hard_seconds)),
                     browser_contract_data,
+                    heading_latin_ch_pages,
                 )
                 _assert_wrapper_tool_records(wrapper_tools)
             except RunnerError:

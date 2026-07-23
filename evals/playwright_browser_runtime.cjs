@@ -357,6 +357,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             }
             const lines = mergeRenderedLines(records);
             const publicSegments = [];
+            let hanGraphemes = 0;
             let lastLineGraphemes = 0;
             let lastLineHanGraphemes = 0;
             let lastLinePunctuationGraphemes = 0;
@@ -369,6 +370,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                   end: record.end,
                   line: lineIndex,
                 });
+                if (record.han) hanGraphemes += 1;
                 if (lineIndex === lines.length - 1) {
                   lastLineGraphemes += 1;
                   if (record.han) lastLineHanGraphemes += 1;
@@ -378,6 +380,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             }
             return freeze({
               lineCount: lines.length,
+              hanGraphemes,
               lastLineGraphemes,
               lastLineHanGraphemes,
               lastLinePunctuationGraphemes,

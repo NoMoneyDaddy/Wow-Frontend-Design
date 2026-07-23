@@ -265,6 +265,20 @@ function validateBrowserContract(value, pages) {
   return value;
 }
 
+function validateSourceLayoutRisks(value, pages) {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || !exactKeys(value, ["heading_latin_ch_pages", "schema_version"])
+    || value.schema_version !== 1
+    || !Array.isArray(value.heading_latin_ch_pages)
+    || value.heading_latin_ch_pages.length > pages.length
+    || value.heading_latin_ch_pages.some((item) => typeof item !== "string" || !pages.includes(item))
+    || value.heading_latin_ch_pages.join("\0")
+      !== [...new Set(value.heading_latin_ch_pages)].sort().join("\0")) {
+    throw new Error("invalid source layout risks");
+  }
+  return value;
+}
+
 async function settleStep(page) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.waitForTimeout(20);
@@ -560,8 +574,8 @@ async function runBrowserContract(page, contractCase) {
 }
 
 async function main() {
-  if (![5, 6].includes(process.argv.length)) {
-    fail("expected stage, JSON page list, JSON output list and optional browser contract");
+  if (![5, 6, 7].includes(process.argv.length)) {
+    fail("expected stage, JSON page list, JSON output list, optional browser contract and optional source layout risks");
     return;
   }
   const stage = process.argv[2];
@@ -572,9 +586,13 @@ async function main() {
     fail("invalid page list");
     return;
   }
-  const browserContract = process.argv.length === 6
-    ? validateBrowserContract(JSON.parse(process.argv[5]), pages)
-    : null;
+  const rawBrowserContract = process.argv.length >= 6 ? JSON.parse(process.argv[5]) : null;
+  const browserContract = rawBrowserContract === null
+    ? null
+    : validateBrowserContract(rawBrowserContract, pages);
+  const sourceLayoutRisks = process.argv.length === 7
+    ? validateSourceLayoutRisks(JSON.parse(process.argv[6]), pages)
+    : { schema_version: 1, heading_latin_ch_pages: [] };
   const profiles = browserContract?.cases.some((item) => item.profile === "mobile-motion")
     ? [...VIEWPORTS, MOBILE_MOTION_VIEWPORT]
     : VIEWPORTS;
@@ -588,7 +606,8 @@ async function main() {
         .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
         .analyze();
       const axeTargets = await summarizeAxeTargets(page, analysis.violations);
-      const layoutHazards = await page.evaluate(() => {
+      const headingLatinChRisk = sourceLayoutRisks.heading_latin_ch_pages.includes(relativePage);
+      const layoutHazards = await page.evaluate(({ inspectCjkHeadingWidth }) => {
         const visible = (element) => {
           let current = element;
           while (current instanceof Element) {
@@ -636,6 +655,7 @@ async function main() {
           .filter(visible).length;
         const trusted = globalThis.__wowEvaluatorRead;
         let singleHanLastLineHeadingCount = 0;
+        let cjkHeadingLatinChNarrowCount = 0;
         let headingScanCount = 0;
         let headingScanTruncated = false;
         const displayHeadings = Array.from(document.querySelectorAll("h1,[role='heading'][aria-level='1']"));
@@ -650,6 +670,15 @@ async function main() {
           const profile = trusted?.renderedLineProfile(heading);
           if (!profile) continue;
           headingScanCount += 1;
+          if (inspectCjkHeadingWidth && profile.lineCount >= 2 && profile.hanGraphemes > 0) {
+            const headingBox = trusted?.rect(heading);
+            const mainElement = document.querySelector("main");
+            const mainBox = mainElement ? trusted?.rect(mainElement) : null;
+            if (headingBox?.width > 0 && mainBox?.width > 0
+              && headingBox.width / mainBox.width < 0.65) {
+              cjkHeadingLatinChNarrowCount += 1;
+            }
+          }
           if (profile.lineCount >= 2
             && profile.lastLineHanGraphemes === 1
             && profile.lastLineGraphemes === 1 + profile.lastLinePunctuationGraphemes) {
@@ -689,10 +718,13 @@ async function main() {
         return {
           hidden_attribute_visible_count: hiddenAttributeVisible,
           fixed_content_obstruction_count: fixedContentObstructions,
+          cjk_heading_latin_ch_narrow_count: cjkHeadingLatinChNarrowCount,
           heading_scan_count: headingScanCount,
           heading_scan_truncated: headingScanTruncated,
           single_han_last_line_heading_count: singleHanLastLineHeadingCount,
         };
+      }, {
+        inspectCjkHeadingWidth: headingLatinChRisk && ["mobile", "narrow"].includes(profile.name),
       });
       const matchingContract = browserContract?.cases.find((item) =>
         item.page === relativePage && item.profile === profile.name);
@@ -706,6 +738,7 @@ async function main() {
         layout_hazards: {
           hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
           fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
+          cjk_heading_latin_ch_narrow_count: layoutHazards.cjk_heading_latin_ch_narrow_count,
         },
         typography_advisories: {
           heading_scan_count: layoutHazards.heading_scan_count,
@@ -727,6 +760,7 @@ async function main() {
       && result.inspection.axe_violation_count === 0
       && result.inspection.layout_hazards.hidden_attribute_visible_count === 0
       && result.inspection.layout_hazards.fixed_content_obstruction_count === 0
+      && result.inspection.layout_hazards.cjk_heading_latin_ch_narrow_count === 0
       && (!("browser_contract" in result.inspection) || result.inspection.browser_contract.status === "passed");
     result.status = passed ? "passed" : "rejected";
   }
@@ -743,6 +777,7 @@ async function main() {
     },
     settle_ms: 300,
     profiles: profiles.map(({ name, viewport, reducedMotion }) => ({ name, viewport, reduced_motion: reducedMotion })),
+    source_layout_risks: sourceLayoutRisks,
     results,
   };
   if (browserContract) {
