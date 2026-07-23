@@ -2765,6 +2765,7 @@ def run(
         except (OSError, RunnerError):
             pass
         if trusted_wrapper_tools is None:
+            trusted_decision_lineage = None
             error = RunnerError("current policy tool provenance drifted during failure handling")
             execution = None
             design_rejection = None

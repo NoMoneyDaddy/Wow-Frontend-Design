@@ -110,6 +110,43 @@ def attempt_execution_projection() -> dict[str, object]:
     }
 
 
+def draft_decision_source() -> dict[str, object]:
+    tree = core.skill_tree_summary(policy.SKILL_SOURCE, "wow-frontend-design")
+    return {
+        "action": "select",
+        "cohort_id": "marketplace-directions-1",
+        "authority": "user_confirmed",
+        "authority_assurance": "caller_attested_not_identity_verified",
+        "variant": {
+            "id": "editorial-index",
+            "hypothesis": "Editorial hierarchy.",
+            "changed_axes": ["composition", "typography"],
+            "expected_benefit": "Clear priority.",
+            "risk": "Lower density.",
+            "disqualifier": "Hidden action.",
+        },
+        "reason": "Selected against the criteria.",
+        "adjustments": [],
+        "held_constant_axes": [
+            "product-facts",
+            "content-fixture",
+            "functional-behavior",
+            "comparison-conditions",
+        ],
+        "selection_criteria": ["task clarity", "brand distinction"],
+        "receipt": {"bytes": 10, "mode": "0600", "sha256": "a" * 64},
+        "decision_input": {"bytes": 10, "mode": "0600", "sha256": "b" * 64},
+        "cohort_receipt": {"bytes": 10, "mode": "0600", "sha256": "c" * 64},
+        "capture_set_sha256": "d" * 64,
+        "capture_labels": [
+            "editorial-index-desktop-default",
+            "editorial-index-mobile-default",
+        ],
+        "skill_tree_sha256": tree["tree_sha256"],
+        "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+    }
+
+
 class CurrentSkillBuildTests(unittest.TestCase):
     def observe_trace(self, events: list[dict[str, object]]) -> dict[str, object]:
         with tempfile.TemporaryDirectory() as directory:
@@ -1478,6 +1515,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             brief, target, _, environment = self.fixture(root)
             log_dir = root / "logs"
             log_dir.mkdir()
+            decision_paths = tuple(
+                root / name for name in ("receipt.json", "decision.json", "cohort", "cohort-logs")
+            )
+            source = draft_decision_source()
             baseline = policy._wrapper_tool_records()
             drifted = json.loads(json.dumps(baseline))
             drifted["trace_validator"]["sha256"] = "0" * 64
@@ -1492,6 +1533,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
                 policy.design_policy, "validate_local", return_value=rejected
             ), mock.patch.object(
+                policy, "_validate_draft_decision_source", return_value=source
+            ), mock.patch.object(
                 policy, "_wrapper_tool_records", side_effect=[baseline, drifted, drifted]
             ) as provenance, self.assertRaisesRegex(
                 policy.RunnerError, "execution_infrastructure_failure"
@@ -1502,6 +1545,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     hard_seconds=5,
                     log_dir=log_dir,
                     max_repair_rounds=0,
+                    draft_decision_receipt=decision_paths[0],
+                    draft_decision_input=decision_paths[1],
+                    draft_cohort_root=decision_paths[2],
+                    draft_cohort_log_dir=decision_paths[3],
                 )
             self.assertEqual(3, provenance.call_count)
             receipt = json.loads(
@@ -1513,6 +1560,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertNotIn("execution", receipt)
             self.assertNotIn("configured_isolation", receipt)
             self.assertNotIn("trace_observed", receipt)
+            self.assertNotIn("draft_decision_lineage", receipt)
             self.assertEqual({}, receipt["logs"])
 
     def test_generation_failure_only_trusts_fresh_wrapper_provenance(self) -> None:
@@ -3984,6 +4032,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             brief, target, _, environment = self.fixture(root)
             log_dir = root / "logs"
             log_dir.mkdir()
+            decision_paths = tuple(
+                root / name for name in ("receipt.json", "decision.json", "cohort", "cohort-logs")
+            )
+            source = draft_decision_source()
             baseline = policy._wrapper_tool_records()
             drifted = json.loads(json.dumps(baseline))
             drifted["current_policy"]["sha256"] = "0" * 64
@@ -3995,19 +4047,31 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
                 policy.design_policy, "validate_local", side_effect=gate
             ), mock.patch.object(
+                policy, "_validate_draft_decision_source", return_value=source
+            ), mock.patch.object(
                 policy,
                 "_wrapper_tool_records",
                 side_effect=[baseline, baseline, baseline, baseline, baseline, drifted],
             ) as provenance, self.assertRaisesRegex(
                 policy.RunnerError, "execution_infrastructure_failure"
             ):
-                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+                policy.run(
+                    brief,
+                    target,
+                    hard_seconds=5,
+                    log_dir=log_dir,
+                    draft_decision_receipt=decision_paths[0],
+                    draft_decision_input=decision_paths[1],
+                    draft_cohort_root=decision_paths[2],
+                    draft_cohort_log_dir=decision_paths[3],
+                )
             self.assertEqual(6, provenance.call_count)
             publication = json.loads(
                 (log_dir / "current-skill-build.publication-failure.json").read_text(encoding="utf-8")
             )
             self.assertEqual("publication_failed", publication["classification"])
             self.assertNotIn("tools", publication)
+            self.assertNotIn("draft_decision_lineage", publication)
 
     def test_publication_failure_does_not_rebuild_execution_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
