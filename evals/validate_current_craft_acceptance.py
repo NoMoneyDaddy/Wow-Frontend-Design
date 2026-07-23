@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import stat
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -63,6 +64,25 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
+def _unaliased_file(path: Path, label: str) -> Path:
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        raise CurrentCraftError(f"{label} must be an unaliased regular file")
+    try:
+        info = expanded.lstat()
+        canonical = expanded.resolve(strict=True)
+    except OSError as error:
+        raise CurrentCraftError(f"{label} must be an unaliased regular file") from error
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or expanded.is_symlink()
+        or canonical != expanded
+        or info.st_nlink != 1
+    ):
+        raise CurrentCraftError(f"{label} must be an unaliased regular file")
+    return canonical
+
+
 def _exact(value: object, keys: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != keys:
         raise CurrentCraftError(f"{label} must contain exactly {sorted(keys)}")
@@ -103,22 +123,38 @@ def _outside_authoring_repository(path: Path, label: str) -> None:
     raise CurrentCraftError(f"{label} must remain outside the authoring repository")
 
 
-def validate_current_acceptance(
-    result_path: Path,
-    ledger_path: Path,
-    policy_path: Path,
+def validate_current_capture_evidence(
     workspace_root: Path,
     case_path: Path,
     receipt_path: Path,
     manifest_path: Path,
-) -> int:
+) -> dict[str, Any]:
+    try:
+        return _validate_current_capture_evidence(
+            workspace_root,
+            case_path,
+            receipt_path,
+            manifest_path,
+        )
+    except CurrentCraftError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError, AttributeError, KeyError) as error:
+        raise CurrentCraftError(
+            "current capture evidence is malformed or changed during validation"
+        ) from error
+
+
+def _validate_current_capture_evidence(
+    workspace_root: Path,
+    case_path: Path,
+    receipt_path: Path,
+    manifest_path: Path,
+) -> dict[str, Any]:
     workspace = workspace_root.expanduser().resolve(strict=True)
-    case_file = case_path.expanduser().resolve(strict=True)
-    receipt_file = receipt_path.expanduser().resolve(strict=True)
-    manifest_file = manifest_path.expanduser().resolve(strict=True)
-    ledger_file = ledger_path.expanduser().resolve(strict=True)
-    policy_file = policy_path.expanduser().resolve(strict=True)
-    for path, label in ((case_file, "case"), (receipt_file, "capture receipt"), (ledger_file, "ledger"), (policy_file, "policy")):
+    case_file = _unaliased_file(case_path, "case")
+    receipt_file = _unaliased_file(receipt_path, "capture receipt")
+    manifest_file = _unaliased_file(manifest_path, "run manifest")
+    for path, label in ((case_file, "case"), (receipt_file, "capture receipt")):
         _outside_workspace(path, workspace, label)
         _outside_authoring_repository(path, label)
     try:
@@ -129,14 +165,17 @@ def validate_current_acceptance(
     case = _exact(_load_json(case_file, "case"), CASE_KEYS, "case")
     receipt = _exact(_load_json(receipt_file, "capture receipt"), RECEIPT_KEYS, "capture receipt")
     manifest = _load_json(manifest_file, "run manifest")
-    policy = _load_json(policy_file, "policy")
-    result = _load_json(result_path.expanduser().resolve(strict=True), "quality result")
 
-    if case["schema_version"] != 1 or not isinstance(case["case_id"], str) or not case["case_id"].strip():
+    if (
+        type(case["schema_version"]) is not int
+        or case["schema_version"] != 1
+        or not isinstance(case["case_id"], str)
+        or not case["case_id"].strip()
+    ):
         raise CurrentCraftError("case identity is invalid")
     if not isinstance(case["run_id"], str) or RUN_ID_PATTERN.fullmatch(case["run_id"]) is None:
         raise CurrentCraftError("case run_id is invalid")
-    if case["partition"] not in {"validation", "test"}:
+    if not isinstance(case["partition"], str) or case["partition"] not in {"validation", "test"}:
         raise CurrentCraftError("current acceptance requires a validation or test case")
     case_brief = _exact(case["brief"], {"bytes", "sha256"}, "case.brief")
     if (
@@ -162,7 +201,8 @@ def validate_current_acceptance(
         "case.capture_plan",
     )
     if (
-        capture_plan["locale"] not in {"zh-Hant", "en"}
+        not isinstance(capture_plan["locale"], str)
+        or capture_plan["locale"] not in {"zh-Hant", "en"}
         or capture_plan["state"] != "default"
         or capture_plan["pages"] != "all_html_outputs"
         or capture_plan["wait_condition"] != "load+fonts+two-raf+300ms+two-raf"
@@ -170,7 +210,7 @@ def validate_current_acceptance(
     ):
         raise CurrentCraftError("case capture plan is not the current standard")
 
-    if receipt["schema_version"] != 1 or receipt["status"] != "captured":
+    if type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1 or receipt["status"] != "captured":
         raise CurrentCraftError("capture receipt is not a completed current receipt")
     runtime = _exact(receipt["runtime"], {"package", "version", "browser", "browser_version", "headless"}, "capture receipt.runtime")
     if (
@@ -219,16 +259,33 @@ def validate_current_acceptance(
 
     output_root = manifest_file.parent
     html_pages: set[str] = set()
+    output_paths: set[str] = set()
     for index, record in enumerate(source["outputs"]):
         record = _exact(record, {"path", "bytes", "mode", "sha256"}, f"outputs[{index}]")
         relative = _relative(record["path"], f"outputs[{index}].path")
-        output = (output_root / relative).resolve(strict=True)
+        if relative in output_paths:
+            raise CurrentCraftError("current output paths must be unique")
+        if (
+            type(record["bytes"]) is not int
+            or record["bytes"] < 1
+            or not isinstance(record["mode"], str)
+            or re.fullmatch(r"0[0-7]{3}", record["mode"]) is None
+            or not isinstance(record["sha256"], str)
+            or HASH_PATTERN.fullmatch(record["sha256"]) is None
+        ):
+            raise CurrentCraftError(f"current output provenance record is invalid: {relative}")
+        output = _unaliased_file(output_root / relative, "current output")
         try:
             output.relative_to(output_root.resolve(strict=True))
         except ValueError as error:
             raise CurrentCraftError("current output escapes its workspace") from error
-        if output.is_symlink() or not output.is_file() or output.stat().st_size != record["bytes"] or _sha256(output) != record["sha256"]:
+        if (
+            output.stat().st_size != record["bytes"]
+            or f"{stat.S_IMODE(output.stat().st_mode):04o}" != record["mode"]
+            or _sha256(output) != record["sha256"]
+        ):
             raise CurrentCraftError(f"current output changed after capture: {relative}")
+        output_paths.add(relative)
         if relative.lower().endswith(".html"):
             html_pages.add(relative)
 
@@ -238,22 +295,36 @@ def validate_current_acceptance(
     capture_labels: set[str] = set()
     capture_paths: set[str] = set()
     capture_matrix: set[tuple[str, str]] = set()
+    capture_artifacts: dict[str, Path] = {}
     total_bytes = 0
     evidence_root = receipt_file.parent.resolve(strict=True)
-    ledger_root = ledger_file.parent.resolve(strict=True)
     for index, raw_capture in enumerate(captures):
         capture = _exact(raw_capture, CAPTURE_KEYS, f"captures[{index}]")
         label = capture["label"]
         if not isinstance(label, str) or not label or label in capture_labels:
             raise CurrentCraftError("capture labels must be unique non-empty strings")
+        if (
+            not isinstance(capture["page"], str)
+            or not isinstance(capture["profile"], str)
+            or type(capture["bytes"]) is not int
+            or capture["bytes"] < 1
+            or type(capture["width"]) is not int
+            or capture["width"] < 1
+            or type(capture["height"]) is not int
+            or capture["height"] < 1
+            or not isinstance(capture["sha256"], str)
+            or HASH_PATTERN.fullmatch(capture["sha256"]) is None
+        ):
+            raise CurrentCraftError("capture provenance fields are invalid")
         relative = _relative(capture["path"], f"captures[{index}].path")
+        if relative in capture_paths:
+            raise CurrentCraftError("capture paths must be unique")
         candidate = evidence_root / relative
-        artifact = candidate.resolve(strict=True)
+        artifact = _unaliased_file(candidate, "capture artifact")
         try:
             artifact.relative_to(evidence_root)
-            ledger_relative = artifact.relative_to(ledger_root).as_posix()
         except ValueError as error:
-            raise CurrentCraftError("capture artifact is outside evaluator evidence roots") from error
+            raise CurrentCraftError("capture artifact is outside the evaluator evidence root") from error
         if artifact != candidate or not artifact.is_file():
             raise CurrentCraftError(f"capture artifact must be an unaliased regular file: {relative}")
         info = artifact.stat()
@@ -270,6 +341,8 @@ def validate_current_acceptance(
             {"route", "state", "locale", "viewport", "dpr", "reduced_motion", "wait_condition"},
             f"captures[{index}].context",
         )
+        if type(context["dpr"]) is not int or context["dpr"] < 1:
+            raise CurrentCraftError("capture context numeric fields are invalid")
         profile = capture["profile"]
         profile_rule = next((item for item in PROFILE_STANDARD if item["name"] == profile), None)
         expected_viewport = (
@@ -296,12 +369,75 @@ def validate_current_acceptance(
         ):
             raise CurrentCraftError("capture matrix or dimensions drifted from the current standard")
         capture_labels.add(label)
-        capture_paths.add(ledger_relative)
+        capture_paths.add(relative)
+        capture_artifacts[label] = artifact
         capture_matrix.add((capture["page"], profile))
         total_bytes += size
     expected_matrix = {(page, profile) for page in html_pages for profile in ("desktop-default", "mobile-default")}
     if capture_matrix != expected_matrix or total_bytes > MAX_TOTAL_CAPTURE_BYTES:
         raise CurrentCraftError("capture matrix is incomplete or exceeds its evidence budget")
+
+    capture_projection = [
+        {
+            "label": capture["label"],
+            "path": capture["path"],
+            "sha256": capture["sha256"],
+        }
+        for capture in captures
+    ]
+    capture_set_sha256 = hashlib.sha256(
+        json.dumps(capture_projection, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        "case": case,
+        "craft_case": craft_case,
+        "receipt": receipt,
+        "manifest": manifest,
+        "capture_labels": capture_labels,
+        "capture_paths": capture_paths,
+        "capture_artifacts": capture_artifacts,
+        "capture_count": len(captures),
+        "capture_set_sha256": capture_set_sha256,
+        "capture_standard": capture_standard,
+    }
+
+
+def validate_current_acceptance(
+    result_path: Path,
+    ledger_path: Path,
+    policy_path: Path,
+    workspace_root: Path,
+    case_path: Path,
+    receipt_path: Path,
+    manifest_path: Path,
+) -> int:
+    workspace = workspace_root.expanduser().resolve(strict=True)
+    ledger_file = _unaliased_file(ledger_path, "ledger")
+    policy_file = _unaliased_file(policy_path, "policy")
+    for path, label in ((ledger_file, "ledger"), (policy_file, "policy")):
+        _outside_workspace(path, workspace, label)
+        _outside_authoring_repository(path, label)
+    validated = validate_current_capture_evidence(
+        workspace,
+        case_path,
+        receipt_path,
+        manifest_path,
+    )
+    case = validated["case"]
+    craft_case = validated["craft_case"]
+    receipt = validated["receipt"]
+    captures = receipt["captures"]
+    capture_labels = validated["capture_labels"]
+    capture_artifacts = validated["capture_artifacts"]
+    policy = _load_json(policy_file, "policy")
+    result = _load_json(_unaliased_file(result_path, "quality result"), "quality result")
+    ledger_root = ledger_file.parent.resolve(strict=True)
+    capture_paths: set[str] = set()
+    for label, artifact in capture_artifacts.items():
+        try:
+            capture_paths.add(artifact.relative_to(ledger_root).as_posix())
+        except ValueError as error:
+            raise CurrentCraftError(f"capture artifact is outside the ledger root: {label}") from error
 
     if policy.get("case_id") != case["case_id"] or policy.get("run_id") != case["run_id"]:
         raise CurrentCraftError("evaluator policy does not match the frozen case")
@@ -323,7 +459,7 @@ def validate_current_acceptance(
         if not isinstance(rule, dict) or rule.get("kind") != "artifact" or rule.get("artifact_kind") != "screenshot":
             raise CurrentCraftError(f"fresh capture is not evaluator-approved: {capture['label']}")
         policy_artifact = (ledger_root / _relative(rule.get("path"), f"policy evidence {capture['label']}")).resolve(strict=True)
-        receipt_artifact = (evidence_root / capture["path"]).resolve(strict=True)
+        receipt_artifact = capture_artifacts[capture["label"]]
         if policy_artifact != receipt_artifact:
             raise CurrentCraftError(f"policy screenshot path does not match capture receipt: {capture['label']}")
         context = rule.get("context")

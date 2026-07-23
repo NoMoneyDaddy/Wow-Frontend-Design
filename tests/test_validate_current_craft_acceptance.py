@@ -36,6 +36,7 @@ def digest(path: Path) -> str:
 
 class CurrentCraftAcceptanceTests(unittest.TestCase):
     def build_fixture(self, root: Path) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
+        root = root.resolve()
         workspace = root / "workspace"
         workspace.mkdir()
         brief = "建立可用且有辨識度的繁體中文產品介面。\n".encode()
@@ -235,6 +236,141 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             fixture = self.build_fixture(Path(directory))
             self.assertEqual(3, self.validate(fixture))
 
+    def test_capture_provenance_can_be_validated_before_independent_review(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            observed = validate_current_craft_acceptance.validate_current_capture_evidence(
+                workspace,
+                case_path,
+                receipt_path,
+                manifest_path,
+            )
+            self.assertEqual(2, observed["capture_count"])
+            self.assertRegex(observed["capture_set_sha256"], r"^[a-f0-9]{64}$")
+            self.assertEqual({"desktop-default", "mobile-default"}, {
+                capture["profile"] for capture in observed["receipt"]["captures"]
+            })
+
+    def test_capture_evidence_rejects_symlink_receipt_and_duplicate_artifact_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            linked = receipt_path.with_name("linked-receipt.json")
+            linked.symlink_to(receipt_path)
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "unaliased"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, linked, manifest_path
+                )
+
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["captures"][1]["path"] = receipt["captures"][0]["path"]
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "paths must be unique"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, receipt_path, manifest_path
+                )
+
+    def test_capture_evidence_rejects_parent_symlink_and_hardlink_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            fixture = self.build_fixture(root)
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            linked_parent = root / "linked-evidence"
+            linked_parent.symlink_to(receipt_path.parent, target_is_directory=True)
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "unaliased"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace,
+                    case_path,
+                    linked_parent / receipt_path.name,
+                    manifest_path,
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            fixture = self.build_fixture(root)
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            hardlink = root / "hardlink-receipt.json"
+            os.link(receipt_path, hardlink)
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "unaliased"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, hardlink, manifest_path
+                )
+
+    def test_capture_evidence_malformed_partition_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            case = json.loads(case_path.read_text(encoding="utf-8"))
+            case["partition"] = []
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+            with self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "validation or test case",
+            ):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, receipt_path, manifest_path
+                )
+
+    def test_capture_disappearance_fails_closed_without_private_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            artifact = receipt_path.parent / receipt["captures"][0]["path"]
+            artifact.unlink()
+            with self.assertRaises(validate_current_craft_acceptance.CurrentCraftError) as observed:
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, receipt_path, manifest_path
+                )
+            self.assertNotIn(str(receipt_path.parent), str(observed.exception))
+
+    def test_output_and_capture_records_are_schema_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            manifest["outputs"][0]["bytes"] = float(manifest["outputs"][0]["bytes"])
+            manifest["outputs"][0]["mode"] = "PRIVATE"
+            receipt["source"]["outputs"] = copy.deepcopy(manifest["outputs"])
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            receipt["source"]["run_manifest_sha256"] = digest(manifest_path)
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "output provenance record"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, receipt_path, manifest_path
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            manifest["outputs"].append(copy.deepcopy(manifest["outputs"][0]))
+            receipt["source"]["outputs"] = copy.deepcopy(manifest["outputs"])
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            receipt["source"]["run_manifest_sha256"] = digest(manifest_path)
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "paths must be unique"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, receipt_path, manifest_path
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            capture = receipt["captures"][0]
+            for field in ("bytes", "width", "height"):
+                capture[field] = float(capture[field])
+            capture["context"]["dpr"] = 1.0
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "provenance fields"):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case_path, receipt_path, manifest_path
+                )
+
     def test_manifest_change_after_capture_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = self.build_fixture(Path(directory))
@@ -304,7 +440,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             ]
             result_path.write_text(json.dumps(result), encoding="utf-8")
 
-            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "one filesystem identity"):
+            with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "unaliased regular file"):
                 self.validate(fixture)
 
     def test_capture_symlink_alias_is_rejected(self) -> None:

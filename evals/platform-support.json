@@ -91,12 +91,12 @@
       "id": "evaluator-posix-runners",
       "category": "evaluator_harness",
       "repository_status": "partially_tested",
-      "entrypoints": ["evals/run_current_skill_build.py"],
+      "entrypoints": ["evals/run_current_skill_build.py", "evals/run_current_draft_cohort.py"],
       "requirements": ["POSIX process groups and resource controls", "Python 3.9+", "Node.js 22", "Authenticated Codex CLI", "Pinned @google/design.md, Playwright Chromium and Axe"],
       "checks": {"static": "passed", "unit": "passed", "linux": "not_run", "macos": "passed", "windows": "not_supported", "browser": "passed", "visual": "not_run"},
       "source_ids": ["github-hosted-runners", "playwright-installation"],
-      "artifacts": ["evals/run_current_skill_build.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/validate_current_craft_acceptance.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "evals/capture_current_visual_evidence.cjs", "tests/test_run_current_skill_build.py", "tests/test_validate_current_craft_acceptance.py", ".github/workflows/ci.yml"],
-      "boundary": "The controlled evaluator is outside the installed Skill runtime, is intentionally POSIX-only, and proves exact-output greenfield builds, evaluator-frozen seeded retrofit/patch mutation allowlists, bounded repair, deterministic smoke and provenance binding only; evaluator independence and commercial approval remain external facts."
+      "artifacts": ["evals/run_current_skill_build.py", "evals/run_current_draft_cohort.py", "evals/codex_isolated_build_core.py", "evals/current_skill_repair.py", "evals/validate_codex_log_policy.py", "evals/validate_design_md_clean.py", "evals/validate_current_craft_acceptance.py", "evals/playwright_html_smoke.cjs", "evals/playwright_browser_runtime.cjs", "evals/capture_current_visual_evidence.cjs", "tests/test_run_current_skill_build.py", "tests/test_run_current_draft_cohort.py", "tests/test_validate_current_craft_acceptance.py", ".github/workflows/ci.yml"],
+      "boundary": "The controlled evaluator is outside the installed Skill runtime, is intentionally POSIX-only, and proves exact-output greenfield builds, evaluator-frozen seeded retrofit/patch mutation allowlists, bounded repair, deterministic smoke, provenance binding and fresh style-calibration draft cohorts only; evaluator independence, direction selection and commercial approval remain external facts."
     },
     {
       "id": "browser-chromium-evaluator",

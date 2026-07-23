@@ -143,6 +143,7 @@ jobs:
       - name: Check current evaluator syntax
         run: |
           python3 -m py_compile evals/run_current_skill_build.py
+          python3 -m py_compile evals/run_current_draft_cohort.py
           python3 -m py_compile evals/codex_isolated_build_core.py
           python3 -m py_compile evals/current_skill_repair.py
           python3 -m py_compile evals/validate_design_md_clean.py

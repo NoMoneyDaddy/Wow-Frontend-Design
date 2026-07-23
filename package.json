@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build:current": "python3 evals/run_current_skill_build.py",
+    "drafts:current": "python3 evals/run_current_draft_cohort.py",
     "capture:current": "node evals/capture_current_visual_evidence.cjs",
     "accept:current": "python3 evals/validate_current_craft_acceptance.py",
     "audit:html": "node evals/run_vnu.cjs"

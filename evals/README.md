@@ -4,6 +4,55 @@
 
 `evals/` 是 repository evaluator，不屬於安裝後自動執行的 Skill runtime。一般 Skill package 仍可只靠 `SKILL.md`、按需 references、scripts 與 assets 使用。
 
+## 快速多方向草稿
+
+`drafts:current` 是 `build:current` 的 style-calibration wrapper，不是第二套 builder。它在同一次受控 BUILD 內產生 2–3 個方向頁面，固定使用 `references/design-exploration.md`，再呼叫現行 final-only capture 取得同一 manifest 下的 fresh desktop/mobile PNG。這個流程只支援 greenfield 草稿；不做 production integration、release acceptance、勝者判定或 award claim。
+
+計畫檔必須是 evaluator-owned、schema-closed JSON：
+
+```json
+{
+  "schema_version": 1,
+  "cohort_id": "marketplace-directions-1",
+  "partition": "validation",
+  "locale": "zh-Hant",
+  "surface": "marketplace-home",
+  "decision_question": "哪一種資訊層級最能支援可信任的探索？",
+  "held_constant_axes": ["product-facts", "content-fixture", "functional-behavior", "comparison-conditions"],
+  "selection_criteria": ["主要任務清晰", "品牌辨識度", "手機轉化成立"],
+  "variants": [
+    {
+      "id": "editorial-index",
+      "hypothesis": "以策展索引建立可信任的探索節奏。",
+      "changed_axes": ["composition", "typography", "density"],
+      "expected_benefit": "大量內容仍保有來源與層級。",
+      "risk": "可能壓低立即行動的能見度。",
+      "disqualifier": "主要行動在手機首屏不可見。"
+    },
+    {
+      "id": "task-led-market",
+      "hypothesis": "以任務與快速比較縮短選擇路徑。",
+      "changed_axes": ["information-hierarchy", "interaction-emphasis", "mobile-transformation"],
+      "expected_benefit": "更快抵達可比較的結果。",
+      "risk": "可能降低品牌敘事的記憶點。",
+      "disqualifier": "方向退化成通用卡片牆。"
+    }
+  ]
+}
+```
+
+先建立兩個新的空目錄，且保持在 authoring repository 外：
+
+```bash
+npm run drafts:current -- \
+  --plan /absolute/evaluator-root/cohort-plan.json \
+  --brief /absolute/evaluator-root/brief.md \
+  --cohort-root /absolute/evaluator-root/cohort-output \
+  --log-dir /absolute/evaluator-root/private-logs
+```
+
+成功時最後才以 `0600` 建立 `draft-cohort-receipt.json`。Receipt 綁定 plan、base/effective brief、Skill tree、run manifest、outputs、capture receipt、capture matrix 與 evaluator tools，但不保存 brief 內容或絕對私人路徑。任一 build、fresh capture、provenance 或 tool drift 失敗都不產生成功 receipt。草稿 PNG 只能支持這次方向選擇；選定後仍須重新正式實作、重新截圖並執行 affected release matrix。
+
 ## 受控建置
 
 ```bash
