@@ -11,11 +11,14 @@ import json
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +35,18 @@ CORE = {"concept-coherence", "originality", "visual-typography"}
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def png_with_text_chunk(content: bytes) -> bytes:
+    chunk_type = b"tEXt"
+    payload = b"fresh-evidence\x00replacement"
+    chunk = (
+        struct.pack(">I", len(payload))
+        + chunk_type
+        + payload
+        + struct.pack(">I", zlib.crc32(chunk_type + payload) & 0xFFFFFFFF)
+    )
+    return content[:-12] + chunk + content[-12:]
 
 
 class CurrentCraftAcceptanceTests(unittest.TestCase):
@@ -465,6 +480,43 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             screenshot = fixture[5].parent / receipt["captures"][0]["path"]
             screenshot.write_bytes(screenshot.read_bytes() + b"tamper")
             with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "provenance is invalid"):
+                self.validate(fixture)
+
+    def test_capture_receipt_and_latest_ledger_event_must_bind_the_same_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            ledger_path = fixture[1]
+            receipt = json.loads(fixture[5].read_text(encoding="utf-8"))
+            capture = receipt["captures"][0]
+            artifact = fixture[5].parent / capture["path"]
+            replacement = png_with_text_chunk(artifact.read_bytes())
+            evidence_ledger.png_metadata(replacement)
+
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+            event = next(item for item in ledger["events"] if item.get("label") == capture["label"])
+            event["bytes"] = len(replacement)
+            event["sha256"] = hashlib.sha256(replacement).hexdigest()
+            ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+
+            original_load = validate_current_craft_acceptance._load_json
+            swapped = False
+
+            def swap_after_receipt_validation(path: Path, label: str) -> dict:
+                nonlocal swapped
+                value = original_load(path, label)
+                if label == "quality result" and not swapped:
+                    artifact.write_bytes(replacement)
+                    swapped = True
+                return value
+
+            with mock.patch.object(
+                validate_current_craft_acceptance,
+                "_load_json",
+                side_effect=swap_after_receipt_validation,
+            ), self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "latest ledger artifact does not match the current capture receipt",
+            ):
                 self.validate(fixture)
 
     def test_validation_case_inside_authoring_repository_is_rejected(self) -> None:

@@ -433,11 +433,14 @@ def validate_current_acceptance(
     result = _load_json(_unaliased_file(result_path, "quality result"), "quality result")
     ledger_root = ledger_file.parent.resolve(strict=True)
     capture_paths: set[str] = set()
+    capture_ledger_paths: dict[str, str] = {}
     for label, artifact in capture_artifacts.items():
         try:
-            capture_paths.add(artifact.relative_to(ledger_root).as_posix())
+            relative = artifact.relative_to(ledger_root).as_posix()
         except ValueError as error:
             raise CurrentCraftError(f"capture artifact is outside the ledger root: {label}") from error
+        capture_paths.add(relative)
+        capture_ledger_paths[label] = relative
 
     if policy.get("case_id") != case["case_id"] or policy.get("run_id") != case["run_id"]:
         raise CurrentCraftError("evaluator policy does not match the frozen case")
@@ -454,6 +457,7 @@ def validate_current_acceptance(
     evidence = policy.get("evidence")
     if not isinstance(evidence, dict):
         raise CurrentCraftError("evaluator policy evidence is invalid")
+    expected_artifacts: dict[str, dict[str, Any]] = {}
     for capture in captures:
         rule = evidence.get(capture["label"])
         if not isinstance(rule, dict) or rule.get("kind") != "artifact" or rule.get("artifact_kind") != "screenshot":
@@ -467,21 +471,41 @@ def validate_current_acceptance(
             context.get(field) != capture["context"][field] for field in ("route", "viewport", "locale", "state")
         ) or context.get("note") != "dpr=1":
             raise CurrentCraftError(f"policy screenshot context does not match capture receipt: {capture['label']}")
+        expected_artifacts[capture["label"]] = {
+            "kind": "artifact",
+            "artifact_kind": "screenshot",
+            "path": capture_ledger_paths[capture["label"]],
+            "exists": True,
+            "bytes": capture["bytes"],
+            "sha256": capture["sha256"],
+            "media_type": "image/png",
+            "width": capture["width"],
+            "height": capture["height"],
+            "context": {
+                "route": capture["context"]["route"],
+                "viewport": capture["context"]["viewport"],
+                "locale": capture["context"]["locale"],
+                "state": capture["context"]["state"],
+                "note": "dpr=1",
+            },
+        }
 
     rendered = result.get("handoff", {}).get("rendered_evidence", {})
     if rendered.get("status") != "OBSERVED" or set(rendered.get("paths", [])) != capture_paths:
         raise CurrentCraftError("quality result must hand off the complete fresh capture set")
 
     try:
-        return validate_quality_result.validate_with_ledger(
+        count = validate_quality_result.validate_with_ledger(
             result_path.expanduser(),
             ledger_file,
             workspace,
             ("novel-discovery",),
             policy_file,
+            expected_artifacts=expected_artifacts,
         )
     except (validate_quality_result.QualityResultError, evidence_ledger.LedgerError) as error:
         raise CurrentCraftError(str(error)) from error
+    return count
 
 
 def main(argv: list[str] | None = None) -> int:

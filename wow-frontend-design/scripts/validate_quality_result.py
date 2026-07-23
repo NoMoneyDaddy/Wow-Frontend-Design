@@ -463,12 +463,42 @@ def _validate_probe_evidence_bindings(
             )
 
 
+def _validate_expected_artifacts(
+    events: dict[str, dict[str, Any]],
+    expected_artifacts: dict[str, dict[str, Any]],
+) -> None:
+    if not isinstance(expected_artifacts, dict) or not expected_artifacts:
+        raise QualityResultError("expected artifact bindings must be a non-empty object")
+    fields = {
+        "kind",
+        "artifact_kind",
+        "exists",
+        "path",
+        "bytes",
+        "sha256",
+        "media_type",
+        "width",
+        "height",
+        "context",
+    }
+    for label, expected in expected_artifacts.items():
+        if not isinstance(label, str) or not label or not isinstance(expected, dict) or set(expected) != fields:
+            raise QualityResultError("expected artifact binding is malformed")
+        event = events.get(label)
+        if not isinstance(event, dict) or any(event.get(field) != expected[field] for field in fields):
+            raise QualityResultError(
+                f"latest ledger artifact does not match the current capture receipt: {label}"
+            )
+
+
 def validate_with_ledger(
     result_path: Path,
     ledger_path: Path,
     workspace_root: Path,
     required_gates: tuple[str, ...] = (),
     policy_path: Path | None = None,
+    *,
+    expected_artifacts: dict[str, dict[str, Any]] | None = None,
 ) -> int:
     """Validate result structure and bind every positive claim to evaluator policy and facts."""
 
@@ -508,6 +538,8 @@ def validate_with_ledger(
         raise QualityResultError(f"evaluator policy is invalid: {error}") from error
     if policy is None or artifact_root is None:
         raise QualityResultError("completion validation requires an evaluator-owned evidence policy")
+    if expected_artifacts is not None:
+        _validate_expected_artifacts(events, expected_artifacts)
     if data["release"] == "VERIFIED" and policy["release_acceptance"]["decision"] != "accepted_by_evaluator":
         raise QualityResultError("VERIFIED release requires evaluator acceptance in the evidence policy")
     if data["release"] == "VERIFIED":
