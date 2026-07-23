@@ -140,6 +140,27 @@ def _validate_parent(
         for output in cohort_source.get("outputs", [])
         if isinstance(output, dict)
     }
+    design_record = output_records.get("DESIGN.md")
+    design_path = cohort_root / "workspace" / "DESIGN.md"
+    if (
+        not isinstance(design_record, dict)
+        or set(design_record) != {"path", "bytes", "mode", "sha256"}
+        or design_record["path"] != "DESIGN.md"
+    ):
+        raise DraftRevisionError("draft revision design output provenance is invalid")
+    _, design_raw = _as_revision_error(
+        cohort._regular_absolute_file,
+        design_path,
+        "draft revision design output",
+        current_build.FILE_LIMIT,
+    )
+    if (
+        _record(design_path) != {
+            key: design_record[key] for key in ("bytes", "mode", "sha256")
+        }
+        or _digest_bytes(design_raw) != design_record["sha256"]
+    ):
+        raise DraftRevisionError("draft revision design output drifted")
     base_record = output_records.get(base_page)
     base_path = cohort_root / "workspace" / base_page
     if (
@@ -157,11 +178,12 @@ def _validate_parent(
     ):
         raise DraftRevisionError("draft revision base page drifted")
     try:
+        design_raw.decode("utf-8")
         base_raw.decode("utf-8")
         brief_text = brief_raw.decode("utf-8")
     except UnicodeError as error:
         raise DraftRevisionError("draft revision inputs must be strict UTF-8") from error
-    if b"\x00" in base_raw or "\x00" in brief_text:
+    if b"\x00" in design_raw or b"\x00" in base_raw or "\x00" in brief_text:
         raise DraftRevisionError("draft revision inputs must not contain NUL")
     skill = current_build.skill_tree_summary(SKILL_ROOT, "wow-frontend-design")
     if cohort_source.get("skill_tree_sha256") != skill["tree_sha256"]:
@@ -182,6 +204,8 @@ def _validate_parent(
         "decision_input_record": receipt["source"]["decision_input"],
         "cohort_receipt_record": source["receipt_record"],
         "parent_capture_set_sha256": source["capture"]["capture_set_sha256"],
+        "design_path": design_path,
+        "design_record": design_record,
         "base_variant_id": base_variant_id,
         "base_page": base_page,
         "base_path": base_path,
@@ -409,6 +433,7 @@ def run(
         if (
             observed["decision_receipt"] != parent["decision_receipt"]
             or observed["decision_receipt_record"] != parent["decision_receipt_record"]
+            or observed["design_record"] != parent["design_record"]
             or observed["base_record"] != parent["base_record"]
             or observed["semantic_contract_sha256"] != parent["semantic_contract_sha256"]
             or _tool_records() != tools_before
@@ -447,10 +472,26 @@ def run(
             seed_root = Path(tempfile.mkdtemp(prefix="wow-draft-revision-seed-")).resolve()
             try:
                 (seed_root / "directions").mkdir(mode=0o700)
-                shutil.copy2(cohort_root / "workspace" / "DESIGN.md", seed_root / "DESIGN.md")
+                design_seed = seed_root / "DESIGN.md"
+                shutil.copy2(parent["design_path"], design_seed)
                 child_seed = seed_root / parent["child_page"]
                 shutil.copy2(parent["base_path"], child_seed)
                 seed_record = _record(child_seed)
+                if (
+                    _record(design_seed)
+                    != {
+                        key: parent["design_record"][key]
+                        for key in ("bytes", "mode", "sha256")
+                    }
+                    or seed_record
+                    != {
+                        key: parent["base_record"][key]
+                        for key in ("bytes", "mode", "sha256")
+                    }
+                ):
+                    raise DraftRevisionError(
+                        "draft revision seed provenance does not match parent outputs"
+                    )
                 assert_current()
                 try:
                     manifest = current_build.run(

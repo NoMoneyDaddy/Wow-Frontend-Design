@@ -828,6 +828,45 @@ class CurrentDraftRevisionTests(unittest.TestCase):
         capture.assert_not_called()
         self.assertFalse((self.revision_root / "draft-revision-receipt.json").exists())
 
+    def test_revision_seed_must_match_the_parent_output_before_build(self) -> None:
+        real_copy = revision.shutil.copy2
+
+        def corrupt_child_seed(source: Path, destination: Path) -> Path:
+            copied = real_copy(source, destination)
+            target = Path(destination)
+            if target.suffix == ".html":
+                target.write_text(
+                    '<!doctype html><html lang="zh-Hant"><body><main><h1>Unbound seed</h1></main></body></html>',
+                    encoding="utf-8",
+                )
+            return Path(copied)
+
+        with (
+            mock.patch.object(revision.decision, "validate_cohort_source", return_value=self.cohort_source()),
+            mock.patch.object(revision.decision, "validate_decision_receipt", return_value=self.revise_source()),
+            mock.patch.object(revision.shutil, "copy2", side_effect=corrupt_child_seed),
+            mock.patch.object(revision.current_build, "run", side_effect=self.fake_build) as build,
+            mock.patch.object(revision.cohort, "run_capture", side_effect=self.fake_capture) as capture,
+            mock.patch.object(
+                revision,
+                "validate_current_capture_evidence",
+                side_effect=lambda workspace, *_args: self.validated_capture(workspace),
+            ),
+            self.assertRaisesRegex(revision.DraftRevisionError, "seed provenance"),
+        ):
+            revision.run(
+                self.brief,
+                self.cohort_root,
+                self.cohort_logs,
+                self.decision,
+                self.decision_receipt,
+                self.revision_root,
+                self.revision_logs,
+            )
+        build.assert_not_called()
+        capture.assert_not_called()
+        self.assertFalse((self.revision_root / "draft-revision-receipt.json").exists())
+
     def test_source_drift_before_capture_blocks_new_evidence(self) -> None:
         stable = self.cohort_source()
         drifted = self.cohort_source()
