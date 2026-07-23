@@ -286,6 +286,32 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                     workspace, case_path, receipt_path, manifest_path
                 )
 
+    def test_capture_runtime_must_match_the_repository_playwright_pin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory))
+            receipt_path = fixture[5]
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["runtime"]["version"] = "999.0.0-unpinned"
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "current Playwright Chromium standard",
+            ):
+                self.validate(fixture)
+
+    def test_repository_playwright_pin_rejects_ranges_and_tags(self) -> None:
+        for version in ("^1.61.1", "~1.61.1", "latest", "1.61"):
+            with self.subTest(version=version), mock.patch.object(
+                validate_current_craft_acceptance,
+                "_load_json",
+                return_value={"devDependencies": {"playwright": version}},
+            ), self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "one exact version",
+            ):
+                validate_current_craft_acceptance._repository_playwright_version()
+
     def test_capture_evidence_rejects_parent_symlink_and_hardlink_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

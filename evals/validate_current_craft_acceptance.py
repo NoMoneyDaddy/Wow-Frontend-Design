@@ -28,6 +28,7 @@ MAX_CAPTURE_BYTES = 8_000_000
 MAX_TOTAL_CAPTURE_BYTES = 64_000_000
 HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+PACKAGE_VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$")
 CORE_CRAFT = validate_quality_result.VERIFIED_CORE_CRAFT_DIMENSIONS
 PROFILE_STANDARD = [
     {"name": "desktop-default", "viewport": {"width": 1440, "height": 1000}, "reducedMotion": "no-preference", "dpr": 1},
@@ -62,6 +63,15 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise CurrentCraftError(f"{label} must be an object")
     return value
+
+
+def _repository_playwright_version() -> str:
+    package = _load_json(ROOT / "package.json", "repository package manifest")
+    dependencies = package.get("devDependencies")
+    version = dependencies.get("playwright") if isinstance(dependencies, dict) else None
+    if not isinstance(version, str) or PACKAGE_VERSION_PATTERN.fullmatch(version) is None:
+        raise CurrentCraftError("repository Playwright dependency must use one exact version")
+    return version
 
 
 def _unaliased_file(path: Path, label: str) -> Path:
@@ -216,7 +226,7 @@ def _validate_current_capture_evidence(
     if (
         runtime["package"] != "playwright"
         or not isinstance(runtime["version"], str)
-        or not runtime["version"].strip()
+        or runtime["version"] != _repository_playwright_version()
         or runtime["browser"] != "chromium"
         or not isinstance(runtime["browser_version"], str)
         or not runtime["browser_version"].strip()
