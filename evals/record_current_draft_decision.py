@@ -36,7 +36,8 @@ SOURCE_KEYS = {
     "run_manifest", "capture_receipt", "skill_tree_sha256", "outputs",
 }
 CONFIGURATION_KEYS = {
-    "model", "reasoning_effort", "max_repair_rounds", "skill_reference", "capture_standard",
+    "model", "reasoning_effort", "max_repair_rounds", "browser_contract",
+    "skill_reference", "capture_standard",
 }
 EVIDENCE_KEYS = {"capture_count", "capture_set_sha256", "capture_standard", "convergence"}
 CONVERGENCE_KEYS = {
@@ -63,6 +64,34 @@ def _exact(value: object, keys: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != keys:
         raise DraftDecisionError(f"{label} schema is invalid")
     return value
+
+
+def _browser_contract_record(value: object) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    record = _exact(
+        value,
+        {"schema_version", "bytes", "sha256", "case_count", "step_count"},
+        "cohort receipt.configuration.browser_contract",
+    )
+    sha256 = record["sha256"]
+    if (
+        type(record["schema_version"]) is not int
+        or record["schema_version"] not in {1, 2}
+        or type(record["bytes"]) is not int
+        or not 1 <= record["bytes"] <= 32 * 1024
+        or not isinstance(sha256, str)
+        or len(sha256) != 64
+        or any(character not in "0123456789abcdef" for character in sha256)
+        or type(record["case_count"]) is not int
+        or not 1 <= record["case_count"] <= 4
+        or type(record["step_count"]) is not int
+        or not record["case_count"] <= record["step_count"] <= 96
+    ):
+        raise DraftDecisionError(
+            "cohort receipt.configuration.browser_contract is invalid"
+        )
+    return record
 
 
 def _as_decision_error(callable_: Any, *args: Any) -> Any:
@@ -176,7 +205,12 @@ def _normalize_cohort(receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str
         "variants": variants,
     }
     source = _exact(receipt["source"], SOURCE_KEYS, "cohort receipt.source")
-    _exact(receipt["configuration"], CONFIGURATION_KEYS, "cohort receipt.configuration")
+    configuration = _exact(
+        receipt["configuration"],
+        CONFIGURATION_KEYS,
+        "cohort receipt.configuration",
+    )
+    _browser_contract_record(configuration["browser_contract"])
     evidence = _exact(receipt["evidence"], EVIDENCE_KEYS, "cohort receipt.evidence")
     _exact(evidence["convergence"], CONVERGENCE_KEYS, "cohort convergence")
     if (
@@ -243,6 +277,8 @@ def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
     if (
         manifest.get("outputs") != source["outputs"]
         or manifest.get("skill_snapshot", {}).get("tree_sha256") != source["skill_tree_sha256"]
+        or manifest.get("browser_contract")
+        != receipt["configuration"]["browser_contract"]
     ):
         raise DraftDecisionError("cohort receipt and validated manifest projection drifted")
     try:

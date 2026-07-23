@@ -135,7 +135,7 @@ function validateBrowserContract(value, pages) {
     : [
       "active-animation-count-between", "animations-inactive-for", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
-      "inline-start-aligned-with", "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
+      "inline-size-ratio-between", "inline-start-aligned-with", "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
       "rendered-text-excludes", "rendered-text-includes", "text-includes", "text-segment-on-one-line", "visible",
     ];
   const ids = new Set();
@@ -173,6 +173,7 @@ function validateBrowserContract(value, pages) {
         if (step.expect === "attribute-equals") expectedKeys.push("attribute");
         if (step.expect === "count-equals") expectedKeys.push("count");
         if (step.expect === "font-face-loaded") expectedKeys.push("family");
+        if (step.expect === "inline-size-ratio-between") expectedKeys.push("reference_selector", "min_ratio", "max_ratio");
         if (step.expect === "inline-start-aligned-with") expectedKeys.push("reference_selector");
         if (step.expect === "last-line-graphemes-at-least") expectedKeys.push("count");
         if (step.expect === "line-count-between") expectedKeys.push("min_lines", "max_lines");
@@ -223,6 +224,13 @@ function validateBrowserContract(value, pages) {
         if (step.expect === "inline-start-aligned-with"
           && !boundedContractText(step.reference_selector, 256)) {
           throw new Error("invalid browser contract alignment assertion");
+        }
+        if (step.expect === "inline-size-ratio-between"
+          && (!boundedContractText(step.reference_selector, 256)
+            || typeof step.min_ratio !== "number" || !Number.isFinite(step.min_ratio)
+            || typeof step.max_ratio !== "number" || !Number.isFinite(step.max_ratio)
+            || !(step.min_ratio > 0 && step.min_ratio <= step.max_ratio && step.max_ratio <= 4))) {
+          throw new Error("invalid browser contract inline size ratio assertion");
         }
         if (step.expect === "last-line-graphemes-at-least"
           && (!Number.isInteger(step.count) || step.count < 1 || step.count > 128)) {
@@ -314,6 +322,51 @@ async function checkAssertion(page, locator, step) {
     return aligned(second)
       && Math.abs(first.candidate.inlineStart - second.candidate.inlineStart) <= 1
       && Math.abs(first.anchor.inlineStart - second.anchor.inlineStart) <= 1;
+  }
+  if (step.expect === "inline-size-ratio-between") {
+    const reference = page.locator(step.reference_selector);
+    if (await reference.count() !== 1) return false;
+    const snapshot = async () => {
+      const [candidateHandle, referenceHandle] = await Promise.all([
+        locator.elementHandle(), reference.elementHandle(),
+      ]);
+      if (!candidateHandle || !referenceHandle) return null;
+      try {
+        return await page.evaluate(({ candidate, anchor }) => {
+          const trusted = globalThis.__wowEvaluatorRead;
+          if (!trusted) return null;
+          const probe = (element) => {
+            let current = element;
+            while (current) {
+              const display = trusted.style(current, "display");
+              const visibility = trusted.style(current, "visibility");
+              if (display === "none" || visibility === "hidden"
+                || visibility === "collapse" || trusted.zeroNumber(trusted.style(current, "opacity"))) return null;
+              current = trusted.parent(current);
+            }
+            const box = trusted.rect(element);
+            const writingMode = trusted.style(element, "writing-mode");
+            if (!(box.width > 0 && box.height > 0) || !trusted.horizontalWritingMode(writingMode)) return null;
+            return box.width;
+          };
+          return { candidate: probe(candidate), reference: probe(anchor) };
+        }, { candidate: candidateHandle, anchor: referenceHandle });
+      } finally {
+        await candidateHandle.dispose();
+        await referenceHandle.dispose();
+      }
+    };
+    const withinBounds = (value) => value !== null
+      && value.candidate !== null && value.reference !== null && value.reference > 0
+      && value.candidate / value.reference >= step.min_ratio
+      && value.candidate / value.reference <= step.max_ratio;
+    const first = await snapshot();
+    if (!withinBounds(first)) return false;
+    await page.waitForTimeout(50);
+    const second = await snapshot();
+    return withinBounds(second)
+      && Math.abs(first.candidate - second.candidate) <= 1
+      && Math.abs(first.reference - second.reference) <= 1;
   }
   if ([
     "active-animation-count-between", "animations-inactive-for", "animations-settled", "font-face-loaded",

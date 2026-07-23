@@ -552,6 +552,8 @@ def compile_html_feedback(
                         "segment",
                         "min_lines",
                         "max_lines",
+                        "min_ratio",
+                        "max_ratio",
                         "min_animations",
                         "max_animations",
                         "duration_ms",

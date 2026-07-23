@@ -583,7 +583,17 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             serialized_manifest = json.dumps(manifest)
             self.assertNotIn(str(contract), serialized_manifest)
             self.assertNotIn("#primary", serialized_manifest)
+            initial_prompt = json.loads(
+                (capture / "invocation-1.json").read_text(encoding="utf-8")
+            )["prompt"]
+            self.assertIn("CONTROLLED BROWSER ACCEPTANCE CONTRACT", initial_prompt)
+            self.assertIn('"selector":"#primary"', initial_prompt)
+            self.assertLess(
+                initial_prompt.index("CONTROLLED BROWSER ACCEPTANCE CONTRACT"),
+                initial_prompt.index("UNTRUSTED PRODUCT BRIEF"),
+            )
             repair_prompt = json.loads((capture / "invocation-2.json").read_text(encoding="utf-8"))["prompt"]
+            self.assertIn("CONTROLLED BROWSER ACCEPTANCE CONTRACT", repair_prompt)
             self.assertIn("contract-mobile-primary-task-primary-in-first-viewport", repair_prompt)
             self.assertIn('"locator":{"kind":"css","selector":"#primary"}', repair_prompt)
             self.assertIn('"expect":"fully-visible-in-viewport"', repair_prompt)
@@ -1428,6 +1438,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "steps": [
                         {"id": "font-loaded", "action": "assert", "selector": "h1", "expect": "font-face-loaded", "family": "Product Display"},
                         {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3.0},
+                        {"id": "heading-measure", "action": "assert", "selector": "h1", "expect": "inline-size-ratio-between", "reference_selector": "main", "min_ratio": 0.65, "max_ratio": 1.0},
                         {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2.0},
                         {"id": "heading-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"},
                         {"id": "visible-state", "action": "assert", "selector": "main", "expect": "rendered-text-includes", "value": "Task"},
@@ -1445,7 +1456,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(11, record["step_count"])
+            self.assertEqual(12, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

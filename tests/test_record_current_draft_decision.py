@@ -128,6 +128,7 @@ class CurrentDraftDecisionTests(unittest.TestCase):
                 "model": "gpt-5.4-mini",
                 "reasoning_effort": "high",
                 "max_repair_rounds": 1,
+                "browser_contract": None,
                 "skill_reference": "references/design-exploration.md",
                 "capture_standard": decision.cohort.CAPTURE_STANDARD,
             },
@@ -255,6 +256,87 @@ class CurrentDraftDecisionTests(unittest.TestCase):
                 self.decision_path,
                 self.output_root / "draft-decision-receipt.json",
             )
+
+    def test_browser_contract_record_is_closed_and_matches_validated_manifest(self) -> None:
+        valid_record = {
+            "schema_version": 2,
+            "bytes": 100,
+            "sha256": "c" * 64,
+            "case_count": 2,
+            "step_count": 4,
+        }
+        receipt_value = self.cohort_receipt()
+        receipt_value["configuration"]["browser_contract"] = valid_record
+        self.write_cohort_receipt(payload=receipt_value)
+        validated = self.validated_capture()
+        validated["manifest"]["browser_contract"] = valid_record
+        with (
+            mock.patch.object(
+                decision,
+                "validate_current_capture_evidence",
+                return_value=validated,
+            ),
+            mock.patch.object(
+                decision.cohort,
+                "_convergence_summary",
+                return_value=self.convergence(),
+            ),
+            mock.patch.object(
+                decision.cohort,
+                "_tool_records",
+                return_value=receipt_value["tools"],
+            ),
+        ):
+            observed = decision.validate_cohort_source(
+                self.cohort_root,
+                self.log_dir,
+            )
+        self.assertEqual(
+            valid_record,
+            observed["receipt"]["configuration"]["browser_contract"],
+        )
+
+        validated["manifest"].pop("browser_contract")
+        with (
+            mock.patch.object(
+                decision,
+                "validate_current_capture_evidence",
+                return_value=validated,
+            ),
+            mock.patch.object(
+                decision.cohort,
+                "_tool_records",
+                return_value=receipt_value["tools"],
+            ),
+            self.assertRaisesRegex(
+                decision.DraftDecisionError,
+                "manifest projection drifted",
+            ),
+        ):
+            decision.validate_cohort_source(self.cohort_root, self.log_dir)
+
+        malformed = dict(valid_record)
+        malformed["bytes"] = True
+        receipt_value["configuration"]["browser_contract"] = malformed
+        self.write_cohort_receipt(payload=receipt_value)
+        validated["manifest"]["browser_contract"] = malformed
+        with (
+            mock.patch.object(
+                decision,
+                "validate_current_capture_evidence",
+                return_value=validated,
+            ),
+            mock.patch.object(
+                decision.cohort,
+                "_tool_records",
+                return_value=receipt_value["tools"],
+            ),
+            self.assertRaisesRegex(
+                decision.DraftDecisionError,
+                "browser_contract is invalid",
+            ),
+        ):
+            decision.validate_cohort_source(self.cohort_root, self.log_dir)
 
     def test_revise_and_stop_have_bounded_distinct_handoffs(self) -> None:
         revise = self.run_with_source(self.valid_decision(action="revise", adjustments=["改變資訊層級。"]))

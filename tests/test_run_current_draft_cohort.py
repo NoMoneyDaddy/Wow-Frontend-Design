@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import signal
 import stat
 import subprocess
@@ -72,6 +73,49 @@ class CurrentDraftCohortTests(unittest.TestCase):
         logs.mkdir()
         return plan, brief, cohort_root, logs
 
+    def browser_contract(self, root: Path) -> Path:
+        contract = root / "draft-browser-contract.json"
+        contract.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "cases": [
+                        {
+                            "id": "editorial-mobile",
+                            "page": "directions/editorial-index.html",
+                            "profile": "mobile",
+                            "steps": [
+                                {
+                                    "id": "heading-measure",
+                                    "action": "assert",
+                                    "selector": "h1",
+                                    "expect": "inline-size-ratio-between",
+                                    "reference_selector": "main",
+                                    "min_ratio": 0.65,
+                                    "max_ratio": 1,
+                                }
+                            ],
+                        },
+                        {
+                            "id": "task-mobile",
+                            "page": "directions/task-led-market.html",
+                            "profile": "mobile",
+                            "steps": [
+                                {
+                                    "id": "primary-action",
+                                    "action": "assert",
+                                    "selector": "[data-primary-action]",
+                                    "expect": "fully-visible-in-viewport",
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return contract
+
     def fake_build(self, brief: Path, workspace: Path, **kwargs: object) -> dict:
         outputs = list(kwargs["outputs"])
         (workspace / "DESIGN.md").write_text("# Draft directions\n", encoding="utf-8")
@@ -103,6 +147,12 @@ class CurrentDraftCohortTests(unittest.TestCase):
             },
             "outputs": records,
         }
+        if kwargs.get("browser_contract") is not None:
+            _, _, browser_contract_record = cohort.current_build._load_browser_contract(
+                Path(kwargs["browser_contract"]),
+                tuple(str(item) for item in kwargs["outputs"]),
+            )
+            manifest["browser_contract"] = browser_contract_record
         (workspace / "run-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         return manifest
 
@@ -303,6 +353,109 @@ class CurrentDraftCohortTests(unittest.TestCase):
             receipt_path = cohort_root / "draft-cohort-receipt.json"
             self.assertTrue(receipt_path.is_file())
             self.assertEqual(0o600, stat.S_IMODE(receipt_path.stat().st_mode))
+
+    def test_browser_contract_is_validated_bound_and_passed_to_all_directions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            contract = self.browser_contract(root)
+            validated = {
+                "capture_count": 4,
+                "capture_set_sha256": "c" * 64,
+                "capture_standard": cohort.CAPTURE_STANDARD,
+            }
+            with (
+                mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build) as build,
+                mock.patch.object(cohort, "run_capture", side_effect=self.fake_capture),
+                mock.patch.object(
+                    cohort,
+                    "validate_current_capture_evidence",
+                    return_value=validated,
+                ),
+            ):
+                receipt = cohort.run(
+                    plan,
+                    brief,
+                    cohort_root,
+                    logs,
+                    browser_contract=contract,
+                )
+            self.assertEqual(contract, build.call_args.kwargs["browser_contract"])
+            self.assertEqual(
+                cohort.current_build._load_browser_contract(
+                    contract,
+                    cohort.direction_outputs(self.valid_plan()),
+                )[2],
+                receipt["configuration"]["browser_contract"],
+            )
+
+    def test_invalid_or_hardlinked_browser_contract_fails_before_build(self) -> None:
+        for mode in ("invalid", "hardlinked"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                plan, brief, cohort_root, logs = self.write_inputs(root)
+                contract = self.browser_contract(root)
+                if mode == "invalid":
+                    payload = json.loads(contract.read_text(encoding="utf-8"))
+                    payload["cases"][0]["page"] = "directions/unknown.html"
+                    contract.write_text(json.dumps(payload), encoding="utf-8")
+                else:
+                    os.link(contract, root / "contract-alias.json")
+                with (
+                    mock.patch.object(cohort.current_build, "run") as build,
+                    self.assertRaisesRegex(
+                        cohort.DraftCohortError,
+                        "browser contract",
+                    ),
+                ):
+                    cohort.run(
+                        plan,
+                        brief,
+                        cohort_root,
+                        logs,
+                        browser_contract=contract,
+                    )
+                build.assert_not_called()
+                self.assertEqual([], list(cohort_root.iterdir()))
+                self.assertEqual([], list(logs.iterdir()))
+
+    def test_browser_contract_drift_after_build_blocks_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            contract = self.browser_contract(root)
+
+            def drifting_build(
+                brief_path: Path, workspace: Path, **kwargs: object
+            ) -> dict:
+                manifest = self.fake_build(brief_path, workspace, **kwargs)
+                contract.write_text(
+                    contract.read_text(encoding="utf-8") + "\n",
+                    encoding="utf-8",
+                )
+                return manifest
+
+            with (
+                mock.patch.object(
+                    cohort.current_build,
+                    "run",
+                    side_effect=drifting_build,
+                ),
+                mock.patch.object(cohort, "run_capture") as capture,
+                self.assertRaisesRegex(
+                    cohort.DraftCohortError,
+                    "contract drifted",
+                ),
+            ):
+                cohort.run(
+                    plan,
+                    brief,
+                    cohort_root,
+                    logs,
+                    browser_contract=contract,
+                )
+            capture.assert_not_called()
+            self.assertFalse((cohort_root / "draft-cohort-receipt.json").exists())
 
     def test_failed_build_never_creates_success_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

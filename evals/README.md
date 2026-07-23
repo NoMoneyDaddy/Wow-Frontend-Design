@@ -50,8 +50,11 @@ npm run drafts:current -- \
   --plan /absolute/evaluator-root/cohort-plan.json \
   --brief /absolute/evaluator-root/brief.md \
   --cohort-root /absolute/evaluator-root/cohort-output \
-  --log-dir /absolute/evaluator-root/private-logs
+  --log-dir /absolute/evaluator-root/private-logs \
+  --browser-contract /absolute/evaluator-root/draft-browser-contract.json
 ```
+
+`--browser-contract` 是選用但建議的 evaluator-owned 共用驗收：同一份 schema-closed contract 可各自指向 2–3 個方向頁面。Runner 會在第一次生成前提供完整 closed contract，要求直接實作穩定 locator 與結果狀態，再於截圖前以同一個 Playwright gate 驗證 brief 已凍結的首屏、標題 measure、狀態與互動；失敗時沿用單一 repair fuse，避免先猜 DOM、失敗後才逐層補 selector。Contract 必須位於 authoring repository、cohort、log、plan 與 brief 之外，且每個 case 只驗證一個明示頁面／profile；不應把所有網站硬套成相同 hero。若 brief 刻意採用窄欄 editorial 標題，就不要加入寬度下限。
 
 成功時最後才以 `0600` 建立 `draft-cohort-receipt.json`。Receipt 綁定 plan、base/effective brief、Skill tree、run manifest、outputs、capture receipt、capture matrix、macro observations、template audit 與 evaluator tools，但不保存 brief 內容或絕對私人路徑。Convergence summary 固定列出四類 advisory 數量、受影響方向與 `advisory_only` policy；任一 build、fresh capture、provenance 或 telemetry drift 失敗都不產生成功 receipt。草稿 PNG 只能支持這次方向選擇；選定後仍須重新正式實作、重新截圖並執行 affected release matrix。
 
@@ -197,6 +200,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
     "steps": [
       {"id": "font-loaded", "action": "assert", "selector": "[data-display-type]", "expect": "font-face-loaded", "family": "Approved Display"},
       {"id": "heading-lines", "action": "assert", "selector": "h1", "expect": "line-count-between", "min_lines": 1, "max_lines": 3},
+      {"id": "heading-measure", "action": "assert", "selector": "h1", "expect": "inline-size-ratio-between", "reference_selector": "[data-heading-container]", "min_ratio": 0.65, "max_ratio": 1},
       {"id": "heading-tail", "action": "assert", "selector": "h1", "expect": "last-line-graphemes-at-least", "count": 2},
       {"id": "keep-release-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"}
     ]
@@ -206,6 +210,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 
 - `font-face-loaded` 同時要求 selector 的 computed `font-family` 使用指定 family，且頁面的 `FontFaceSet` 內有同名、狀態為 `loaded` 的 `@font-face`；它不證明字形完整、區域字形正確、授權或美感。
 - `line-count-between` 量測 horizontal writing mode 的實際 text client rects；上下限是 evaluator 對這份固定內容與 viewport 的契約，不是通用最佳行數。
+- `inline-size-ratio-between` 以兩次相隔 `50ms` 的原子雙元素快照，比較唯一 selector 與 `reference_selector` 的水平 inline-size ratio；上下限只適用於這份固定內容、容器與 viewport。它能攔截誤把 CJK 標題限制在約半個容器的結果，但不是全域「標題越寬越好」規則；刻意窄欄 editorial composition 應由 brief 決定是否啟用。
 - `last-line-graphemes-at-least` 使用 grapheme cluster 而不是 UTF-16 code unit，適合確認固定短標題沒有一字尾行；不要對可任意變動的 user content 設成全域 gate。
 - `text-segment-on-one-line` 要求 evaluator 明示的 literal segment 在唯一 locator 的可見文字中恰好出現一次，且其 rendered grapheme rects 位於同一列。它不做 Unicode 正規化、斷詞或字典猜測；不存在、重複、裁切或 vertical writing mode 都失敗。
 - `rendered-text-includes` 要求唯一 HTMLElement locator 與其 composed ancestors 可見、有非零 box，並在 evaluator 啟動時捕獲的原生 `innerText` 中包含 literal value；它排除 `display:none` 等未渲染後代，不接受頁面覆寫 getter 後偽造的結果。`rendered-text-excludes` 要求唯一 HTMLElement locator；若 element 或 composed ancestor 的 `display`／`visibility`／`opacity` 使其不渲染就通過，否則要求 trusted `innerText` 不含指定 literal。若允許舊 control 隱藏，contract author 應用穩定 selector 定位，因 role locator 預設不解析 hidden element。替換型成功、錯誤或復原狀態要把正向新狀態與負向舊標籤／舊動作成對凍結，避免只因成功字串出現就放過仍可見的矛盾 UI。若舊 control 改名後繼續存在，contract author 還要執行它並斷言下一個可見狀態；runtime 不會從排除舊字串自動推論新動作有效。這些 assertion 都不證明語句美感、live-region 宣告或未明列的完整互動流程。

@@ -404,6 +404,56 @@ contractFont.load();
             self.assertEqual("passed", desktop["inspection"]["browser_contract"]["status"])
             self.assertEqual(2, receipt["browser_contract"]["schema_version"])
 
+    def test_v2_browser_contract_measures_inline_size_against_named_container(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>Heading measure</title><style>
+#hero { inline-size: 320px; }
+#wide { inline-size: 240px; }
+#narrow { inline-size: 160px; }
+</style></head><body><main><section id="hero">
+<h1 id="wide">完整品牌標題</h1><h2 id="narrow">過窄品牌標題</h2>
+</section></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-heading-measure",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [
+                        {
+                            "id": "wide-heading",
+                            "action": "assert",
+                            "selector": "#wide",
+                            "expect": "inline-size-ratio-between",
+                            "reference_selector": "#hero",
+                            "min_ratio": 0.7,
+                            "max_ratio": 1,
+                        },
+                        {
+                            "id": "narrow-heading",
+                            "action": "assert",
+                            "selector": "#narrow",
+                            "expect": "inline-size-ratio-between",
+                            "reference_selector": "#hero",
+                            "min_ratio": 0.7,
+                            "max_ratio": 1,
+                        },
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            observed = mobile["inspection"]["browser_contract"]
+            self.assertEqual("rejected", observed["status"])
+            self.assertEqual(
+                ["contract-mobile-heading-measure-narrow-heading"],
+                observed["finding_ids"],
+            )
+
     def test_generic_smoke_reports_bounded_single_han_heading_tail_advisory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

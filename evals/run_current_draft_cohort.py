@@ -114,6 +114,45 @@ def _record(path: Path) -> dict[str, Any]:
     }
 
 
+def _browser_contract_identity(
+    path: Path, expected: dict[str, Any]
+) -> tuple[int, int]:
+    try:
+        before = path.lstat()
+        raw = path.read_bytes()
+        after = path.lstat()
+    except OSError as error:
+        raise DraftCohortError("draft browser contract provenance is invalid") from error
+    stable_before = (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_nlink,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    stable_after = (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_nlink,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if (
+        stable_before != stable_after
+        or not stat.S_ISREG(before.st_mode)
+        or path.is_symlink()
+        or before.st_nlink != 1
+        or before.st_size != expected["bytes"]
+        or _digest_bytes(raw) != expected["sha256"]
+    ):
+        raise DraftCohortError("draft browser contract provenance is invalid")
+    return before.st_dev, before.st_ino
+
+
 def _regular_absolute_file(path: Path, label: str, limit: int) -> tuple[Path, bytes]:
     if not path.is_absolute():
         raise DraftCohortError(f"{label} must be an absolute regular file")
@@ -651,12 +690,32 @@ def run(
     hard_seconds: int = 1800,
     inactivity_seconds: int | None = None,
     max_repair_rounds: int = 1,
+    browser_contract: Path | None = None,
 ) -> dict[str, Any]:
     if type(max_repair_rounds) is not int or not 0 <= max_repair_rounds <= 1:
         raise DraftCohortError("draft max repair rounds must be within 0..1")
     plan_path, _ = _regular_absolute_file(plan_path, "plan", PLAN_LIMIT)
     brief_path, brief_raw = _regular_absolute_file(brief_path, "brief", BRIEF_LIMIT)
     plan, plan_record = load_plan(plan_path)
+    outputs = direction_outputs(plan)
+    browser_contract_path: Path | None = None
+    browser_contract_record: dict[str, Any] | None = None
+    browser_contract_identity: tuple[int, int] | None = None
+    if browser_contract is not None:
+        try:
+            (
+                browser_contract_path,
+                _browser_contract_data,
+                browser_contract_record,
+            ) = current_build._load_browser_contract(browser_contract, outputs)
+        except (OSError, current_build.RunnerError) as error:
+            raise DraftCohortError("draft browser contract is invalid") from error
+        _outside_authoring_repository(
+            browser_contract_path, "draft browser contract"
+        )
+        browser_contract_identity = _browser_contract_identity(
+            browser_contract_path, browser_contract_record
+        )
     try:
         brief_text = brief_raw.decode("utf-8")
     except UnicodeError as error:
@@ -670,6 +729,18 @@ def run(
     _separate(cohort_root, log_dir, "cohort root and log directory")
     _separate(plan_path, cohort_root, "plan and cohort root")
     _separate(brief_path, cohort_root, "brief and cohort root")
+    if browser_contract_path is not None:
+        for boundary, label in (
+            (plan_path, "plan"),
+            (brief_path, "brief"),
+            (cohort_root, "cohort root"),
+            (log_dir, "log directory"),
+        ):
+            _separate(
+                browser_contract_path,
+                boundary,
+                f"draft browser contract and {label}",
+            )
 
     with _PinnedDirectory(cohort_root, "cohort root") as cohort_pin:
         with _PinnedDirectory(log_dir, "log directory") as log_pin:
@@ -688,6 +759,9 @@ def run(
                 hard_seconds=hard_seconds,
                 inactivity_seconds=inactivity_seconds,
                 max_repair_rounds=max_repair_rounds,
+                browser_contract_path=browser_contract_path,
+                browser_contract_record=browser_contract_record,
+                browser_contract_identity=browser_contract_identity,
             )
 
 
@@ -707,10 +781,36 @@ def _run_pinned(
     hard_seconds: int,
     inactivity_seconds: int | None,
     max_repair_rounds: int,
+    browser_contract_path: Path | None,
+    browser_contract_record: dict[str, Any] | None,
+    browser_contract_identity: tuple[int, int] | None,
 ) -> dict[str, Any]:
 
     tools_before = _tool_records()
     outputs = direction_outputs(plan)
+
+    def assert_current() -> None:
+        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        try:
+            current_build._browser_contract_unchanged(
+                browser_contract_path, browser_contract_record
+            )
+        except (OSError, current_build.RunnerError) as error:
+            raise DraftCohortError(
+                "draft browser contract drifted during execution"
+            ) from error
+        if (
+            browser_contract_path is not None
+            and browser_contract_record is not None
+            and _browser_contract_identity(
+                browser_contract_path, browser_contract_record
+            )
+            != browser_contract_identity
+        ):
+            raise DraftCohortError(
+                "draft browser contract drifted during execution"
+            )
+
     effective_text = effective_brief(brief_raw.decode("utf-8"), plan)
     effective_raw = effective_text.encode("utf-8")
     if len(effective_raw) > BRIEF_LIMIT:
@@ -720,7 +820,7 @@ def _run_pinned(
     )
     workspace = cohort_pin.mkdir("workspace")
     inactivity = inactivity_seconds if inactivity_seconds is not None else min(600, hard_seconds)
-    _assert_execution_guards(cohort_pin, log_pin, tools_before)
+    assert_current()
     try:
         manifest = current_build.run(
             effective_path,
@@ -733,12 +833,15 @@ def _run_pinned(
             log_dir=log_dir,
             max_repair_rounds=max_repair_rounds,
             case_mode="greenfield",
+            browser_contract=browser_contract_path,
             skill_reference="references/design-exploration.md",
         )
     except (OSError, current_build.RunnerError) as error:
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         raise DraftCohortError("draft cohort build failed; inspect the bounded current-build receipt") from error
-    _assert_execution_guards(cohort_pin, log_pin, tools_before)
+    assert_current()
+    if manifest.get("browser_contract") != browser_contract_record:
+        raise DraftCohortError("draft browser contract provenance is invalid")
 
     case_raw = (json.dumps(_case(plan, manifest), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     case_path, case_record = log_pin.write_exclusive("draft-cohort-case.json", case_raw)
@@ -755,13 +858,13 @@ def _run_pinned(
         "draft-cohort-convergence.json", convergence_raw
     )
     evidence = cohort_root / "evidence"
-    _assert_execution_guards(cohort_pin, log_pin, tools_before)
+    assert_current()
     try:
         run_capture(workspace, case_path, evidence, convergence_path)
     except DraftCohortError:
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         raise
-    _assert_execution_guards(cohort_pin, log_pin, tools_before)
+    assert_current()
     capture_receipt = evidence / "capture-receipt.json"
     try:
         validated_capture = validate_current_capture_evidence(
@@ -771,12 +874,12 @@ def _run_pinned(
             workspace / "run-manifest.json",
         )
     except CurrentCraftError as error:
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         raise DraftCohortError("fresh capture provenance validation failed") from error
     try:
         convergence = _convergence_summary(plan, evidence)
     except DraftCohortError:
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         raise
 
     _, plan_after = _regular_absolute_file(plan_path, "plan", PLAN_LIMIT)
@@ -790,7 +893,7 @@ def _run_pinned(
         or _digest_bytes(convergence_after) != convergence_config_record["sha256"]
     ):
         raise DraftCohortError("plan, brief, or convergence provenance drifted during the cohort run")
-    _assert_execution_guards(cohort_pin, log_pin, tools_before)
+    assert_current()
 
     validated = {
         "capture_count": validated_capture["capture_count"],
@@ -812,7 +915,7 @@ def _run_pinned(
         manifest_record = _record(manifest_path)
         capture_record = _record(capture_receipt)
     except (OSError, CurrentCraftError, DraftCohortError) as error:
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         raise DraftCohortError("draft cohort final provenance validation failed") from error
     validated_again_projection = {
         "capture_count": validated_again["capture_count"],
@@ -826,7 +929,7 @@ def _run_pinned(
         or convergence_again != convergence
     ):
         raise DraftCohortError("draft cohort final provenance drifted")
-    _assert_execution_guards(cohort_pin, log_pin, tools_before)
+    assert_current()
     receipt = {
         "schema_version": 1,
         "status": "captured",
@@ -858,6 +961,7 @@ def _run_pinned(
             "model": model,
             "reasoning_effort": reasoning_effort,
             "max_repair_rounds": max_repair_rounds,
+            "browser_contract": browser_contract_record,
             "skill_reference": "references/design-exploration.md",
             "capture_standard": CAPTURE_STANDARD,
         },
@@ -866,10 +970,10 @@ def _run_pinned(
     }
     try:
         encoded = (json.dumps(receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         cohort_pin.write_exclusive("draft-cohort-receipt.json", encoded)
     except (OSError, TypeError, ValueError, DraftCohortError) as error:
-        _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        assert_current()
         raise DraftCohortError("draft cohort final receipt could not be created") from error
     return receipt
 
@@ -888,6 +992,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--hard-seconds", type=int, default=1800)
     parser.add_argument("--inactivity-seconds", type=int)
+    parser.add_argument("--browser-contract", type=Path)
     parser.add_argument("--max-repair-rounds", type=int, default=1)
     args = parser.parse_args(argv)
     try:
@@ -901,6 +1006,7 @@ def main(argv: list[str] | None = None) -> int:
             hard_seconds=args.hard_seconds,
             inactivity_seconds=args.inactivity_seconds,
             max_repair_rounds=args.max_repair_rounds,
+            browser_contract=args.browser_contract,
         )
     except (OSError, DraftCohortError) as error:
         print(f"current draft cohort failed: {error}", file=sys.stderr)
