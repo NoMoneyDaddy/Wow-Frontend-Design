@@ -185,4 +185,4 @@ Label material claims:
 
 In a controlled cohort, acceptance remains evaluator-owned. Never edit an active gate, accept a self-authored score, present an affected replay as a full matrix, or upgrade `INFERRED` or `UNVERIFIED` evidence.
 
-Report direction, declared viewport behavior, contract changes, artifact path, executed checks, fresh evidence, remaining risk, and next action. Keep it concise.
+Report direction, viewport behavior, contract deltas, check results, evidence, risks, next action; show authorized, privacy-bounded fresh screenshots when host-supported, else host-safe links.

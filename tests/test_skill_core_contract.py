@@ -81,6 +81,17 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertNotIn("fresh desktop/mobile Playwright contexts", pressure)
         self.assertNotIn("zero runtime, egress, root-overflow, or Axe findings", pressure)
 
+    def test_completion_routes_fresh_screenshots_to_the_user(self) -> None:
+        for phrase in (
+            "contract deltas",
+            "check results",
+            "authorized, privacy-bounded fresh screenshots",
+            "when host-supported",
+            "else host-safe links",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+
     def test_project_verification_does_not_inherit_controlled_eval_overhead(self) -> None:
         quality = QUALITY_GATES.read_text(encoding="utf-8")
         for phrase in (
