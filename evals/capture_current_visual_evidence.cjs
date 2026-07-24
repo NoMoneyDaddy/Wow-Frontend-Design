@@ -7,6 +7,7 @@ const path = require("node:path");
 const { runLocalPageMatrix } = require("./playwright_browser_runtime.cjs");
 const {
   runBrowserContract,
+  runBrowserContractPrefixToFirstAction,
   validateBrowserContract,
 } = require("./playwright_html_smoke.cjs");
 
@@ -192,9 +193,9 @@ function selectedCapturePages(selection, htmlPages, manifest, hasConvergence) {
 
 function validateCase(data) {
   const caseKeys = ["schema_version", "case_id", "run_id", "partition", "brief", "capture_plan", "craft"];
-  if (data?.schema_version === 2) caseKeys.push("browser_contract");
+  if ([2, 3].includes(data?.schema_version)) caseKeys.push("browser_contract");
   exactKeys(data, caseKeys, "case");
-  if (![1, 2].includes(data.schema_version)
+  if (![1, 2, 3].includes(data.schema_version)
     || typeof data.case_id !== "string" || !ID.test(data.run_id)) {
     throw new Error("case identity is invalid");
   }
@@ -207,6 +208,7 @@ function validateCase(data) {
   }
   const planKeys = ["locale", "state", "pages", "wait_condition", "profiles"];
   if (data.schema_version === 2) planKeys.push("consequential_state");
+  if (data.schema_version === 3) planKeys.push("motion_sequence");
   const plan = exactKeys(data.capture_plan, planKeys, "case.capture_plan");
   if (!new Set(["zh-Hant", "en"]).has(plan.locale) || plan.state !== "default"
     || plan.wait_condition !== "load+fonts+two-raf+300ms+two-raf") {
@@ -234,6 +236,24 @@ function validateCase(data) {
       throw new Error("case consequential state is invalid");
     }
     validateBrowserContractRecord(data.browser_contract, "case.browser_contract");
+  } else if (data.schema_version === 3) {
+    const sequence = exactKeys(
+      plan.motion_sequence,
+      ["page", "motion_contract_case_id", "reduced_motion_contract_case_id", "offsets_ms"],
+      "case.capture_plan.motion_sequence",
+    );
+    safeRelative(sequence.page, "case.capture_plan.motion_sequence.page");
+    if (!sequence.page.toLowerCase().endsWith(".html")
+      || !DRAFT_ID.test(sequence.motion_contract_case_id)
+      || !DRAFT_ID.test(sequence.reduced_motion_contract_case_id)
+      || sequence.motion_contract_case_id === sequence.reduced_motion_contract_case_id
+      || !Array.isArray(sequence.offsets_ms) || sequence.offsets_ms.length !== 3
+      || sequence.offsets_ms.some((offset) => !Number.isSafeInteger(offset) || offset < 50 || offset > 5000)
+      || JSON.stringify(sequence.offsets_ms) !== JSON.stringify([...new Set(sequence.offsets_ms)].sort((a, b) => a - b))
+      || plan.pages !== "all_html_outputs") {
+      throw new Error("case motion sequence is invalid");
+    }
+    validateBrowserContractRecord(data.browser_contract, "case.browser_contract");
   }
   if (!data.craft || typeof data.craft !== "object" || Array.isArray(data.craft)) {
     throw new Error("case craft policy must be an evaluator-owned object");
@@ -253,7 +273,13 @@ function validateBrowserContractRecord(value, label) {
     || !Number.isSafeInteger(record.step_count) || record.step_count < 1 || record.step_count > 96) {
     throw new Error(`${label} is invalid`);
   }
-  return record;
+  return {
+    schema_version: record.schema_version,
+    bytes: record.bytes,
+    sha256: record.sha256,
+    case_count: record.case_count,
+    step_count: record.step_count,
+  };
 }
 
 function validateManifest(target, manifest) {
@@ -399,19 +425,29 @@ async function main() {
     : null;
   let browserContract = null;
   let selectedContractCase = null;
+  let motionContractCase = null;
+  let reducedMotionContractCase = null;
   let browserContractRecord = null;
-  if (caseData.schema_version === 2) {
+  let browserContractBytes = null;
+  let browserContractFile = null;
+  if ([2, 3].includes(caseData.schema_version)) {
     if (!browserContractArg || convergenceArg) {
-      throw new Error("consequential state capture requires one browser contract");
+      throw new Error("contract-bound capture requires one browser contract");
     }
+    browserContractFile = browserContractArg;
     const contractBytes = readUnaliasedBytes(
       browserContractArg,
       "browser contract",
     );
+    browserContractBytes = contractBytes;
     const contractValue = JSON.parse(contractBytes.toString("utf8"));
     browserContractRecord = validateBrowserContractRecord(
       caseData.browser_contract,
       "case.browser_contract",
+    );
+    const manifestContractRecord = validateBrowserContractRecord(
+      manifest.browser_contract,
+      "manifest.browser_contract",
     );
     const actualRecord = {
       schema_version: contractValue.schema_version,
@@ -426,20 +462,62 @@ async function main() {
         : 0,
     };
     if (JSON.stringify(browserContractRecord) !== JSON.stringify(actualRecord)
-      || JSON.stringify(manifest.browser_contract) !== JSON.stringify(actualRecord)) {
+      || JSON.stringify(manifestContractRecord) !== JSON.stringify(actualRecord)) {
       throw new Error("browser contract provenance disagrees across case and manifest");
     }
     browserContract = validateBrowserContract(contractValue, before.pages);
-    selectedContractCase = browserContract.cases.find(
-      (item) => item.id === caseData.capture_plan.consequential_state.contract_case_id,
-    );
-    if (!selectedContractCase
-      || !["desktop", "mobile"].includes(selectedContractCase.profile)
-      || !selectedContractCase.steps.some((step) => step.action !== "assert")) {
-      throw new Error("consequential state browser contract case is invalid");
+    if (caseData.schema_version === 2) {
+      selectedContractCase = browserContract.cases.find(
+        (item) => item.id === caseData.capture_plan.consequential_state.contract_case_id,
+      );
+      if (!selectedContractCase
+        || !["desktop", "mobile"].includes(selectedContractCase.profile)
+        || !selectedContractCase.steps.some((step) => step.action !== "assert")) {
+        throw new Error("consequential state browser contract case is invalid");
+      }
+    } else {
+      const sequence = caseData.capture_plan.motion_sequence;
+      motionContractCase = browserContract.cases.find(
+        (item) => item.id === sequence.motion_contract_case_id,
+      );
+      reducedMotionContractCase = browserContract.cases.find(
+        (item) => item.id === sequence.reduced_motion_contract_case_id,
+      );
+      const actionIndexes = (contractCase) => contractCase.steps.flatMap(
+        (step, index) => step.action === "assert" ? [] : [index],
+      );
+      const assertionIndexes = (contractCase, expect) => contractCase.steps.flatMap(
+        (step, index) => step.action === "assert" && step.expect === expect ? [index] : [],
+      );
+      const finalIndexes = (contractCase) => contractCase.steps.flatMap(
+        (step, index) => step.action === "assert"
+          && !["active-animation-count-between", "animations-inactive-for", "animations-settled"].includes(step.expect)
+          ? [index] : [],
+      );
+      const motionActions = motionContractCase ? actionIndexes(motionContractCase) : [];
+      const active = motionContractCase
+        ? assertionIndexes(motionContractCase, "active-animation-count-between") : [];
+      const settled = motionContractCase
+        ? assertionIndexes(motionContractCase, "animations-settled") : [];
+      const motionFinal = motionContractCase ? finalIndexes(motionContractCase) : [];
+      const reducedActions = reducedMotionContractCase ? actionIndexes(reducedMotionContractCase) : [];
+      const inactive = reducedMotionContractCase
+        ? assertionIndexes(reducedMotionContractCase, "animations-inactive-for") : [];
+      const reducedFinal = reducedMotionContractCase ? finalIndexes(reducedMotionContractCase) : [];
+      if (!motionContractCase || !reducedMotionContractCase
+        || before.pages.length !== 1 || before.pages[0] !== sequence.page
+        || motionContractCase.page !== sequence.page || reducedMotionContractCase.page !== sequence.page
+        || !["desktop", "mobile-motion"].includes(motionContractCase.profile)
+        || reducedMotionContractCase.profile !== "mobile"
+        || motionActions.length !== 1 || active.length !== 1 || settled.length !== 1 || motionFinal.length < 1
+        || !(motionActions[0] < active[0] && active[0] < settled[0] && settled[0] < motionFinal.at(-1))
+        || reducedActions.length !== 1 || inactive.length !== 1 || reducedFinal.length < 1
+        || !(reducedActions[0] < inactive[0] && inactive[0] < reducedFinal.at(-1))) {
+        throw new Error("animation-primary browser contract cases are invalid");
+      }
     }
   } else if (browserContractArg) {
-    throw new Error("browser contract capture requires a schema v2 case");
+    throw new Error("browser contract capture requires a schema v2 or v3 case");
   }
   if (JSON.stringify(caseData.brief) !== JSON.stringify(manifest.brief)) {
     throw new Error("case brief does not match the current build");
@@ -455,7 +533,12 @@ async function main() {
     fs.mkdirSync(artifacts, { mode: 0o700 });
     snapshotOutputs(target, sourceSnapshot, before.outputs);
     const profiles = PROFILE_STANDARD.map((profile) => ({ ...profile, locale: caseData.capture_plan.locale }));
-    const captureScreenshot = async (page, meta, state) => {
+    const captureScreenshot = async (
+      page,
+      meta,
+      state,
+      { animations = "disabled", waitCondition = caseData.capture_plan.wait_condition } = {},
+    ) => {
       ordinal += 1;
       const name = `${String(ordinal).padStart(2, "0")}-${slug(meta.relativePage)}-${meta.profile.name}.png`;
       const relative = `artifacts/${name}`;
@@ -464,7 +547,7 @@ async function main() {
         path: destination,
         type: "png",
         fullPage: false,
-        animations: "disabled",
+        animations,
         caret: "hide",
         scale: "device",
       });
@@ -493,7 +576,7 @@ async function main() {
           viewport: `${meta.profile.viewport.width}x${meta.profile.viewport.height}`,
           dpr: meta.profile.dpr,
           reduced_motion: meta.profile.reducedMotion,
-          wait_condition: caseData.capture_plan.wait_condition,
+          wait_condition: waitCondition,
         },
       });
       return relative;
@@ -569,18 +652,155 @@ async function main() {
         status: "passed",
       };
     }
+    let motionEvidence = null;
+    const allMotionResults = [];
+    if (motionContractCase && reducedMotionContractCase) {
+      const sequence = caseData.capture_plan.motion_sequence;
+      const motionProfile = {
+        name: motionContractCase.profile === "desktop" ? "desktop-motion" : "mobile-motion",
+        viewport: motionContractCase.profile === "desktop"
+          ? { width: 1440, height: 1000 }
+          : { width: 390, height: 844 },
+        reducedMotion: "no-preference",
+        dpr: 1,
+        locale: caseData.capture_plan.locale,
+      };
+      const motionLabels = [];
+      for (const offset of sequence.offsets_ms) {
+        const offsetRun = await runLocalPageMatrix({
+          stage: sourceSnapshot,
+          pages: [sequence.page],
+          allowedFiles: before.outputs.map((record) => record.path),
+          profiles: [motionProfile],
+          inspectPage: async (page, meta) => {
+            const initial = new URL(page.url());
+            const prefix = await runBrowserContractPrefixToFirstAction(page, motionContractCase);
+            if (prefix.status !== "passed" || new URL(page.url()).href !== initial.href) {
+              throw new Error("motion trigger replay failed or navigated");
+            }
+            await page.waitForTimeout(offset);
+            if (new URL(page.url()).href !== initial.href) {
+              throw new Error("motion frame replay navigated");
+            }
+            const relative = await captureScreenshot(
+              page,
+              meta,
+              `contract:${motionContractCase.id}:motion-${offset}ms`,
+              { animations: "allow", waitCondition: `post-trigger+${offset}ms` },
+            );
+            return { capture: relative, browser_contract_prefix: prefix };
+          },
+        });
+        if (offsetRun.browserVersion !== browserVersion || offsetRun.results.length !== 1) {
+          throw new Error("motion frame runtime drifted");
+        }
+        allMotionResults.push(...offsetRun.results);
+        motionLabels.push(captures.at(-1).label);
+      }
+      const verificationRun = await runLocalPageMatrix({
+        stage: sourceSnapshot,
+        pages: [sequence.page],
+        allowedFiles: before.outputs.map((record) => record.path),
+        profiles: [motionProfile],
+        inspectPage: async (page) => {
+          const initial = new URL(page.url());
+          const contractResult = await runBrowserContract(page, motionContractCase);
+          if (contractResult.status !== "passed" || new URL(page.url()).href !== initial.href) {
+            throw new Error("motion contract replay failed or navigated");
+          }
+          return { browser_contract: contractResult };
+        },
+      });
+      const reducedProfile = {
+        name: "mobile-reduced-static",
+        viewport: { width: 390, height: 844 },
+        reducedMotion: "reduce",
+        dpr: 1,
+        locale: caseData.capture_plan.locale,
+      };
+      const reducedRun = await runLocalPageMatrix({
+        stage: sourceSnapshot,
+        pages: [sequence.page],
+        allowedFiles: before.outputs.map((record) => record.path),
+        profiles: [reducedProfile],
+        inspectPage: async (page, meta) => {
+          const initial = new URL(page.url());
+          const contractResult = await runBrowserContract(page, reducedMotionContractCase);
+          if (contractResult.status !== "passed" || new URL(page.url()).href !== initial.href) {
+            throw new Error("reduced motion contract replay failed or navigated");
+          }
+          const relative = await captureScreenshot(
+            page,
+            meta,
+            `contract:${reducedMotionContractCase.id}:reduced-static`,
+            { animations: "allow", waitCondition: "contract-replay-complete" },
+          );
+          return { capture: relative, browser_contract: contractResult };
+        },
+      });
+      if (verificationRun.browserVersion !== browserVersion
+        || reducedRun.browserVersion !== browserVersion
+        || verificationRun.results.length !== 1
+        || reducedRun.results.length !== 1) {
+        throw new Error("motion contract runtime drifted");
+      }
+      allMotionResults.push(...verificationRun.results, ...reducedRun.results);
+      const motionContractResult = verificationRun.results[0].inspection.browser_contract;
+      const reducedContractResult = reducedRun.results[0].inspection.browser_contract;
+      motionEvidence = {
+        motion_contract: {
+          contract_case_id: motionContractCase.id,
+          steps_executed: motionContractResult.steps_executed,
+          status: motionContractResult.status,
+        },
+        reduced_motion_contract: {
+          contract_case_id: reducedMotionContractCase.id,
+          steps_executed: reducedContractResult.steps_executed,
+          status: reducedContractResult.status,
+        },
+        capture_labels: {
+          motion_sequence: motionLabels,
+          reduced_motion_static: captures.at(-1).label,
+        },
+        claim_scope: {
+          observed: [
+            "fresh-fixed-request-offset-viewport-frames",
+            "fresh-reduced-motion-static-frame",
+          ],
+          not_certified: [
+            "timing",
+            "easing",
+            "spatial-continuity",
+            "runtime-performance",
+            "award-quality",
+          ],
+        },
+      };
+    }
+    const cleanResult = (result) => result.navigation === "passed"
+      && result.visible_main && result.visible_text && result.visible_primary_content
+      && !result.root_horizontal_overflow
+      && Object.values(result.counters).every((count) => count === 0);
     if (captures.length !== capturePages.length * PROFILE_STANDARD.length
       + (stateEvidence ? 1 : 0)
+      + (motionEvidence ? 4 : 0)
       || captures.reduce((sum, item) => sum + item.bytes, 0) > MAX_TOTAL_CAPTURE_BYTES
-      || results.some((result) => result.navigation !== "passed" || !result.visible_main
-        || !result.visible_text || !result.visible_primary_content || result.root_horizontal_overflow
-        || Object.values(result.counters).some((count) => count !== 0))) {
+      || results.some((result) => !cleanResult(result))
+      || allMotionResults.some((result) => !cleanResult(result))
+      || (motionEvidence && (
+        motionEvidence.motion_contract.status !== "passed"
+        || motionEvidence.reduced_motion_contract.status !== "passed"
+      ))) {
       throw new Error("fresh browser replay did not remain clean");
     }
     const afterManifest = fs.readFileSync(manifestFile);
     const after = validateManifest(target, readJson(manifestFile, "run manifest"));
     if (!afterManifest.equals(manifestBytes) || JSON.stringify(after.outputs) !== JSON.stringify(before.outputs)) {
       throw new Error("current build drifted during capture");
+    }
+    if (browserContractFile
+      && !readUnaliasedBytes(browserContractFile, "browser contract").equals(browserContractBytes)) {
+      throw new Error("browser contract drifted during capture");
     }
     if (convergence) {
       if (macroObservations.length !== convergence.variants.length * PROFILE_STANDARD.length) {
@@ -610,7 +830,7 @@ async function main() {
     };
     if (browserContractRecord) source.browser_contract = browserContractRecord;
     const receipt = {
-      schema_version: stateEvidence ? 2 : 1,
+      schema_version: motionEvidence ? 3 : stateEvidence ? 2 : 1,
       status: "captured",
       case: {
         case_id: caseData.case_id,
@@ -635,6 +855,10 @@ async function main() {
       },
       captures,
     };
+    if (motionEvidence) {
+      receipt.capture_standard.motion_evidence_animations = "allow";
+      receipt.motion_evidence = motionEvidence;
+    }
     if (stateEvidence) receipt.state_evidence = stateEvidence;
     fs.writeFileSync(path.join(evidence, "capture-receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
     process.stdout.write(`${JSON.stringify(receipt)}\n`);

@@ -199,6 +199,188 @@ class PrepareCurrentCraftCaseTests(unittest.TestCase):
                 case["browser_contract"],
             )
 
+    def test_prepares_opt_in_animation_primary_motion_case(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace, manifest_path, _ = self.fixture(root)
+            contract = root / "browser-contract.json"
+            payload = {
+                "schema_version": 2,
+                "cases": [
+                    {
+                        "id": "play-motion",
+                        "page": "index.html",
+                        "profile": "desktop",
+                        "steps": [
+                            {"id": "play", "action": "click", "selector": "#play"},
+                            {
+                                "id": "active",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "active-animation-count-between",
+                                "min_animations": 1,
+                                "max_animations": 8,
+                            },
+                            {
+                                "id": "settled",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "animations-settled",
+                            },
+                            {
+                                "id": "final",
+                                "action": "assert",
+                                "selector": "#final",
+                                "expect": "visible",
+                            },
+                        ],
+                    },
+                    {
+                        "id": "play-reduced",
+                        "page": "index.html",
+                        "profile": "mobile",
+                        "steps": [
+                            {"id": "play", "action": "click", "selector": "#play"},
+                            {
+                                "id": "inactive",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "animations-inactive-for",
+                                "duration_ms": 200,
+                            },
+                            {
+                                "id": "final",
+                                "action": "assert",
+                                "selector": "#final",
+                                "expect": "visible",
+                            },
+                        ],
+                    },
+                ],
+            }
+            contract.write_text(json.dumps(payload), encoding="utf-8")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["browser_contract"] = {
+                "schema_version": 2,
+                "bytes": contract.stat().st_size,
+                "sha256": digest(contract.read_bytes()),
+                "case_count": 2,
+                "step_count": 7,
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "case.json"
+
+            completed = self.invoke(
+                workspace,
+                output,
+                "--browser-contract",
+                str(contract),
+                "--motion-contract-case-id",
+                "play-motion",
+                "--reduced-motion-contract-case-id",
+                "play-reduced",
+                "--motion-offsets-ms",
+                "120",
+                "540",
+                "1250",
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            case = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(3, case["schema_version"])
+            self.assertEqual(
+                {
+                    "page": "index.html",
+                    "motion_contract_case_id": "play-motion",
+                    "reduced_motion_contract_case_id": "play-reduced",
+                    "offsets_ms": [120, 540, 1250],
+                },
+                case["capture_plan"]["motion_sequence"],
+            )
+            self.assertEqual(manifest["browser_contract"], case["browser_contract"])
+
+    def test_animation_primary_requires_exact_safe_motion_contract_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace, manifest_path, _ = self.fixture(root)
+            contract = root / "browser-contract.json"
+            payload = {
+                "schema_version": 2,
+                "cases": [
+                    {
+                        "id": "play-motion",
+                        "page": "index.html",
+                        "profile": "desktop",
+                        "steps": [
+                            {"id": "play", "action": "click", "selector": "#play"},
+                            {
+                                "id": "settled",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "animations-settled",
+                            },
+                            {
+                                "id": "final",
+                                "action": "assert",
+                                "selector": "#final",
+                                "expect": "visible",
+                            },
+                        ],
+                    },
+                    {
+                        "id": "play-reduced",
+                        "page": "index.html",
+                        "profile": "mobile",
+                        "steps": [
+                            {"id": "play", "action": "click", "selector": "#play"},
+                            {
+                                "id": "inactive",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "animations-inactive-for",
+                                "duration_ms": 200,
+                            },
+                            {
+                                "id": "final",
+                                "action": "assert",
+                                "selector": "#final",
+                                "expect": "visible",
+                            },
+                        ],
+                    },
+                ],
+            }
+            contract.write_text(json.dumps(payload), encoding="utf-8")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["browser_contract"] = {
+                "schema_version": 2,
+                "bytes": contract.stat().st_size,
+                "sha256": digest(contract.read_bytes()),
+                "case_count": 2,
+                "step_count": 6,
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "case.json"
+
+            completed = self.invoke(
+                workspace,
+                output,
+                "--browser-contract",
+                str(contract),
+                "--motion-contract-case-id",
+                "play-motion",
+                "--reduced-motion-contract-case-id",
+                "play-reduced",
+                "--motion-offsets-ms",
+                "120",
+                "540",
+                "1250",
+            )
+
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("motion", completed.stderr)
+            self.assertFalse(output.exists())
+
     def test_consequential_state_case_requires_paired_matching_contract(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

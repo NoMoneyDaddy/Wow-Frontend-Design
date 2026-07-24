@@ -201,17 +201,21 @@ def _validate_current_capture_evidence(
 
     case_value = _load_json(case_file, "case")
     case_schema = case_value.get("schema_version")
-    case_keys = CASE_KEYS | ({"browser_contract"} if case_schema == 2 else set())
+    case_keys = CASE_KEYS | ({"browser_contract"} if case_schema in {2, 3} else set())
     case = _exact(case_value, case_keys, "case")
     receipt_value = _load_json(receipt_file, "capture receipt")
     receipt_schema = receipt_value.get("schema_version")
-    receipt_keys = RECEIPT_KEYS | ({"state_evidence"} if receipt_schema == 2 else set())
+    receipt_keys = RECEIPT_KEYS.copy()
+    if receipt_schema == 2:
+        receipt_keys |= {"state_evidence"}
+    elif receipt_schema == 3:
+        receipt_keys |= {"motion_evidence"}
     receipt = _exact(receipt_value, receipt_keys, "capture receipt")
     manifest = _load_json(manifest_file, "run manifest")
 
     if (
         type(case["schema_version"]) is not int
-        or case["schema_version"] not in {1, 2}
+        or case["schema_version"] not in {1, 2, 3}
         or not isinstance(case["case_id"], str)
         or not case["case_id"].strip()
     ):
@@ -241,6 +245,8 @@ def _validate_current_capture_evidence(
     capture_plan_keys = {"locale", "state", "pages", "wait_condition", "profiles"}
     if case_schema == 2:
         capture_plan_keys.add("consequential_state")
+    elif case_schema == 3:
+        capture_plan_keys.add("motion_sequence")
     capture_plan = _exact(
         case["capture_plan"],
         capture_plan_keys,
@@ -287,6 +293,7 @@ def _validate_current_capture_evidence(
     ):
         raise CurrentCraftError("case capture plan is not the current standard")
     consequential_state: dict[str, Any] | None = None
+    motion_sequence: dict[str, Any] | None = None
     case_contract: dict[str, Any] | None = None
     if case_schema == 2:
         if explicit_pages is not None:
@@ -304,6 +311,55 @@ def _validate_current_capture_evidence(
             or re.fullmatch(r"[a-z][a-z0-9-]{0,47}", contract_case_id) is None
         ):
             raise CurrentCraftError("case consequential state is invalid")
+        case_contract = _browser_contract_record(
+            case["browser_contract"],
+            "case.browser_contract",
+        )
+    elif case_schema == 3:
+        if explicit_pages is not None:
+            raise CurrentCraftError(
+                "motion sequence evidence is unavailable for draft calibration"
+            )
+        motion_sequence = _exact(
+            capture_plan["motion_sequence"],
+            {
+                "page",
+                "motion_contract_case_id",
+                "reduced_motion_contract_case_id",
+                "offsets_ms",
+            },
+            "case.capture_plan.motion_sequence",
+        )
+        motion_page = _relative(
+            motion_sequence["page"],
+            "case.capture_plan.motion_sequence.page",
+        )
+        offsets = motion_sequence["offsets_ms"]
+        if (
+            not motion_page.lower().endswith(".html")
+            or not isinstance(motion_sequence["motion_contract_case_id"], str)
+            or re.fullmatch(
+                r"[a-z][a-z0-9-]{0,47}",
+                motion_sequence["motion_contract_case_id"],
+            )
+            is None
+            or not isinstance(
+                motion_sequence["reduced_motion_contract_case_id"],
+                str,
+            )
+            or re.fullmatch(
+                r"[a-z][a-z0-9-]{0,47}",
+                motion_sequence["reduced_motion_contract_case_id"],
+            )
+            is None
+            or motion_sequence["motion_contract_case_id"]
+            == motion_sequence["reduced_motion_contract_case_id"]
+            or not isinstance(offsets, list)
+            or len(offsets) != 3
+            or any(type(offset) is not int or not 50 <= offset <= 5000 for offset in offsets)
+            or offsets != sorted(set(offsets))
+        ):
+            raise CurrentCraftError("case motion sequence is invalid")
         case_contract = _browser_contract_record(
             case["browser_contract"],
             "case.browser_contract",
@@ -326,18 +382,24 @@ def _validate_current_capture_evidence(
         or runtime["headless"] is not True
     ):
         raise CurrentCraftError("capture runtime is not the current Playwright Chromium standard")
+    capture_standard_keys = {"profiles", "screenshot_mode", "animations", "caret", "network"}
+    if case_schema == 3:
+        capture_standard_keys.add("motion_evidence_animations")
     capture_standard = _exact(
         receipt["capture_standard"],
-        {"profiles", "screenshot_mode", "animations", "caret", "network"},
+        capture_standard_keys,
         "capture receipt.capture_standard",
     )
-    if capture_standard != {
+    expected_capture_standard = {
         "profiles": PROFILE_STANDARD,
         "screenshot_mode": "viewport",
         "animations": "disabled",
         "caret": "hide",
         "network": "local-output-only",
-    }:
+    }
+    if case_schema == 3:
+        expected_capture_standard["motion_evidence_animations"] = "allow"
+    if capture_standard != expected_capture_standard:
         raise CurrentCraftError("capture receipt standard drifted")
     receipt_case = _exact(receipt["case"], {"case_id", "run_id", "partition", "case_sha256"}, "capture receipt.case")
     if receipt_case != {
@@ -381,7 +443,7 @@ def _validate_current_capture_evidence(
                 "draft capture subset is not bound to a seeded RETROFIT manifest"
             )
     source_keys = {"run_manifest_sha256", "brief", "skill_tree_sha256", "outputs"}
-    if case_schema == 2:
+    if case_schema in {2, 3}:
         source_keys.add("browser_contract")
     source = _exact(receipt["source"], source_keys, "capture receipt.source")
     if source["run_manifest_sha256"] != _sha256(manifest_file):
@@ -393,7 +455,8 @@ def _validate_current_capture_evidence(
     if source["outputs"] != manifest.get("outputs") or not isinstance(source["outputs"], list):
         raise CurrentCraftError("output provenance disagrees with the current build")
     state_evidence: dict[str, Any] | None = None
-    if case_schema == 2:
+    motion_evidence: dict[str, Any] | None = None
+    if case_schema in {2, 3}:
         manifest_contract = _browser_contract_record(
             manifest.get("browser_contract"),
             "manifest.browser_contract",
@@ -406,6 +469,7 @@ def _validate_current_capture_evidence(
             raise CurrentCraftError(
                 "browser contract provenance disagrees across case, capture, and current build"
             )
+    if case_schema == 2:
         state_evidence = _exact(
             receipt["state_evidence"],
             {"contract_case_id", "page", "profile", "steps_executed", "status"},
@@ -426,6 +490,72 @@ def _validate_current_capture_evidence(
             or state_evidence["status"] != "passed"
         ):
             raise CurrentCraftError("consequential state evidence is invalid")
+    elif case_schema == 3:
+        motion_evidence = _exact(
+            receipt["motion_evidence"],
+            {
+                "motion_contract",
+                "reduced_motion_contract",
+                "capture_labels",
+                "claim_scope",
+            },
+            "capture receipt.motion_evidence",
+        )
+        motion_contract_evidence = _exact(
+            motion_evidence["motion_contract"],
+            {"contract_case_id", "steps_executed", "status"},
+            "capture receipt.motion_evidence.motion_contract",
+        )
+        reduced_contract_evidence = _exact(
+            motion_evidence["reduced_motion_contract"],
+            {"contract_case_id", "steps_executed", "status"},
+            "capture receipt.motion_evidence.reduced_motion_contract",
+        )
+        motion_labels = _exact(
+            motion_evidence["capture_labels"],
+            {"motion_sequence", "reduced_motion_static"},
+            "capture receipt.motion_evidence.capture_labels",
+        )
+        claim_scope = _exact(
+            motion_evidence["claim_scope"],
+            {"observed", "not_certified"},
+            "capture receipt.motion_evidence.claim_scope",
+        )
+        sequence_labels = motion_labels["motion_sequence"]
+        reduced_label = motion_labels["reduced_motion_static"]
+        if (
+            motion_contract_evidence["contract_case_id"]
+            != motion_sequence["motion_contract_case_id"]
+            or reduced_contract_evidence["contract_case_id"]
+            != motion_sequence["reduced_motion_contract_case_id"]
+            or any(
+                evidence["status"] != "passed"
+                or type(evidence["steps_executed"]) is not int
+                or not 1 <= evidence["steps_executed"] <= case_contract["step_count"]
+                for evidence in (motion_contract_evidence, reduced_contract_evidence)
+            )
+            or not isinstance(sequence_labels, list)
+            or len(sequence_labels) != 3
+            or any(not isinstance(label, str) or not label for label in sequence_labels)
+            or len(set(sequence_labels)) != 3
+            or not isinstance(reduced_label, str)
+            or not reduced_label
+            or reduced_label in sequence_labels
+            or claim_scope["observed"]
+            != [
+                "fresh-fixed-request-offset-viewport-frames",
+                "fresh-reduced-motion-static-frame",
+            ]
+            or claim_scope["not_certified"]
+            != [
+                "timing",
+                "easing",
+                "spatial-continuity",
+                "runtime-performance",
+                "award-quality",
+            ]
+        ):
+            raise CurrentCraftError("motion evidence is invalid")
 
     output_root = manifest_file.parent
     html_pages: set[str] = set()
@@ -463,7 +593,13 @@ def _validate_current_capture_evidence(
     if not capture_pages <= html_pages:
         raise CurrentCraftError("case capture pages must exist in the current manifest")
     captures = receipt["captures"]
-    expected_capture_count = len(capture_pages) * 2 + (1 if state_evidence else 0)
+    if motion_sequence is not None and capture_pages != {motion_sequence["page"]}:
+        raise CurrentCraftError("motion evidence requires exactly one selected HTML output")
+    expected_capture_count = (
+        len(capture_pages) * 2
+        + (1 if state_evidence else 0)
+        + (4 if motion_evidence else 0)
+    )
     if (
         not isinstance(captures, list)
         or not captures
@@ -474,6 +610,7 @@ def _validate_current_capture_evidence(
     capture_paths: set[str] = set()
     default_capture_matrix: set[tuple[str, str]] = set()
     state_capture_matrix: list[tuple[str, str, str]] = []
+    motion_capture_matrix: list[tuple[str, str, str]] = []
     capture_artifacts: dict[str, Path] = {}
     total_bytes = 0
     evidence_root = receipt_file.parent.resolve(strict=True)
@@ -524,6 +661,24 @@ def _validate_current_capture_evidence(
             raise CurrentCraftError("capture context numeric fields are invalid")
         profile = capture["profile"]
         profile_rule = next((item for item in PROFILE_STANDARD if item["name"] == profile), None)
+        if profile == "desktop-motion":
+            profile_rule = {
+                "name": profile,
+                "viewport": {"width": 1440, "height": 1000},
+                "reducedMotion": "no-preference",
+                "dpr": 1,
+            }
+        elif profile in {"mobile-motion", "mobile-reduced-static"}:
+            profile_rule = {
+                "name": profile,
+                "viewport": {"width": 390, "height": 844},
+                "reducedMotion": (
+                    "no-preference"
+                    if profile == "mobile-motion"
+                    else "reduce"
+                ),
+                "dpr": 1,
+            }
         expected_viewport = (
             f"{profile_rule['viewport']['width']}x{profile_rule['viewport']['height']}"
             if profile_rule else None
@@ -540,6 +695,22 @@ def _validate_current_capture_evidence(
             if state_evidence
             else None
         )
+        motion_states = (
+            {
+                f"contract:{motion_sequence['motion_contract_case_id']}:motion-{offset}ms":
+                f"post-trigger+{offset}ms"
+                for offset in motion_sequence["offsets_ms"]
+            }
+            if motion_sequence
+            else {}
+        )
+        reduced_state = (
+            f"contract:{motion_sequence['reduced_motion_contract_case_id']}:reduced-static"
+            if motion_sequence
+            else None
+        )
+        is_motion_capture = context["state"] in motion_states
+        is_reduced_capture = context["state"] == reduced_state
         if (
             capture["page"] not in capture_pages
             or expected_viewport is None
@@ -548,6 +719,8 @@ def _validate_current_capture_evidence(
             or context["locale"] != capture_plan["locale"]
             or (
                 is_state_capture
+                and not is_motion_capture
+                and not is_reduced_capture
                 and (
                     expected_state is None
                     or context["state"] != expected_state
@@ -559,7 +732,27 @@ def _validate_current_capture_evidence(
                 not is_state_capture
                 and context["state"] != capture_plan["state"]
             )
-            or context["wait_condition"] != capture_plan["wait_condition"]
+            or (
+                not is_motion_capture
+                and not is_reduced_capture
+                and context["wait_condition"] != capture_plan["wait_condition"]
+            )
+            or (
+                is_motion_capture
+                and (
+                    profile not in {"desktop-motion", "mobile-motion"}
+                    or context["wait_condition"] != motion_states[context["state"]]
+                    or capture["page"] != motion_sequence["page"]
+                )
+            )
+            or (
+                is_reduced_capture
+                and (
+                    profile != "mobile-reduced-static"
+                    or context["wait_condition"] != "contract-replay-complete"
+                    or capture["page"] != motion_sequence["page"]
+                )
+            )
             or context["reduced_motion"] != profile_rule["reducedMotion"]
             or captured_at.tzinfo is None
             or f"{width}x{height}" != expected_viewport
@@ -568,7 +761,11 @@ def _validate_current_capture_evidence(
         capture_labels.add(label)
         capture_paths.add(relative)
         capture_artifacts[label] = artifact
-        if is_state_capture:
+        if is_motion_capture or is_reduced_capture:
+            motion_capture_matrix.append(
+                (capture["page"], profile, context["state"])
+            )
+        elif is_state_capture:
             state_capture_matrix.append(
                 (capture["page"], profile, context["state"])
             )
@@ -591,9 +788,46 @@ def _validate_current_capture_evidence(
         if state_evidence
         else []
     )
+    expected_motion_profiles = {"desktop-motion", "mobile-motion"}
+    observed_motion_profiles = {
+        profile
+        for _, profile, state in motion_capture_matrix
+        if state in motion_states
+    }
+    expected_motion_matrix = (
+        [
+            (
+                motion_sequence["page"],
+                next(iter(observed_motion_profiles)) if len(observed_motion_profiles) == 1 else "",
+                f"contract:{motion_sequence['motion_contract_case_id']}:motion-{offset}ms",
+            )
+            for offset in motion_sequence["offsets_ms"]
+        ]
+        + [
+            (
+                motion_sequence["page"],
+                "mobile-reduced-static",
+                f"contract:{motion_sequence['reduced_motion_contract_case_id']}:reduced-static",
+            )
+        ]
+        if motion_sequence
+        else []
+    )
     if (
         default_capture_matrix != expected_matrix
         or state_capture_matrix != expected_state_matrix
+        or observed_motion_profiles - expected_motion_profiles
+        or motion_capture_matrix != expected_motion_matrix
+        or (
+            motion_evidence
+            and set(motion_evidence["capture_labels"]["motion_sequence"])
+            | {motion_evidence["capture_labels"]["reduced_motion_static"]}
+            != {
+                capture["label"]
+                for capture in captures
+                if capture["context"]["state"] != capture_plan["state"]
+            }
+        )
         or total_bytes > MAX_TOTAL_CAPTURE_BYTES
     ):
         raise CurrentCraftError("capture matrix is incomplete or exceeds its evidence budget")

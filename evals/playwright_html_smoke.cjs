@@ -506,6 +506,67 @@ async function waitForAssertion(page, locator, step) {
   return false;
 }
 
+function locatorForStep(page, step) {
+  return Object.hasOwn(step, "selector")
+    ? page.locator(step.selector)
+    : page.getByRole(step.role, { name: step.name, exact: true });
+}
+
+async function executeContractStep(page, step) {
+  const locator = locatorForStep(page, step);
+  let passed = false;
+  try {
+    if (step.action === "click") {
+      await locator.click({ timeout: 2_000 });
+      passed = true;
+    } else if (step.action === "fill") {
+      await locator.fill(step.value, { timeout: 2_000 });
+      passed = true;
+    } else if (step.action === "select") {
+      await locator.selectOption(step.value, { timeout: 2_000 });
+      passed = true;
+    } else if (step.action === "press") {
+      await locator.press(step.key, { timeout: 2_000 });
+      passed = true;
+    } else if (step.action === "assert") {
+      passed = await waitForAssertion(page, locator, step);
+    }
+  } catch {
+    passed = false;
+  }
+  return { locator, passed };
+}
+
+async function runBrowserContractPrefixToFirstAction(page, contractCase) {
+  let stepsExecuted = 0;
+  for (const step of contractCase.steps) {
+    const { passed } = await executeContractStep(page, step);
+    stepsExecuted += 1;
+    if (!passed) {
+      return {
+        case_id: contractCase.id,
+        status: "rejected",
+        action_step_id: null,
+        steps_executed: stepsExecuted,
+      };
+    }
+    if (step.action !== "assert") {
+      return {
+        case_id: contractCase.id,
+        status: "passed",
+        action_step_id: step.id,
+        steps_executed: stepsExecuted,
+      };
+    }
+  }
+  return {
+    case_id: contractCase.id,
+    status: "rejected",
+    action_step_id: null,
+    steps_executed: stepsExecuted,
+  };
+}
+
 async function runBrowserContract(page, contractCase) {
   const findingIds = [];
   const failures = [];
@@ -514,29 +575,7 @@ async function runBrowserContract(page, contractCase) {
   for (const step of contractCase.steps) {
     if (findingIds.length > 0 && (actionObserved || step.action !== "assert")) break;
     const finding = `contract-${contractCase.id}-${step.id}`;
-    const locator = Object.hasOwn(step, "selector")
-      ? page.locator(step.selector)
-      : page.getByRole(step.role, { name: step.name, exact: true });
-    let passed = false;
-    try {
-      if (step.action === "click") {
-        await locator.click({ timeout: 2_000 });
-        passed = true;
-      } else if (step.action === "fill") {
-        await locator.fill(step.value, { timeout: 2_000 });
-        passed = true;
-      } else if (step.action === "select") {
-        await locator.selectOption(step.value, { timeout: 2_000 });
-        passed = true;
-      } else if (step.action === "press") {
-        await locator.press(step.key, { timeout: 2_000 });
-        passed = true;
-      } else if (step.action === "assert") {
-        passed = await waitForAssertion(page, locator, step);
-      }
-    } catch {
-      passed = false;
-    }
+    const { locator, passed } = await executeContractStep(page, step);
     stepsExecuted += 1;
     if (!passed) {
       findingIds.push(finding);
@@ -836,4 +875,8 @@ if (require.main === module) {
   main().catch((error) => fail(error && error.name ? error.name : "unknown"));
 }
 
-module.exports = { runBrowserContract, validateBrowserContract };
+module.exports = {
+  runBrowserContract,
+  runBrowserContractPrefixToFirstAction,
+  validateBrowserContract,
+};

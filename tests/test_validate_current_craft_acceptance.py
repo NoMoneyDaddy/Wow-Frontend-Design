@@ -57,6 +57,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
         explicit_pages: list[str] | None = None,
         include_legacy_html: bool = False,
         consequential_state: bool = False,
+        motion_primary: bool = False,
     ) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
         root = root.resolve()
         workspace = root / "workspace"
@@ -70,7 +71,17 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 'onclick="document.querySelector(\'#details\').hidden=false">Open</button>'
                 '<section id="details" hidden>Details</section></main></body></html>'
                 if consequential_state
-                else '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main><h1>現行輸出</h1><p>Independent review.</p></main></body></html>'
+                else (
+                    '<!doctype html><html lang="zh-Hant"><head><title>Motion</title></head><body><main>'
+                    '<h1>Motion</h1><button id="play" onclick="'
+                    "if(!matchMedia('(prefers-reduced-motion: reduce)').matches)"
+                    "document.querySelector('#final').animate("
+                    "[{transform:'translateX(0px)'},{transform:'translateX(20px)'}],"
+                    "{duration:700,fill:'forwards'});"
+                    '">Play</button><section id="final">Final</section></main></body></html>'
+                    if motion_primary
+                    else '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main><h1>現行輸出</h1><p>Independent review.</p></main></body></html>'
+                )
             ),
             encoding="utf-8",
         )
@@ -182,6 +193,80 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             case["schema_version"] = 2
             case["browser_contract"] = contract_record
             case["capture_plan"]["consequential_state"] = {"contract_case_id": "open-details"}
+        elif motion_primary:
+            contract_payload = {
+                "schema_version": 2,
+                "cases": [
+                    {
+                        "id": "play-motion",
+                        "page": "index.html",
+                        "profile": "desktop",
+                        "steps": [
+                            {"id": "play", "action": "click", "selector": "#play"},
+                            {
+                                "id": "active",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "active-animation-count-between",
+                                "min_animations": 1,
+                                "max_animations": 8,
+                            },
+                            {
+                                "id": "settled",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "animations-settled",
+                            },
+                            {
+                                "id": "final",
+                                "action": "assert",
+                                "selector": "#final",
+                                "expect": "visible",
+                            },
+                        ],
+                    },
+                    {
+                        "id": "play-reduced",
+                        "page": "index.html",
+                        "profile": "mobile",
+                        "steps": [
+                            {"id": "play", "action": "click", "selector": "#play"},
+                            {
+                                "id": "inactive",
+                                "action": "assert",
+                                "selector": "main",
+                                "expect": "animations-inactive-for",
+                                "duration_ms": 200,
+                            },
+                            {
+                                "id": "final",
+                                "action": "assert",
+                                "selector": "#final",
+                                "expect": "visible",
+                            },
+                        ],
+                    },
+                ],
+            }
+            browser_contract = root / "browser-contract.json"
+            browser_contract.write_text(json.dumps(contract_payload), encoding="utf-8")
+            contract_record = {
+                "schema_version": 2,
+                "bytes": browser_contract.stat().st_size,
+                "sha256": digest(browser_contract),
+                "case_count": 2,
+                "step_count": 7,
+            }
+            manifest["browser_contract"] = contract_record
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            case["schema_version"] = 3
+            case["browser_contract"] = contract_record
+            case["capture_plan"]["motion_sequence"] = {
+                "page": "index.html",
+                "motion_contract_case_id": "play-motion",
+                "reduced_motion_contract_case_id": "play-reduced",
+                "offsets_ms": [120, 540, 1250],
+            }
         case_path = root / "case.json"
         case_path.write_text(json.dumps(case), encoding="utf-8")
         evidence_root = root / "evidence"
@@ -392,6 +477,73 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(case["browser_contract"], manifest["browser_contract"])
             self.assertEqual(case["browser_contract"], receipt["source"]["browser_contract"])
+
+    def test_opt_in_v3_motion_capture_binds_all_six_frames_to_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory), motion_primary=True)
+            self.assertEqual(3, self.validate(fixture))
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            observed = validate_current_craft_acceptance.validate_current_capture_evidence(
+                workspace,
+                case_path,
+                receipt_path,
+                manifest_path,
+            )
+            self.assertEqual(6, observed["capture_count"])
+            self.assertEqual(
+                set(observed["receipt"]["motion_evidence"]["capture_labels"]["motion_sequence"])
+                | {observed["receipt"]["motion_evidence"]["capture_labels"]["reduced_motion_static"]},
+                {
+                    item["label"]
+                    for item in observed["receipt"]["captures"]
+                    if item["context"]["state"] != "default"
+                },
+            )
+
+    def test_opt_in_v3_motion_frames_need_not_have_distinct_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory), motion_primary=True)
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            labels = receipt["motion_evidence"]["capture_labels"]["motion_sequence"]
+            captures = {item["label"]: item for item in receipt["captures"]}
+            source = receipt_path.parent / captures[labels[0]]["path"]
+            for label in labels[1:]:
+                capture = captures[label]
+                destination = receipt_path.parent / capture["path"]
+                shutil.copyfile(source, destination)
+                capture["bytes"] = destination.stat().st_size
+                capture["sha256"] = digest(destination)
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            observed = validate_current_craft_acceptance.validate_current_capture_evidence(
+                workspace,
+                case_path,
+                receipt_path,
+                manifest_path,
+            )
+
+            self.assertEqual(1, len({
+                item["sha256"]
+                for item in observed["receipt"]["captures"]
+                if item["label"] in labels
+            }))
+
+    def test_opt_in_v3_motion_evidence_is_schema_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory), motion_primary=True)
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["motion_evidence"]["distinct_hashes"] = True
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            with self.assertRaises(validate_current_craft_acceptance.CurrentCraftError):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace,
+                    case_path,
+                    receipt_path,
+                    manifest_path,
+                )
 
     def test_opt_in_v2_acceptance_rejects_contract_record_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

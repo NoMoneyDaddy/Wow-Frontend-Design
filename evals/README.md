@@ -341,6 +341,8 @@ npm run capture:current -- \
 
 v2 不取代 default matrix：runner 仍先以各自 fresh BrowserContext 擷取所有 HTML 的桌機／手機 default state，再以另一個 fresh context 重播被選中的 `desktop` 或 `mobile` contract case，通過至少一個 action 與結果 assertion、且未離開原 output route 後，才多存恰好一張 `contract:<case-id>` screenshot。Case、manifest、receipt 與實際 contract bytes/hash 任一不一致、無 action、未知 case、`narrow`／`mobile-motion` profile、導頁或第二張 state 都 fail closed。Draft cohort 永遠維持 schema v1/default-only；草稿圖不會進正式 acceptance。
 
+Animation-primary 可由 evaluator 明示建立 schema v3 case：同一份 frozen browser contract 必須提供一個 `desktop` 或 `mobile-motion` case，依序證明 trigger action、active animation、settled animation 與非 motion final assertion；另提供同頁 `mobile` reduced case，證明 action 後持續 inactive 與 final assertion。Capture plan 固定三個遞增的 `50–5000ms` post-trigger offsets，canonical runner 以三個 fresh context 允許動畫取 viewport frame，再以第四個 fresh reduced context 完整重播並取得 static frame；加上原本 animations-disabled desktop/mobile，共恰六張。Receipt 只把這些 frame 限定為 requested-offset 與 reduced static observation；不同 frame hash 不是通過條件，也不認證 timing、easing、spatial continuity、runtime performance 或 award quality。
+
 獨立 reviewer 仍使用現有 `quality_result.json`、evaluator-owned `policy.json` 與 `ledger.json`，不新增第二套分數。完成 reviewer verdict 與 ledger 後，用 current acceptance wrapper 收口：
 
 ```bash
@@ -367,7 +369,7 @@ npm run accept:current -- \
 - `playwright_html_smoke.cjs`：fresh Chromium/Axe acceptance smoke。
 - `playwright_browser_runtime.cjs`：共用 Playwright network、popup、Service Worker 與 lifecycle policy。
 - `capture_current_visual_evidence.cjs`：final-only fresh 桌機／手機證據與 provenance receipt。
-- `prepare_current_craft_case.py`：從 completed manifest 原子建立 schema-closed private capture case；選用 contract case 時安全建立 v2 consequential-state case。
+- `prepare_current_craft_case.py`：從 completed manifest 原子建立 schema-closed private capture case；選用 contract case 時安全建立 v2 consequential-state case，或以雙 case 與三個 frozen offsets 建立 animation-primary v3 case。
 - `validate_current_craft_acceptance.py`：把現有 craft policy／ledger 綁回 frozen case、current manifest 與 fresh capture set。
 - `validate_codex_log_policy.py`：bounded stdout/stderr 與敏感輸出政策。
 - `product_cases.json`、`trigger_cases.json`：通用產品與 trigger fixtures，不是已發布成果。

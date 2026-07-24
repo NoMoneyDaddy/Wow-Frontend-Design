@@ -247,6 +247,148 @@ def _consequential_contract(
     return record
 
 
+def _motion_sequence_contract(
+    raw: bytes,
+    manifest: dict[str, Any],
+    motion_case_id: str,
+    reduced_case_id: str,
+    offsets_ms: list[int],
+) -> tuple[dict[str, Any], str]:
+    for value, label in (
+        (motion_case_id, "motion_contract_case_id"),
+        (reduced_case_id, "reduced_motion_contract_case_id"),
+    ):
+        if re.fullmatch(r"[a-z][a-z0-9-]{0,47}", value) is None:
+            raise CraftCaseError(f"{label} is invalid")
+    if (
+        len(offsets_ms) != 3
+        or any(type(value) is not int or not 50 <= value <= 5000 for value in offsets_ms)
+        or offsets_ms != sorted(set(offsets_ms))
+    ):
+        raise CraftCaseError(
+            "motion_offsets_ms must contain exactly three increasing values from 50 to 5000"
+        )
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise CraftCaseError("browser contract is not valid JSON") from error
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"schema_version", "cases"}
+        or value.get("schema_version") not in {1, 2}
+        or not isinstance(value.get("cases"), list)
+        or not 1 <= len(value["cases"]) <= 4
+    ):
+        raise CraftCaseError("browser contract schema is invalid")
+    selected: dict[str, dict[str, Any]] = {}
+    step_count = 0
+    for item in value["cases"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"id", "page", "profile", "steps"}
+            or not isinstance(item["steps"], list)
+            or not 1 <= len(item["steps"]) <= 24
+        ):
+            raise CraftCaseError("browser contract case is invalid")
+        step_count += len(item["steps"])
+        if item["id"] in {motion_case_id, reduced_case_id}:
+            selected[item["id"]] = item
+    motion = selected.get(motion_case_id)
+    reduced = selected.get(reduced_case_id)
+    output_pages = {
+        record["path"]
+        for record in manifest["outputs"]
+        if record["path"].lower().endswith(".html")
+    }
+    if (
+        motion is None
+        or reduced is None
+        or motion_case_id == reduced_case_id
+        or motion["page"] != reduced["page"]
+        or output_pages != {motion["page"]}
+        or motion["profile"] not in {"desktop", "mobile-motion"}
+        or reduced["profile"] != "mobile"
+    ):
+        raise CraftCaseError("motion contract case selection is invalid")
+
+    motion_steps = motion["steps"]
+    reduced_steps = reduced["steps"]
+    motion_actions = [
+        index
+        for index, step in enumerate(motion_steps)
+        if isinstance(step, dict) and step.get("action") in {"click", "fill", "press", "select"}
+    ]
+    reduced_actions = [
+        index
+        for index, step in enumerate(reduced_steps)
+        if isinstance(step, dict) and step.get("action") in {"click", "fill", "press", "select"}
+    ]
+    motion_active = [
+        index
+        for index, step in enumerate(motion_steps)
+        if isinstance(step, dict) and step.get("action") == "assert"
+        and step.get("expect") == "active-animation-count-between"
+    ]
+    motion_settled = [
+        index
+        for index, step in enumerate(motion_steps)
+        if isinstance(step, dict) and step.get("action") == "assert"
+        and step.get("expect") == "animations-settled"
+    ]
+    reduced_inactive = [
+        index
+        for index, step in enumerate(reduced_steps)
+        if isinstance(step, dict) and step.get("action") == "assert"
+        and step.get("expect") == "animations-inactive-for"
+    ]
+    motion_assertions = {
+        "active-animation-count-between",
+        "animations-inactive-for",
+        "animations-settled",
+    }
+    motion_final = [
+        index
+        for index, step in enumerate(motion_steps)
+        if isinstance(step, dict) and step.get("action") == "assert"
+        and step.get("expect") not in motion_assertions
+    ]
+    reduced_final = [
+        index
+        for index, step in enumerate(reduced_steps)
+        if isinstance(step, dict) and step.get("action") == "assert"
+        and step.get("expect") not in motion_assertions
+    ]
+    if (
+        len(motion_actions) != 1
+        or len(motion_active) != 1
+        or len(motion_settled) != 1
+        or not motion_final
+        or not (
+            motion_actions[0]
+            < motion_active[0]
+            < motion_settled[0]
+            < motion_final[-1]
+        )
+        or len(reduced_actions) != 1
+        or len(reduced_inactive) != 1
+        or not reduced_final
+        or not reduced_actions[0] < reduced_inactive[0] < reduced_final[-1]
+    ):
+        raise CraftCaseError("motion contract cases do not prove active, settled, and reduced final states")
+    record = {
+        "schema_version": value["schema_version"],
+        "bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "case_count": len(value["cases"]),
+        "step_count": step_count,
+    }
+    if manifest.get("browser_contract") != record:
+        raise CraftCaseError(
+            "browser contract provenance does not match the completed manifest"
+        )
+    return record, motion["page"]
+
+
 def _validate_manifest_output(
     workspace: Path,
     record: dict[str, Any],
@@ -416,6 +558,9 @@ def prepare_case(
     locale: str = "zh-Hant",
     browser_contract: Path | None = None,
     contract_case_id: str | None = None,
+    motion_contract_case_id: str | None = None,
+    reduced_motion_contract_case_id: str | None = None,
+    motion_offsets_ms: list[int] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(case_id, str) or ID_PATTERN.fullmatch(case_id) is None:
         raise CraftCaseError("case_id is invalid")
@@ -434,11 +579,26 @@ def prepare_case(
     for index, record in enumerate(manifest["outputs"]):
         _validate_manifest_output(workspace, record, index)
     output_path, parent = _output_path(Path(output), workspace)
-    if (browser_contract is None) != (contract_case_id is None):
+    motion_values = (
+        motion_contract_case_id,
+        reduced_motion_contract_case_id,
+        motion_offsets_ms,
+    )
+    motion_requested = any(value is not None for value in motion_values)
+    if motion_requested and (
+        browser_contract is None
+        or any(value is None for value in motion_values)
+        or contract_case_id is not None
+    ):
+        raise CraftCaseError(
+            "animation-primary capture requires browser_contract, both motion case IDs, and three offsets"
+        )
+    if not motion_requested and (browser_contract is None) != (contract_case_id is None):
         raise CraftCaseError(
             "browser_contract and contract_case_id must be provided together"
         )
     contract_record = None
+    motion_page = None
     if browser_contract is not None:
         contract_path = Path(browser_contract)
         raw_contract = _read_manifest(contract_path, "browser contract")
@@ -452,14 +612,23 @@ def prepare_case(
             workspace,
             "browser contract",
         )
-        contract_record = _consequential_contract(
-            raw_contract,
-            manifest,
-            contract_case_id,
-        )
+        if motion_requested:
+            contract_record, motion_page = _motion_sequence_contract(
+                raw_contract,
+                manifest,
+                motion_contract_case_id,
+                reduced_motion_contract_case_id,
+                motion_offsets_ms,
+            )
+        else:
+            contract_record = _consequential_contract(
+                raw_contract,
+                manifest,
+                contract_case_id,
+            )
 
     case = {
-        "schema_version": 2 if contract_record else 1,
+        "schema_version": 3 if motion_requested else 2 if contract_record else 1,
         "case_id": case_id,
         "run_id": f"current-{hashlib.sha256(raw_manifest).hexdigest()}",
         "partition": partition,
@@ -479,9 +648,17 @@ def prepare_case(
     }
     if contract_record:
         case["browser_contract"] = contract_record
-        case["capture_plan"]["consequential_state"] = {
-            "contract_case_id": contract_case_id,
-        }
+        if motion_requested:
+            case["capture_plan"]["motion_sequence"] = {
+                "page": motion_page,
+                "motion_contract_case_id": motion_contract_case_id,
+                "reduced_motion_contract_case_id": reduced_motion_contract_case_id,
+                "offsets_ms": motion_offsets_ms,
+            }
+        else:
+            case["capture_plan"]["consequential_state"] = {
+                "contract_case_id": contract_case_id,
+            }
     encoded = (
         json.dumps(case, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     ).encode("utf-8")
@@ -504,6 +681,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--locale", choices=("zh-Hant", "en"), default="zh-Hant")
     parser.add_argument("--browser-contract", type=Path)
     parser.add_argument("--contract-case-id")
+    parser.add_argument("--motion-contract-case-id")
+    parser.add_argument("--reduced-motion-contract-case-id")
+    parser.add_argument("--motion-offsets-ms", nargs=3, type=int)
     args = parser.parse_args(argv)
     try:
         prepare_case(
@@ -514,6 +694,9 @@ def main(argv: list[str] | None = None) -> int:
             locale=args.locale,
             browser_contract=args.browser_contract,
             contract_case_id=args.contract_case_id,
+            motion_contract_case_id=args.motion_contract_case_id,
+            reduced_motion_contract_case_id=args.reduced_motion_contract_case_id,
+            motion_offsets_ms=args.motion_offsets_ms,
         )
     except CraftCaseError as error:
         print(f"error: {error}", file=sys.stderr)

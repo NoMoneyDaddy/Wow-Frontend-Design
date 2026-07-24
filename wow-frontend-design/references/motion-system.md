@@ -157,7 +157,7 @@ For a ScrollTrigger product section, keep the product name, evidence and CTA in 
 
 ## 4. Provide a reduced-motion result
 
-Use the user preference from [Media Queries Level 5](https://www.w3.org/TR/mediaqueries-5/#prefers-reduced-motion). The alternative must preserve meaning, order, and final state.
+Use the user preference from [Media Queries Level 5](https://www.w3.org/TR/mediaqueries-5/#prefers-reduced-motion). The alternative must preserve meaning, order, and final state. For an animation-primary surface, keep the reduced poster or final composition in the animated stage's same useful viewport region; a technically present fallback below the fold does not preserve the observed composition.
 
 Reduce or remove:
 
@@ -184,6 +184,7 @@ The packaged `scripts/motion_svg_audit.py` is advisory source discovery only. It
 - Gate hover-only polish with `(hover: hover) and (pointer: fine)`; provide tap and keyboard equivalents.
 - Keep touch cancellation, native page scroll, browser zoom, text selection, and system gestures intact.
 - Test nested scroll containers, modal scroll lock, virtual keyboard, safe areas, short landscape, anchor links, Back/Forward, and scroll restoration.
+- Keep each motion stage's own border box, status, and controls inside its mobile layout track. Resolve `aspect-ratio`, minimum block size, padding, and grid constraints together; global `overflow-x: hidden` or `clip` must not conceal an oversized stage.
 - Avoid scroll-jacking. A scroll-linked narrative must leave the user in control and remain understandable when the effect is absent.
 - Do not pin large sections merely to imitate an award-site trope. Confirm reading order, focus visibility, and escape routes while pinned.
 - Reduce effect count, layer area, DPR, and asset complexity on constrained devices based on measurement—not user-agent stereotypes.

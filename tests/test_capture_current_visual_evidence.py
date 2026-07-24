@@ -8,6 +8,7 @@ import json
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -137,6 +138,84 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
         case["capture_plan"]["consequential_state"] = {"contract_case_id": "open-details"}
         return contract
 
+    def motion_contract(self, root: Path, target: Path, case: dict) -> Path:
+        payload = {
+            "schema_version": 2,
+            "cases": [
+                {
+                    "id": "play-motion",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "play", "action": "click", "selector": "#play"},
+                        {
+                            "id": "active",
+                            "action": "assert",
+                            "selector": "main",
+                            "expect": "active-animation-count-between",
+                            "min_animations": 1,
+                            "max_animations": 8,
+                        },
+                        {
+                            "id": "settled",
+                            "action": "assert",
+                            "selector": "main",
+                            "expect": "animations-settled",
+                        },
+                        {
+                            "id": "final",
+                            "action": "assert",
+                            "selector": "#final",
+                            "expect": "visible",
+                        },
+                    ],
+                },
+                {
+                    "id": "play-reduced",
+                    "page": "index.html",
+                    "profile": "mobile",
+                    "steps": [
+                        {"id": "play", "action": "click", "selector": "#play"},
+                        {
+                            "id": "inactive",
+                            "action": "assert",
+                            "selector": "main",
+                            "expect": "animations-inactive-for",
+                            "duration_ms": 200,
+                        },
+                        {
+                            "id": "final",
+                            "action": "assert",
+                            "selector": "#final",
+                            "expect": "visible",
+                        },
+                    ],
+                },
+            ],
+        }
+        contract = root / "browser-contract.json"
+        contract.write_text(json.dumps(payload), encoding="utf-8")
+        record = {
+            "schema_version": 2,
+            "bytes": contract.stat().st_size,
+            "sha256": digest(contract),
+            "case_count": 2,
+            "step_count": 7,
+        }
+        manifest_path = target / "run-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["browser_contract"] = record
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        case["schema_version"] = 3
+        case["browser_contract"] = record
+        case["capture_plan"]["motion_sequence"] = {
+            "page": "index.html",
+            "motion_contract_case_id": "play-motion",
+            "reduced_motion_contract_case_id": "play-reduced",
+            "offsets_ms": [120, 540, 1250],
+        }
+        return contract
+
     def test_captures_exact_fresh_desktop_and_mobile_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -170,7 +249,7 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 ),
             )
             contract = self.consequential_contract(root, target, case)
-            case_path.write_text(json.dumps(case), encoding="utf-8")
+            case_path.write_text(json.dumps(case, sort_keys=True), encoding="utf-8")
 
             evidence = root / "evidence"
             completed = self.invoke(target, case_path, evidence, browser_contract=contract)
@@ -186,6 +265,115 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             self.assertEqual("desktop-default", states[0]["profile"])
             self.assertEqual("contract:open-details", states[0]["context"]["state"])
             self.assertEqual(case["browser_contract"], receipt["source"]["browser_contract"])
+
+    def test_opt_in_v3_captures_three_fresh_motion_frames_and_reduced_static(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(
+                root,
+                html=(
+                    '<!doctype html><html><head><style>'
+                    '#final{opacity:.2} @media(prefers-reduced-motion:reduce){#final{opacity:1}}'
+                    '</style></head><body><main><h1>Motion</h1>'
+                    '<button id="play" onclick="'
+                    "if(!matchMedia('(prefers-reduced-motion: reduce)').matches)"
+                    "document.querySelector('#final').animate("
+                    "[{transform:'translateX(0px)'},{transform:'translateX(20px)'}],"
+                    "{duration:700,fill:'forwards'});"
+                    '">Play</button><section id="final">Final</section>'
+                    '</main></body></html>'
+                ),
+            )
+            contract = self.motion_contract(root, target, case)
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            receipt = json.loads((evidence / "capture-receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual(3, receipt["schema_version"])
+            self.assertEqual(6, len(receipt["captures"]))
+            self.assertEqual("allow", receipt["capture_standard"]["motion_evidence_animations"])
+            self.assertIn(
+                '{ animations: "allow", waitCondition: "contract-replay-complete" }',
+                CAPTURE.read_text(encoding="utf-8"),
+            )
+            motion = receipt["motion_evidence"]
+            self.assertEqual(3, len(motion["capture_labels"]["motion_sequence"]))
+            self.assertIn(
+                motion["capture_labels"]["reduced_motion_static"],
+                {item["label"] for item in receipt["captures"]},
+            )
+            self.assertEqual(
+                [
+                    "fresh-fixed-request-offset-viewport-frames",
+                    "fresh-reduced-motion-static-frame",
+                ],
+                motion["claim_scope"]["observed"],
+            )
+            self.assertEqual(
+                ["timing", "easing", "spatial-continuity", "runtime-performance", "award-quality"],
+                motion["claim_scope"]["not_certified"],
+            )
+            defaults = [
+                item for item in receipt["captures"]
+                if item["context"]["state"] == "default"
+            ]
+            self.assertEqual(2, len(defaults))
+            self.assertTrue(all(item["context"]["wait_condition"].startswith("post-trigger+") for item in receipt["captures"][2:5]))
+            self.assertEqual(
+                "contract:play-reduced:reduced-static",
+                receipt["captures"][5]["context"]["state"],
+            )
+
+    def test_opt_in_v3_rejects_browser_contract_drift_during_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(
+                root,
+                html=(
+                    '<!doctype html><html><body><main><h1>Motion</h1>'
+                    '<button id="play" onclick="'
+                    "if(!matchMedia('(prefers-reduced-motion: reduce)').matches)"
+                    "document.querySelector('#final').animate("
+                    "[{opacity:.2},{opacity:1}],{duration:700,fill:'forwards'});"
+                    '">Play</button><section id="final">Final</section>'
+                    '</main></body></html>'
+                ),
+            )
+            contract = self.motion_contract(root, target, case)
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+            evidence = root / "evidence"
+            process = subprocess.Popen(
+                [
+                    "node",
+                    str(CAPTURE),
+                    str(target),
+                    str(case_path),
+                    str(evidence),
+                    "--browser-contract",
+                    str(contract),
+                ],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            deadline = time.monotonic() + 20
+            artifacts = evidence / "artifacts"
+            while time.monotonic() < deadline and not list(artifacts.glob("*.png")):
+                if process.poll() is not None:
+                    break
+                time.sleep(0.05)
+            self.assertIsNone(process.poll(), "capture exited before drift could be injected")
+            contract.write_bytes(contract.read_bytes() + b"\n")
+            stdout, stderr = process.communicate(timeout=30)
+
+            self.assertEqual("", stdout)
+            self.assertEqual(1, process.returncode)
+            self.assertIn("drifted during capture", stderr)
+            self.assertFalse(evidence.exists())
 
     def test_opt_in_v2_rejects_invalid_consequential_contract_selection(self) -> None:
         modes = {

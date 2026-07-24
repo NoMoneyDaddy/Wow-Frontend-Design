@@ -1442,6 +1442,24 @@ html, body { overflow-x: clip; }
             self.assertEqual("passed", receipt["status"])
             self.assertTrue(all(not item["root_horizontal_overflow"] for item in receipt["results"]))
 
+    def test_body_clip_cannot_hide_a_layout_surface_wider_than_the_viewport(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Masked overflow</title><style>
+html, body { margin: 0; overflow-x: clip; }
+main { padding: 16px; }
+.stage { min-height: 384px; aspect-ratio: 4 / 3; overflow: clip; }
+</style></head><body><main><h1>Stage</h1><div class="stage">Composition</div></main></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+
+            self.assertEqual("rejected", receipt["status"])
+            results = {item["profile"]: item for item in receipt["results"]}
+            self.assertFalse(results["desktop"]["root_horizontal_overflow"])
+            self.assertTrue(results["mobile"]["root_horizontal_overflow"])
+            self.assertTrue(results["narrow"]["root_horizontal_overflow"])
+
     def test_text_outside_empty_main_does_not_satisfy_primary_content(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

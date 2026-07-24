@@ -684,7 +684,8 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           root_horizontal_overflow: (() => {
             // CSSOM View defines scrollingElement as the element that scrolls the document.
             const rootScroller = document.scrollingElement || document.documentElement;
-            return rootScroller.scrollWidth > rootScroller.clientWidth + 1;
+            const bodyWidth = document.body ? document.body.scrollWidth : 0;
+            return Math.max(rootScroller.scrollWidth, bodyWidth) > rootScroller.clientWidth + 1;
           })(),
         })).catch(() => ({ visible_text: false, visible_primary_content: false, root_horizontal_overflow: false })) : {
           visible_text: false,
