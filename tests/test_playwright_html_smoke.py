@@ -503,9 +503,12 @@ document.querySelector('#primary').onclick = () => {
 </style></head><body><main><h1>字體與排版驗證</h1>
 <p id="specimen"><span>繁體中文第一行</span><span>中英混排 Design 2026</span><span style="visibility:hidden">不可冒充第三行</span><span class="clipped"><span>裁切文字不可冒充第三行</span></span></p>
 </main><script>
-const contractFont = new FontFace("Contract Probe", 'local("Arial")');
+const contractFont = new FontFace(
+  "Contract Probe",
+  'local("Arial"), local("Helvetica"), local("DejaVu Sans"), local("Liberation Sans")'
+);
 document.fonts.add(contractFont);
-contractFont.load();
+contractFont.load().catch(() => {});
 </script></body></html>''',
                 encoding="utf-8",
             )
