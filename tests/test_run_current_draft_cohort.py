@@ -147,6 +147,25 @@ class CurrentDraftCohortTests(unittest.TestCase):
             },
             "outputs": records,
         }
+        if kwargs.get("seed_root") is not None:
+            manifest["case"] = {"mode": "retrofit", "lane_contract": "RETROFIT"}
+            manifest["seed_snapshot"] = {
+                "files": [],
+                "directories": [],
+                "tree_sha256": "d" * 64,
+            }
+            manifest["mutation"] = {
+                "allowed_changes": outputs,
+                "observed_changes": outputs,
+                "preserved_directories": 0,
+            }
+            manifest["html_verification"] = {
+                "policy": "draft_direction_subset",
+                "pages": [
+                    output for output in outputs
+                    if output.endswith(".html")
+                ],
+            }
         if kwargs.get("browser_contract") is not None:
             _, _, browser_contract_record = cohort.current_build._load_browser_contract(
                 Path(kwargs["browser_contract"]),
@@ -371,6 +390,117 @@ class CurrentDraftCohortTests(unittest.TestCase):
             receipt_path = cohort_root / "draft-cohort-receipt.json"
             self.assertTrue(receipt_path.is_file())
             self.assertEqual(0o600, stat.S_IMODE(receipt_path.stat().st_mode))
+
+    def test_seeded_cohort_uses_retrofit_builder_and_captures_only_directions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            seed = root / "existing-product"
+            seed.mkdir()
+            legacy = seed / "legacy.html"
+            legacy.write_text(
+                '<!doctype html><html><body><main>Existing product</main></body></html>',
+                encoding="utf-8",
+            )
+            legacy_before = digest(legacy)
+            validated = {
+                "capture_count": 4,
+                "capture_set_sha256": "c" * 64,
+                "capture_standard": cohort.CAPTURE_STANDARD,
+            }
+            with (
+                mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build) as build,
+                mock.patch.object(cohort, "run_capture", side_effect=self.fake_capture),
+                mock.patch.object(
+                    cohort,
+                    "validate_current_capture_evidence",
+                    return_value=validated,
+                ),
+            ):
+                receipt = cohort.run(
+                    plan,
+                    brief,
+                    cohort_root,
+                    logs,
+                    seed_root=seed,
+                )
+
+            kwargs = build.call_args.kwargs
+            self.assertEqual("retrofit", kwargs["case_mode"])
+            self.assertEqual(seed, kwargs["seed_root"])
+            self.assertEqual(cohort.direction_outputs(self.valid_plan()), kwargs["allow_changes"])
+            self.assertEqual(
+                cohort.direction_outputs(self.valid_plan())[1:],
+                kwargs["html_verification_pages"],
+            )
+            case = json.loads((logs / "draft-cohort-case.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {
+                    "policy": "draft_direction_subset",
+                    "paths": [
+                        "directions/editorial-index.html",
+                        "directions/task-led-market.html",
+                    ],
+                },
+                case["capture_plan"]["pages"],
+            )
+            self.assertEqual("style_calibration_only", receipt["claim_boundary"])
+            self.assertEqual(legacy_before, digest(legacy))
+            self.assertFalse((seed / "directions").exists())
+
+    def test_seeded_cohort_rejects_existing_direction_before_build(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            seed = root / "existing-product"
+            (seed / "directions").mkdir(parents=True)
+            (seed / "directions" / "editorial-index.html").write_text(
+                "<html><body>Owned path</body></html>",
+                encoding="utf-8",
+            )
+            with mock.patch.object(cohort.current_build, "run") as build:
+                with self.assertRaisesRegex(
+                    cohort.DraftCohortError,
+                    "already contains a requested draft direction",
+                ):
+                    cohort.run(plan, brief, cohort_root, logs, seed_root=seed)
+            build.assert_not_called()
+            self.assertEqual([], list(cohort_root.iterdir()))
+            self.assertEqual([], list(logs.iterdir()))
+
+    def test_seed_drift_during_capture_prevents_success_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            plan, brief, cohort_root, logs = self.write_inputs(root)
+            seed = root / "existing-product"
+            seed.mkdir()
+            legacy = seed / "legacy.html"
+            legacy.write_text("<html><body>Existing</body></html>", encoding="utf-8")
+            validated = {
+                "capture_count": 4,
+                "capture_set_sha256": "c" * 64,
+                "capture_standard": cohort.CAPTURE_STANDARD,
+            }
+
+            def mutate_seed(*args: object, **kwargs: object) -> None:
+                self.fake_capture(*args, **kwargs)
+                legacy.write_text("<html><body>Drifted</body></html>", encoding="utf-8")
+
+            with (
+                mock.patch.object(cohort.current_build, "run", side_effect=self.fake_build),
+                mock.patch.object(cohort, "run_capture", side_effect=mutate_seed),
+                mock.patch.object(
+                    cohort,
+                    "validate_current_capture_evidence",
+                    return_value=validated,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    cohort.DraftCohortError,
+                    "seed provenance drifted",
+                ):
+                    cohort.run(plan, brief, cohort_root, logs, seed_root=seed)
+            self.assertFalse((cohort_root / "draft-cohort-receipt.json").exists())
 
     def test_browser_contract_is_validated_bound_and_passed_to_all_directions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

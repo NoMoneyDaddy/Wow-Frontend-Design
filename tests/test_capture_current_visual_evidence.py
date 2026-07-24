@@ -113,6 +113,114 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 self.assertEqual(item["bytes"], artifact.stat().st_size)
                 self.assertEqual(item["sha256"], digest(artifact))
 
+    def test_explicit_page_set_excludes_other_manifest_html(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(root)
+            other = target / "legacy.html"
+            other.write_text(
+                '<!doctype html><html lang="zh-Hant"><body><main><h1>Legacy</h1></main></body></html>',
+                encoding="utf-8",
+            )
+            manifest_path = target / "run-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            direction_pages = [
+                "directions/editorial-index.html",
+                "directions/task-led-market.html",
+            ]
+            for page in direction_pages:
+                artifact = target / page
+                artifact.parent.mkdir(parents=True, exist_ok=True)
+                artifact.write_text(
+                    f'<!doctype html><html><body><main><h1>{page}</h1></main></body></html>',
+                    encoding="utf-8",
+                )
+                manifest["outputs"].append({
+                    "path": page,
+                    "bytes": artifact.stat().st_size,
+                    "mode": f"{stat.S_IMODE(artifact.stat().st_mode):04o}",
+                    "sha256": digest(artifact),
+                })
+            manifest["outputs"].append({
+                "path": "legacy.html",
+                "bytes": other.stat().st_size,
+                "mode": f"{stat.S_IMODE(other.stat().st_mode):04o}",
+                "sha256": digest(other),
+            })
+            manifest["case"] = {"mode": "retrofit", "lane_contract": "RETROFIT"}
+            manifest["seed_snapshot"] = {"files": [], "directories": [], "tree_sha256": "a" * 64}
+            manifest["mutation"] = {
+                "allowed_changes": ["DESIGN.md", *direction_pages],
+                "observed_changes": direction_pages,
+                "preserved_directories": 0,
+            }
+            manifest["html_verification"] = {
+                "policy": "draft_direction_subset",
+                "pages": direction_pages,
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            case["capture_plan"]["pages"] = {
+                "policy": "draft_direction_subset",
+                "paths": direction_pages,
+            }
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+            convergence = root / "convergence.json"
+            convergence.write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "cohort_id": "private-validation-case",
+                    "surface": "primary",
+                    "variants": [
+                        {"id": "editorial-index", "page": direction_pages[0]},
+                        {"id": "task-led-market", "page": direction_pages[1]},
+                    ],
+                }),
+                encoding="utf-8",
+            )
+
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, convergence)
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            receipt = json.loads((evidence / "capture-receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual(set(direction_pages), {item["page"] for item in receipt["captures"]})
+            self.assertEqual(4, len(receipt["captures"]))
+
+            manifest["html_verification"]["pages"] = [
+                direction_pages[0],
+                direction_pages[0],
+            ]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            rejected_evidence = root / "rejected-evidence"
+            rejected = self.invoke(target, case_path, rejected_evidence, convergence)
+            self.assertEqual(1, rejected.returncode)
+            self.assertIn(
+                "not bound to a seeded RETROFIT manifest",
+                rejected.stderr,
+            )
+            self.assertFalse(rejected_evidence.exists())
+
+    def test_explicit_page_set_rejects_unknown_or_duplicate_pages(self) -> None:
+        for paths in (
+            ["directions/missing.html", "directions/other.html"],
+            ["directions/same.html", "directions/same.html"],
+            ["../index.html", "directions/other.html"],
+        ):
+            with self.subTest(paths=paths), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                target, case_path, case = self.fixture(root)
+                case["capture_plan"]["pages"] = {
+                    "policy": "draft_direction_subset",
+                    "paths": paths,
+                }
+                case_path.write_text(json.dumps(case), encoding="utf-8")
+                evidence = root / "evidence"
+
+                completed = self.invoke(target, case_path, evidence)
+
+                self.assertEqual(1, completed.returncode)
+                self.assertFalse(evidence.exists())
+
     def test_existing_evidence_directory_is_never_reused_or_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

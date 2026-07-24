@@ -1661,6 +1661,33 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("passed", receipt["status"])
             self.assertEqual(2, receipt["browser_contract"]["schema_version"])
 
+    def test_draft_html_verification_scope_does_not_gate_unchanged_seed_html(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            (stage / "legacy.html").write_text(
+                "<html><body>Legacy seed without current output contract</body></html>",
+                encoding="utf-8",
+            )
+            direction = stage / "directions" / "editorial-index.html"
+            direction.parent.mkdir()
+            direction.write_text(
+                '<!doctype html><html lang="zh-Hant"><head><title>Direction</title></head>'
+                '<body><main><h1>方向</h1><p>Style calibration.</p></main></body></html>',
+                encoding="utf-8",
+            )
+
+            receipt = policy._run_html_smoke(
+                stage,
+                ("legacy.html", "directions/editorial-index.html"),
+                30,
+                verification_pages=("directions/editorial-index.html",),
+            )
+
+            self.assertEqual("passed", receipt["status"])
+            self.assertEqual(
+                {"directions/editorial-index.html"},
+                {result["page"] for result in receipt["results"]},
+            )
     def test_html_smoke_accepts_opt_in_mobile_motion_profile(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory).resolve()

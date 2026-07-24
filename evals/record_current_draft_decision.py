@@ -264,9 +264,25 @@ def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
         has_mode=True,
         expected_path="evidence/capture-receipt.json",
     )
+    case_value, _ = _read_json(
+        logs / "draft-cohort-case.json",
+        "draft cohort case",
+        RECEIPT_LIMIT,
+    )
+    allow_subset = isinstance(
+        case_value.get("capture_plan", {}).get("pages")
+        if isinstance(case_value.get("capture_plan"), dict)
+        else None,
+        dict,
+    )
+    validation_arguments = {"allow_draft_subset": True} if allow_subset else {}
     try:
         validated = validate_current_capture_evidence(
-            root / "workspace", logs / "draft-cohort-case.json", capture_path, manifest_path
+            root / "workspace",
+            logs / "draft-cohort-case.json",
+            capture_path,
+            manifest_path,
+            **validation_arguments,
         )
     except CurrentCraftError as error:
         raise DraftDecisionError("current draft capture provenance is invalid") from error
@@ -295,6 +311,7 @@ def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
         "receipt_record": {"path": "draft-cohort-receipt.json", **_digest_record(receipt_path)},
         "cohort": metadata,
         "capture": validated,
+        "automatic_production_lane": None if allow_subset else "BUILD",
     }
 
 
@@ -362,12 +379,24 @@ def _decision_receipt_payload(
         "stop": "draft_direction_stopped",
     }[item["action"]]
     next_step = {
-        "select": "implement_selected_direction",
+        "select": (
+            "implement_selected_direction"
+            if source["automatic_production_lane"] == "BUILD"
+            else "carry_selected_direction_to_retrofit_brief"
+        ),
         "revise": "render_one_bounded_revision",
         "stop": "stop_before_production",
     }[item["action"]]
     revalidation = {
-        "select": ["production implementation", "fresh Playwright capture", "affected release matrix"],
+        "select": [
+            (
+                "production implementation"
+                if source["automatic_production_lane"] == "BUILD"
+                else "formal RETROFIT implementation"
+            ),
+            "fresh Playwright capture",
+            "affected release matrix",
+        ],
         "revise": ["one fresh desktop/mobile revision pair", "return to this decision checkpoint"],
         "stop": [],
     }[item["action"]]
@@ -396,7 +425,11 @@ def _decision_receipt_payload(
         },
         "handoff": {
             "next_step": next_step,
-            "production_lane": "BUILD" if item["action"] == "select" else None,
+            "production_lane": (
+                source["automatic_production_lane"]
+                if item["action"] == "select"
+                else None
+            ),
             "base_variant_id": item["variant_id"], "source_page": page,
             "held_constant_axes": source["cohort"]["held_constant_axes"],
             "selection_criteria": source["cohort"]["selection_criteria"],

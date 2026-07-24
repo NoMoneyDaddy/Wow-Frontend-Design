@@ -50,7 +50,13 @@ def png_with_text_chunk(content: bytes) -> bytes:
 
 
 class CurrentCraftAcceptanceTests(unittest.TestCase):
-    def build_fixture(self, root: Path) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
+    def build_fixture(
+        self,
+        root: Path,
+        *,
+        explicit_pages: list[str] | None = None,
+        include_legacy_html: bool = False,
+    ) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
         root = root.resolve()
         workspace = root / "workspace"
         workspace.mkdir()
@@ -60,8 +66,24 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main><h1>現行輸出</h1><p>Independent review.</p></main></body></html>',
             encoding="utf-8",
         )
+        if include_legacy_html:
+            (workspace / "legacy.html").write_text(
+                '<!doctype html><html lang="zh-Hant"><body><main><h1>Legacy</h1></main></body></html>',
+                encoding="utf-8",
+            )
+        for page in explicit_pages or []:
+            artifact = workspace / page
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text(
+                f'<!doctype html><html lang="zh-Hant"><body><main><h1>{page}</h1></main></body></html>',
+                encoding="utf-8",
+            )
         outputs = []
-        for name in ("DESIGN.md", "index.html"):
+        output_names = ["DESIGN.md", "index.html"]
+        if include_legacy_html:
+            output_names.append("legacy.html")
+        output_names.extend(explicit_pages or [])
+        for name in output_names:
             artifact = workspace / name
             outputs.append({
                 "path": name,
@@ -76,6 +98,22 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             "skill_snapshot": {"tree_sha256": "a" * 64},
             "outputs": outputs,
         }
+        if explicit_pages is not None:
+            manifest["case"] = {"mode": "retrofit", "lane_contract": "RETROFIT"}
+            manifest["seed_snapshot"] = {
+                "files": [],
+                "directories": [],
+                "tree_sha256": "a" * 64,
+            }
+            manifest["mutation"] = {
+                "allowed_changes": ["DESIGN.md", *explicit_pages],
+                "observed_changes": explicit_pages,
+                "preserved_directories": 0,
+            }
+            manifest["html_verification"] = {
+                "policy": "draft_direction_subset",
+                "pages": explicit_pages,
+            }
         manifest_path = workspace / "run-manifest.json"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         case = {
@@ -87,7 +125,14 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             "capture_plan": {
                 "locale": "zh-Hant",
                 "state": "default",
-                "pages": "all_html_outputs",
+                "pages": (
+                    {
+                        "policy": "draft_direction_subset",
+                        "paths": explicit_pages,
+                    }
+                    if explicit_pages is not None
+                    else "all_html_outputs"
+                ),
                 "wait_condition": "load+fonts+two-raf+300ms+two-raf",
                 "profiles": [
                     {"name": "desktop-default", "viewport": {"width": 1440, "height": 1000}, "reducedMotion": "no-preference", "dpr": 1},
@@ -103,8 +148,29 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
         case_path = root / "case.json"
         case_path.write_text(json.dumps(case), encoding="utf-8")
         evidence_root = root / "evidence"
+        capture_command = [
+            "node", str(CAPTURE), str(workspace), str(case_path), str(evidence_root)
+        ]
+        if explicit_pages is not None:
+            convergence = root / "convergence.json"
+            convergence.write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "cohort_id": "private-validation-case",
+                    "surface": "primary",
+                    "variants": [
+                        {
+                            "id": Path(page).stem,
+                            "page": page,
+                        }
+                        for page in explicit_pages
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            capture_command.append(str(convergence))
         captured = subprocess.run(
-            ["node", str(CAPTURE), str(workspace), str(case_path), str(evidence_root)],
+            capture_command,
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -262,6 +328,42 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 manifest_path,
             )
             self.assertEqual(2, observed["capture_count"])
+
+    def test_capture_provenance_accepts_an_explicit_manifest_page_subset(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, _, _, workspace, case, receipt, manifest = self.build_fixture(
+                root,
+                explicit_pages=[
+                    "directions/editorial-index.html",
+                    "directions/task-led-market.html",
+                ],
+                include_legacy_html=True,
+            )
+
+            observed = validate_current_craft_acceptance.validate_current_capture_evidence(
+                workspace,
+                case,
+                receipt,
+                manifest,
+                allow_draft_subset=True,
+            )
+
+            self.assertEqual(4, observed["capture_count"])
+            self.assertEqual(
+                {
+                    "directions/editorial-index.html",
+                    "directions/task-led-market.html",
+                },
+                {item["page"] for item in observed["receipt"]["captures"]},
+            )
+            with self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "outside draft calibration",
+            ):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace, case, receipt, manifest
+                )
             self.assertRegex(observed["capture_set_sha256"], r"^[a-f0-9]{64}$")
             self.assertEqual({"desktop-default", "mobile-default"}, {
                 capture["profile"] for capture in observed["receipt"]["captures"]

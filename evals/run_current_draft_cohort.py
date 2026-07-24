@@ -193,6 +193,19 @@ def _real_empty_directory(path: Path, label: str) -> Path:
     return path
 
 
+def _real_directory(path: Path, label: str) -> Path:
+    if not path.is_absolute():
+        raise DraftCohortError(f"{label} must be an absolute real directory")
+    try:
+        info = path.lstat()
+        canonical = path.resolve(strict=True)
+    except OSError as error:
+        raise DraftCohortError(f"{label} must be an absolute real directory") from error
+    if not stat.S_ISDIR(info.st_mode) or path.is_symlink() or canonical != path:
+        raise DraftCohortError(f"{label} must be an absolute real directory")
+    return path
+
+
 class _PinnedDirectory:
     """Hold a directory identity while path-based child tools execute."""
 
@@ -691,7 +704,11 @@ def _assert_execution_guards(
         raise DraftCohortError("cohort tool provenance drifted during execution")
 
 
-def _case(plan: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+def _case(
+    plan: dict[str, Any],
+    manifest: dict[str, Any],
+    pages: str | dict[str, Any] = "all_html_outputs",
+) -> dict[str, Any]:
     run_suffix = manifest["brief"]["sha256"][:12]
     return {
         "schema_version": 1,
@@ -702,7 +719,7 @@ def _case(plan: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
         "capture_plan": {
             "locale": plan["locale"],
             "state": "default",
-            "pages": "all_html_outputs",
+            "pages": pages,
             "wait_condition": "load+fonts+two-raf+300ms+two-raf",
             "profiles": CAPTURE_STANDARD["profiles"],
         },
@@ -726,6 +743,7 @@ def run(
     inactivity_seconds: int | None = None,
     max_repair_rounds: int = 1,
     browser_contract: Path | None = None,
+    seed_root: Path | None = None,
 ) -> dict[str, Any]:
     if type(max_repair_rounds) is not int or not 0 <= max_repair_rounds <= 1:
         raise DraftCohortError("draft max repair rounds must be within 0..1")
@@ -733,6 +751,21 @@ def run(
     brief_path, brief_raw = _regular_absolute_file(brief_path, "brief", BRIEF_LIMIT)
     plan, plan_record = load_plan(plan_path)
     outputs = direction_outputs(plan)
+    seed_snapshot: list[dict[str, Any]] = []
+    seed_directories: list[dict[str, Any]] = []
+    if seed_root is not None:
+        seed_root = _real_directory(seed_root, "seed root")
+        _outside_authoring_repository(seed_root, "seed root")
+        try:
+            seed_snapshot = current_build._seed_records(seed_root)
+            seed_directories = current_build._directory_records(seed_root)
+        except current_build.RunnerError as error:
+            raise DraftCohortError("seed root is not a valid current-build seed") from error
+        draft_collisions = {
+            record["path"] for record in seed_snapshot
+        } & set(outputs[1:])
+        if draft_collisions:
+            raise DraftCohortError("seed root already contains a requested draft direction")
     browser_contract_path: Path | None = None
     browser_contract_data: dict[str, Any] | None = None
     browser_contract_record: dict[str, Any] | None = None
@@ -766,6 +799,14 @@ def run(
     _separate(cohort_root, log_dir, "cohort root and log directory")
     _separate(plan_path, cohort_root, "plan and cohort root")
     _separate(brief_path, cohort_root, "brief and cohort root")
+    if seed_root is not None:
+        for boundary, label in (
+            (plan_path, "plan"),
+            (brief_path, "brief"),
+            (cohort_root, "cohort root"),
+            (log_dir, "log directory"),
+        ):
+            _separate(seed_root, boundary, f"seed root and {label}")
     if browser_contract_path is not None:
         for boundary, label in (
             (plan_path, "plan"),
@@ -777,6 +818,12 @@ def run(
                 browser_contract_path,
                 boundary,
                 f"draft browser contract and {label}",
+            )
+        if seed_root is not None:
+            _separate(
+                browser_contract_path,
+                seed_root,
+                "draft browser contract and seed root",
             )
 
     with _PinnedDirectory(cohort_root, "cohort root") as cohort_pin:
@@ -799,6 +846,9 @@ def run(
                 browser_contract_path=browser_contract_path,
                 browser_contract_record=browser_contract_record,
                 browser_contract_identity=browser_contract_identity,
+                seed_root=seed_root,
+                seed_snapshot=seed_snapshot,
+                seed_directories=seed_directories,
             )
 
 
@@ -821,6 +871,9 @@ def _run_pinned(
     browser_contract_path: Path | None,
     browser_contract_record: dict[str, Any] | None,
     browser_contract_identity: tuple[int, int] | None,
+    seed_root: Path | None,
+    seed_snapshot: list[dict[str, Any]],
+    seed_directories: list[dict[str, Any]],
 ) -> dict[str, Any]:
 
     tools_before = _tool_records()
@@ -828,6 +881,15 @@ def _run_pinned(
 
     def assert_current() -> None:
         _assert_execution_guards(cohort_pin, log_pin, tools_before)
+        if seed_root is not None:
+            try:
+                if (
+                    current_build._seed_records(seed_root) != seed_snapshot
+                    or current_build._directory_records(seed_root) != seed_directories
+                ):
+                    raise DraftCohortError("draft seed provenance drifted during execution")
+            except current_build.RunnerError as error:
+                raise DraftCohortError("draft seed provenance drifted during execution") from error
         try:
             current_build._browser_contract_unchanged(
                 browser_contract_path, browser_contract_record
@@ -849,6 +911,12 @@ def _run_pinned(
             )
 
     effective_text = effective_brief(brief_raw.decode("utf-8"), plan)
+    if seed_root is not None:
+        effective_text += (
+            "\nUse the frozen existing product only as evidence for facts, behavior, brand equity, "
+            "content relationships, and constraints. Produce isolated direction specimens; do not "
+            "rewrite, promote, or claim to integrate the existing product.\n"
+        )
     effective_raw = effective_text.encode("utf-8")
     if len(effective_raw) > BRIEF_LIMIT:
         raise DraftCohortError("effective brief exceeds the current build limit")
@@ -859,6 +927,12 @@ def _run_pinned(
     inactivity = inactivity_seconds if inactivity_seconds is not None else min(600, hard_seconds)
     assert_current()
     try:
+        build_arguments: dict[str, Any] = {}
+        if seed_root is not None:
+            build_arguments = {
+                "seed_root": seed_root,
+                "allow_changes": outputs,
+            }
         manifest = current_build.run(
             effective_path,
             workspace,
@@ -869,9 +943,11 @@ def _run_pinned(
             outputs=outputs,
             log_dir=log_dir,
             max_repair_rounds=max_repair_rounds,
-            case_mode="greenfield",
+            case_mode="greenfield" if seed_root is None else "retrofit",
             browser_contract=browser_contract_path,
             skill_reference="references/design-exploration.md",
+            html_verification_pages=outputs[1:] if seed_root is not None else None,
+            **build_arguments,
         )
     except (OSError, current_build.RunnerError) as error:
         assert_current()
@@ -880,7 +956,26 @@ def _run_pinned(
     if manifest.get("browser_contract") != browser_contract_record:
         raise DraftCohortError("draft browser contract provenance is invalid")
 
-    case_raw = (json.dumps(_case(plan, manifest), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    capture_pages: str | dict[str, Any] = (
+        "all_html_outputs"
+        if seed_root is None
+        else {
+            "policy": "draft_direction_subset",
+            "paths": [
+                f"directions/{variant['id']}.html"
+                for variant in plan["variants"]
+            ],
+        }
+    )
+    case_raw = (
+        json.dumps(
+            _case(plan, manifest, capture_pages),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
     case_path, case_record = log_pin.write_exclusive("draft-cohort-case.json", case_raw)
     convergence_raw = (json.dumps({
         "schema_version": 1,
@@ -903,12 +998,16 @@ def _run_pinned(
         raise
     assert_current()
     capture_receipt = evidence / "capture-receipt.json"
+    capture_validation_arguments = (
+        {"allow_draft_subset": True} if seed_root is not None else {}
+    )
     try:
         validated_capture = validate_current_capture_evidence(
             workspace,
             case_path,
             capture_receipt,
             workspace / "run-manifest.json",
+            **capture_validation_arguments,
         )
     except CurrentCraftError as error:
         assert_current()
@@ -947,6 +1046,7 @@ def _run_pinned(
             case_path,
             capture_receipt,
             manifest_path,
+            **capture_validation_arguments,
         )
         convergence_again = _convergence_summary(plan, evidence)
         manifest_record = _record(manifest_path)
@@ -1030,6 +1130,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hard-seconds", type=int, default=1800)
     parser.add_argument("--inactivity-seconds", type=int)
     parser.add_argument("--browser-contract", type=Path)
+    parser.add_argument("--seed-root", type=Path)
     parser.add_argument("--max-repair-rounds", type=int, default=1)
     args = parser.parse_args(argv)
     try:
@@ -1044,6 +1145,7 @@ def main(argv: list[str] | None = None) -> int:
             inactivity_seconds=args.inactivity_seconds,
             max_repair_rounds=args.max_repair_rounds,
             browser_contract=args.browser_contract,
+            seed_root=args.seed_root,
         )
     except (OSError, DraftCohortError) as error:
         print(f"current draft cohort failed: {error}", file=sys.stderr)

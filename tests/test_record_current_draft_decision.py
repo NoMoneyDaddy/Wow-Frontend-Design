@@ -222,6 +222,34 @@ class CurrentDraftDecisionTests(unittest.TestCase):
         )
         self.assertEqual(0o600, stat.S_IMODE(output.stat().st_mode))
 
+    def test_seeded_subset_selection_is_manual_retrofit_input_not_build_handoff(self) -> None:
+        self.case_path.write_text(
+            json.dumps({
+                "capture_plan": {
+                    "pages": {
+                        "policy": "draft_direction_subset",
+                        "paths": [
+                            "directions/editorial-index.html",
+                            "directions/task-led-market.html",
+                        ],
+                    }
+                }
+            }),
+            encoding="utf-8",
+        )
+
+        result = self.run_with_source(self.valid_decision())
+
+        self.assertIsNone(result["handoff"]["production_lane"])
+        self.assertEqual(
+            "carry_selected_direction_to_retrofit_brief",
+            result["handoff"]["next_step"],
+        )
+        self.assertIn(
+            "formal RETROFIT implementation",
+            result["handoff"]["required_revalidation"],
+        )
+
     def test_public_validator_rechecks_receipt_and_original_sources(self) -> None:
         receipt_value = self.cohort_receipt()
         self.write_cohort_receipt(payload=receipt_value)

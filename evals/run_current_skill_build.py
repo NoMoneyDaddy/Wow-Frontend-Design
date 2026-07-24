@@ -1199,8 +1199,13 @@ def _run_html_smoke(
     timeout: int,
     browser_contract: dict[str, Any] | None = None,
     heading_explicit_narrow_pages: tuple[str, ...] = (),
+    verification_pages: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
-    html_outputs = [name for name in outputs if name.casefold().endswith(".html")]
+    html_outputs = (
+        list(verification_pages)
+        if verification_pages is not None
+        else [name for name in outputs if name.casefold().endswith(".html")]
+    )
     node_raw = shutil.which("node", path=design_policy.SYSTEM_PATH)
     if not node_raw:
         raise RunnerError("HTML Playwright smoke gate infrastructure failure")
@@ -1417,9 +1422,14 @@ def _heading_explicit_narrow_pages(
     stage: Path,
     outputs: tuple[str, ...],
     timeout: int,
+    verification_pages: tuple[str, ...] | None = None,
 ) -> tuple[str, ...]:
     html_outputs = sorted(
-        name for name in outputs if name.casefold().endswith((".htm", ".html"))
+        verification_pages
+        if verification_pages is not None
+        else (
+            name for name in outputs if name.casefold().endswith((".htm", ".html"))
+        )
     )
     if not html_outputs:
         return ()
@@ -2483,6 +2493,7 @@ def run(
     draft_decision_input: Path | None = None,
     draft_cohort_root: Path | None = None,
     draft_cohort_log_dir: Path | None = None,
+    html_verification_pages: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     if type(max_repair_rounds) is not int or not 0 <= max_repair_rounds <= MAX_REPAIR_ROUNDS:
         raise RunnerError(f"max repair rounds must be within 0..{MAX_REPAIR_ROUNDS}")
@@ -2548,6 +2559,22 @@ def run(
         seed_directories = _directory_records(seed_root)
     seed_paths = tuple(record["path"] for record in seed_snapshot)
     output_names = tuple(dict.fromkeys((*seed_paths, *requested_outputs)))
+    verification_pages: tuple[str, ...] | None = None
+    if html_verification_pages is not None:
+        verification_pages = _normalized_paths(
+            list(html_verification_pages),
+            "HTML verification page",
+        )
+        if (
+            case_mode != "retrofit"
+            or not verification_pages
+            or any(not page.casefold().endswith(".html") for page in verification_pages)
+            or not set(verification_pages) <= set(requested_outputs)
+            or not set(verification_pages) <= set(allowed_change_names)
+        ):
+            raise RunnerError(
+                "HTML verification pages are only valid for allowed requested RETROFIT HTML outputs"
+            )
     output_entries = {
         parent.as_posix()
         for name in output_names
@@ -2600,6 +2627,15 @@ def run(
                 or boundary in browser_contract_path.parents
             ):
                 raise RunnerError("browser contract must remain outside repository, seed, log, and publish paths")
+        if verification_pages is not None:
+            contract_pages = {
+                case["page"]
+                for case in browser_contract_data.get("cases", [])
+            }
+            if not contract_pages <= set(verification_pages):
+                raise RunnerError(
+                    "browser contract pages must be inside the HTML verification scope"
+                )
     browser_contract_context = _browser_contract_prompt_context(browser_contract_data)
     controlled_prompt_context = skill_reference_context + browser_contract_context
     wrapper_tools = _wrapper_tool_records()
@@ -2860,6 +2896,7 @@ def run(
                     stage,
                     output_names,
                     min(120, max(15, hard_seconds)),
+                    verification_pages,
                 )
                 _assert_wrapper_tool_records(wrapper_tools)
                 if validate_candidate() != output_records:
@@ -2870,6 +2907,7 @@ def run(
                     min(120, max(15, hard_seconds)),
                     browser_contract_data,
                     heading_explicit_narrow_pages,
+                    verification_pages,
                 )
                 _assert_wrapper_tool_records(wrapper_tools)
             except RunnerError:
@@ -2975,6 +3013,11 @@ def run(
                 seed_directories,
                 published_directories,
             )
+        if verification_pages is not None:
+            manifest["html_verification"] = {
+                "policy": "draft_direction_subset",
+                "pages": list(verification_pages),
+            }
         if repair_summary() is not None:
             manifest["repair"] = repair_summary()
         if decision_lineage is not None:

@@ -8,7 +8,7 @@ Seeded `RETROFIT`／`PATCH` 會在第一次生成前，以現行 `project_scan.p
 
 ## 快速多方向草稿
 
-`drafts:current` 是 `build:current` 的 style-calibration wrapper，不是第二套 builder。它在同一次受控 BUILD 內產生 2–3 個方向頁面，固定使用 `references/design-exploration.md`，再呼叫現行 final-only capture 取得同一 manifest 下的 fresh desktop/mobile PNG。這個流程只支援 greenfield 草稿；不做 production integration、release acceptance、勝者判定或 award claim。
+`drafts:current` 是 `build:current` 的 style-calibration wrapper，不是第二套 builder。它產生 2–3 個方向頁面，固定使用 `references/design-exploration.md`，再呼叫現行 final-only capture 取得同一 manifest 下的 fresh desktop/mobile PNG。預設是受控 greenfield `BUILD`；加上 `--seed-root` 時則以 immutable existing-product seed 走同一個 `RETROFIT` builder，只把 seed 當產品、品牌、內容與行為證據，且只允許隔離 workspace 的 `DESIGN.md` 與新 `directions/*.html` 改變。兩種模式都不做 production integration、release acceptance、勝者判定或 award claim。
 
 草稿 wrapper 會在同一次 Playwright capture matrix 內同步取得 rendered macro fingerprints，並重用現行 `cross_output_template_audit.cjs` 產生跨稿結構與低解析視覺語法 telemetry。它不多開一次 browser；advisory 只把 `review_required` 設為 true，不能自動淘汰方向、觸發 release failure，或證明原創、美感與產品適配。原本 final capture 未提供 draft convergence contract 時，不產生這兩個 sidecar，receipt schema 維持不變。
 
@@ -55,6 +55,19 @@ npm run drafts:current -- \
   --log-dir /absolute/evaluator-root/private-logs \
   --browser-contract /absolute/evaluator-root/draft-browser-contract.json
 ```
+
+既有產品要先確認風格時，加上位於 authoring repository、cohort 與 logs 外的唯讀 seed：
+
+```bash
+npm run drafts:current -- \
+  --plan /absolute/evaluator-root/cohort-plan.json \
+  --brief /absolute/evaluator-root/brief.md \
+  --seed-root /absolute/existing-product-snapshot \
+  --cohort-root /absolute/evaluator-root/cohort-output \
+  --log-dir /absolute/evaluator-root/private-logs
+```
+
+Seeded cohort 會凍結檔案、目錄、mode 與 digest，拒絕既有 `directions/<variant>.html` 衝突，並在 build、capture 與 receipt 前重驗。HTML smoke 與 capture case 都使用 schema-closed 的明示方向頁集合，所以 seed 內原有 HTML 不會混入草稿 gate 或比較矩陣；manifest 仍保留完整 output provenance。這只代表 existing-product style calibration：原 seed 不被修改，選定後的 decision receipt 不提供自動 production lane，必須把方向決策人工帶回正式 `RETROFIT` brief，重新實作、重新截圖與驗證。下方四參數的自動 production handoff 仍只接受 greenfield `BUILD`。
 
 `--browser-contract` 是選用但建議的 evaluator-owned 共用驗收；若任一方向的 `changed_axes` 明確包含 `interaction-emphasis`，該方向則必須有同頁 action 後的結果 assertion，不能以預設狀態截圖冒充互動差異。同一份 schema-closed contract 可各自指向 2–3 個方向頁面。Runner 會在第一次生成前提供完整 closed contract，要求直接實作穩定 locator 與結果狀態，再於截圖前以同一個 Playwright gate 驗證 brief 已凍結的首屏、標題 measure、狀態與互動；失敗時沿用單一 repair fuse，避免先猜 DOM、失敗後才逐層補 selector。Contract 必須位於 authoring repository、cohort、log、plan 與 brief 之外，且每個 case 只驗證一個明示頁面／profile；不應把所有網站硬套成相同 hero。若 brief 刻意採用窄欄 editorial 標題，就不要加入寬度下限。
 

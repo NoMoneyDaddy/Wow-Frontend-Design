@@ -84,6 +84,53 @@ function safeRelative(value, label) {
   return value;
 }
 
+function validatePageSelection(value) {
+  if (value === "all_html_outputs") return value;
+  const selection = exactKeys(value, ["policy", "paths"], "case.capture_plan.pages");
+  if (selection.policy !== "draft_direction_subset"
+    || !Array.isArray(selection.paths) || selection.paths.length < 2 || selection.paths.length > 3) {
+    throw new Error("case capture pages must be all_html_outputs or a 2-3 page draft subset");
+  }
+  const pages = selection.paths.map(
+    (page, index) => safeRelative(page, `case.capture_plan.pages.paths[${index}]`),
+  );
+  if (pages.some((page) => !page.toLowerCase().endsWith(".html"))
+    || pages.some((page) => {
+      const parts = page.split("/");
+      return parts.length !== 2 || parts[0] !== "directions"
+        || !DRAFT_ID.test(parts[1].replace(/\.html$/i, ""));
+    })
+    || new Set(pages).size !== pages.length) {
+    throw new Error("draft capture pages must be unique directions HTML outputs");
+  }
+  return pages;
+}
+
+function selectedCapturePages(selection, htmlPages, manifest, hasConvergence) {
+  if (selection === "all_html_outputs") return htmlPages;
+  const available = new Set(htmlPages);
+  if (selection.some((page) => !available.has(page))) {
+    throw new Error("case capture pages must exist in the current manifest");
+  }
+  const expectedChanges = new Set(["DESIGN.md", ...selection]);
+  const allowedChanges = manifest.mutation && manifest.mutation.allowed_changes;
+  const observedChanges = manifest.mutation && manifest.mutation.observed_changes;
+  const verification = manifest.html_verification;
+  if (!hasConvergence || !manifest.case || manifest.case.mode !== "retrofit"
+    || manifest.case.lane_contract !== "RETROFIT" || !manifest.seed_snapshot
+    || !verification || verification.policy !== "draft_direction_subset"
+    || !Array.isArray(verification.pages)
+    || JSON.stringify(verification.pages) !== JSON.stringify(selection)
+    || !Array.isArray(allowedChanges) || !Array.isArray(observedChanges)
+    || allowedChanges.length !== expectedChanges.size
+    || allowedChanges.some((name) => !expectedChanges.has(name))
+    || selection.some((name) => !observedChanges.includes(name))
+    || observedChanges.some((name) => !expectedChanges.has(name))) {
+    throw new Error("draft capture subset is not bound to a seeded RETROFIT manifest");
+  }
+  return selection;
+}
+
 function validateCase(data) {
   exactKeys(data, ["schema_version", "case_id", "run_id", "partition", "brief", "capture_plan", "craft"], "case");
   if (data.schema_version !== 1 || typeof data.case_id !== "string" || !ID.test(data.run_id)) {
@@ -98,10 +145,10 @@ function validateCase(data) {
   }
   const plan = exactKeys(data.capture_plan, ["locale", "state", "pages", "wait_condition", "profiles"], "case.capture_plan");
   if (!new Set(["zh-Hant", "en"]).has(plan.locale) || plan.state !== "default"
-    || plan.pages !== "all_html_outputs"
     || plan.wait_condition !== "load+fonts+two-raf+300ms+two-raf") {
     throw new Error("case capture plan is not the current standard");
   }
+  plan.pages = validatePageSelection(plan.pages);
   if (!Array.isArray(plan.profiles) || plan.profiles.length !== PROFILE_STANDARD.length
     || plan.profiles.some((profile, index) => {
       const expected = PROFILE_STANDARD[index];
@@ -238,8 +285,14 @@ async function main() {
   const manifest = readJson(manifestFile, "run manifest");
   const manifestBytes = fs.readFileSync(manifestFile);
   const before = validateManifest(target, manifest);
+  const capturePages = selectedCapturePages(
+    caseData.capture_plan.pages,
+    before.pages,
+    manifest,
+    Boolean(convergenceArg),
+  );
   const convergence = convergenceArg
-    ? validateDraftConvergence(readUnaliasedJson(convergenceArg, "draft convergence contract"), before.pages)
+    ? validateDraftConvergence(readUnaliasedJson(convergenceArg, "draft convergence contract"), capturePages)
     : null;
   const convergenceTools = convergence
     ? require("../wow-frontend-design/scripts/cross_output_template_audit.cjs")
@@ -260,7 +313,7 @@ async function main() {
     const profiles = PROFILE_STANDARD.map((profile) => ({ ...profile, locale: caseData.capture_plan.locale }));
     const { browserVersion, results } = await runLocalPageMatrix({
       stage: sourceSnapshot,
-      pages: before.pages,
+      pages: capturePages,
       allowedFiles: before.outputs.map((record) => record.path),
       profiles,
       inspectPage: async (page, meta) => {
@@ -311,7 +364,7 @@ async function main() {
         return { capture: relative };
       },
     });
-    if (captures.length !== before.pages.length * PROFILE_STANDARD.length
+    if (captures.length !== capturePages.length * PROFILE_STANDARD.length
       || captures.reduce((sum, item) => sum + item.bytes, 0) > MAX_TOTAL_CAPTURE_BYTES
       || results.some((result) => result.navigation !== "passed" || !result.visible_main
         || !result.visible_text || !result.visible_primary_content || result.root_horizontal_overflow

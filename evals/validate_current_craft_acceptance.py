@@ -138,6 +138,8 @@ def validate_current_capture_evidence(
     case_path: Path,
     receipt_path: Path,
     manifest_path: Path,
+    *,
+    allow_draft_subset: bool = False,
 ) -> dict[str, Any]:
     try:
         return _validate_current_capture_evidence(
@@ -145,6 +147,7 @@ def validate_current_capture_evidence(
             case_path,
             receipt_path,
             manifest_path,
+            allow_draft_subset=allow_draft_subset,
         )
     except CurrentCraftError:
         raise
@@ -159,6 +162,8 @@ def _validate_current_capture_evidence(
     case_path: Path,
     receipt_path: Path,
     manifest_path: Path,
+    *,
+    allow_draft_subset: bool,
 ) -> dict[str, Any]:
     workspace = workspace_root.expanduser().resolve(strict=True)
     case_file = _unaliased_file(case_path, "case")
@@ -210,11 +215,42 @@ def _validate_current_capture_evidence(
         {"locale", "state", "pages", "wait_condition", "profiles"},
         "case.capture_plan",
     )
+    selected_pages = capture_plan["pages"]
+    explicit_pages: list[str] | None = None
+    if selected_pages != "all_html_outputs":
+        selection = _exact(
+            selected_pages,
+            {"policy", "paths"},
+            "case.capture_plan.pages",
+        )
+        if (
+            not allow_draft_subset
+            or selection["policy"] != "draft_direction_subset"
+            or not isinstance(selection["paths"], list)
+            or not 2 <= len(selection["paths"]) <= 3
+        ):
+            raise CurrentCraftError(
+                "case capture pages must be all_html_outputs outside draft calibration"
+            )
+        explicit_pages = [
+            _relative(page, f"case.capture_plan.pages.paths[{index}]")
+            for index, page in enumerate(selection["paths"])
+        ]
+        if (
+            len(set(explicit_pages)) != len(explicit_pages)
+            or any(not page.lower().endswith(".html") for page in explicit_pages)
+            or any(
+                len(Path(page).parts) != 2
+                or Path(page).parts[0] != "directions"
+                or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*\.html", Path(page).name) is None
+                for page in explicit_pages
+            )
+        ):
+            raise CurrentCraftError("draft capture pages must be unique directions HTML outputs")
     if (
         not isinstance(capture_plan["locale"], str)
         or capture_plan["locale"] not in {"zh-Hant", "en"}
         or capture_plan["state"] != "default"
-        or capture_plan["pages"] != "all_html_outputs"
         or capture_plan["wait_condition"] != "load+fonts+two-raf+300ms+two-raf"
         or capture_plan["profiles"] != PROFILE_STANDARD
     ):
@@ -257,6 +293,36 @@ def _validate_current_capture_evidence(
 
     if manifest.get("schema_version") != 2 or manifest.get("status") != "completed":
         raise CurrentCraftError("run manifest is not a completed current build")
+    if explicit_pages is not None:
+        manifest_case = _exact(manifest.get("case"), {"mode", "lane_contract"}, "manifest.case")
+        mutation = _exact(
+            manifest.get("mutation"),
+            {"allowed_changes", "observed_changes", "preserved_directories"},
+            "manifest.mutation",
+        )
+        verification = _exact(
+            manifest.get("html_verification"),
+            {"policy", "pages"},
+            "manifest.html_verification",
+        )
+        expected_changes = {"DESIGN.md", *explicit_pages}
+        if (
+            manifest_case != {"mode": "retrofit", "lane_contract": "RETROFIT"}
+            or not isinstance(manifest.get("seed_snapshot"), dict)
+            or verification["policy"] != "draft_direction_subset"
+            or verification["pages"] != explicit_pages
+            or not isinstance(mutation["allowed_changes"], list)
+            or set(mutation["allowed_changes"]) != expected_changes
+            or len(mutation["allowed_changes"]) != len(expected_changes)
+            or not isinstance(mutation["observed_changes"], list)
+            or not set(explicit_pages) <= set(mutation["observed_changes"])
+            or not set(mutation["observed_changes"]) <= expected_changes
+            or type(mutation["preserved_directories"]) is not int
+            or mutation["preserved_directories"] < 0
+        ):
+            raise CurrentCraftError(
+                "draft capture subset is not bound to a seeded RETROFIT manifest"
+            )
     source = _exact(receipt["source"], {"run_manifest_sha256", "brief", "skill_tree_sha256", "outputs"}, "capture receipt.source")
     if source["run_manifest_sha256"] != _sha256(manifest_file):
         raise CurrentCraftError("run manifest changed after capture")
@@ -299,9 +365,12 @@ def _validate_current_capture_evidence(
         if relative.lower().endswith(".html"):
             html_pages.add(relative)
 
+    capture_pages = html_pages if explicit_pages is None else set(explicit_pages)
+    if not capture_pages <= html_pages:
+        raise CurrentCraftError("case capture pages must exist in the current manifest")
     captures = receipt["captures"]
-    if not isinstance(captures, list) or not captures or len(captures) != len(html_pages) * 2:
-        raise CurrentCraftError("capture receipt must cover every HTML output at desktop and mobile")
+    if not isinstance(captures, list) or not captures or len(captures) != len(capture_pages) * 2:
+        raise CurrentCraftError("capture receipt must cover every selected HTML output at desktop and mobile")
     capture_labels: set[str] = set()
     capture_paths: set[str] = set()
     capture_matrix: set[tuple[str, str]] = set()
@@ -366,7 +435,7 @@ def _validate_current_capture_evidence(
         if context["route"] != f"/{capture['page']}":
             raise CurrentCraftError("capture route does not match its declared page")
         if (
-            capture["page"] not in html_pages
+            capture["page"] not in capture_pages
             or expected_viewport is None
             or context["viewport"] != expected_viewport
             or context["dpr"] != 1
@@ -383,7 +452,11 @@ def _validate_current_capture_evidence(
         capture_artifacts[label] = artifact
         capture_matrix.add((capture["page"], profile))
         total_bytes += size
-    expected_matrix = {(page, profile) for page in html_pages for profile in ("desktop-default", "mobile-default")}
+    expected_matrix = {
+        (page, profile)
+        for page in capture_pages
+        for profile in ("desktop-default", "mobile-default")
+    }
     if capture_matrix != expected_matrix or total_bytes > MAX_TOTAL_CAPTURE_BYTES:
         raise CurrentCraftError("capture matrix is incomplete or exceeds its evidence budget")
 
