@@ -99,6 +99,28 @@ def _exact(value: object, keys: set[str], label: str) -> dict[str, Any]:
     return value
 
 
+def _browser_contract_record(value: object, label: str) -> dict[str, Any]:
+    record = _exact(
+        value,
+        {"schema_version", "bytes", "sha256", "case_count", "step_count"},
+        label,
+    )
+    if (
+        type(record["schema_version"]) is not int
+        or record["schema_version"] not in {1, 2}
+        or type(record["bytes"]) is not int
+        or not 1 <= record["bytes"] <= MAX_JSON_BYTES
+        or not isinstance(record["sha256"], str)
+        or HASH_PATTERN.fullmatch(record["sha256"]) is None
+        or type(record["case_count"]) is not int
+        or not 1 <= record["case_count"] <= 4
+        or type(record["step_count"]) is not int
+        or not 1 <= record["step_count"] <= 96
+    ):
+        raise CurrentCraftError(f"{label} is invalid")
+    return record
+
+
 def _relative(value: object, label: str) -> str:
     if not isinstance(value, str) or not value or "\\" in value or "\x00" in value:
         raise CurrentCraftError(f"{label} must be a normalized relative path")
@@ -177,13 +199,19 @@ def _validate_current_capture_evidence(
     except ValueError as error:
         raise CurrentCraftError("run manifest must remain inside the current workspace") from error
 
-    case = _exact(_load_json(case_file, "case"), CASE_KEYS, "case")
-    receipt = _exact(_load_json(receipt_file, "capture receipt"), RECEIPT_KEYS, "capture receipt")
+    case_value = _load_json(case_file, "case")
+    case_schema = case_value.get("schema_version")
+    case_keys = CASE_KEYS | ({"browser_contract"} if case_schema == 2 else set())
+    case = _exact(case_value, case_keys, "case")
+    receipt_value = _load_json(receipt_file, "capture receipt")
+    receipt_schema = receipt_value.get("schema_version")
+    receipt_keys = RECEIPT_KEYS | ({"state_evidence"} if receipt_schema == 2 else set())
+    receipt = _exact(receipt_value, receipt_keys, "capture receipt")
     manifest = _load_json(manifest_file, "run manifest")
 
     if (
         type(case["schema_version"]) is not int
-        or case["schema_version"] != 1
+        or case["schema_version"] not in {1, 2}
         or not isinstance(case["case_id"], str)
         or not case["case_id"].strip()
     ):
@@ -210,9 +238,12 @@ def _validate_current_capture_evidence(
         or craft_case["feedback_policy"] != "aggregate-failure-families-only"
     ):
         raise CurrentCraftError("case craft floor is not the current standard")
+    capture_plan_keys = {"locale", "state", "pages", "wait_condition", "profiles"}
+    if case_schema == 2:
+        capture_plan_keys.add("consequential_state")
     capture_plan = _exact(
         case["capture_plan"],
-        {"locale", "state", "pages", "wait_condition", "profiles"},
+        capture_plan_keys,
         "case.capture_plan",
     )
     selected_pages = capture_plan["pages"]
@@ -255,8 +286,34 @@ def _validate_current_capture_evidence(
         or capture_plan["profiles"] != PROFILE_STANDARD
     ):
         raise CurrentCraftError("case capture plan is not the current standard")
+    consequential_state: dict[str, Any] | None = None
+    case_contract: dict[str, Any] | None = None
+    if case_schema == 2:
+        if explicit_pages is not None:
+            raise CurrentCraftError(
+                "consequential state evidence is unavailable for draft calibration"
+            )
+        consequential_state = _exact(
+            capture_plan["consequential_state"],
+            {"contract_case_id"},
+            "case.capture_plan.consequential_state",
+        )
+        contract_case_id = consequential_state["contract_case_id"]
+        if (
+            not isinstance(contract_case_id, str)
+            or re.fullmatch(r"[a-z][a-z0-9-]{0,47}", contract_case_id) is None
+        ):
+            raise CurrentCraftError("case consequential state is invalid")
+        case_contract = _browser_contract_record(
+            case["browser_contract"],
+            "case.browser_contract",
+        )
 
-    if type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1 or receipt["status"] != "captured":
+    if (
+        type(receipt["schema_version"]) is not int
+        or receipt["schema_version"] != case_schema
+        or receipt["status"] != "captured"
+    ):
         raise CurrentCraftError("capture receipt is not a completed current receipt")
     runtime = _exact(receipt["runtime"], {"package", "version", "browser", "browser_version", "headless"}, "capture receipt.runtime")
     if (
@@ -323,7 +380,10 @@ def _validate_current_capture_evidence(
             raise CurrentCraftError(
                 "draft capture subset is not bound to a seeded RETROFIT manifest"
             )
-    source = _exact(receipt["source"], {"run_manifest_sha256", "brief", "skill_tree_sha256", "outputs"}, "capture receipt.source")
+    source_keys = {"run_manifest_sha256", "brief", "skill_tree_sha256", "outputs"}
+    if case_schema == 2:
+        source_keys.add("browser_contract")
+    source = _exact(receipt["source"], source_keys, "capture receipt.source")
     if source["run_manifest_sha256"] != _sha256(manifest_file):
         raise CurrentCraftError("run manifest changed after capture")
     if source["brief"] != case_brief or source["brief"] != manifest.get("brief"):
@@ -332,6 +392,40 @@ def _validate_current_capture_evidence(
         raise CurrentCraftError("Skill snapshot provenance disagrees with the current build")
     if source["outputs"] != manifest.get("outputs") or not isinstance(source["outputs"], list):
         raise CurrentCraftError("output provenance disagrees with the current build")
+    state_evidence: dict[str, Any] | None = None
+    if case_schema == 2:
+        manifest_contract = _browser_contract_record(
+            manifest.get("browser_contract"),
+            "manifest.browser_contract",
+        )
+        receipt_contract = _browser_contract_record(
+            source["browser_contract"],
+            "capture receipt.source.browser_contract",
+        )
+        if case_contract != manifest_contract or case_contract != receipt_contract:
+            raise CurrentCraftError(
+                "browser contract provenance disagrees across case, capture, and current build"
+            )
+        state_evidence = _exact(
+            receipt["state_evidence"],
+            {"contract_case_id", "page", "profile", "steps_executed", "status"},
+            "capture receipt.state_evidence",
+        )
+        state_page = _relative(
+            state_evidence["page"],
+            "capture receipt.state_evidence.page",
+        )
+        if (
+            state_evidence["contract_case_id"]
+            != consequential_state["contract_case_id"]
+            or not state_page.lower().endswith(".html")
+            or state_evidence["profile"]
+            not in {"desktop-default", "mobile-default"}
+            or type(state_evidence["steps_executed"]) is not int
+            or not 1 <= state_evidence["steps_executed"] <= case_contract["step_count"]
+            or state_evidence["status"] != "passed"
+        ):
+            raise CurrentCraftError("consequential state evidence is invalid")
 
     output_root = manifest_file.parent
     html_pages: set[str] = set()
@@ -369,11 +463,17 @@ def _validate_current_capture_evidence(
     if not capture_pages <= html_pages:
         raise CurrentCraftError("case capture pages must exist in the current manifest")
     captures = receipt["captures"]
-    if not isinstance(captures, list) or not captures or len(captures) != len(capture_pages) * 2:
+    expected_capture_count = len(capture_pages) * 2 + (1 if state_evidence else 0)
+    if (
+        not isinstance(captures, list)
+        or not captures
+        or len(captures) != expected_capture_count
+    ):
         raise CurrentCraftError("capture receipt must cover every selected HTML output at desktop and mobile")
     capture_labels: set[str] = set()
     capture_paths: set[str] = set()
-    capture_matrix: set[tuple[str, str]] = set()
+    default_capture_matrix: set[tuple[str, str]] = set()
+    state_capture_matrix: list[tuple[str, str, str]] = []
     capture_artifacts: dict[str, Path] = {}
     total_bytes = 0
     evidence_root = receipt_file.parent.resolve(strict=True)
@@ -434,13 +534,31 @@ def _validate_current_capture_evidence(
             raise CurrentCraftError("capture timestamp is invalid") from error
         if context["route"] != f"/{capture['page']}":
             raise CurrentCraftError("capture route does not match its declared page")
+        is_state_capture = context["state"] != capture_plan["state"]
+        expected_state = (
+            f"contract:{state_evidence['contract_case_id']}"
+            if state_evidence
+            else None
+        )
         if (
             capture["page"] not in capture_pages
             or expected_viewport is None
             or context["viewport"] != expected_viewport
             or context["dpr"] != 1
             or context["locale"] != capture_plan["locale"]
-            or context["state"] != capture_plan["state"]
+            or (
+                is_state_capture
+                and (
+                    expected_state is None
+                    or context["state"] != expected_state
+                    or capture["page"] != state_evidence["page"]
+                    or profile != state_evidence["profile"]
+                )
+            )
+            or (
+                not is_state_capture
+                and context["state"] != capture_plan["state"]
+            )
             or context["wait_condition"] != capture_plan["wait_condition"]
             or context["reduced_motion"] != profile_rule["reducedMotion"]
             or captured_at.tzinfo is None
@@ -450,14 +568,34 @@ def _validate_current_capture_evidence(
         capture_labels.add(label)
         capture_paths.add(relative)
         capture_artifacts[label] = artifact
-        capture_matrix.add((capture["page"], profile))
+        if is_state_capture:
+            state_capture_matrix.append(
+                (capture["page"], profile, context["state"])
+            )
+        else:
+            default_capture_matrix.add((capture["page"], profile))
         total_bytes += size
     expected_matrix = {
         (page, profile)
         for page in capture_pages
         for profile in ("desktop-default", "mobile-default")
     }
-    if capture_matrix != expected_matrix or total_bytes > MAX_TOTAL_CAPTURE_BYTES:
+    expected_state_matrix = (
+        [
+            (
+                state_evidence["page"],
+                state_evidence["profile"],
+                f"contract:{state_evidence['contract_case_id']}",
+            )
+        ]
+        if state_evidence
+        else []
+    )
+    if (
+        default_capture_matrix != expected_matrix
+        or state_capture_matrix != expected_state_matrix
+        or total_bytes > MAX_TOTAL_CAPTURE_BYTES
+    ):
         raise CurrentCraftError("capture matrix is incomplete or exceeds its evidence budget")
 
     capture_projection = [

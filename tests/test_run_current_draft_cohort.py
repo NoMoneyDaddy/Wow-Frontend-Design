@@ -515,6 +515,13 @@ class CurrentDraftCohortTests(unittest.TestCase):
                 kwargs["html_verification_pages"],
             )
             case = json.loads((logs / "draft-cohort-case.json").read_text(encoding="utf-8"))
+            self.assertEqual(1, case["schema_version"])
+            self.assertNotIn("browser_contract", case)
+            self.assertEqual(
+                {"locale", "state", "pages", "wait_condition", "profiles"},
+                set(case["capture_plan"]),
+            )
+            self.assertEqual("default", case["capture_plan"]["state"])
             self.assertEqual(
                 {
                     "policy": "draft_direction_subset",

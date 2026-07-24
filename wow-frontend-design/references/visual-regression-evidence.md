@@ -6,6 +6,8 @@ Use this reference when capturing screenshots, comparing renders, maintaining vi
 
 A screenshot can support `OBSERVED rendered_visual` for its exact route, state, data, viewport, browser, OS, DPR, fonts, locale, theme, preferences, and revision. It does not prove interaction, accessibility-tree behavior, responsive ranges, other browsers/devices, performance, or overall design quality.
 
+When the visual claim concerns a consequential post-action state, keep the default matrix intact and add one bounded state witness. Replay an evaluator-owned browser contract in a fresh context, require at least one declared action plus its result assertion, reject navigation away from the bound output route, and capture only after the contract passes. Bind the state image to the same contract bytes/hash recorded by the completed manifest; a draft image or an actionless default-state capture cannot substitute.
+
 Pixel comparison detects paint differences relative to a baseline. It cannot decide whether the baseline or change is better, whether a difference is meaningful, or whether unchanged UI satisfies the brief. Playwright notes that rendering varies with OS, version, settings, hardware, power source, headless mode, and other environment factors; generate and compare baselines in a controlled environment. See [Playwright visual comparisons](https://playwright.dev/docs/test-snapshots).
 
 ## Capture provenance

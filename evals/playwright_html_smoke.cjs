@@ -796,4 +796,8 @@ async function main() {
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
 }
 
-main().catch((error) => fail(error && error.name ? error.name : "unknown"));
+if (require.main === module) {
+  main().catch((error) => fail(error && error.name ? error.name : "unknown"));
+}
+
+module.exports = { runBrowserContract, validateBrowserContract };

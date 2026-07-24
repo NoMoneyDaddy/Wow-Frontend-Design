@@ -79,10 +79,13 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
         case: Path,
         evidence: Path,
         convergence: Path | None = None,
+        browser_contract: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
         command = ["node", str(CAPTURE), str(target), str(case), str(evidence)]
         if convergence is not None:
             command.append(str(convergence))
+        if browser_contract is not None:
+            command.extend(("--browser-contract", str(browser_contract)))
         return subprocess.run(
             command,
             cwd=ROOT,
@@ -91,6 +94,48 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             timeout=45,
             check=False,
         )
+
+    def consequential_contract(
+        self,
+        root: Path,
+        target: Path,
+        case: dict,
+        *,
+        profile: str = "desktop",
+        includes_action: bool = True,
+    ) -> Path:
+        steps = [
+            {"id": "open-visible", "action": "assert", "selector": "#open", "expect": "visible"},
+        ]
+        if includes_action:
+            steps.append({"id": "open-details", "action": "click", "selector": "#open"})
+        steps.append({"id": "details-visible", "action": "assert", "selector": "#details", "expect": "visible"})
+        payload = {
+            "schema_version": 2,
+            "cases": [{
+                "id": "open-details",
+                "page": "index.html",
+                "profile": profile,
+                "steps": steps,
+            }],
+        }
+        contract = root / "browser-contract.json"
+        contract.write_text(json.dumps(payload), encoding="utf-8")
+        record = {
+            "schema_version": 2,
+            "bytes": contract.stat().st_size,
+            "sha256": digest(contract),
+            "case_count": 1,
+            "step_count": len(steps),
+        }
+        manifest_path = target / "run-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["browser_contract"] = record
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        case["schema_version"] = 2
+        case["browser_contract"] = record
+        case["capture_plan"]["consequential_state"] = {"contract_case_id": "open-details"}
+        return contract
 
     def test_captures_exact_fresh_desktop_and_mobile_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -112,6 +157,105 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 artifact = evidence / item["path"]
                 self.assertEqual(item["bytes"], artifact.stat().st_size)
                 self.assertEqual(item["sha256"], digest(artifact))
+
+    def test_opt_in_v2_captures_default_matrix_plus_one_contract_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(
+                root,
+                html=(
+                    '<!doctype html><html><body><main><h1>State</h1>'
+                    '<button id="open" onclick="document.querySelector(\'#details\').hidden=false">Open</button>'
+                    '<section id="details" hidden>Details</section></main></body></html>'
+                ),
+            )
+            contract = self.consequential_contract(root, target, case)
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            receipt = json.loads((evidence / "capture-receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual(2, receipt["schema_version"])
+            defaults = [item for item in receipt["captures"] if item["context"]["state"] == "default"]
+            states = [item for item in receipt["captures"] if item["context"]["state"] != "default"]
+            self.assertEqual(2, len(defaults))
+            self.assertEqual(1, len(states))
+            self.assertEqual("index.html", states[0]["page"])
+            self.assertEqual("desktop-default", states[0]["profile"])
+            self.assertEqual("contract:open-details", states[0]["context"]["state"])
+            self.assertEqual(case["browser_contract"], receipt["source"]["browser_contract"])
+
+    def test_opt_in_v2_rejects_invalid_consequential_contract_selection(self) -> None:
+        modes = {
+            "unknown_case": lambda case, _manifest: case["capture_plan"]["consequential_state"].update(
+                {"contract_case_id": "missing-case"}
+            ),
+            "extra_state_key": lambda case, _manifest: case["capture_plan"]["consequential_state"].update(
+                {"selector": "#open"}
+            ),
+            "case_record_drift": lambda case, _manifest: case["browser_contract"].update({"sha256": "b" * 64}),
+            "manifest_record_drift": lambda _case, manifest: manifest["browser_contract"].update({"sha256": "c" * 64}),
+        }
+        for mode, mutate in modes.items():
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                target, case_path, case = self.fixture(root)
+                contract = self.consequential_contract(root, target, case)
+                manifest_path = target / "run-manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                mutate(case, manifest)
+                case_path.write_text(json.dumps(case), encoding="utf-8")
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                evidence = root / "evidence"
+                completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+
+                self.assertEqual(1, completed.returncode)
+                self.assertFalse(evidence.exists())
+
+    def test_opt_in_v2_rejects_actionless_or_unsupported_profile_contract_cases(self) -> None:
+        for includes_action, profile in ((False, "desktop"), (True, "narrow")):
+            with self.subTest(includes_action=includes_action, profile=profile), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                target, case_path, case = self.fixture(root)
+                contract = self.consequential_contract(
+                    root, target, case, includes_action=includes_action, profile=profile
+                )
+                case_path.write_text(json.dumps(case), encoding="utf-8")
+
+                evidence = root / "evidence"
+                completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+
+                self.assertEqual(1, completed.returncode)
+                self.assertFalse(evidence.exists())
+
+    def test_opt_in_v2_rejects_a_contract_action_that_navigates_away(self) -> None:
+        for destination in ("/outside.html", "?state=changed", "#changed"):
+            with self.subTest(destination=destination), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                target, case_path, case = self.fixture(
+                    root,
+                    html=(
+                        '<!doctype html><html><body><main><h1>State</h1>'
+                        f'<a id="open" href="{destination}">Open</a>'
+                        '<section id="details">Details</section></main></body></html>'
+                    ),
+                )
+                contract = self.consequential_contract(root, target, case)
+                case_path.write_text(json.dumps(case), encoding="utf-8")
+
+                evidence = root / "evidence"
+                completed = self.invoke(
+                    target,
+                    case_path,
+                    evidence,
+                    browser_contract=contract,
+                )
+
+                self.assertEqual(1, completed.returncode)
+                self.assertFalse(evidence.exists())
 
     def test_explicit_page_set_excludes_other_manifest_html(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -140,6 +140,82 @@ class PrepareCurrentCraftCaseTests(unittest.TestCase):
             self.assertEqual("en", case["capture_plan"]["locale"])
             self.assertEqual(manifest["brief"], case["brief"])
 
+    def test_prepares_opt_in_consequential_state_case(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace, manifest_path, _ = self.fixture(root)
+            contract = root / "browser-contract.json"
+            payload = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "open-details",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {
+                            "id": "open",
+                            "action": "click",
+                            "selector": "#open",
+                        },
+                        {
+                            "id": "visible",
+                            "action": "assert",
+                            "selector": "#details",
+                            "expect": "visible",
+                        },
+                    ],
+                }],
+            }
+            contract.write_text(json.dumps(payload), encoding="utf-8")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["browser_contract"] = {
+                "schema_version": 2,
+                "bytes": contract.stat().st_size,
+                "sha256": digest(contract.read_bytes()),
+                "case_count": 1,
+                "step_count": 2,
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "case.json"
+
+            completed = self.invoke(
+                workspace,
+                output,
+                "--browser-contract",
+                str(contract),
+                "--contract-case-id",
+                "open-details",
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            case = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(2, case["schema_version"])
+            self.assertEqual(
+                {"contract_case_id": "open-details"},
+                case["capture_plan"]["consequential_state"],
+            )
+            self.assertEqual(
+                manifest["browser_contract"],
+                case["browser_contract"],
+            )
+
+    def test_consequential_state_case_requires_paired_matching_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace, _, _ = self.fixture(root)
+            output = root / "case.json"
+
+            completed = self.invoke(
+                workspace,
+                output,
+                "--contract-case-id",
+                "open-details",
+            )
+
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("provided together", completed.stderr)
+            self.assertFalse(output.exists())
+
     def test_rejects_relative_workspace_root(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

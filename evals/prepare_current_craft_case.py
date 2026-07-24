@@ -64,14 +64,14 @@ def _outside(path: Path, boundary: Path, label: str) -> None:
         raise CraftCaseError(f"{label} must remain outside the authoring repository")
 
 
-def _read_manifest(path: Path) -> bytes:
+def _read_manifest(path: Path, label: str = "run manifest") -> bytes:
     if not path.is_absolute():
-        raise CraftCaseError("run manifest must be an absolute unaliased regular file")
+        raise CraftCaseError(f"{label} must be an absolute unaliased regular file")
     try:
         before = path.lstat()
         canonical = path.resolve(strict=True)
     except OSError as error:
-        raise CraftCaseError("run manifest must be an absolute unaliased regular file") from error
+        raise CraftCaseError(f"{label} must be an absolute unaliased regular file") from error
     if (
         not stat.S_ISREG(before.st_mode)
         or path.is_symlink()
@@ -79,7 +79,7 @@ def _read_manifest(path: Path) -> bytes:
         or before.st_nlink != 1
         or not 1 <= before.st_size <= MAX_MANIFEST_BYTES
     ):
-        raise CraftCaseError("run manifest must be a bounded unaliased regular file")
+        raise CraftCaseError(f"{label} must be a bounded unaliased regular file")
 
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | _required_flag("O_NOFOLLOW")
     descriptor = -1
@@ -87,22 +87,22 @@ def _read_manifest(path: Path) -> bytes:
         descriptor = os.open(path, flags)
         opened = os.fstat(descriptor)
         if _identity(opened) != _identity(before) or not stat.S_ISREG(opened.st_mode):
-            raise CraftCaseError("run manifest identity changed before it was read")
+            raise CraftCaseError(f"{label} identity changed before it was read")
         chunks: list[bytes] = []
         remaining = opened.st_size
         while remaining:
             chunk = os.read(descriptor, min(remaining, 1024 * 1024))
             if not chunk:
-                raise CraftCaseError("run manifest changed while it was read")
+                raise CraftCaseError(f"{label} changed while it was read")
             chunks.append(chunk)
             remaining -= len(chunk)
         if os.read(descriptor, 1):
-            raise CraftCaseError("run manifest changed while it was read")
+            raise CraftCaseError(f"{label} changed while it was read")
         after = os.fstat(descriptor)
     except CraftCaseError:
         raise
     except OSError as error:
-        raise CraftCaseError("run manifest could not be read safely") from error
+        raise CraftCaseError(f"{label} could not be read safely") from error
     finally:
         if descriptor >= 0:
             os.close(descriptor)
@@ -110,9 +110,9 @@ def _read_manifest(path: Path) -> bytes:
     try:
         current = path.lstat()
     except OSError as error:
-        raise CraftCaseError("run manifest changed while it was read") from error
+        raise CraftCaseError(f"{label} changed while it was read") from error
     if _identity(before) != _identity(after) or _identity(before) != _identity(current):
-        raise CraftCaseError("run manifest changed while it was read")
+        raise CraftCaseError(f"{label} changed while it was read")
     return b"".join(chunks)
 
 
@@ -183,6 +183,68 @@ def _manifest_payload(raw: bytes) -> dict[str, Any]:
     if html_count < 1:
         raise CraftCaseError("run manifest must contain at least one HTML output")
     return value
+
+
+def _consequential_contract(
+    raw: bytes,
+    manifest: dict[str, Any],
+    case_id: str,
+) -> dict[str, Any]:
+    if re.fullmatch(r"[a-z][a-z0-9-]{0,47}", case_id) is None:
+        raise CraftCaseError("contract_case_id is invalid")
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise CraftCaseError("browser contract is not valid JSON") from error
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"schema_version", "cases"}
+        or value.get("schema_version") not in {1, 2}
+        or not isinstance(value.get("cases"), list)
+        or not 1 <= len(value["cases"]) <= 4
+    ):
+        raise CraftCaseError("browser contract schema is invalid")
+    selected = None
+    step_count = 0
+    for item in value["cases"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"id", "page", "profile", "steps"}
+            or not isinstance(item["steps"], list)
+            or not 1 <= len(item["steps"]) <= 24
+        ):
+            raise CraftCaseError("browser contract case is invalid")
+        step_count += len(item["steps"])
+        if item["id"] == case_id:
+            selected = item
+    output_pages = {
+        record["path"]
+        for record in manifest["outputs"]
+        if record["path"].lower().endswith(".html")
+    }
+    if (
+        selected is None
+        or selected["page"] not in output_pages
+        or selected["profile"] not in {"desktop", "mobile"}
+        or not any(
+            isinstance(step, dict)
+            and step.get("action") in {"click", "fill", "press", "select"}
+            for step in selected["steps"]
+        )
+    ):
+        raise CraftCaseError("selected consequential contract case is invalid")
+    record = {
+        "schema_version": value["schema_version"],
+        "bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "case_count": len(value["cases"]),
+        "step_count": step_count,
+    }
+    if manifest.get("browser_contract") != record:
+        raise CraftCaseError(
+            "browser contract provenance does not match the completed manifest"
+        )
+    return record
 
 
 def _validate_manifest_output(
@@ -352,6 +414,8 @@ def prepare_case(
     case_id: str = "current-production",
     partition: str = "validation",
     locale: str = "zh-Hant",
+    browser_contract: Path | None = None,
+    contract_case_id: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(case_id, str) or ID_PATTERN.fullmatch(case_id) is None:
         raise CraftCaseError("case_id is invalid")
@@ -370,9 +434,32 @@ def prepare_case(
     for index, record in enumerate(manifest["outputs"]):
         _validate_manifest_output(workspace, record, index)
     output_path, parent = _output_path(Path(output), workspace)
+    if (browser_contract is None) != (contract_case_id is None):
+        raise CraftCaseError(
+            "browser_contract and contract_case_id must be provided together"
+        )
+    contract_record = None
+    if browser_contract is not None:
+        contract_path = Path(browser_contract)
+        raw_contract = _read_manifest(contract_path, "browser contract")
+        _outside(
+            contract_path.resolve(strict=True),
+            repository,
+            "browser contract",
+        )
+        _outside(
+            contract_path.resolve(strict=True),
+            workspace,
+            "browser contract",
+        )
+        contract_record = _consequential_contract(
+            raw_contract,
+            manifest,
+            contract_case_id,
+        )
 
     case = {
-        "schema_version": 1,
+        "schema_version": 2 if contract_record else 1,
         "case_id": case_id,
         "run_id": f"current-{hashlib.sha256(raw_manifest).hexdigest()}",
         "partition": partition,
@@ -390,6 +477,11 @@ def prepare_case(
             "feedback_policy": "aggregate-failure-families-only",
         },
     }
+    if contract_record:
+        case["browser_contract"] = contract_record
+        case["capture_plan"]["consequential_state"] = {
+            "contract_case_id": contract_case_id,
+        }
     encoded = (
         json.dumps(case, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     ).encode("utf-8")
@@ -410,6 +502,8 @@ def main(argv: list[str] | None = None) -> int:
         default="validation",
     )
     parser.add_argument("--locale", choices=("zh-Hant", "en"), default="zh-Hant")
+    parser.add_argument("--browser-contract", type=Path)
+    parser.add_argument("--contract-case-id")
     args = parser.parse_args(argv)
     try:
         prepare_case(
@@ -418,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
             case_id=args.case_id,
             partition=args.partition,
             locale=args.locale,
+            browser_contract=args.browser_contract,
+            contract_case_id=args.contract_case_id,
         )
     except CraftCaseError as error:
         print(f"error: {error}", file=sys.stderr)

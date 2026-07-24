@@ -56,6 +56,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
         *,
         explicit_pages: list[str] | None = None,
         include_legacy_html: bool = False,
+        consequential_state: bool = False,
     ) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
         root = root.resolve()
         workspace = root / "workspace"
@@ -63,7 +64,14 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
         brief = "建立可用且有辨識度的繁體中文產品介面。\n".encode()
         (workspace / "DESIGN.md").write_text("# Design\n", encoding="utf-8")
         (workspace / "index.html").write_text(
-            '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main><h1>現行輸出</h1><p>Independent review.</p></main></body></html>',
+            (
+                '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main>'
+                '<h1>現行輸出</h1><button id="open" '
+                'onclick="document.querySelector(\'#details\').hidden=false">Open</button>'
+                '<section id="details" hidden>Details</section></main></body></html>'
+                if consequential_state
+                else '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main><h1>現行輸出</h1><p>Independent review.</p></main></body></html>'
+            ),
             encoding="utf-8",
         )
         if include_legacy_html:
@@ -145,6 +153,35 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 "feedback_policy": "aggregate-failure-families-only",
             },
         }
+        browser_contract: Path | None = None
+        if consequential_state:
+            contract_payload = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "open-details",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [
+                        {"id": "open-visible", "action": "assert", "selector": "#open", "expect": "visible"},
+                        {"id": "open-details", "action": "click", "selector": "#open"},
+                        {"id": "details-visible", "action": "assert", "selector": "#details", "expect": "visible"},
+                    ],
+                }],
+            }
+            browser_contract = root / "browser-contract.json"
+            browser_contract.write_text(json.dumps(contract_payload), encoding="utf-8")
+            contract_record = {
+                "schema_version": 2,
+                "bytes": browser_contract.stat().st_size,
+                "sha256": digest(browser_contract),
+                "case_count": 1,
+                "step_count": 3,
+            }
+            manifest["browser_contract"] = contract_record
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            case["schema_version"] = 2
+            case["browser_contract"] = contract_record
+            case["capture_plan"]["consequential_state"] = {"contract_case_id": "open-details"}
         case_path = root / "case.json"
         case_path.write_text(json.dumps(case), encoding="utf-8")
         evidence_root = root / "evidence"
@@ -169,6 +206,8 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             capture_command.append(str(convergence))
+        if browser_contract is not None:
+            capture_command.extend(("--browser-contract", str(browser_contract)))
         captured = subprocess.run(
             capture_command,
             cwd=ROOT,
@@ -328,6 +367,79 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 manifest_path,
             )
             self.assertEqual(2, observed["capture_count"])
+
+    def test_opt_in_v2_state_capture_binds_one_contract_replay_to_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory), consequential_state=True)
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+
+            observed = validate_current_craft_acceptance.validate_current_capture_evidence(
+                workspace,
+                case_path,
+                receipt_path,
+                manifest_path,
+            )
+
+            captures = observed["receipt"]["captures"]
+            self.assertEqual(3, observed["capture_count"])
+            self.assertEqual(2, sum(item["context"]["state"] == "default" for item in captures))
+            state = [item for item in captures if item["context"]["state"] != "default"]
+            self.assertEqual(1, len(state))
+            self.assertEqual("contract:open-details", state[0]["context"]["state"])
+            self.assertEqual("desktop-default", state[0]["profile"])
+            case = json.loads(case_path.read_text(encoding="utf-8"))
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(case["browser_contract"], manifest["browser_contract"])
+            self.assertEqual(case["browser_contract"], receipt["source"]["browser_contract"])
+
+    def test_opt_in_v2_acceptance_rejects_contract_record_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(Path(directory), consequential_state=True)
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            case = json.loads(case_path.read_text(encoding="utf-8"))
+            case["browser_contract"]["sha256"] = "b" * 64
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+
+            with self.assertRaises(validate_current_craft_acceptance.CurrentCraftError):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace,
+                    case_path,
+                    receipt_path,
+                    manifest_path,
+                )
+
+    def test_opt_in_v2_acceptance_rejects_state_receipt_tampering(self) -> None:
+        for mode in ("witness_profile", "capture_state", "extra_state"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                fixture = self.build_fixture(
+                    Path(directory),
+                    consequential_state=True,
+                )
+                _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                state_capture = next(
+                    item
+                    for item in receipt["captures"]
+                    if item["context"]["state"] != "default"
+                )
+                if mode == "witness_profile":
+                    receipt["state_evidence"]["profile"] = "mobile-default"
+                elif mode == "capture_state":
+                    state_capture["context"]["state"] = "default"
+                else:
+                    receipt["captures"].append(copy.deepcopy(state_capture))
+                receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+                with self.assertRaises(
+                    validate_current_craft_acceptance.CurrentCraftError
+                ):
+                    validate_current_craft_acceptance.validate_current_capture_evidence(
+                        workspace,
+                        case_path,
+                        receipt_path,
+                        manifest_path,
+                    )
 
     def test_capture_provenance_accepts_an_explicit_manifest_page_subset(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -319,6 +319,28 @@ npm run capture:current -- \
 
 Capture command 會拒絕既存 evidence directory，capture 前後重驗 `run-manifest.json` 與所有 output hashes，並在失敗時移除本輪 partial cohort。成功後只留下本次 viewport PNG 與 `capture-receipt.json`；receipt 綁定 case、brief、Skill tree、manifest、outputs、Playwright/Chromium 與每張 PNG 的 hash、尺寸、viewport、locale、state。
 
+若本次視覺結論涉及一個關鍵 action 後狀態，不必手動改 JSON。Completed manifest 已含同一 browser contract provenance 時，以成對 flags 直接產生 schema v2 private case；preparer 會核對 contract bytes/hash、case、page、profile 與至少一個 action：
+
+```bash
+npm run case:current -- \
+  --workspace-root /absolute/evaluator-root/workspace \
+  --output /absolute/evaluator-root/case-v2.json \
+  --browser-contract /absolute/evaluator-root/browser-contract.json \
+  --contract-case-id open-details
+```
+
+再明示傳入同一份未別名 contract：
+
+```bash
+npm run capture:current -- \
+  /absolute/evaluator-root/workspace \
+  /absolute/evaluator-root/case-v2.json \
+  /absolute/evaluator-root/evidence-run-001 \
+  --browser-contract /absolute/evaluator-root/browser-contract.json
+```
+
+v2 不取代 default matrix：runner 仍先以各自 fresh BrowserContext 擷取所有 HTML 的桌機／手機 default state，再以另一個 fresh context 重播被選中的 `desktop` 或 `mobile` contract case，通過至少一個 action 與結果 assertion、且未離開原 output route 後，才多存恰好一張 `contract:<case-id>` screenshot。Case、manifest、receipt 與實際 contract bytes/hash 任一不一致、無 action、未知 case、`narrow`／`mobile-motion` profile、導頁或第二張 state 都 fail closed。Draft cohort 永遠維持 schema v1/default-only；草稿圖不會進正式 acceptance。
+
 獨立 reviewer 仍使用現有 `quality_result.json`、evaluator-owned `policy.json` 與 `ledger.json`，不新增第二套分數。完成 reviewer verdict 與 ledger 後，用 current acceptance wrapper 收口：
 
 ```bash
@@ -345,7 +367,7 @@ npm run accept:current -- \
 - `playwright_html_smoke.cjs`：fresh Chromium/Axe acceptance smoke。
 - `playwright_browser_runtime.cjs`：共用 Playwright network、popup、Service Worker 與 lifecycle policy。
 - `capture_current_visual_evidence.cjs`：final-only fresh 桌機／手機證據與 provenance receipt。
-- `prepare_current_craft_case.py`：從 completed manifest 原子建立 schema-closed private capture case。
+- `prepare_current_craft_case.py`：從 completed manifest 原子建立 schema-closed private capture case；選用 contract case 時安全建立 v2 consequential-state case。
 - `validate_current_craft_acceptance.py`：把現有 craft policy／ledger 綁回 frozen case、current manifest 與 fresh capture set。
 - `validate_codex_log_policy.py`：bounded stdout/stderr 與敏感輸出政策。
 - `product_cases.json`、`trigger_cases.json`：通用產品與 trigger fixtures，不是已發布成果。
