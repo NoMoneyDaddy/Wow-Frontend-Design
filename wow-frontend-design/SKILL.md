@@ -1,7 +1,7 @@
 ---
 name: wow-frontend-design
 description: >-
-  Design, build, audit, repair, or refactor distinctive web frontends. Use for new or existing product UI, sites, responsive UX, Traditional Chinese typography, accessibility, motion, creative direction, UI polish, or controlled refactoring. Adapts to detected framework and tools; keeps verification evidence-bounded.
+  Design, build, audit, repair, or refactor distinctive web frontends. Use for new/existing product UI, sites, responsive UX, Traditional Chinese type, accessibility, motion, creative direction, polish, or controlled refactoring. Adapts to detected framework/tools and keeps verification evidence-bounded.
 license: MIT
 metadata:
   author: NoMoneyDaddy
@@ -10,7 +10,7 @@ metadata:
 
 # WOW Frontend Design
 
-Create a coherent, product-derived experience through working code and rendered evidence. Make it useful and specific without turning a style into a default.
+Create product-derived working code with rendered evidence without a default style.
 
 ## Contract
 
@@ -62,20 +62,20 @@ Follow the requested collaboration mode. `AUTOMATIC` continues safely; `CHECKPOI
 
 ### 1. Evidence freeze
 
-Inspect the nearest instructions, manifests and lockfile, entry routes, existing design tokens and components, representative content and states, localization, and relevant tests. For an existing repository, the packaged scanner may provide bounded file evidence:
+Inspect nearby instructions, manifests/lockfile, routes, tokens/components, representative content/states, locale, and tests. For an existing repository, use the packaged scanner for bounded file evidence:
 
     python3 <skill-dir>/scripts/project_scan.py <project-root> --authorized-root <workspace-root> --json
 
-Freeze a terse working contract:
+Compile a one-sentence request and inspected evidence into this contract. Ask only the smallest answerable blocker when a gap changes a public contract or authority, or prevents a safe runnable deliverable; otherwise take a reversible assumption, continue, and hand off non-blocking gaps:
 
-- desired outcome and evidence required for acceptance;
-- authoritative product, brand, content, asset, and user-preference evidence;
-- top task, primary action, content/data relationships, usage frequency, consequence, and risk;
-- required routes, states, viewports, locales, input modes, and interactions;
-- preserved public behavior, mutation boundary, and rollback needs;
+- outcome and acceptance evidence;
+- product/brand/content/asset/preference evidence;
+- task/action, content/data relation, frequency, consequence, risk;
+- required routes, states, viewports, locales, inputs, and interactions;
+- preserved behavior, mutation boundary, and rollback;
 - what is explicit, observed, inherited, inferred, rejected, or unknown.
 
-Do not invent personas, quotes, metrics, assets, or remote behavior. Create only artifacts needed by the task.
+Do not invent personas, quotes, metrics, assets, remote behavior, or unnecessary artifacts.
 
 ### 2. Representation
 

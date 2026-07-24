@@ -187,6 +187,22 @@ class SkillCoreContractTests(unittest.TestCase):
         offsets = [self.text.index(heading) for heading in headings]
         self.assertEqual(offsets, sorted(offsets))
 
+    def test_thin_request_becomes_a_working_contract_without_a_generic_quiz(self) -> None:
+        evidence = self.text.split("### 1. Evidence freeze", 1)[1].split(
+            "### 2. Representation", 1
+        )[0]
+        for phrase in (
+            "one-sentence request",
+            "smallest answerable blocker",
+            "non-blocking gaps",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, evidence)
+        self.assertIn("public contract", evidence)
+        self.assertIn("authority", evidence)
+        self.assertIn("prevents a safe runnable deliverable", evidence)
+        self.assertNotIn("brand questionnaire", evidence)
+
     def test_requested_multi_direction_drafts_route_to_fast_style_calibration(self) -> None:
         direction = self.text.split("### 3. Direction", 1)[1].split(
             "### 4. System", 1

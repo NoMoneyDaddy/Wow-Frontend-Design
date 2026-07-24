@@ -70,7 +70,7 @@ Use $wow-frontend-design to repair the confirmed mobile heading wrap and sticky
 focus obstruction. Modify only styles.css; preserve every other path and behavior.
 ```
 
-需求至少應說明產品、主要使用者、核心任務、必要互動、不可破壞的契約，以及任何明確拒絕的方向。只有真正影響公開契約或授權邊界的缺口才需要停下詢問。
+一句話需求即可開始。Skill 會先讀取專案證據，整理產品、使用者、核心任務、必要互動、不可破壞契約與未知項；只有會改變公開契約或授權，或使可執行交付無法安全完成的最小缺口才詢問，其餘採安全可逆假設繼續，並在 handoff 列出未阻擋上線的缺口。
 
 ## 工作流程
 

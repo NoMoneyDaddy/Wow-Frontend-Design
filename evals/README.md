@@ -4,6 +4,8 @@
 
 `evals/` 是 repository evaluator，不屬於安裝後自動執行的 Skill runtime。一般 Skill package 仍可只靠 `SKILL.md`、按需 references、scripts 與 assets 使用。
 
+Seeded `RETROFIT`／`PATCH` 會在第一次生成前，以現行 `project_scan.py` 對 frozen seed 取得隱私裁切、schema-closed 的 untrusted project evidence，協助一句需求正規化。Projection 不含專案根路徑、檔案內容、任意 package metadata、任意路徑或 scanner warnings；`mode_hint`、封閉訊號計數與 truncation 只供判讀，不能改 caller 宣告的 lane、mutation allowlist、公開契約、權利、reference 或 acceptance。Greenfield 不偽造專案證據。
+
 ## 快速多方向草稿
 
 `drafts:current` 是 `build:current` 的 style-calibration wrapper，不是第二套 builder。它在同一次受控 BUILD 內產生 2–3 個方向頁面，固定使用 `references/design-exploration.md`，再呼叫現行 final-only capture 取得同一 manifest 下的 fresh desktop/mobile PNG。這個流程只支援 greenfield 草稿；不做 production integration、release acceptance、勝者判定或 award claim。
