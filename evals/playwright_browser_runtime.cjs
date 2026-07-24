@@ -383,13 +383,20 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               }
             }
             let splitHanWordCount = 0;
+            const splitHanWordRanges = [];
             for (let segmentIndex = 1; segmentIndex + 1 < segments.length; segmentIndex += 1) {
               const segment = segments[segmentIndex];
               if (apply(regexExec, formatControlGrapheme, [segment.value]) === null) continue;
               const previous = segments[segmentIndex - 1];
               const next = segments[segmentIndex + 1];
               if (apply(regexExec, hanGrapheme, [previous.value]) !== null
-                && apply(regexExec, hanGrapheme, [next.value]) !== null) splitHanWordCount += 1;
+                && apply(regexExec, hanGrapheme, [next.value]) !== null) {
+                splitHanWordCount += 1;
+                splitHanWordRanges[splitHanWordRanges.length] = freeze({
+                  start: previous.index,
+                  end: next.index + next.value.length,
+                });
+              }
             }
             const words = segmentText(
               combined,
@@ -409,12 +416,19 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                 else if (record.line !== firstLine) spansLines = true;
                 hanCount += 1;
               }
-              if (hanCount >= 2 && spansLines) splitHanWordCount += 1;
+              if (hanCount >= 2 && spansLines) {
+                splitHanWordCount += 1;
+                splitHanWordRanges[splitHanWordRanges.length] = freeze({
+                  start: word.index,
+                  end: wordEnd,
+                });
+              }
             }
             return freeze({
               lineCount: lines.length,
               hanGraphemes,
               splitHanWordCount,
+              splitHanWordRanges: freeze(splitHanWordRanges),
               lastLineGraphemes,
               lastLineHanGraphemes,
               lastLinePunctuationGraphemes,
@@ -524,13 +538,16 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
                 scrollWidth: apply(scrollWidth, element, []),
               });
             },
-            structuralPath(selector) {
-              if (typeof selector !== "string") return null;
+            structuralPath(target) {
               let element;
-              try {
-                element = apply(documentQuerySelector, pageDocument, [selector]);
-              } catch {
-                return null;
+              if (typeof target === "string") {
+                try {
+                  element = apply(documentQuerySelector, pageDocument, [target]);
+                } catch {
+                  return null;
+                }
+              } else {
+                element = target;
               }
               if (!element || !apply(isPrototypeOf, elementPrototype, [element])) return null;
               const upward = [];

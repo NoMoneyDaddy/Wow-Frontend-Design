@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -637,10 +638,41 @@ RegExp.prototype.exec = function(value) {
             )
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
             self.assertEqual("rejected", receipt["status"])
+            self.assertEqual(3, receipt["schema_version"])
             self.assertTrue(all(
                 result["inspection"]["layout_hazards"]["cjk_heading_split_word_count"] == 1
                 for result in receipt["results"]
             ))
+            for result in receipt["results"]:
+                inspection = result["inspection"]
+                self.assertEqual(1, inspection["cjk_heading_split_target_count"])
+                self.assertFalse(inspection["cjk_heading_split_targets_truncated"])
+                self.assertEqual(1, len(inspection["cjk_heading_split_target_descriptors"]))
+                descriptor = inspection["cjk_heading_split_target_descriptors"][0]
+                self.assertEqual(
+                    {
+                        "heading_index", "path", "split_ranges",
+                        "split_ranges_truncated", "target_sha256",
+                    },
+                    set(descriptor),
+                )
+                self.assertEqual(0, descriptor["heading_index"])
+                self.assertEqual([{"start": 0, "end": 2}], descriptor["split_ranges"])
+                self.assertFalse(descriptor["split_ranges_truncated"])
+                self.assertEqual(["html", 1], descriptor["path"][0])
+                self.assertEqual("h1", descriptor["path"][-1][0])
+                self.assertEqual(
+                    hashlib.sha256(
+                        json.dumps(descriptor["path"], separators=(",", ":")).encode()
+                    ).hexdigest(),
+                    descriptor["target_sha256"],
+                )
+                self.assertEqual(
+                    hashlib.sha256(
+                        json.dumps([descriptor["target_sha256"]], separators=(",", ":")).encode()
+                    ).hexdigest(),
+                    inspection["cjk_heading_split_target_set_sha256"],
+                )
             self.assertNotIn("價格", json.dumps(receipt, ensure_ascii=False))
 
             (stage / "index.html").write_text(
@@ -657,6 +689,11 @@ RegExp.prototype.exec = function(value) {
                 result["inspection"]["layout_hazards"]["cjk_heading_split_word_count"] == 1
                 for result in receipt["results"]
             ))
+            for result in receipt["results"]:
+                descriptor = result["inspection"]["cjk_heading_split_target_descriptors"][0]
+                self.assertEqual(1, descriptor["heading_index"])
+                self.assertEqual("h2", descriptor["path"][-1][0])
+                self.assertEqual([{"start": 0, "end": 2}], descriptor["split_ranges"])
             self.assertNotIn("更新", json.dumps(receipt, ensure_ascii=False))
 
             (stage / "index.html").write_text(
@@ -1338,7 +1375,7 @@ Object.defineProperty(Element.prototype, 'previousElementSibling', { configurabl
                 encoding="utf-8",
             )
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
-            self.assertEqual(2, receipt["schema_version"])
+            self.assertEqual(3, receipt["schema_version"])
             for result in receipt["results"]:
                 inspection = result["inspection"]
                 self.assertEqual(["color-contrast"], inspection["axe_rule_ids"])

@@ -656,6 +656,8 @@ async function main() {
         const trusted = globalThis.__wowEvaluatorRead;
         let singleHanLastLineHeadingCount = 0;
         let cjkHeadingSplitWordCount = 0;
+        let cjkHeadingSplitTargetCount = 0;
+        const cjkHeadingSplitTargetCandidates = [];
         let cjkHeadingExplicitNarrowCount = 0;
         let headingScanCount = 0;
         let headingScanTruncated = false;
@@ -674,6 +676,17 @@ async function main() {
           if (!profile) continue;
           headingScanCount += 1;
           cjkHeadingSplitWordCount += profile.splitHanWordCount;
+          if (profile.splitHanWordCount > 0) {
+            cjkHeadingSplitTargetCount += 1;
+            const path = trusted?.structuralPath(heading);
+            if (path) {
+              cjkHeadingSplitTargetCandidates.push({
+                heading_index: index,
+                path,
+                split_ranges: profile.splitHanWordRanges,
+              });
+            }
+          }
           if (inspectCjkHeadingWidth && profile.lineCount >= 2 && profile.hanGraphemes > 0) {
             const headingBox = trusted?.rect(heading);
             const parentBox = heading.parentElement ? trusted?.rect(heading.parentElement) : null;
@@ -723,6 +736,8 @@ async function main() {
           fixed_content_obstruction_count: fixedContentObstructions,
           cjk_heading_explicit_narrow_count: cjkHeadingExplicitNarrowCount,
           cjk_heading_split_word_count: cjkHeadingSplitWordCount,
+          cjk_heading_split_target_count: cjkHeadingSplitTargetCount,
+          cjk_heading_split_target_candidates: cjkHeadingSplitTargetCandidates,
           heading_scan_count: headingScanCount,
           heading_scan_truncated: headingScanTruncated,
           single_han_last_line_heading_count: singleHanLastLineHeadingCount,
@@ -735,10 +750,31 @@ async function main() {
       const browserContractResult = matchingContract
         ? await runBrowserContract(page, matchingContract)
         : null;
+      const cjkTargetDescriptors = layoutHazards.cjk_heading_split_target_candidates
+        .map(({ heading_index: headingIndex, path, split_ranges: splitRanges }) => {
+          const uniqueRanges = new Map();
+          for (const range of splitRanges) uniqueRanges.set(`${range.start}\0${range.end}`, range);
+          const orderedRanges = [...uniqueRanges.values()]
+            .sort((left, right) => left.start - right.start || left.end - right.end);
+          return {
+            heading_index: headingIndex,
+            path,
+            split_ranges: orderedRanges.slice(0, 8),
+            split_ranges_truncated: orderedRanges.length > 8,
+            target_sha256: sha256(JSON.stringify(path)),
+          };
+        })
+        .sort((left, right) => left.target_sha256.localeCompare(right.target_sha256));
+      const cjkTargetIdentities = cjkTargetDescriptors.map(({ target_sha256: targetSha256 }) => targetSha256);
       const inspection = {
         axe_violation_count: analysis.violations.length,
         axe_rule_ids: analysis.violations.map((violation) => violation.id).sort(),
         ...axeTargets,
+        cjk_heading_split_target_count: layoutHazards.cjk_heading_split_target_count,
+        cjk_heading_split_target_set_sha256: sha256(JSON.stringify(cjkTargetIdentities)),
+        cjk_heading_split_targets_truncated:
+          cjkTargetDescriptors.length !== layoutHazards.cjk_heading_split_target_count,
+        cjk_heading_split_target_descriptors: cjkTargetDescriptors,
         layout_hazards: {
           hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
           fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
@@ -773,7 +809,7 @@ async function main() {
 
   const status = results.every((result) => result.status === "passed") ? "passed" : "rejected";
   const receipt = {
-    schema_version: 2,
+    schema_version: 3,
     status,
     tool: {
       package: "playwright",

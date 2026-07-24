@@ -457,7 +457,10 @@ def _validate_axe_inspection(inspection: Any) -> None:
         raise RunnerError(failure)
     required = {
         "axe_violation_count", "axe_rule_ids", "axe_target_count", "axe_target_set_sha256",
-        "axe_targets_truncated", "axe_target_descriptors", "layout_hazards", "typography_advisories",
+        "axe_targets_truncated", "axe_target_descriptors",
+        "cjk_heading_split_target_count", "cjk_heading_split_target_set_sha256",
+        "cjk_heading_split_targets_truncated", "cjk_heading_split_target_descriptors",
+        "layout_hazards", "typography_advisories",
     }
     keys = frozenset(inspection)
     if keys not in {frozenset(required), frozenset({*required, "browser_contract"})}:
@@ -530,6 +533,71 @@ def _validate_axe_inspection(inspection: Any) -> None:
     if not truncated and hashlib.sha256(
         json.dumps([list(item) for item in identities], separators=(",", ":")).encode("utf-8")
     ).hexdigest() != target_set_sha256:
+        raise RunnerError(failure)
+    cjk_target_count = inspection.get("cjk_heading_split_target_count")
+    cjk_target_set_sha256 = inspection.get("cjk_heading_split_target_set_sha256")
+    cjk_truncated = inspection.get("cjk_heading_split_targets_truncated")
+    cjk_descriptors = inspection.get("cjk_heading_split_target_descriptors")
+    if (
+        type(cjk_target_count) is not int or not 0 <= cjk_target_count <= 16
+        or not isinstance(cjk_target_set_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", cjk_target_set_sha256) is None
+        or type(cjk_truncated) is not bool
+        or not isinstance(cjk_descriptors, list) or len(cjk_descriptors) > 16
+        or cjk_truncated != (len(cjk_descriptors) != cjk_target_count)
+    ):
+        raise RunnerError(failure)
+    cjk_identities: list[str] = []
+    for descriptor in cjk_descriptors:
+        if not isinstance(descriptor, dict) or set(descriptor) != {
+            "target_sha256", "path", "heading_index",
+            "split_ranges", "split_ranges_truncated",
+        }:
+            raise RunnerError(failure)
+        cjk_target_sha256 = descriptor.get("target_sha256")
+        cjk_path = descriptor.get("path")
+        heading_index = descriptor.get("heading_index")
+        split_ranges = descriptor.get("split_ranges")
+        split_ranges_truncated = descriptor.get("split_ranges_truncated")
+        if (
+            not isinstance(cjk_target_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", cjk_target_sha256) is None
+            or not isinstance(cjk_path, list) or not 1 <= len(cjk_path) <= 16
+            or type(heading_index) is not int or not 0 <= heading_index < 16
+            or not isinstance(split_ranges, list) or not 1 <= len(split_ranges) <= 8
+            or type(split_ranges_truncated) is not bool
+            or any(
+                not isinstance(item, dict) or set(item) != {"start", "end"}
+                or type(item.get("start")) is not int or type(item.get("end")) is not int
+                or not 0 <= item["start"] < item["end"] <= 512
+                for item in split_ranges
+            )
+            or split_ranges != sorted(
+                split_ranges, key=lambda item: (item["start"], item["end"])
+            )
+            or len({(item["start"], item["end"]) for item in split_ranges}) != len(split_ranges)
+        ):
+            raise RunnerError(failure)
+        normalized_cjk_path: list[list[Any]] = []
+        for segment in cjk_path:
+            if (
+                not isinstance(segment, list) or len(segment) != 2
+                or not isinstance(segment[0], str)
+                or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", segment[0]) is None
+                or type(segment[1]) is not int or not 1 <= segment[1] <= 10000
+            ):
+                raise RunnerError(failure)
+            normalized_cjk_path.append(segment)
+        if normalized_cjk_path[0][0] != "html" or hashlib.sha256(
+            json.dumps(normalized_cjk_path, separators=(",", ":")).encode("utf-8")
+        ).hexdigest() != cjk_target_sha256:
+            raise RunnerError(failure)
+        cjk_identities.append(cjk_target_sha256)
+    if cjk_identities != sorted(set(cjk_identities)):
+        raise RunnerError(failure)
+    if not cjk_truncated and hashlib.sha256(
+        json.dumps(cjk_identities, separators=(",", ":")).encode("utf-8")
+    ).hexdigest() != cjk_target_set_sha256:
         raise RunnerError(failure)
     layout = inspection.get("layout_hazards")
     typography = inspection.get("typography_advisories")
@@ -1288,7 +1356,7 @@ def _run_html_smoke(
     aggregate_status = "passed" if result_statuses and all(status == "passed" for status in result_statuses) else "rejected"
     if (
         process.returncode != 0
-        or receipt.get("schema_version") != 2
+        or receipt.get("schema_version") != 3
         or receipt.get("status") not in {"passed", "rejected"}
         or tool.get("package") != "playwright"
         or tool.get("version") != version

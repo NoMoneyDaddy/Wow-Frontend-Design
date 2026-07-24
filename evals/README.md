@@ -274,7 +274,7 @@ Contract 只允許 bounded `click`、`fill`、`press`、`select` 與 `assert` st
 
 Generic HTML smoke 會額外記錄 visible horizontal `h1`／`h2` 與 level-one／level-two ARIA heading 的 `single_han_last_line_heading_count`。每頁／profile 最多掃描前 16 個 matching elements、每個最多 512 UTF-16 code units，並以 `heading_scan_count` 與 `heading_scan_truncated` 明示 coverage。它由實際 rendered grapheme geometry 得出，只是 novel-discovery advisory：不影響 gate status、不回傳文字，也不觸發自動修復。若 fresh screenshot 確認固定文案真的有孤字，再由 evaluator contract 明示 `last-line-graphemes-at-least` 或 exact `text-segment-on-one-line`。
 
-同一份 bounded scan 另以 evaluator 啟動時封存的 `Intl.Segmenter` 詞界與 grapheme 行框計算 `cjk_heading_split_word_count`。它只回傳計數；當一個至少兩個 Han grapheme 的詞跨越實際行框時拒絕該 route/profile，並觸發最小修復。這不是以字串規則猜詞，也不讓 candidate 覆寫 browser primitive 後繞過。
+同一份 bounded scan 另以 evaluator 啟動時封存的 `Intl.Segmenter` 詞界與 grapheme 行框計算 `cjk_heading_split_word_count`。當一個至少兩個 Han grapheme 的詞跨越實際行框時拒絕該 route/profile，並觸發最小修復。schema v3 receipt 只附受影響 heading 的 bounded DOM tag/ordinal path、path hash、scan index，以及該 semantic unit 在 rendered visible heading text 內的 UTF-16 offset range；每個 heading 最多八組 range 並明示截斷。它不回傳文字、class、id、selector 或 computed style。Repair 以同一結構目標跨 profile 去重，收斂 state 也封存每 route 的 target-set hash，避免斷詞移到另一標題仍被誤判為同一失敗。這不是以字串規則猜詞，也不讓 candidate 覆寫 browser primitive 後繞過。
 
 `--case-mode patch` 使用相同契約，並必須用 `--patch-lane polish|repair` 明示它是受限呈現調整（`POLISH`）或有證據的缺陷修復（`REPAIR`），不建立平行 lane。Retrofit／patch 必須提供 seed 與至少一個 `--allow-change`；任何未授權修改、刪除、重新命名、新增路徑、file／directory mode 漂移、空目錄遺失、seed 漂移或輸出集合漂移都會拒絕發布。Manifest 只保存 mode、實際 Skill lane、seed file/directory hashes 或 modes 與 observed mutation，不保存外部絕對路徑或 brief 內容。
 

@@ -1449,6 +1449,83 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         self.assertTrue(feedback["truncated"])
         self.assertNotIn("axe_targets", feedback)
 
+    def test_cjk_feedback_deduplicates_structural_targets_without_copy(self) -> None:
+        path = [["html", 1], ["body", 1], ["main", 1], ["h1", 1]]
+        target = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
+        target_set = hashlib.sha256(json.dumps([target], separators=(",", ":")).encode()).hexdigest()
+
+        def result(profile: str) -> dict[str, Any]:
+            return {
+                "page": "index.html", "profile": profile, "status": "rejected",
+                "navigation": "passed", "visible_main": True, "visible_text": True,
+                "visible_primary_content": True, "root_horizontal_overflow": False,
+                "counters": {},
+                "inspection": {
+                    "axe_rule_ids": [],
+                    "layout_hazards": {"cjk_heading_split_word_count": 1},
+                    "cjk_heading_split_target_count": 1,
+                    "cjk_heading_split_target_set_sha256": target_set,
+                    "cjk_heading_split_targets_truncated": False,
+                    "cjk_heading_split_target_descriptors": [{
+                        "target_sha256": target, "path": path, "heading_index": 0,
+                        "split_ranges": [{"start": 0, "end": 2}],
+                        "split_ranges_truncated": False,
+                    }],
+                    "raw_diagnostics": "PRIVATE-CANDIDATE-DOM",
+                },
+            }
+
+        receipt = {"status": "rejected", "results": [result("mobile"), result("desktop")]}
+        feedback = policy.compile_html_feedback(receipt)
+        self.assertEqual(2, feedback["counts"]["cjk-heading-split-word"])
+        self.assertEqual(1, len(feedback["cjk_heading_targets"]))
+        self.assertEqual(["desktop", "mobile"], feedback["cjk_heading_targets"][0]["profiles"])
+        self.assertEqual(
+            [{"start": 0, "end": 2}],
+            feedback["cjk_heading_targets"][0]["split_ranges"],
+        )
+        prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
+        self.assertIn('[["html",1],["body",1],["main",1],["h1",1]]', prompt)
+        self.assertIn('"split_ranges":[{"end":2,"start":0}]', prompt)
+        self.assertNotIn("PRIVATE-CANDIDATE-DOM", prompt)
+
+    def test_cjk_target_identity_prevents_false_repeated_failure(self) -> None:
+        def receipt(path: list[list[Any]]) -> dict[str, Any]:
+            target = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
+            target_set = hashlib.sha256(json.dumps([target], separators=(",", ":")).encode()).hexdigest()
+            return {
+                "status": "rejected",
+                "results": [{
+                    "page": "index.html", "profile": "mobile", "status": "rejected",
+                    "navigation": "passed", "visible_main": True, "visible_text": True,
+                    "visible_primary_content": True, "root_horizontal_overflow": False,
+                    "counters": {},
+                    "inspection": {
+                        "axe_rule_ids": [],
+                        "layout_hazards": {"cjk_heading_split_word_count": 1},
+                        "cjk_heading_split_target_count": 1,
+                        "cjk_heading_split_target_set_sha256": target_set,
+                        "cjk_heading_split_targets_truncated": False,
+                        "cjk_heading_split_target_descriptors": [{
+                            "target_sha256": target, "path": path, "heading_index": 0,
+                            "split_ranges": [{"start": 0, "end": 2}],
+                            "split_ranges_truncated": False,
+                        }],
+                    },
+                }],
+            }
+
+        first = policy.compile_repair_state(
+            "html", receipt([["html", 1], ["body", 1], ["main", 1], ["h1", 1]])
+        )
+        moved = policy.compile_repair_state(
+            "html", receipt([["html", 1], ["body", 1], ["main", 1], ["h2", 1]])
+        )
+        self.assertNotEqual(first, moved)
+        self.assertIsNone(policy.repair_state_stop_reason([first], moved, 1))
+        self.assertFalse(policy.repair_state_strictly_progressed(first, moved))
+        self.assertEqual("repeated_failure", policy.repair_state_stop_reason([first], first, 1))
+
     def test_axe_receipt_schema_rejects_unclosed_descriptor(self) -> None:
         path = [["html", 1], ["body", 1], ["small", 1]]
         target_sha256 = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
@@ -1469,6 +1546,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "actual_ratio_x100": 447, "required_ratio_x100": 450,
                 },
             }],
+            "cjk_heading_split_target_count": 0,
+            "cjk_heading_split_target_set_sha256": hashlib.sha256(b"[]").hexdigest(),
+            "cjk_heading_split_targets_truncated": False,
+            "cjk_heading_split_target_descriptors": [],
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,
@@ -1483,6 +1564,47 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         }
         policy._validate_axe_inspection(inspection)
         inspection["axe_target_descriptors"][0]["html"] = "PRIVATE"
+        with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+            policy._validate_axe_inspection(inspection)
+
+    def test_cjk_receipt_schema_rejects_copy_and_wrong_hash(self) -> None:
+        path = [["html", 1], ["body", 1], ["main", 1], ["h1", 1]]
+        target = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
+        inspection = {
+            "axe_violation_count": 0,
+            "axe_rule_ids": [],
+            "axe_target_count": 0,
+            "axe_target_set_sha256": hashlib.sha256(b"[]").hexdigest(),
+            "axe_targets_truncated": False,
+            "axe_target_descriptors": [],
+            "cjk_heading_split_target_count": 1,
+            "cjk_heading_split_target_set_sha256": hashlib.sha256(
+                json.dumps([target], separators=(",", ":")).encode()
+            ).hexdigest(),
+            "cjk_heading_split_targets_truncated": False,
+            "cjk_heading_split_target_descriptors": [{
+                "target_sha256": target, "path": path, "heading_index": 0,
+                "split_ranges": [{"start": 0, "end": 2}],
+                "split_ranges_truncated": False,
+            }],
+            "layout_hazards": {
+                "hidden_attribute_visible_count": 0,
+                "fixed_content_obstruction_count": 0,
+                "cjk_heading_explicit_narrow_count": 0,
+                "cjk_heading_split_word_count": 1,
+            },
+            "typography_advisories": {
+                "heading_scan_count": 1,
+                "heading_scan_truncated": False,
+                "single_han_last_line_heading_count": 0,
+            },
+        }
+        policy._validate_axe_inspection(inspection)
+        inspection["cjk_heading_split_target_descriptors"][0]["text"] = "PRIVATE"
+        with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+            policy._validate_axe_inspection(inspection)
+        inspection["cjk_heading_split_target_descriptors"][0].pop("text")
+        inspection["cjk_heading_split_target_descriptors"][0]["target_sha256"] = "0" * 64
         with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
             policy._validate_axe_inspection(inspection)
 
@@ -3988,7 +4110,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 repair_prompt,
             )
             self.assertIn(
-                "repair its owning inline space or type sizing first",
+                "Repair its owning inline space or type sizing first",
                 repair_prompt,
             )
             self.assertIn(
