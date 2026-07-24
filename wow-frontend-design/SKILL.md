@@ -101,7 +101,7 @@ A category noun alone does not earn a palette, material, font, shape, or motif. 
 
 When evidence calls for identity, use task-bearing structure or behavior; nouns, copy, palette, background, or cards alone fail. Revise an interchangeable result; `none` remains valid when identity would harm the task. For each explicit rejection, name its forbidden visible pattern and alternative; a softened or renamed version still fails source and rendered review.
 
-Compare directions only for a material unresolved choice. When the user requests multiple direction drafts to confirm style, route to the fast calibration pass in [design-exploration.md](references/design-exploration.md) before production implementation. A focused repair inherits the direction unless it is the evidenced root cause.
+Compare directions only for a material choice. For multiple direction drafts to confirm style, use the fast calibration pass in [exploration](references/design-exploration.md) before production. If the request explicitly delegates selection, record reason and continue. Focused repair inherits the direction unless it owns the failure.
 
 ### 4. System
 

@@ -138,6 +138,26 @@ class CurrentDraftDecisionTests(unittest.TestCase):
                 "capture_standard": decision.cohort.CAPTURE_STANDARD,
                 "convergence": self.convergence(review_required),
             },
+            "decision_checkpoint": {
+                "schema_version": 1,
+                "claim_boundary": "fresh_capture_navigation_only_not_selection_or_release",
+                "variants": [
+                    {
+                        "variant_id": variant,
+                        "desktop": {
+                            "label": f"{variant}-desktop-default",
+                            "path": f"evidence/artifacts/{variant}-desktop-default.png",
+                        },
+                        "mobile": {
+                            "label": f"{variant}-mobile-default",
+                            "path": f"evidence/artifacts/{variant}-mobile-default.png",
+                        },
+                    }
+                    for variant in ("editorial-index", "task-led-market")
+                ],
+                "allowed_actions": ["select", "revise", "stop"],
+                "reply_grammar": decision.cohort.DECISION_CHECKPOINT_REPLY_GRAMMAR,
+            },
             "tools": [{"path": "evals/run_current_draft_cohort.py", "bytes": 1, "mode": "0644", "sha256": "0" * 64}],
         }
 
@@ -149,13 +169,47 @@ class CurrentDraftDecisionTests(unittest.TestCase):
                     "label": f"{variant}-{profile}",
                     "page": f"directions/{variant}.html",
                     "profile": profile,
+                    "path": f"artifacts/{variant}-{profile}.png",
                 })
+        manifest = {
+            "skill_snapshot": {"tree_sha256": "5" * 64},
+            "outputs": self.cohort_receipt()["source"]["outputs"],
+        }
+        try:
+            case_value = json.loads(self.case_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            case_value = {}
+        if isinstance(case_value.get("capture_plan", {}).get("pages"), dict):
+            seed_files = [
+                {
+                    "path": "index.html",
+                    "bytes": 10,
+                    "mode": "0644",
+                    "sha256": "b" * 64,
+                }
+            ]
+            seed_directories: list[dict] = []
+            seed_tree_sha256 = hashlib.sha256(
+                json.dumps(
+                    {
+                        "directories": seed_directories,
+                        "files": seed_files,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            manifest.update({
+                "case": {"mode": "retrofit", "lane_contract": "RETROFIT"},
+                "seed_snapshot": {
+                    "tree_sha256": seed_tree_sha256,
+                    "files": seed_files,
+                    "directories": seed_directories,
+                },
+            })
         return {
             "receipt": {"captures": captures},
-            "manifest": {
-                "skill_snapshot": {"tree_sha256": "5" * 64},
-                "outputs": self.cohort_receipt()["source"]["outputs"],
-            },
+            "manifest": manifest,
             "capture_count": 4,
             "capture_set_sha256": "9" * 64,
             "capture_standard": decision.cohort.CAPTURE_STANDARD,
@@ -222,7 +276,7 @@ class CurrentDraftDecisionTests(unittest.TestCase):
         )
         self.assertEqual(0o600, stat.S_IMODE(output.stat().st_mode))
 
-    def test_seeded_subset_selection_is_manual_retrofit_input_not_build_handoff(self) -> None:
+    def test_seeded_subset_selection_is_formal_retrofit_handoff(self) -> None:
         self.case_path.write_text(
             json.dumps({
                 "capture_plan": {
@@ -240,9 +294,9 @@ class CurrentDraftDecisionTests(unittest.TestCase):
 
         result = self.run_with_source(self.valid_decision())
 
-        self.assertIsNone(result["handoff"]["production_lane"])
+        self.assertEqual("RETROFIT", result["handoff"]["production_lane"])
         self.assertEqual(
-            "carry_selected_direction_to_retrofit_brief",
+            "implement_selected_direction",
             result["handoff"]["next_step"],
         )
         self.assertIn(
@@ -362,6 +416,30 @@ class CurrentDraftDecisionTests(unittest.TestCase):
             self.assertRaisesRegex(
                 decision.DraftDecisionError,
                 "browser_contract is invalid",
+            ),
+        ):
+            decision.validate_cohort_source(self.cohort_root, self.log_dir)
+
+    def test_checkpoint_must_match_validated_capture_pair_exactly(self) -> None:
+        receipt_value = self.cohort_receipt()
+        receipt_value["decision_checkpoint"]["variants"][0]["desktop"][
+            "label"
+        ] = "editorial-index-desktop-alternate"
+        self.write_cohort_receipt(payload=receipt_value)
+        with (
+            mock.patch.object(
+                decision,
+                "validate_current_capture_evidence",
+                return_value=self.validated_capture(),
+            ),
+            mock.patch.object(
+                decision.cohort,
+                "_tool_records",
+                return_value=receipt_value["tools"],
+            ),
+            self.assertRaisesRegex(
+                decision.DraftDecisionError,
+                "checkpoint drifted",
             ),
         ):
             decision.validate_cohort_source(self.cohort_root, self.log_dir)
@@ -574,6 +652,104 @@ class CurrentDraftDecisionTests(unittest.TestCase):
             self.assertRaisesRegex(decision.DraftDecisionError, "drifted during failed finalization"),
         ):
             self.run_with_source(self.valid_decision())
+
+    def test_structured_cli_creates_private_non_overwriting_decision_input(self) -> None:
+        generated = self.output_root.with_name(
+            f"{self.output_root.name}.input.json"
+        )
+        with mock.patch.object(decision, "run", return_value={}) as run:
+            result = decision.main([
+                "--cohort-root",
+                str(self.cohort_root),
+                "--log-dir",
+                str(self.log_dir),
+                "--output-root",
+                str(self.output_root),
+                "--cohort-id",
+                "marketplace-directions-1",
+                "--action",
+                "select",
+                "--variant-id",
+                "editorial-index",
+                "--authority",
+                "user_confirmed",
+                "--reason",
+                "資訊層級最清楚。",
+                "--adjustment",
+                "主操作再突出。",
+                "--convergence-reviewed",
+            ])
+        self.assertEqual(0, result)
+        self.assertEqual(0o600, stat.S_IMODE(generated.stat().st_mode))
+        self.assertEqual(self.valid_decision(), json.loads(generated.read_text(encoding="utf-8")))
+        run.assert_called_once_with(
+            self.cohort_root,
+            self.log_dir,
+            generated,
+            self.output_root,
+        )
+
+        original = generated.read_bytes()
+        with mock.patch.object(decision, "run") as second_run:
+            result = decision.main([
+                "--cohort-root",
+                str(self.cohort_root),
+                "--log-dir",
+                str(self.log_dir),
+                "--output-root",
+                str(self.output_root),
+                "--cohort-id",
+                "marketplace-directions-1",
+                "--action",
+                "stop",
+                "--authority",
+                "user_confirmed",
+                "--reason",
+                "暫停。",
+            ])
+        self.assertEqual(1, result)
+        self.assertEqual(original, generated.read_bytes())
+        second_run.assert_not_called()
+
+    def test_structured_decision_parent_swap_preserves_replacement(self) -> None:
+        parent = self.root / "decision-parent"
+        parent.mkdir()
+        self.output_root = parent / "decision"
+        self.output_root.mkdir()
+        moved = self.root / "moved-parent"
+        replacement = parent / "decision.input.json"
+        original_write = decision.os.write
+        swapped = False
+
+        def swap_parent(descriptor: int, data: bytes) -> int:
+            nonlocal swapped
+            count = original_write(descriptor, data)
+            if not swapped:
+                parent.rename(moved)
+                parent.mkdir()
+                replacement.write_text("sentinel", encoding="utf-8")
+                swapped = True
+            return count
+
+        with (
+            mock.patch.object(decision.os, "write", side_effect=swap_parent),
+            self.assertRaisesRegex(
+                decision.DraftDecisionError,
+                "could not be created exclusively",
+            ),
+        ):
+            decision.write_structured_decision(
+                self.output_root,
+                cohort_id="marketplace-directions-1",
+                action="select",
+                variant_id="editorial-index",
+                authority="user_confirmed",
+                reason="資訊層級最清楚。",
+                adjustments=["主操作再突出。"],
+                convergence_reviewed=True,
+            )
+        self.assertEqual("sentinel", replacement.read_text(encoding="utf-8"))
+        self.assertFalse((moved / "decision.input.json").exists())
 
     def test_package_exposes_one_documented_decision_checkpoint(self) -> None:
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))

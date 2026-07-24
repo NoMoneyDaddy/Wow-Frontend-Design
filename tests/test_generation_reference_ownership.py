@@ -124,6 +124,9 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             "Run the full affected state and viewport matrix only for the selected direction",
             "fresh project-pinned Playwright captures",
             "selected style contract",
+            "Author the schema-closed variant manifest from the frozen contract",
+            "Do not ask the user to write evaluator JSON",
+            "explicitly delegates selection",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.exploration)

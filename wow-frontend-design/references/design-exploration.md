@@ -23,6 +23,8 @@ variant id → hypothesis → changed axes → held-constant axes → expected b
 
 When the user requests multiple direction drafts to confirm style, or a named high-impact ambiguity would make a full build wasteful, run a fast multi-direction draft pass before production. Each draft is a coherent direction group, not a colorway or a single tile. Use the smallest decisive set: normally three groups for an explicit open style choice, two for a binary hypothesis, and a fourth only when it answers another named question.
 
+Author the schema-closed variant manifest from the frozen contract. Do not ask the user to write evaluator JSON, restate repository evidence, or complete a brand questionnaire. If the evidence supports two product-specific hypotheses, proceed; ask only when the missing answer would change the product task, preserved contract, or the material decision itself. Keep the default axes observable without invented locators. When an interaction model is the named decision, require an action-to-result witness; if that witness cannot be specified from inspected evidence, treat it as the smallest blocker instead of guessing DOM hooks.
+
 Hold the product truth, task, real or representative content, data fixture, required behavior, brand invariants, and comparison conditions constant. Each group must express a different product hypothesis through several compatible changed axes—such as composition, typography, density, material, imagery, and motion character—not through palette or decoration alone. Require this minimum comparable slice from every group:
 
 - the same representative route at a declared desktop profile;
@@ -108,7 +110,7 @@ Choose one direction or an explicitly compatible synthesis. Do not combine every
 selected thesis → kept axes → rejected axes and why → invariants → implementation delta → verification plan
 ```
 
-When the user requested style confirmation, present the fresh groups before production work and treat selection as the material direction checkpoint. If the user delegated selection, apply the predeclared product-fit and task criteria and record the reason instead of pausing. Freeze a selected style contract covering composition, typography, density, color roles, material, imagery, motion character, mobile transformation, preserved behaviors, and forbidden drift. Later production evidence must compare the selected implementation with this contract; do not reuse the draft captures as release evidence.
+When the user requested style confirmation, present the fresh groups before production work and treat selection as the material direction checkpoint. If the request explicitly delegates selection, apply the predeclared product-fit and task criteria, record `user_delegated` plus the reason, and continue instead of pausing for another choice. Freeze a selected style contract covering composition, typography, density, color roles, material, imagery, motion character, mobile transformation, preserved behaviors, and forbidden drift. Later production evidence must compare the selected implementation with this contract; do not reuse the draft captures as release evidence.
 
 Implement through the real design system and production route only after selection. Re-run the normal release gates; a working lab is not evidence that production integration works.
 

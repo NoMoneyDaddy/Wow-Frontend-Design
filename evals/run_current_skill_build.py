@@ -1759,6 +1759,9 @@ def _valid_decision_lineage(value: Any) -> bool:
 
 def _validate_draft_decision_source(
     receipt_path: Path, decision_path: Path, cohort_root: Path, cohort_log_dir: Path,
+    *,
+    expected_lane: str = "BUILD",
+    seed_root: Path | None = None,
 ) -> dict[str, Any]:
     try:
         module = _module("current_draft_decision_policy", DECISION_RECORDER)
@@ -1774,13 +1777,42 @@ def _validate_draft_decision_source(
         or receipt.get("classification") != "draft_direction_selected"
         or receipt.get("claim_boundary") != "selection_lineage_only_no_release_acceptance"
         or receipt.get("decision", {}).get("action") != "select"
-        or receipt.get("handoff", {}).get("production_lane") != "BUILD"
+        or expected_lane not in {"BUILD", "RETROFIT"}
+        or receipt.get("handoff", {}).get("production_lane") != expected_lane
         or receipt.get("handoff", {}).get("next_step") != "implement_selected_direction"
         or receipt.get("handoff", {}).get("draft_evidence_policy")
         != "style_calibration_only_not_release_evidence"
         or validated.get("skill_tree_sha256") != current_skill.get("tree_sha256")
     ):
-        raise RunnerError("draft decision must be a fresh select handoff for the current Skill BUILD lane")
+        raise RunnerError(
+            "draft decision must be a fresh select handoff for the current Skill production lane"
+        )
+    cohort_seed = validated.get("cohort_seed_snapshot")
+    if expected_lane == "BUILD":
+        if cohort_seed is not None or seed_root is not None:
+            raise RunnerError("greenfield draft decision cannot carry a seeded cohort")
+    else:
+        if seed_root is None or not isinstance(cohort_seed, dict):
+            raise RunnerError("RETROFIT draft decision requires its exact cohort seed")
+        try:
+            seed_files = _seed_records(seed_root)
+            seed_directories = _directory_records(seed_root)
+            seed_tree = {"directories": seed_directories, "files": seed_files}
+            seed_tree_sha256 = _digest_bytes(
+                json.dumps(
+                    seed_tree,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+        except (OSError, TypeError, ValueError) as error:
+            raise RunnerError("RETROFIT draft decision seed validation failed") from error
+        if cohort_seed != {
+            "tree_sha256": seed_tree_sha256,
+            "files": seed_files,
+            "directories": seed_directories,
+        }:
+            raise RunnerError("RETROFIT draft decision seed drifted from the cohort")
     decision = receipt["decision"]
     handoff = receipt["handoff"]
     source = receipt["source"]
@@ -2514,11 +2546,16 @@ def run(
         raise RunnerError("draft decision source arguments must be supplied together")
     decision_source: dict[str, Any] | None = None
     if all(path is not None for path in decision_paths):
-        if case_mode != "greenfield" or lane_contract != "BUILD":
-            raise RunnerError("draft decision handoff is only valid for a greenfield BUILD lane")
+        if lane_contract not in {"BUILD", "RETROFIT"}:
+            raise RunnerError("draft decision handoff is only valid for BUILD or RETROFIT")
         assert all(path is not None for path in decision_paths)
         decision_source = _validate_draft_decision_source(
-            draft_decision_receipt, draft_decision_input, draft_cohort_root, draft_cohort_log_dir
+            draft_decision_receipt,
+            draft_decision_input,
+            draft_cohort_root,
+            draft_cohort_log_dir,
+            expected_lane=lane_contract,
+            seed_root=seed_root,
         )
         if decision_source.get("action") != "select":
             raise RunnerError("draft decision handoff requires a selected direction")
@@ -2704,7 +2741,12 @@ def run(
             return
         assert all(path is not None for path in decision_paths)
         observed = _validate_draft_decision_source(
-            draft_decision_receipt, draft_decision_input, draft_cohort_root, draft_cohort_log_dir
+            draft_decision_receipt,
+            draft_decision_input,
+            draft_cohort_root,
+            draft_cohort_log_dir,
+            expected_lane=lane_contract,
+            seed_root=seed_root,
         )
         if observed != decision_source:
             raise RunnerError("draft decision source drifted during current build")

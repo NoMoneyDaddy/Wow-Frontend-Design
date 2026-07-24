@@ -210,6 +210,7 @@ class SkillCoreContractTests(unittest.TestCase):
         self.assertIn("multiple direction drafts to confirm style", direction)
         self.assertIn("fast calibration pass", direction)
         self.assertIn("design-exploration.md", direction)
+        self.assertIn("explicitly delegates selection", direction)
 
     def test_formal_build_uses_layered_feedback_without_skipping_release_gates(self) -> None:
         implementation = IMPLEMENTATION.read_text(encoding="utf-8")

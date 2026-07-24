@@ -212,6 +212,27 @@ class CurrentDraftCohortTests(unittest.TestCase):
             "capture_standard": cohort.CAPTURE_STANDARD,
             "captures": [],
         }
+        pages = case["capture_plan"]["pages"]
+        if isinstance(pages, dict):
+            pages = pages["paths"]
+        if pages == "all_html_outputs":
+            pages = [
+                record["path"]
+                for record in manifest["outputs"]
+                if record["path"].endswith(".html")
+            ]
+        for page in pages:
+            for profile in ("desktop-default", "mobile-default"):
+                label = f"{Path(page).stem}-{profile}"
+                relative = f"artifacts/{label}.png"
+                artifact = evidence / relative
+                artifact.write_bytes(b"fake-png")
+                receipt["captures"].append({
+                    "label": label,
+                    "page": page,
+                    "profile": profile,
+                    "path": relative,
+                })
         (evidence / "capture-receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
         if convergence_path is not None:
             convergence = json.loads(convergence_path.read_text(encoding="utf-8"))
@@ -386,7 +407,67 @@ class CurrentDraftCohortTests(unittest.TestCase):
                 "references/design-exploration.md",
                 build.call_args.kwargs["skill_reference"],
             )
-            self.assertNotIn("release", json.dumps(receipt).lower())
+            checkpoint = receipt["decision_checkpoint"]
+            self.assertEqual(
+                {
+                    "schema_version",
+                    "claim_boundary",
+                    "variants",
+                    "allowed_actions",
+                    "reply_grammar",
+                },
+                set(checkpoint),
+            )
+            self.assertEqual(1, checkpoint["schema_version"])
+            self.assertEqual(
+                ["select", "revise", "stop"],
+                checkpoint["allowed_actions"],
+            )
+            self.assertEqual(
+                {
+                    "select": "選 <variant_id>｜原因：<reason>｜調整：<0-3 adjustments>",
+                    "revise": "修 <variant_id>｜調整：<1-3 adjustments>",
+                    "stop": "停｜原因：<reason>",
+                },
+                checkpoint["reply_grammar"],
+            )
+            capture_receipt = json.loads(
+                (cohort_root / "evidence" / "capture-receipt.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                [variant["id"] for variant in self.valid_plan()["variants"]],
+                [item["variant_id"] for item in checkpoint["variants"]],
+            )
+            for variant in checkpoint["variants"]:
+                page = f"directions/{variant['variant_id']}.html"
+                expected = {
+                    capture["profile"]: capture
+                    for capture in capture_receipt["captures"]
+                    if capture["page"] == page
+                }
+                self.assertEqual({"desktop-default", "mobile-default"}, set(expected))
+                self.assertEqual(
+                    expected["desktop-default"]["label"],
+                    variant["desktop"]["label"],
+                )
+                self.assertEqual(
+                    expected["mobile-default"]["label"],
+                    variant["mobile"]["label"],
+                )
+                self.assertEqual(
+                    f"evidence/{expected['desktop-default']['path']}",
+                    variant["desktop"]["path"],
+                )
+                self.assertEqual(
+                    f"evidence/{expected['mobile-default']['path']}",
+                    variant["mobile"]["path"],
+                )
+                for profile in ("desktop", "mobile"):
+                    self.assertFalse(Path(variant[profile]["path"]).is_absolute())
+            self.assertEqual(
+                "fresh_capture_navigation_only_not_selection_or_release",
+                checkpoint["claim_boundary"],
+            )
             receipt_path = cohort_root / "draft-cohort-receipt.json"
             self.assertTrue(receipt_path.is_file())
             self.assertEqual(0o600, stat.S_IMODE(receipt_path.stat().st_mode))

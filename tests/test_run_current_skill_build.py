@@ -3121,6 +3121,112 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         self.assertNotIn("path", summary["cohort_receipt"])
         self.assertTrue(policy._valid_decision_source(summary))
 
+    def test_seeded_draft_decision_requires_the_exact_formal_retrofit_seed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            seed = root / "seed"
+            seed.mkdir()
+            (seed / "index.html").write_text("seed\n", encoding="utf-8")
+            seed_files = policy._seed_records(seed)
+            seed_directories = policy._directory_records(seed)
+            seed_tree = {
+                "directories": seed_directories,
+                "files": seed_files,
+            }
+            tree_sha256 = policy._digest_bytes(
+                json.dumps(
+                    seed_tree,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+            skill_tree = core.skill_tree_summary(
+                policy.SKILL_SOURCE,
+                "wow-frontend-design",
+            )
+            record = {"bytes": 10, "mode": "0600", "sha256": "a" * 64}
+            receipt = {
+                "status": "recorded",
+                "classification": "draft_direction_selected",
+                "claim_boundary": "selection_lineage_only_no_release_acceptance",
+                "source": {
+                    "cohort_id": "marketplace-directions-1",
+                    "decision_input": {**record, "sha256": "b" * 64},
+                    "cohort_receipt": {
+                        "path": "draft-cohort-receipt.json",
+                        **record,
+                        "sha256": "c" * 64,
+                    },
+                    "capture_set_sha256": "d" * 64,
+                    "skill_tree_sha256": skill_tree["tree_sha256"],
+                },
+                "decision": {
+                    "action": "select",
+                    "authority": "user_delegated",
+                    "reason": "Best task fit.",
+                    "adjustments": [],
+                    "variant": {
+                        "id": "editorial-index",
+                        "hypothesis": "Editorial hierarchy.",
+                        "changed_axes": ["composition", "typography"],
+                        "expected_benefit": "Clear priority.",
+                        "risk": "Lower density.",
+                        "disqualifier": "Hidden action.",
+                    },
+                    "capture_labels": [
+                        "editorial-index-desktop-default",
+                        "editorial-index-mobile-default",
+                    ],
+                },
+                "handoff": {
+                    "production_lane": "RETROFIT",
+                    "next_step": "implement_selected_direction",
+                    "held_constant_axes": [
+                        "product-facts",
+                        "content-fixture",
+                        "functional-behavior",
+                        "comparison-conditions",
+                    ],
+                    "selection_criteria": ["task clarity", "brand distinction"],
+                    "draft_evidence_policy": "style_calibration_only_not_release_evidence",
+                },
+            }
+            module = mock.Mock()
+            module.validate_decision_receipt.return_value = {
+                "receipt": receipt,
+                "receipt_record": record,
+                "skill_tree_sha256": skill_tree["tree_sha256"],
+                "cohort_seed_snapshot": {
+                    "tree_sha256": tree_sha256,
+                    "files": seed_files,
+                    "directories": seed_directories,
+                },
+            }
+            with mock.patch.object(policy, "_module", return_value=module):
+                summary = policy._validate_draft_decision_source(
+                    root / "receipt.json",
+                    root / "decision.json",
+                    root / "cohort",
+                    root / "logs",
+                    expected_lane="RETROFIT",
+                    seed_root=seed,
+                )
+                self.assertTrue(policy._valid_decision_source(summary))
+
+                (seed / "index.html").write_text("drift\n", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    policy.RunnerError,
+                    "seed",
+                ):
+                    policy._validate_draft_decision_source(
+                        root / "receipt.json",
+                        root / "decision.json",
+                        root / "cohort",
+                        root / "logs",
+                        expected_lane="RETROFIT",
+                        seed_root=seed,
+                    )
+
     def test_draft_decision_revise_is_rejected_before_target_side_effect(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -3174,6 +3280,62 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 )
             fresh_target.assert_not_called()
             validate.assert_not_called()
+
+    def test_retrofit_lane_routes_selected_direction_through_the_same_builder(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief = root / "brief.md"
+            brief.write_text("Refactor the selected direction.\n", encoding="utf-8")
+            seed = root / "seed"
+            seed.mkdir()
+            (seed / "styles.css").write_text("body{}\n", encoding="utf-8")
+            target = root / "target"
+            target.mkdir()
+            logs = root / "logs"
+            logs.mkdir()
+            paths = tuple(
+                root / name
+                for name in (
+                    "receipt.json",
+                    "decision.json",
+                    "cohort",
+                    "cohort-logs",
+                )
+            )
+            source = draft_decision_source()
+            with (
+                mock.patch.object(
+                    policy,
+                    "_validate_draft_decision_source",
+                    return_value=source,
+                ) as validate,
+                mock.patch.object(
+                    policy,
+                    "_fresh_target",
+                    side_effect=policy.RunnerError("stop after routing"),
+                ),
+                self.assertRaisesRegex(policy.RunnerError, "stop after routing"),
+            ):
+                policy.run(
+                    brief,
+                    target,
+                    log_dir=logs,
+                    case_mode="retrofit",
+                    seed_root=seed,
+                    allow_changes=("styles.css",),
+                    draft_decision_receipt=paths[0],
+                    draft_decision_input=paths[1],
+                    draft_cohort_root=paths[2],
+                    draft_cohort_log_dir=paths[3],
+                )
+            validate.assert_called_once_with(
+                paths[0],
+                paths[1],
+                paths[2],
+                paths[3],
+                expected_lane="RETROFIT",
+                seed_root=seed,
+            )
 
     def test_decision_enabled_receipt_and_repair_attempt_share_exact_lineage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

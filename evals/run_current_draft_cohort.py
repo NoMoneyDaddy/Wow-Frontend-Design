@@ -65,6 +65,11 @@ CAPTURE_STANDARD = {
     "network": "local-output-only",
 }
 CLAIM_BOUNDARY = "style_calibration_only"
+DECISION_CHECKPOINT_REPLY_GRAMMAR = {
+    "select": "選 <variant_id>｜原因：<reason>｜調整：<0-3 adjustments>",
+    "revise": "修 <variant_id>｜調整：<1-3 adjustments>",
+    "stop": "停｜原因：<reason>",
+}
 CONVERGENCE_CODES = {
     "cross_output_template_candidate",
     "near_cross_output_template_candidate",
@@ -704,6 +709,71 @@ def _assert_execution_guards(
         raise DraftCohortError("cohort tool provenance drifted during execution")
 
 
+def _decision_checkpoint(
+    plan: dict[str, Any],
+    capture_receipt: Path,
+    capture_record: dict[str, Any],
+) -> dict[str, Any]:
+    _, raw = _regular_absolute_file(
+        capture_receipt, "validated capture receipt", 2_000_000
+    )
+    if _record(capture_receipt) != capture_record:
+        raise DraftCohortError("capture receipt drifted before decision checkpoint")
+    try:
+        receipt = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise DraftCohortError("validated capture receipt is invalid") from error
+    captures = receipt.get("captures") if isinstance(receipt, dict) else None
+    if not isinstance(captures, list):
+        raise DraftCohortError("validated capture receipt has no capture matrix")
+
+    expected = {
+        (f"directions/{variant['id']}.html", profile): variant["id"]
+        for variant in plan["variants"]
+        for profile in ("desktop-default", "mobile-default")
+    }
+    mapped: dict[tuple[str, str], dict[str, str]] = {}
+    for capture in captures:
+        if not isinstance(capture, dict):
+            raise DraftCohortError("validated capture receipt has an invalid capture")
+        page = capture.get("page")
+        profile = capture.get("profile")
+        identity = (page, profile)
+        if identity not in expected:
+            continue
+        label = capture.get("label")
+        path = capture.get("path")
+        if (
+            not isinstance(label, str)
+            or ID_PATTERN.fullmatch(label) is None
+            or not isinstance(path, str)
+            or not path.lower().endswith(".png")
+            or "\\" in path
+            or path.startswith("/")
+            or any(part in {"", ".", ".."} for part in path.split("/"))
+            or identity in mapped
+        ):
+            raise DraftCohortError("validated capture receipt has an unsafe checkpoint capture")
+        mapped[identity] = {"label": label, "path": f"evidence/{path}"}
+    if set(mapped) != set(expected):
+        raise DraftCohortError("validated capture receipt lacks the direction checkpoint matrix")
+    variants = []
+    for variant in plan["variants"]:
+        page = f"directions/{variant['id']}.html"
+        variants.append({
+            "variant_id": variant["id"],
+            "desktop": mapped[(page, "desktop-default")],
+            "mobile": mapped[(page, "mobile-default")],
+        })
+    return {
+        "schema_version": 1,
+        "claim_boundary": "fresh_capture_navigation_only_not_selection_or_release",
+        "variants": variants,
+        "allowed_actions": ["select", "revise", "stop"],
+        "reply_grammar": DECISION_CHECKPOINT_REPLY_GRAMMAR,
+    }
+
+
 def _case(
     plan: dict[str, Any],
     manifest: dict[str, Any],
@@ -1067,6 +1137,8 @@ def _run_pinned(
     ):
         raise DraftCohortError("draft cohort final provenance drifted")
     assert_current()
+    decision_checkpoint = _decision_checkpoint(plan, capture_receipt, capture_record)
+    assert_current()
     receipt = {
         "schema_version": 1,
         "status": "captured",
@@ -1103,6 +1175,7 @@ def _run_pinned(
             "capture_standard": CAPTURE_STANDARD,
         },
         "evidence": {**validated, "convergence": convergence},
+        "decision_checkpoint": decision_checkpoint,
         "tools": tools_before,
     }
     try:

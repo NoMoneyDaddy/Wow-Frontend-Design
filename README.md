@@ -63,6 +63,17 @@ Preserve the framework, routes, API contracts, analytics, form names, and curren
 business logic. Recompose mobile behavior and verify the affected states.
 ```
 
+### 先看多組風格草稿
+
+```text
+Use $wow-frontend-design to inspect this project, then produce three materially
+different direction groups for the same representative route. Keep product facts,
+content, functions, and comparison conditions fixed. Show fresh desktop/mobile
+Playwright captures before production. I will select one direction.
+```
+
+若希望不中斷，可明示「由你依主要任務、品牌辨識與手機成立度選定後繼續」。Skill 仍會先顯示同批 fresh captures，記錄 `user_delegated` 與選擇理由，再以正式 production route 重新實作與取證；草稿 HTML／PNG 不會直接升格為可發布產物。
+
 ### 局部修復
 
 ```text

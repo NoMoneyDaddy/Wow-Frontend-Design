@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import stat
 import sys
 from pathlib import Path
@@ -21,7 +22,7 @@ DECISION_KEYS = {
 }
 RECEIPT_KEYS = {
     "schema_version", "status", "classification", "claim_boundary", "cohort",
-    "source", "configuration", "evidence", "tools",
+    "source", "configuration", "evidence", "decision_checkpoint", "tools",
 }
 DECISION_RECEIPT_KEYS = {
     "schema_version", "status", "classification", "claim_boundary", "source",
@@ -44,6 +45,10 @@ CONVERGENCE_KEYS = {
     "status", "result", "policy", "profiles", "observation_count", "advisory_count",
     "advisory_counts", "affected_variant_ids", "review_required", "observations",
     "audit", "claim_boundary",
+}
+DECISION_CHECKPOINT_KEYS = {
+    "schema_version", "claim_boundary", "variants", "allowed_actions",
+    "reply_grammar",
 }
 
 if str(ROOT / "evals") not in sys.path:
@@ -213,6 +218,50 @@ def _normalize_cohort(receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str
     _browser_contract_record(configuration["browser_contract"])
     evidence = _exact(receipt["evidence"], EVIDENCE_KEYS, "cohort receipt.evidence")
     _exact(evidence["convergence"], CONVERGENCE_KEYS, "cohort convergence")
+    checkpoint = _exact(
+        receipt["decision_checkpoint"],
+        DECISION_CHECKPOINT_KEYS,
+        "cohort decision checkpoint",
+    )
+    checkpoint_variants = checkpoint["variants"]
+    if (
+        checkpoint["schema_version"] != 1
+        or checkpoint["claim_boundary"]
+        != "fresh_capture_navigation_only_not_selection_or_release"
+        or checkpoint["allowed_actions"] != ["select", "revise", "stop"]
+        or checkpoint["reply_grammar"] != cohort.DECISION_CHECKPOINT_REPLY_GRAMMAR
+        or not isinstance(checkpoint_variants, list)
+        or len(checkpoint_variants) != len(variants)
+    ):
+        raise DraftDecisionError("cohort decision checkpoint is invalid")
+    for expected_variant, checkpoint_variant in zip(
+        variants,
+        checkpoint_variants,
+    ):
+        checkpoint_variant = _exact(
+            checkpoint_variant,
+            {"variant_id", "desktop", "mobile"},
+            "cohort decision checkpoint variant",
+        )
+        if checkpoint_variant["variant_id"] != expected_variant["id"]:
+            raise DraftDecisionError("cohort decision checkpoint order drifted")
+        for profile in ("desktop", "mobile"):
+            capture = _exact(
+                checkpoint_variant[profile],
+                {"label", "path"},
+                "cohort decision checkpoint capture",
+            )
+            path = capture["path"]
+            if (
+                not isinstance(capture["label"], str)
+                or cohort.ID_PATTERN.fullmatch(capture["label"]) is None
+                or not isinstance(path, str)
+                or not path.startswith("evidence/artifacts/")
+                or not path.endswith(".png")
+                or "\\" in path
+                or any(part in {"", ".", ".."} for part in path.split("/"))
+            ):
+                raise DraftDecisionError("cohort decision checkpoint capture is invalid")
     if (
         receipt["configuration"]["skill_reference"] != "references/design-exploration.md"
         or receipt["configuration"]["capture_standard"] != cohort.CAPTURE_STANDARD
@@ -289,6 +338,32 @@ def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
     evidence = receipt["evidence"]
     if any(validated[key] != evidence[key] for key in ("capture_count", "capture_set_sha256", "capture_standard")):
         raise DraftDecisionError("current draft capture evidence drifted")
+    captures = validated.get("receipt", {}).get("captures")
+    if not isinstance(captures, list):
+        raise DraftDecisionError("current draft capture matrix is invalid")
+    capture_by_identity = {
+        (capture.get("page"), capture.get("profile")): {
+            "label": capture.get("label"),
+            "path": f"evidence/{capture.get('path')}",
+        }
+        for capture in captures
+        if isinstance(capture, dict)
+    }
+    checkpoint_variants = receipt["decision_checkpoint"]["variants"]
+    for variant, checkpoint_variant in zip(
+        metadata["variants"],
+        checkpoint_variants,
+    ):
+        page = f"directions/{variant['id']}.html"
+        expected = {
+            "variant_id": variant["id"],
+            "desktop": capture_by_identity.get((page, "desktop-default")),
+            "mobile": capture_by_identity.get((page, "mobile-default")),
+        }
+        if checkpoint_variant != expected:
+            raise DraftDecisionError(
+                "cohort decision checkpoint drifted from validated captures"
+            )
     manifest = validated["manifest"]
     if (
         manifest.get("outputs") != source["outputs"]
@@ -303,6 +378,31 @@ def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
         raise DraftDecisionError("current draft convergence evidence is invalid") from error
     if convergence != evidence["convergence"]:
         raise DraftDecisionError("current draft convergence evidence drifted")
+    cohort_seed_snapshot = None
+    if allow_subset:
+        cohort_seed_snapshot = _exact(
+            manifest.get("seed_snapshot"),
+            {"tree_sha256", "files", "directories"},
+            "seeded cohort manifest.seed_snapshot",
+        )
+        seed_tree = {
+            "directories": cohort_seed_snapshot["directories"],
+            "files": cohort_seed_snapshot["files"],
+        }
+        if (
+            not isinstance(cohort_seed_snapshot["files"], list)
+            or not cohort_seed_snapshot["files"]
+            or not isinstance(cohort_seed_snapshot["directories"], list)
+            or cohort_seed_snapshot["tree_sha256"]
+            != cohort._digest_bytes(
+                json.dumps(
+                    seed_tree,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+        ):
+            raise DraftDecisionError("seeded cohort snapshot provenance is invalid")
     receipt_after, raw_after = _read_json(receipt_path, "cohort receipt", RECEIPT_LIMIT)
     if raw_after != raw_before or receipt_after != receipt:
         raise DraftDecisionError("cohort receipt drifted during decision validation")
@@ -311,12 +411,12 @@ def validate_cohort_source(cohort_root: Path, log_dir: Path) -> dict[str, Any]:
         "receipt_record": {"path": "draft-cohort-receipt.json", **_digest_record(receipt_path)},
         "cohort": metadata,
         "capture": validated,
-        "automatic_production_lane": None if allow_subset else "BUILD",
+        "automatic_production_lane": "RETROFIT" if allow_subset else "BUILD",
+        "cohort_seed_snapshot": cohort_seed_snapshot,
     }
 
 
-def load_decision(path: Path) -> dict[str, Any]:
-    item, _ = _read_json(path, "draft decision", DECISION_LIMIT)
+def _normalize_decision(item: object) -> dict[str, Any]:
     item = _exact(item, DECISION_KEYS, "draft decision")
     action = item["action"]
     if (
@@ -355,6 +455,151 @@ def load_decision(path: Path) -> dict[str, Any]:
     }
 
 
+def load_decision(path: Path) -> dict[str, Any]:
+    item, _ = _read_json(path, "draft decision", DECISION_LIMIT)
+    return _normalize_decision(item)
+
+
+def write_structured_decision(
+    output_root: Path,
+    *,
+    cohort_id: str,
+    action: str,
+    variant_id: str | None,
+    authority: str,
+    reason: str,
+    adjustments: list[str],
+    convergence_reviewed: bool,
+) -> Path:
+    payload = {
+        "schema_version": 1,
+        "cohort_id": cohort_id,
+        "action": action,
+        "variant_id": variant_id,
+        "authority": authority,
+        "reason": reason,
+        "adjustments": adjustments,
+        "convergence_reviewed": convergence_reviewed,
+    }
+    _normalize_decision(payload)
+    output_root = cohort._real_empty_directory(
+        output_root,
+        "draft decision output root",
+    )
+    parent = cohort._real_directory(
+        output_root.parent,
+        "draft decision input parent",
+    )
+    decision_path = output_root.with_name(f"{output_root.name}.input.json")
+    cohort._outside_authoring_repository(
+        output_root,
+        "generated draft decision input parent",
+    )
+    encoded = (
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
+    if len(encoded) > DECISION_LIMIT:
+        raise DraftDecisionError("generated draft decision exceeds its size limit")
+    directory_flag = getattr(os, "O_DIRECTORY", 0)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", 0)
+    if directory_flag == 0 or nofollow_flag == 0:
+        raise DraftDecisionError(
+            "platform requires O_DIRECTORY and O_NOFOLLOW"
+        )
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | directory_flag
+        | nofollow_flag
+    )
+    output_flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | nofollow_flag
+    )
+    parent_descriptor = -1
+    descriptor = -1
+    created = False
+    created_identity: tuple[int, int] | None = None
+    try:
+        parent_descriptor = os.open(parent, directory_flags)
+        pinned_parent = os.fstat(parent_descriptor)
+        current_parent = parent.lstat()
+        if (
+            not stat.S_ISDIR(pinned_parent.st_mode)
+            or (pinned_parent.st_dev, pinned_parent.st_ino)
+            != (current_parent.st_dev, current_parent.st_ino)
+        ):
+            raise OSError("draft decision input parent identity changed")
+        descriptor = os.open(
+            decision_path.name,
+            output_flags,
+            0o600,
+            dir_fd=parent_descriptor,
+        )
+        created = True
+        opened = os.fstat(descriptor)
+        created_identity = (opened.st_dev, opened.st_ino)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+            raise OSError("generated decision input is not a regular file")
+        os.fchmod(descriptor, 0o600)
+        written = 0
+        while written < len(encoded):
+            count = os.write(descriptor, encoded[written:])
+            if count <= 0:
+                raise OSError("short write while creating draft decision input")
+            written += count
+        os.fsync(descriptor)
+        final = os.fstat(descriptor)
+        current_parent = parent.lstat()
+        current = os.stat(
+            decision_path.name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            (current_parent.st_dev, current_parent.st_ino)
+            != (pinned_parent.st_dev, pinned_parent.st_ino)
+            or
+            (current.st_dev, current.st_ino) != created_identity
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or final.st_size != len(encoded)
+            or stat.S_IMODE(final.st_mode) != 0o600
+        ):
+            raise OSError("generated decision input provenance is invalid")
+    except OSError as error:
+        if (
+            created
+            and parent_descriptor >= 0
+            and created_identity is not None
+        ):
+            try:
+                current = os.stat(
+                    decision_path.name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+                if (current.st_dev, current.st_ino) == created_identity:
+                    os.unlink(
+                        decision_path.name,
+                        dir_fd=parent_descriptor,
+                    )
+            except OSError:
+                pass
+        raise DraftDecisionError(
+            "generated draft decision input could not be created exclusively"
+        ) from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_descriptor >= 0:
+            os.close(parent_descriptor)
+    return decision_path
+
+
 def _decision_receipt_payload(
     source: dict[str, Any], item: dict[str, Any], decision_record: dict[str, Any],
     tools: dict[str, dict[str, Any]],
@@ -379,11 +624,7 @@ def _decision_receipt_payload(
         "stop": "draft_direction_stopped",
     }[item["action"]]
     next_step = {
-        "select": (
-            "implement_selected_direction"
-            if source["automatic_production_lane"] == "BUILD"
-            else "carry_selected_direction_to_retrofit_brief"
-        ),
+        "select": "implement_selected_direction",
         "revise": "render_one_bounded_revision",
         "stop": "stop_before_production",
     }[item["action"]]
@@ -485,10 +726,40 @@ def validate_decision_receipt(
         "receipt": receipt,
         "receipt_record": receipt_record,
         "skill_tree_sha256": receipt["source"]["skill_tree_sha256"],
+        "cohort_seed_snapshot": source["cohort_seed_snapshot"],
     }
 
 
 def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path) -> dict[str, Any]:
+    decision_path, _ = _as_decision_error(
+        cohort._regular_absolute_file,
+        decision_path,
+        "draft decision",
+        DECISION_LIMIT,
+    )
+    _as_decision_error(
+        cohort._outside_authoring_repository,
+        decision_path,
+        "draft decision",
+    )
+    resolved_cohort_root = _real_directory(cohort_root, "cohort root")
+    resolved_log_dir = _real_directory(log_dir, "cohort log directory")
+    resolved_output_root = _as_decision_error(
+        cohort._real_empty_directory,
+        output_root,
+        "draft decision output root",
+    )
+    for boundary, label in (
+        (resolved_cohort_root, "cohort root"),
+        (resolved_log_dir, "cohort log directory"),
+        (resolved_output_root, "decision output root"),
+    ):
+        _as_decision_error(
+            cohort._separate,
+            decision_path,
+            boundary,
+            f"draft decision and {label}",
+        )
     tools_before = _decision_tool_records()
     source = validate_cohort_source(cohort_root, log_dir)
     decision_before = _digest_record(decision_path)
@@ -516,10 +787,10 @@ def run(cohort_root: Path, log_dir: Path, decision_path: Path, output_root: Path
         raise DraftDecisionError("draft decision tool provenance drifted before finalization")
     encoded = (json.dumps(receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     try:
-        with cohort._PinnedDirectory(output_root, "draft decision output root") as output:
+        with cohort._PinnedDirectory(resolved_output_root, "draft decision output root") as output:
             cohort._outside_authoring_repository(output.path, "draft decision output root")
-            cohort._separate(output.path, _real_directory(cohort_root, "cohort root"), "decision output and cohort root")
-            cohort._separate(output.path, _real_directory(log_dir, "cohort log directory"), "decision output and log directory")
+            cohort._separate(output.path, resolved_cohort_root, "decision output and cohort root")
+            cohort._separate(output.path, resolved_log_dir, "decision output and log directory")
             output.write_exclusive("draft-decision-receipt.json", encoded)
     except (OSError, cohort.DraftCohortError) as error:
         try:
@@ -536,15 +807,73 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cohort-root", required=True, type=Path)
     parser.add_argument("--log-dir", required=True, type=Path)
-    parser.add_argument("--decision", required=True, type=Path)
+    parser.add_argument("--decision", type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
+    parser.add_argument("--cohort-id")
+    parser.add_argument("--action", choices=("select", "revise", "stop"))
+    parser.add_argument("--variant-id")
+    parser.add_argument(
+        "--authority",
+        choices=(
+            "user_confirmed",
+            "human_reviewer_confirmed",
+            "user_delegated",
+        ),
+    )
+    parser.add_argument("--reason")
+    parser.add_argument("--adjustment", action="append", default=[])
+    parser.add_argument("--convergence-reviewed", action="store_true")
     args = parser.parse_args(argv)
     try:
-        run(args.cohort_root, args.log_dir, args.decision, args.output_root)
+        structured_used = (
+            any(
+                value is not None
+                for value in (
+                    args.cohort_id,
+                    args.action,
+                    args.variant_id,
+                    args.authority,
+                    args.reason,
+                )
+            )
+            or bool(args.adjustment)
+            or args.convergence_reviewed
+        )
+        if args.decision is not None and structured_used:
+            raise DraftDecisionError(
+                "--decision cannot be combined with structured decision flags"
+            )
+        decision_path = args.decision
+        if decision_path is None:
+            if any(
+                value is None
+                for value in (
+                    args.cohort_id,
+                    args.action,
+                    args.authority,
+                    args.reason,
+                )
+            ):
+                raise DraftDecisionError(
+                    "structured decision requires cohort id, action, authority, and reason"
+                )
+            decision_path = write_structured_decision(
+                args.output_root,
+                cohort_id=args.cohort_id,
+                action=args.action,
+                variant_id=args.variant_id,
+                authority=args.authority,
+                reason=args.reason,
+                adjustments=args.adjustment,
+                convergence_reviewed=args.convergence_reviewed,
+            )
+        run(args.cohort_root, args.log_dir, decision_path, args.output_root)
     except (OSError, DraftDecisionError) as error:
         print(f"current draft decision failed: {error}", file=sys.stderr)
         return 1
     print("current draft decision recorded")
+    if args.decision is None:
+        print(f"draft decision input: {decision_path}")
     return 0
 
 
