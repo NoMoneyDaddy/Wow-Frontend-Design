@@ -1526,6 +1526,78 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         self.assertFalse(policy.repair_state_strictly_progressed(first, moved))
         self.assertEqual("repeated_failure", policy.repair_state_stop_reason([first], first, 1))
 
+    def test_root_overflow_feedback_locates_target_without_private_content(self) -> None:
+        def result(profile: str, path: list[list[Any]], overflow_right: int) -> dict[str, Any]:
+            target = hashlib.sha256(
+                json.dumps(path, separators=(",", ":")).encode()
+            ).hexdigest()
+            return {
+                "page": "index.html", "profile": profile, "status": "rejected",
+                "navigation": "passed", "visible_main": True, "visible_text": True,
+                "visible_primary_content": True, "root_horizontal_overflow": True,
+                "counters": {},
+                "inspection": {
+                    "axe_rule_ids": [],
+                    "layout_hazards": {},
+                    "root_overflow_target": {
+                        "target_sha256": target,
+                        "path": path,
+                        "overflow_left_px": 0,
+                        "overflow_right_px": overflow_right,
+                    },
+                    "raw_diagnostics": "PRIVATE-OVERFLOW-CONTENT",
+                },
+            }
+
+        stage_path = [["html", 1], ["body", 1], ["main", 1], ["div", 1]]
+        receipt = {"status": "rejected", "results": [
+            result("mobile", stage_path, 128),
+            result("narrow", stage_path, 198),
+        ]}
+        feedback = policy.compile_html_feedback(receipt)
+        self.assertEqual(3, feedback["schema_version"])
+        self.assertEqual(2, feedback["counts"]["root-horizontal-overflow"])
+        self.assertEqual(1, len(feedback["root_overflow_targets"]))
+        target = feedback["root_overflow_targets"][0]
+        self.assertEqual(["mobile", "narrow"], target["profiles"])
+        self.assertEqual(198, target["overflow_right_px"])
+        prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
+        self.assertIn('[["html",1],["body",1],["main",1],["div",1]]', prompt)
+        self.assertNotIn("PRIVATE-OVERFLOW-CONTENT", prompt)
+
+        moved_path = [["html", 1], ["body", 1], ["main", 1], ["section", 1]]
+        first = policy.compile_repair_state("html", {
+            "results": [result("mobile", stage_path, 128)],
+        })
+        moved = policy.compile_repair_state("html", {
+            "results": [result("mobile", moved_path, 128)],
+        })
+        self.assertNotEqual(first, moved)
+        self.assertIsNone(policy.repair_state_stop_reason([first], moved, 1))
+        self.assertFalse(policy.repair_state_strictly_progressed(first, moved))
+
+        reduced = policy.compile_repair_state("html", {
+            "results": [result("mobile", stage_path, 20)],
+        })
+        self.assertTrue(policy.repair_state_strictly_progressed(first, reduced))
+        self.assertIsNone(policy.repair_state_stop_reason([first], reduced, 2))
+
+        unavailable_result = result("mobile", stage_path, 128)
+        unavailable_result["inspection"]["root_overflow_target"] = None
+        unavailable = policy.compile_repair_state("html", {
+            "results": [unavailable_result],
+        })
+        self.assertFalse(policy.repair_state_strictly_progressed(first, unavailable))
+        self.assertEqual(
+            "no_strict_progress",
+            policy.repair_state_stop_reason([first], unavailable, 2),
+        )
+
+        forged = result("mobile", stage_path, 128)
+        forged["inspection"]["root_overflow_target"]["target_sha256"] = "0" * 64
+        forged_feedback = policy.compile_html_feedback({"results": [forged]})
+        self.assertNotIn("root_overflow_targets", forged_feedback)
+
     def test_axe_receipt_schema_rejects_unclosed_descriptor(self) -> None:
         path = [["html", 1], ["body", 1], ["small", 1]]
         target_sha256 = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
@@ -1550,6 +1622,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "cjk_heading_split_target_set_sha256": hashlib.sha256(b"[]").hexdigest(),
             "cjk_heading_split_targets_truncated": False,
             "cjk_heading_split_target_descriptors": [],
+            "root_overflow_target": None,
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,
@@ -1564,6 +1637,20 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         }
         policy._validate_axe_inspection(inspection)
         inspection["axe_target_descriptors"][0]["html"] = "PRIVATE"
+        with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+            policy._validate_axe_inspection(inspection)
+        inspection["axe_target_descriptors"][0].pop("html")
+        overflow_path = [["html", 1], ["body", 1], ["main", 1]]
+        inspection["root_overflow_target"] = {
+            "target_sha256": hashlib.sha256(
+                json.dumps(overflow_path, separators=(",", ":")).encode()
+            ).hexdigest(),
+            "path": overflow_path,
+            "overflow_left_px": 0,
+            "overflow_right_px": 64,
+        }
+        policy._validate_axe_inspection(inspection)
+        inspection["root_overflow_target"]["text"] = "PRIVATE"
         with self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
             policy._validate_axe_inspection(inspection)
 
@@ -1587,6 +1674,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "split_ranges": [{"start": 0, "end": 2}],
                 "split_ranges_truncated": False,
             }],
+            "root_overflow_target": None,
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,

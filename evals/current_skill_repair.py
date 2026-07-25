@@ -10,7 +10,7 @@ from collections import Counter
 from typing import Any
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_FINDING_IDS = 16
 MAX_FEEDBACK_BYTES = 4096
 # The initial build is mutation attempt 1; two repairs keep the bounded run at
@@ -60,6 +60,7 @@ def _bounded_payload(
     contract_steps: list[dict[str, Any]] | None = None,
     axe_targets: list[dict[str, Any]] | None = None,
     cjk_heading_targets: list[dict[str, Any]] | None = None,
+    root_overflow_targets: list[dict[str, Any]] | None = None,
     source_truncated: bool = False,
 ) -> dict[str, Any]:
     counts = Counter(identifiers)
@@ -89,6 +90,11 @@ def _bounded_payload(
         if "cjk-heading-split-word" in selected_ids
         else []
     )
+    eligible_overflow_targets = (
+        list(root_overflow_targets or ())
+        if "root-horizontal-overflow" in selected_ids
+        else []
+    )
 
     def signed(candidate: dict[str, Any]) -> dict[str, Any]:
         signature_source = json.dumps(candidate, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -100,27 +106,44 @@ def _bounded_payload(
         core["axe_targets"] = eligible_targets
     if eligible_cjk_targets:
         core["cjk_heading_targets"] = eligible_cjk_targets
+    if eligible_overflow_targets:
+        core["root_overflow_targets"] = eligible_overflow_targets
     payload = signed(core)
     if len(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")) <= MAX_FEEDBACK_BYTES:
         return payload
-    if not eligible_steps and not eligible_targets and not eligible_cjk_targets:
+    if (
+        not eligible_steps
+        and not eligible_targets
+        and not eligible_cjk_targets
+        and not eligible_overflow_targets
+    ):
         raise ValueError("repair feedback exceeded its byte quota")
 
     core["truncated"] = True
     core.pop("contract_steps", None)
     core.pop("axe_targets", None)
     core.pop("cjk_heading_targets", None)
+    core.pop("root_overflow_targets", None)
     included: dict[str, list[dict[str, Any]]] = {
-        "cjk_heading_targets": [], "axe_targets": [], "contract_steps": [],
+        "cjk_heading_targets": [],
+        "root_overflow_targets": [],
+        "axe_targets": [],
+        "contract_steps": [],
     }
     candidates = {
         "cjk_heading_targets": eligible_cjk_targets,
+        "root_overflow_targets": eligible_overflow_targets,
         "axe_targets": eligible_targets,
         "contract_steps": eligible_steps,
     }
     active = {key: True for key in included}
     while any(active.values()):
-        for key in ("cjk_heading_targets", "axe_targets", "contract_steps"):
+        for key in (
+            "cjk_heading_targets",
+            "root_overflow_targets",
+            "axe_targets",
+            "contract_steps",
+        ):
             if not active[key]:
                 continue
             index = len(included[key])
@@ -323,6 +346,45 @@ def _safe_cjk_heading_targets(result: dict[str, Any]) -> list[dict[str, Any]]:
     return safe
 
 
+def _safe_root_overflow_target(result: dict[str, Any]) -> dict[str, Any] | None:
+    inspection = result.get("inspection")
+    descriptor = inspection.get("root_overflow_target") if isinstance(inspection, dict) else None
+    if not isinstance(descriptor, dict) or set(descriptor) != {
+        "target_sha256", "path", "overflow_left_px", "overflow_right_px",
+    }:
+        return None
+    target_sha256 = descriptor.get("target_sha256")
+    path = descriptor.get("path")
+    overflow_left_px = descriptor.get("overflow_left_px")
+    overflow_right_px = descriptor.get("overflow_right_px")
+    if (
+        not isinstance(target_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", target_sha256) is None
+        or not isinstance(path, list) or not 1 <= len(path) <= 16
+        or type(overflow_left_px) is not int or not 0 <= overflow_left_px <= 100000
+        or type(overflow_right_px) is not int or not 0 <= overflow_right_px <= 100000
+        or overflow_left_px + overflow_right_px <= 0
+        or any(
+            not isinstance(segment, list) or len(segment) != 2
+            or not isinstance(segment[0], str)
+            or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", segment[0]) is None
+            or type(segment[1]) is not int or not 1 <= segment[1] <= 10000
+            for segment in path
+        )
+        or path[0][0] != "html"
+        or hashlib.sha256(
+            json.dumps(path, separators=(",", ":")).encode("utf-8")
+        ).hexdigest() != target_sha256
+    ):
+        return None
+    return {
+        "target_sha256": target_sha256,
+        "path": path,
+        "overflow_left_px": overflow_left_px,
+        "overflow_right_px": overflow_right_px,
+    }
+
+
 def compile_repair_state(
     gate: str,
     receipt: dict[str, Any],
@@ -353,6 +415,7 @@ def compile_repair_state(
     case_states: dict[str, dict[str, Any]] = {}
     axe_routes: dict[str, dict[str, Any]] = {}
     cjk_routes: dict[str, dict[str, Any]] = {}
+    overflow_routes: dict[str, dict[str, Any]] = {}
     reason_rank = {
         "locator-missing": 0,
         "locator-ambiguous": 0,
@@ -391,6 +454,25 @@ def compile_repair_state(
                 cjk_routes[f"{page}\0{profile}"] = {
                     "target_count": cjk_target_count,
                     "target_set_sha256": cjk_target_set_sha256,
+                }
+            overflow_target = _safe_root_overflow_target(result)
+            if (
+                result.get("root_horizontal_overflow") is True
+                and isinstance(page, str) and isinstance(profile, str)
+            ):
+                overflow_routes[f"{page}\0{profile}"] = {
+                    "target_count": 1,
+                    "target_sha256": (
+                        overflow_target["target_sha256"]
+                        if overflow_target is not None
+                        else None
+                    ),
+                    "overflow_px": (
+                        overflow_target["overflow_left_px"]
+                        + overflow_target["overflow_right_px"]
+                        if overflow_target is not None
+                        else None
+                    ),
                 }
         observed = inspection.get("browser_contract") if isinstance(inspection, dict) else None
         if not isinstance(observed, dict):
@@ -443,6 +525,9 @@ def compile_repair_state(
         "cases": {case_id: case_states[case_id] for case_id in sorted(case_states)},
         "axe_routes": {route: axe_routes[route] for route in sorted(axe_routes)},
         "cjk_routes": {route: cjk_routes[route] for route in sorted(cjk_routes)},
+        "overflow_routes": {
+            route: overflow_routes[route] for route in sorted(overflow_routes)
+        },
     }
 
 
@@ -483,6 +568,47 @@ def repair_state_strictly_progressed(previous: dict[str, Any], current: dict[str
             if current_target_count > previous_target_count:
                 return False
             route_improved = route_improved or current_target_count < previous_target_count
+    previous_overflow_routes = previous.get("overflow_routes", {})
+    current_overflow_routes = current.get("overflow_routes", {})
+    if not isinstance(previous_overflow_routes, dict) or not isinstance(current_overflow_routes, dict):
+        return False
+    for route in set(previous_overflow_routes) | set(current_overflow_routes):
+        previous_route = previous_overflow_routes.get(route, {
+            "target_count": 0, "target_sha256": None, "overflow_px": None,
+        })
+        current_route = current_overflow_routes.get(route, {
+            "target_count": 0, "target_sha256": None, "overflow_px": None,
+        })
+        if not isinstance(previous_route, dict) or not isinstance(current_route, dict):
+            return False
+        previous_target_count = previous_route.get("target_count")
+        current_target_count = current_route.get("target_count")
+        if (
+            type(previous_target_count) is not int
+            or type(current_target_count) is not int
+            or previous_target_count not in {0, 1}
+            or current_target_count not in {0, 1}
+            or current_target_count > previous_target_count
+        ):
+            return False
+        if current_target_count < previous_target_count:
+            route_improved = True
+            continue
+        if current_target_count == 0:
+            continue
+        previous_target = previous_route.get("target_sha256")
+        current_target = current_route.get("target_sha256")
+        previous_overflow = previous_route.get("overflow_px")
+        current_overflow = current_route.get("overflow_px")
+        if (
+            previous_target == current_target
+            and isinstance(previous_target, str)
+            and type(previous_overflow) is int
+            and type(current_overflow) is int
+        ):
+            if current_overflow > previous_overflow:
+                return False
+            route_improved = route_improved or current_overflow < previous_overflow
     previous_cases = previous.get("cases")
     current_cases = current.get("cases")
     if not isinstance(previous_cases, dict) or not isinstance(current_cases, dict):
@@ -550,6 +676,7 @@ def compile_html_feedback(
     contract_steps: list[dict[str, Any]] = []
     axe_targets: dict[tuple[str, str, str], dict[str, Any]] = {}
     cjk_targets: dict[tuple[str, str], dict[str, Any]] = {}
+    overflow_targets: dict[tuple[str, str], dict[str, Any]] = {}
     axe_source_truncated = False
     cjk_source_truncated = False
     contract_cases = {
@@ -617,6 +744,31 @@ def compile_html_feedback(
                 existing["split_ranges"] = ordered_ranges[:8]
             if isinstance(profile, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,31}", profile):
                 existing["profiles"].append(profile)
+        overflow_descriptor = _safe_root_overflow_target(result)
+        if (
+            result.get("root_horizontal_overflow") is True
+            and overflow_descriptor is not None
+            and isinstance(page, str)
+        ):
+            overflow_key = (page, overflow_descriptor["target_sha256"])
+            existing_overflow = overflow_targets.get(overflow_key)
+            if existing_overflow is None:
+                existing_overflow = {
+                    "page": page,
+                    **overflow_descriptor,
+                    "profiles": [],
+                }
+                overflow_targets[overflow_key] = existing_overflow
+            elif (
+                overflow_descriptor["overflow_left_px"]
+                + overflow_descriptor["overflow_right_px"]
+                > existing_overflow["overflow_left_px"]
+                + existing_overflow["overflow_right_px"]
+            ):
+                existing_overflow["overflow_left_px"] = overflow_descriptor["overflow_left_px"]
+                existing_overflow["overflow_right_px"] = overflow_descriptor["overflow_right_px"]
+            if isinstance(profile, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,31}", profile):
+                existing_overflow["profiles"].append(profile)
         observed_contract = inspection.get("browser_contract") if isinstance(inspection, dict) else None
         if observed_contract is not None:
             if not isinstance(observed_contract, dict):
@@ -731,12 +883,18 @@ def compile_html_feedback(
         target = cjk_targets[key]
         target["profiles"] = sorted(set(target["profiles"]))
         normalized_cjk_targets.append(target)
+    normalized_overflow_targets = []
+    for key in sorted(overflow_targets):
+        target = overflow_targets[key]
+        target["profiles"] = sorted(set(target["profiles"]))
+        normalized_overflow_targets.append(target)
     return _bounded_payload(
         "html",
         identifiers,
         contract_steps=contract_steps,
         axe_targets=normalized_targets,
         cjk_heading_targets=normalized_cjk_targets,
+        root_overflow_targets=normalized_overflow_targets,
         source_truncated=axe_source_truncated or cjk_source_truncated,
     )
 
@@ -769,6 +927,17 @@ def build_repair_prompt(
             "Never disable wrapping for the whole heading or use global `keep-all` or per-character spans. "
             "Verify the same copy across every declared profile.\n"
         )
+    overflow_repair = ""
+    if "root-horizontal-overflow" in feedback.get("finding_ids", ()):
+        overflow_repair = (
+            "For `root-horizontal-overflow`, treat each structural target as the largest visible "
+            "cross-viewport repair locator, not as proof of root cause. Inspect that element and its "
+            "owning layout track, then repair the width pressure at its source with a responsive sizing "
+            "constraint. Preserve intended local scrolling regions. Do not clear the finding by globally "
+            "hiding or clipping document overflow, shrinking the whole page, or removing content. Use the "
+            "reported left and right overflow pixels only to compare severity across declared profiles, "
+            "then verify the fresh rendered result at every profile.\n"
+        )
     return (
         "Repair the existing controlled frontend build in place. Activate and follow $wow-frontend-design "
         "from the isolated skill snapshot. Preserve the product intent and apply the smallest complete fix "
@@ -794,6 +963,7 @@ def build_repair_prompt(
         "across every rendered state. If an exact stable name is required, keep the visible label stable and "
         "expose changing details in adjacent text. Do not remove unrelated labels.\n"
         f"{heading_repair}"
+        f"{overflow_repair}"
         f"{skill_reference_context}"
         f"--- UNTRUSTED CURRENT OUTPUT JSON: BEGIN ---\n{context}\n"
         "--- UNTRUSTED CURRENT OUTPUT JSON: END ---\n"

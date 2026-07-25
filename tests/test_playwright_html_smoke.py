@@ -638,7 +638,7 @@ RegExp.prototype.exec = function(value) {
             )
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
             self.assertEqual("rejected", receipt["status"])
-            self.assertEqual(3, receipt["schema_version"])
+            self.assertEqual(4, receipt["schema_version"])
             self.assertTrue(all(
                 result["inspection"]["layout_hazards"]["cjk_heading_split_word_count"] == 1
                 for result in receipt["results"]
@@ -1375,7 +1375,7 @@ Object.defineProperty(Element.prototype, 'previousElementSibling', { configurabl
                 encoding="utf-8",
             )
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
-            self.assertEqual(3, receipt["schema_version"])
+            self.assertEqual(4, receipt["schema_version"])
             for result in receipt["results"]:
                 inspection = result["inspection"]
                 self.assertEqual(["color-contrast"], inspection["axe_rule_ids"])
@@ -1441,6 +1441,34 @@ html, body { overflow-x: clip; }
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
             self.assertEqual("passed", receipt["status"])
             self.assertTrue(all(not item["root_horizontal_overflow"] for item in receipt["results"]))
+            self.assertTrue(all(
+                item["inspection"]["root_overflow_target"] is None
+                for item in receipt["results"]
+            ))
+
+    def test_local_scroller_does_not_steal_root_overflow_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            html = '''<!doctype html><html lang="en"><head><title>Overflow owner</title><style>
+html, body { margin: 0; overflow-x: clip; }
+.rail { max-width: 100%; overflow-x: auto; }
+.track { width: 2000px; }
+.bug { width: calc(100vw + 20px); }
+</style></head><body><main><h1>Overflow owner</h1>
+<div class="rail"><div class="track">Local track</div></div>
+<aside class="bug">Root bug</aside>
+</main></body></html>'''
+            (stage / "index.html").write_text(html, encoding="utf-8")
+
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+
+            self.assertEqual("rejected", receipt["status"])
+            for result in receipt["results"]:
+                self.assertTrue(result["root_horizontal_overflow"])
+                target = result["inspection"]["root_overflow_target"]
+                self.assertIsNotNone(target)
+                self.assertEqual(["aside", 1], target["path"][-1])
+                self.assertLessEqual(target["overflow_right_px"], 20)
 
     def test_body_clip_cannot_hide_a_layout_surface_wider_than_the_viewport(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1449,7 +1477,7 @@ html, body { overflow-x: clip; }
 html, body { margin: 0; overflow-x: clip; }
 main { padding: 16px; }
 .stage { min-height: 384px; aspect-ratio: 4 / 3; overflow: clip; }
-</style></head><body><main><h1>Stage</h1><div class="stage">Composition</div></main></body></html>'''
+</style></head><body><main><h1>Stage</h1><div class="stage">PRIVATE-OVERFLOW</div></main></body></html>'''
             (stage / "index.html").write_text(html, encoding="utf-8")
 
             receipt = self.invoke(stage, ["index.html"], ["index.html"])
@@ -1459,6 +1487,27 @@ main { padding: 16px; }
             self.assertFalse(results["desktop"]["root_horizontal_overflow"])
             self.assertTrue(results["mobile"]["root_horizontal_overflow"])
             self.assertTrue(results["narrow"]["root_horizontal_overflow"])
+            self.assertIsNone(results["desktop"]["inspection"]["root_overflow_target"])
+            mobile_target = results["mobile"]["inspection"]["root_overflow_target"]
+            narrow_target = results["narrow"]["inspection"]["root_overflow_target"]
+            self.assertEqual(
+                {"overflow_left_px", "overflow_right_px", "path", "target_sha256"},
+                set(mobile_target),
+            )
+            self.assertEqual(mobile_target["path"], narrow_target["path"])
+            self.assertEqual(["div", 1], mobile_target["path"][-1])
+            expected_hash = hashlib.sha256(
+                json.dumps(mobile_target["path"], separators=(",", ":")).encode()
+            ).hexdigest()
+            self.assertEqual(expected_hash, mobile_target["target_sha256"])
+            self.assertEqual(expected_hash, narrow_target["target_sha256"])
+            self.assertEqual(0, mobile_target["overflow_left_px"])
+            self.assertGreater(mobile_target["overflow_right_px"], 0)
+            self.assertGreater(narrow_target["overflow_right_px"], 0)
+            self.assertNotIn(
+                "PRIVATE-OVERFLOW",
+                json.dumps(receipt, ensure_ascii=False),
+            )
 
     def test_text_outside_empty_main_does_not_satisfy_primary_content(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

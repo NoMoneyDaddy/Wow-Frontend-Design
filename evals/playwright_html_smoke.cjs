@@ -700,6 +700,7 @@ async function main() {
         let cjkHeadingExplicitNarrowCount = 0;
         let headingScanCount = 0;
         let headingScanTruncated = false;
+        let rootOverflowTargetCandidate = null;
         const displayHeadings = Array.from(document.querySelectorAll(
           "h1,h2,[role='heading'][aria-level='1'],[role='heading'][aria-level='2']",
         ));
@@ -770,6 +771,56 @@ async function main() {
             if (coversMainContent) fixedContentObstructions += 1;
           }
         }
+        const rootScroller = document.scrollingElement || document.documentElement;
+        const bodyWidth = document.body ? document.body.scrollWidth : 0;
+        if (Math.max(rootScroller.scrollWidth, bodyWidth) > rootScroller.clientWidth + 1) {
+          const viewportWidth = rootScroller.clientWidth;
+          let rootOverflowTargetElement = null;
+          let rootOverflowLeftPx = 0;
+          let rootOverflowRightPx = 0;
+          for (const element of document.querySelectorAll("body *")) {
+            if (!visible(element)) continue;
+            const box = trusted?.rect(element);
+            if (!box) continue;
+            let locallyContained = false;
+            for (let ancestor = element.parentElement;
+              ancestor && ancestor !== document.body;
+              ancestor = ancestor.parentElement) {
+              const overflowX = trusted?.style(ancestor, "overflow-x");
+              const ancestorBox = trusted?.rect(ancestor);
+              if (["auto", "clip", "hidden", "scroll"].includes(overflowX)
+                && ancestorBox
+                && ancestorBox.left >= -1
+                && ancestorBox.right <= viewportWidth + 1) {
+                locallyContained = true;
+                break;
+              }
+            }
+            if (locallyContained) continue;
+            const overflowLeftPx = Math.min(100000, Math.ceil(Math.max(0, -box.left - 1)));
+            const overflowRightPx = Math.min(
+              100000,
+              Math.ceil(Math.max(0, box.right - viewportWidth - 1)),
+            );
+            const overflowPx = overflowLeftPx + overflowRightPx;
+            if (overflowPx <= 0) continue;
+            if (overflowPx > rootOverflowLeftPx + rootOverflowRightPx) {
+              rootOverflowTargetElement = element;
+              rootOverflowLeftPx = overflowLeftPx;
+              rootOverflowRightPx = overflowRightPx;
+            }
+          }
+          const path = rootOverflowTargetElement
+            ? trusted?.structuralPath(rootOverflowTargetElement)
+            : null;
+          if (path) {
+            rootOverflowTargetCandidate = {
+              path,
+              overflow_left_px: rootOverflowLeftPx,
+              overflow_right_px: rootOverflowRightPx,
+            };
+          }
+        }
         return {
           hidden_attribute_visible_count: hiddenAttributeVisible,
           fixed_content_obstruction_count: fixedContentObstructions,
@@ -777,6 +828,7 @@ async function main() {
           cjk_heading_split_word_count: cjkHeadingSplitWordCount,
           cjk_heading_split_target_count: cjkHeadingSplitTargetCount,
           cjk_heading_split_target_candidates: cjkHeadingSplitTargetCandidates,
+          root_overflow_target_candidate: rootOverflowTargetCandidate,
           heading_scan_count: headingScanCount,
           heading_scan_truncated: headingScanTruncated,
           single_han_last_line_heading_count: singleHanLastLineHeadingCount,
@@ -805,6 +857,12 @@ async function main() {
         })
         .sort((left, right) => left.target_sha256.localeCompare(right.target_sha256));
       const cjkTargetIdentities = cjkTargetDescriptors.map(({ target_sha256: targetSha256 }) => targetSha256);
+      const rootOverflowTarget = layoutHazards.root_overflow_target_candidate
+        ? {
+          ...layoutHazards.root_overflow_target_candidate,
+          target_sha256: sha256(JSON.stringify(layoutHazards.root_overflow_target_candidate.path)),
+        }
+        : null;
       const inspection = {
         axe_violation_count: analysis.violations.length,
         axe_rule_ids: analysis.violations.map((violation) => violation.id).sort(),
@@ -814,6 +872,7 @@ async function main() {
         cjk_heading_split_targets_truncated:
           cjkTargetDescriptors.length !== layoutHazards.cjk_heading_split_target_count,
         cjk_heading_split_target_descriptors: cjkTargetDescriptors,
+        root_overflow_target: rootOverflowTarget,
         layout_hazards: {
           hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
           fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
@@ -848,7 +907,7 @@ async function main() {
 
   const status = results.every((result) => result.status === "passed") ? "passed" : "rejected";
   const receipt = {
-    schema_version: 3,
+    schema_version: 4,
     status,
     tool: {
       package: "playwright",

@@ -460,6 +460,7 @@ def _validate_axe_inspection(inspection: Any) -> None:
         "axe_targets_truncated", "axe_target_descriptors",
         "cjk_heading_split_target_count", "cjk_heading_split_target_set_sha256",
         "cjk_heading_split_targets_truncated", "cjk_heading_split_target_descriptors",
+        "root_overflow_target",
         "layout_hazards", "typography_advisories",
     }
     keys = frozenset(inspection)
@@ -599,6 +600,36 @@ def _validate_axe_inspection(inspection: Any) -> None:
         json.dumps(cjk_identities, separators=(",", ":")).encode("utf-8")
     ).hexdigest() != cjk_target_set_sha256:
         raise RunnerError(failure)
+    root_overflow_target = inspection.get("root_overflow_target")
+    if root_overflow_target is not None:
+        if not isinstance(root_overflow_target, dict) or set(root_overflow_target) != {
+            "target_sha256", "path", "overflow_left_px", "overflow_right_px",
+        }:
+            raise RunnerError(failure)
+        overflow_target_sha256 = root_overflow_target.get("target_sha256")
+        overflow_path = root_overflow_target.get("path")
+        overflow_left_px = root_overflow_target.get("overflow_left_px")
+        overflow_right_px = root_overflow_target.get("overflow_right_px")
+        if (
+            not isinstance(overflow_target_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", overflow_target_sha256) is None
+            or not isinstance(overflow_path, list) or not 1 <= len(overflow_path) <= 16
+            or type(overflow_left_px) is not int or not 0 <= overflow_left_px <= 100000
+            or type(overflow_right_px) is not int or not 0 <= overflow_right_px <= 100000
+            or overflow_left_px + overflow_right_px <= 0
+            or any(
+                not isinstance(segment, list) or len(segment) != 2
+                or not isinstance(segment[0], str)
+                or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", segment[0]) is None
+                or type(segment[1]) is not int or not 1 <= segment[1] <= 10000
+                for segment in overflow_path
+            )
+            or overflow_path[0][0] != "html"
+            or hashlib.sha256(
+                json.dumps(overflow_path, separators=(",", ":")).encode("utf-8")
+            ).hexdigest() != overflow_target_sha256
+        ):
+            raise RunnerError(failure)
     layout = inspection.get("layout_hazards")
     typography = inspection.get("typography_advisories")
     if (
@@ -1356,7 +1387,7 @@ def _run_html_smoke(
     aggregate_status = "passed" if result_statuses and all(status == "passed" for status in result_statuses) else "rejected"
     if (
         process.returncode != 0
-        or receipt.get("schema_version") != 3
+        or receipt.get("schema_version") != 4
         or receipt.get("status") not in {"passed", "rejected"}
         or tool.get("package") != "playwright"
         or tool.get("version") != version
@@ -1368,7 +1399,18 @@ def _run_html_smoke(
     ):
         raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     for result in results:
-        _validate_axe_inspection(result.get("inspection"))
+        inspection = result.get("inspection")
+        _validate_axe_inspection(inspection)
+        root_overflow = result.get("root_horizontal_overflow")
+        if (
+            type(root_overflow) is not bool
+            or (
+                root_overflow is False
+                and isinstance(inspection, dict)
+                and inspection.get("root_overflow_target") is not None
+            )
+        ):
+            raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     if receipt.get("source_layout_risks") != source_layout_risks:
         raise RunnerError("HTML Playwright smoke gate infrastructure failure")
     contract_summary = receipt.get("browser_contract")
