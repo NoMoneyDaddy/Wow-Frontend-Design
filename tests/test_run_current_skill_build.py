@@ -20,6 +20,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TRUSTED_TEST_INTERPRETER = Path("/usr/bin/python3")
 RUNNER = ROOT / "evals" / "run_current_skill_build.py"
 CORE_PATH = ROOT / "evals" / "codex_isolated_build_core.py"
 SPEC = importlib.util.spec_from_file_location("current_skill_build_core_test", CORE_PATH)
@@ -390,7 +391,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
         bin_dir.mkdir()
         fake_codex = bin_dir / "codex"
         fake_codex.write_text(
-            f"""#!{sys.executable}
+            f"""#!{TRUSTED_TEST_INTERPRETER}
 import hashlib
 import json
 import os
@@ -547,7 +548,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             source = root / "codex"
-            source.write_text(f"#!{sys.executable}\nprint('ok')\n", encoding="utf-8")
+            source.write_text(f"#!{TRUSTED_TEST_INTERPRETER}\nprint('ok')\n", encoding="utf-8")
             source.chmod(0o755)
             snapshot = root / "snapshot"
             _, interpreter = core._copy_private_executable(source, snapshot)
