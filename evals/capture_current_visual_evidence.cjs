@@ -425,6 +425,7 @@ async function main() {
     : null;
   let browserContract = null;
   let selectedContractCase = null;
+  let selectedContractResultAssertionCount = 0;
   let motionContractCase = null;
   let reducedMotionContractCase = null;
   let browserContractRecord = null;
@@ -470,9 +471,13 @@ async function main() {
       selectedContractCase = browserContract.cases.find(
         (item) => item.id === caseData.capture_plan.consequential_state.contract_case_id,
       );
+      selectedContractResultAssertionCount = selectedContractCase
+        ? selectedContractCase.steps.filter((step, index) => step.action === "assert"
+          && selectedContractCase.steps.slice(0, index).some((previous) => previous.action !== "assert")).length
+        : 0;
       if (!selectedContractCase
         || !["desktop", "mobile"].includes(selectedContractCase.profile)
-        || !selectedContractCase.steps.some((step) => step.action !== "assert")) {
+        || selectedContractResultAssertionCount < 1) {
         throw new Error("consequential state browser contract case is invalid");
       }
     } else {
@@ -649,6 +654,7 @@ async function main() {
         page: selectedContractCase.page,
         profile: mappedProfile.name,
         steps_executed: stateResult.inspection.browser_contract.steps_executed,
+        result_assertion_count: selectedContractResultAssertionCount,
         status: "passed",
       };
     }

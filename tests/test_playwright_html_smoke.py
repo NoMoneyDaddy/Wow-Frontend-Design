@@ -1672,6 +1672,137 @@ setTimeout(() => window.open('about:blank', '_blank', 'noopener'), 80);
             for item in receipt["results"]:
                 self.assertGreater(item["counters"]["unexpected_pages"], 0)
 
+    def test_global_metrics_use_frozen_reads_after_page_prototype_poisoning(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            stage.joinpath("index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Poisoned metrics</title><style>
+#overflow { width: 2000px; }
+</style></head><body><main><h1>Visible task</h1><div id="overflow">Overflow</div></main><script>
+Object.defineProperty(Element.prototype, 'scrollWidth', { configurable: true, get: () => 1 });
+Object.defineProperty(Element.prototype, 'clientWidth', { configurable: true, get: () => 4000 });
+window.getComputedStyle = () => ({ display: 'block', visibility: 'visible', opacity: '1' });
+</script></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            self.assertTrue(all(item["root_horizontal_overflow"] for item in receipt["results"]))
+
+    def test_transparent_primary_content_is_not_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            stage.joinpath("index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Transparent</title><style>
+body { opacity: 0; }
+</style></head><body><main><h1>Invisible task</h1></main></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            self.assertTrue(all(not item["visible_main"] for item in receipt["results"]))
+            self.assertTrue(all(not item["visible_primary_content"] for item in receipt["results"]))
+
+    def test_unpainted_only_main_text_does_not_satisfy_visibility_metrics(self) -> None:
+        for hidden_style in (
+            "opacity:0",
+            "visibility:hidden",
+            "display:none",
+            "color:transparent",
+            "-webkit-text-fill-color:transparent",
+            "clip:rect(0px, 0px, 0px, 0px);position:absolute",
+            "clip-path:inset(50%)",
+        ):
+            with self.subTest(hidden_style=hidden_style), tempfile.TemporaryDirectory() as directory:
+                stage = Path(directory)
+                stage.joinpath("index.html").write_text(
+                    f'''<!doctype html><html lang="en"><head><title>Unpainted text</title><style>
+main {{ min-height: 48px; }}
+</style></head><body><main><span style="{hidden_style}">Only task text</span></main></body></html>''',
+                    encoding="utf-8",
+                )
+                receipt = self.invoke(stage, ["index.html"], ["index.html"])
+                self.assertEqual("rejected", receipt["status"])
+                for item in receipt["results"]:
+                    self.assertFalse(item["visible_text"])
+                    self.assertFalse(item["visible_main"])
+                    self.assertFalse(item["visible_primary_content"])
+
+    def test_visible_image_remains_primary_content_without_painted_text(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            stage.joinpath("index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Image primary</title></head><body>
+<main><img alt="" width="64" height="64" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="></main>
+</body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            for item in receipt["results"]:
+                self.assertFalse(item["visible_text"])
+                self.assertTrue(item["visible_main"])
+                self.assertTrue(item["visible_primary_content"])
+
+    def test_gradient_and_stroked_transparent_text_remain_painted_primary_content(self) -> None:
+        for class_name, rules in (
+            (
+                "gradient",
+                "color:transparent;-webkit-text-fill-color:transparent;"
+                "background-image:linear-gradient(90deg,#f00,#00f);"
+                "background-clip:text;-webkit-background-clip:text",
+            ),
+            (
+                "stroke",
+                "color:transparent;-webkit-text-fill-color:transparent;"
+                "-webkit-text-stroke-width:1px;-webkit-text-stroke-color:rgb(0,0,0)",
+            ),
+        ):
+            with self.subTest(class_name=class_name), tempfile.TemporaryDirectory() as directory:
+                stage = Path(directory)
+                stage.joinpath("index.html").write_text(
+                    f'''<!doctype html><html lang="en"><head><title>Painted text</title><style>
+.{class_name} {{{rules}}}
+</style></head><body><main><h1 class="{class_name}">Painted hero</h1></main></body></html>''',
+                    encoding="utf-8",
+                )
+                receipt = self.invoke(stage, ["index.html"], ["index.html"])
+                self.assertEqual("passed", receipt["status"])
+                for item in receipt["results"]:
+                    self.assertTrue(item["visible_text"])
+                    self.assertTrue(item["visible_main"])
+                    self.assertTrue(item["visible_primary_content"])
+
+    def test_contract_final_state_rechecks_metrics_axe_and_layout_hazards(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            stage.joinpath("index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Final state</title><style>
+#overlay { display: none; position: fixed; inset: 0; background: white; }
+</style></head><body><main><h1>Task</h1><button id="open" onclick="
+document.body.style.width='2000px';
+document.querySelector('#overlay').style.display='block';
+document.querySelector('#late-input').hidden=false;">Open</button>
+<div id="overflow">Overflow</div><input id="late-input" hidden><div id="overlay">Overlay</div></main></body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "open-final-state", "page": "index.html", "profile": "desktop",
+                    "steps": [
+                        {"id": "open", "action": "click", "selector": "#open"},
+                        {"id": "input-visible", "action": "assert", "selector": "#late-input", "expect": "visible"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            desktop = next(item for item in receipt["results"] if item["profile"] == "desktop")
+            self.assertEqual("rejected", desktop["status"])
+            self.assertTrue(desktop["root_horizontal_overflow"])
+            self.assertGreater(desktop["inspection"]["axe_violation_count"], 0)
+            self.assertEqual(1, desktop["inspection"]["layout_hazards"]["fixed_content_obstruction_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

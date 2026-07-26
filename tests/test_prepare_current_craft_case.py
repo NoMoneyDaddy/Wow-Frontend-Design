@@ -199,6 +199,43 @@ class PrepareCurrentCraftCaseTests(unittest.TestCase):
                 case["browser_contract"],
             )
 
+    def test_rejects_action_only_consequential_state_case(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace, manifest_path, _ = self.fixture(root)
+            contract = root / "browser-contract.json"
+            payload = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "open-details", "page": "index.html", "profile": "desktop",
+                    "steps": [{"id": "open", "action": "click", "selector": "#open"}],
+                }],
+            }
+            contract.write_text(json.dumps(payload), encoding="utf-8")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["browser_contract"] = {
+                "schema_version": 2,
+                "bytes": contract.stat().st_size,
+                "sha256": digest(contract.read_bytes()),
+                "case_count": 1,
+                "step_count": 1,
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "case.json"
+
+            completed = self.invoke(
+                workspace,
+                output,
+                "--browser-contract",
+                str(contract),
+                "--contract-case-id",
+                "open-details",
+            )
+
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("consequential contract case is invalid", completed.stderr)
+            self.assertFalse(output.exists())
+
     def test_prepares_opt_in_animation_primary_motion_case(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

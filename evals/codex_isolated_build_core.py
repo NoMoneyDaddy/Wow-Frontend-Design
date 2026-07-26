@@ -25,6 +25,8 @@ TRACE_VALIDATOR = ROOT / "evals" / "validate_codex_log_policy.py"
 DEFAULT_MODEL = "gpt-5.4-mini"
 STAGE_LIMIT = 8 * 1024 * 1024
 LOG_LIMIT = 16 * 1024 * 1024
+AUTH_LIMIT = 1_048_576
+CODEX_EXECUTABLE_LIMIT = 512 * 1024 * 1024
 SKILL_LIMIT = 16 * 1024 * 1024
 SKILL_FILE_LIMIT = 1_048_576
 MAX_STAGE_ENTRIES = 16
@@ -348,10 +350,10 @@ def _validate_login(result: subprocess.CompletedProcess[str]) -> None:
         raise RunnerError("Codex login status is not first-party ChatGPT")
 
 
-def _codex_record(codex: Path, environment: dict[str, str]) -> dict[str, Any]:
+def _codex_record(codex: Path, command_prefix: tuple[str, ...], environment: dict[str, str]) -> dict[str, Any]:
     try:
         result = subprocess.run(
-            [str(codex), "--version"], env=environment, text=True, capture_output=True, check=False, timeout=15
+            [*command_prefix, "--version"], env=environment, text=True, capture_output=True, check=False, timeout=15
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise RunnerError("Codex CLI version preflight failed") from error
@@ -367,9 +369,222 @@ def _codex_record(codex: Path, environment: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def _trusted_codex_executable() -> Path:
+    configured = os.environ.get("WOW_CODEX_EXECUTABLE")
+    if configured is None:
+        raise RunnerError("trusted absolute Codex executable is required")
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        raise RunnerError("trusted absolute Codex executable is required")
+    try:
+        canonical = candidate.resolve(strict=True)
+    except OSError as error:
+        raise RunnerError("trusted absolute Codex executable is unavailable") from error
+    if (
+        not canonical.is_absolute()
+    ):
+        raise RunnerError("trusted absolute Codex executable is unsafe")
+    return canonical
+
+
+def _native_executable(path: Path) -> bool:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise RunnerError("trusted executable is unavailable") from error
+    try:
+        magic = os.read(descriptor, 4)
+    finally:
+        os.close(descriptor)
+    return magic in {
+        b"\x7fELF", b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf",
+        b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",
+    }
+
+
+def _executable_fingerprint(path: Path) -> tuple[int, int, int, int, int, int, int, str]:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise RunnerError("Codex script interpreter is unavailable") from error
+    try:
+        before = os.fstat(descriptor)
+        digest = hashlib.sha256()
+        offset = 0
+        while offset < before.st_size:
+            chunk = os.pread(descriptor, min(1024 * 1024, before.st_size - offset), offset)
+            if not chunk:
+                raise RunnerError("Codex script interpreter provenance drifted")
+            digest.update(chunk)
+            offset += len(chunk)
+        after = os.fstat(descriptor)
+        path_info = path.lstat()
+        identity = (before.st_dev, before.st_ino, before.st_mode, before.st_size, before.st_nlink, before.st_mtime_ns, before.st_ctime_ns)
+        if identity != (after.st_dev, after.st_ino, after.st_mode, after.st_size, after.st_nlink, after.st_mtime_ns, after.st_ctime_ns) or (after.st_dev, after.st_ino) != (path_info.st_dev, path_info.st_ino):
+            raise RunnerError("Codex script interpreter provenance drifted")
+        return (*identity, digest.hexdigest())
+    finally:
+        os.close(descriptor)
+
+
+def _copy_private_executable(source: Path, destination: Path) -> tuple[tuple[int, int, int, int, int, int, int, str], Path | None]:
+    source_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    try:
+        source_fd = os.open(source, source_flags)
+    except OSError as error:
+        raise RunnerError("Codex executable is unavailable") from error
+    try:
+        before = os.fstat(source_fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or not 1 <= before.st_size <= CODEX_EXECUTABLE_LIMIT
+            or not before.st_mode & 0o111
+            or stat.S_IMODE(before.st_mode) & 0o022
+        ):
+            raise RunnerError("Codex executable is unsafe")
+        magic = os.pread(source_fd, 4, 0)
+        interpreter: Path | None = None
+        if magic not in {
+            b"\x7fELF", b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf",
+            b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",
+        }:
+            line = os.pread(source_fd, 512, 0).splitlines()[0] if before.st_size else b""
+            if not line.startswith(b"#!"):
+                raise RunnerError("WOW_CODEX_EXECUTABLE must resolve to a native Codex binary")
+            try:
+                value = line[2:].strip().decode("utf-8")
+            except UnicodeError as error:
+                raise RunnerError("Codex script interpreter is invalid") from error
+            if not value or any(character.isspace() for character in value):
+                raise RunnerError("Codex script interpreter must be one absolute executable path")
+            candidate = Path(value)
+            if not candidate.is_absolute():
+                raise RunnerError("Codex script interpreter must be one absolute executable path")
+            try:
+                interpreter = candidate.resolve(strict=True)
+                interpreter_info = interpreter.lstat()
+            except OSError as error:
+                raise RunnerError("Codex script interpreter is unavailable") from error
+            if not stat.S_ISREG(interpreter_info.st_mode) or not _native_executable(interpreter):
+                raise RunnerError("Codex script interpreter is unsafe")
+            if (
+                interpreter_info.st_uid != 0
+                or not interpreter_info.st_mode & 0o111
+                or stat.S_IMODE(interpreter_info.st_mode) & 0o022
+            ):
+                raise RunnerError("Codex script interpreter is not system-trusted")
+            for ancestor in (interpreter.parent, *interpreter.parents):
+                ancestor_info = ancestor.lstat()
+                if ancestor_info.st_uid != 0 or stat.S_IMODE(ancestor_info.st_mode) & 0o022:
+                    raise RunnerError("Codex script interpreter is not system-trusted")
+        try:
+            destination_fd = os.open(destination, destination_flags, 0o700)
+        except OSError as error:
+            raise RunnerError("isolated Codex executable cannot be created safely") from error
+        try:
+            os.fchmod(destination_fd, 0o700)
+            digest = hashlib.sha256()
+            remaining = before.st_size
+            while remaining:
+                chunk = os.read(source_fd, min(1024 * 1024, remaining))
+                if not chunk:
+                    raise RunnerError("Codex executable changed while being copied")
+                digest.update(chunk)
+                offset = 0
+                while offset < len(chunk):
+                    written = os.write(destination_fd, chunk[offset:])
+                    if written <= 0:
+                        raise OSError("Codex executable write did not advance")
+                    offset += written
+                remaining -= len(chunk)
+            os.fsync(destination_fd)
+            after = os.fstat(source_fd)
+            copied = os.fstat(destination_fd)
+            path_info = destination.lstat()
+            source_identity = (before.st_dev, before.st_ino, before.st_mode, before.st_size, before.st_nlink, before.st_mtime_ns, before.st_ctime_ns)
+            observed = (after.st_dev, after.st_ino, after.st_mode, after.st_size, after.st_nlink, after.st_mtime_ns, after.st_ctime_ns)
+            if (
+                source_identity != observed or not stat.S_ISREG(copied.st_mode)
+                or stat.S_IMODE(copied.st_mode) != 0o700 or copied.st_nlink != 1
+                or copied.st_size != before.st_size
+                or (copied.st_dev, copied.st_ino) != (path_info.st_dev, path_info.st_ino)
+            ):
+                raise RunnerError("isolated Codex executable provenance drifted")
+            return (*source_identity, digest.hexdigest()), interpreter
+        finally:
+            os.close(destination_fd)
+    finally:
+        os.close(source_fd)
+
+
+def _auth_fingerprint(info: os.stat_result) -> tuple[int, ...]:
+    return (
+        info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_nlink,
+        info.st_mtime_ns, info.st_ctime_ns,
+    )
+
+
+def _copy_auth(source: Path, destination: Path) -> None:
+    source_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    destination_flags |= getattr(os, "O_CLOEXEC", 0) | _required_open_flag("O_NOFOLLOW")
+    try:
+        source_fd = os.open(source, source_flags)
+    except OSError as error:
+        raise RunnerError("Codex auth.json is missing or unsafe") from error
+    try:
+        before = os.fstat(source_fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or not 1 <= before.st_size <= AUTH_LIMIT
+        ):
+            raise RunnerError("Codex auth.json is missing or unsafe")
+        payload = _read_fd_exact(source_fd, before.st_size)
+        after = os.fstat(source_fd)
+        if _auth_fingerprint(before) != _auth_fingerprint(after):
+            raise RunnerError("Codex auth.json changed while being copied")
+        try:
+            destination_fd = os.open(destination, destination_flags, 0o600)
+        except OSError as error:
+            raise RunnerError("isolated Codex auth.json cannot be created safely") from error
+        try:
+            os.fchmod(destination_fd, 0o600)
+            offset = 0
+            while offset < len(payload):
+                written = os.write(destination_fd, payload[offset:])
+                if written <= 0:
+                    raise OSError("auth.json write did not advance")
+                offset += written
+            os.fsync(destination_fd)
+            destination_info = os.fstat(destination_fd)
+            path_info = destination.lstat()
+            if (
+                not stat.S_ISREG(destination_info.st_mode)
+                or stat.S_IMODE(destination_info.st_mode) != 0o600
+                or destination_info.st_nlink != 1
+                or destination_info.st_size != len(payload)
+                or (destination_info.st_dev, destination_info.st_ino)
+                != (path_info.st_dev, path_info.st_ino)
+            ):
+                raise RunnerError("isolated Codex auth.json provenance drifted")
+        finally:
+            os.close(destination_fd)
+    finally:
+        os.close(source_fd)
+
+
+def _assert_interpreter_baseline(interpreter: Path | None, baseline: tuple[int, ...] | None) -> None:
+    if interpreter is not None and (baseline is None or _executable_fingerprint(interpreter) != baseline):
+        raise RunnerError("Codex script interpreter provenance drifted")
+
+
 def _isolated_environment(
     skill_source: Path, skill_name: str
-) -> tuple[Path, dict[str, str], Path, dict[str, Any]]:
+) -> tuple[Path, dict[str, str], Path, tuple[str, ...], Path | None, tuple[int, ...] | None, dict[str, Any]]:
     isolation = Path(tempfile.mkdtemp(prefix="wow-current-codex-"))
     try:
         home = isolation / "home"
@@ -378,19 +593,23 @@ def _isolated_environment(
         home.mkdir(mode=0o700)
         codex_home.mkdir(mode=0o700)
         temp.mkdir(mode=0o700)
+        source_codex = _trusted_codex_executable()
+        codex_path = isolation / "codex-executable"
+        _, interpreter = _copy_private_executable(source_codex, codex_path)
+        command_prefix = (str(codex_path),) if interpreter is None else (str(interpreter), str(codex_path))
+        interpreter_baseline = _executable_fingerprint(interpreter) if interpreter is not None else None
+        preflight_environment = {
+            "HOME": str(home), "CODEX_HOME": str(codex_home),
+            "PATH": f"{codex_path.parent}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            "TMPDIR": str(temp), "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+        }
+        _codex_record(codex_path, command_prefix, preflight_environment)
+        _assert_interpreter_baseline(interpreter, interpreter_baseline)
         original_codex = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
         auth = original_codex / "auth.json"
-        if not auth.is_file() or auth.is_symlink():
-            raise RunnerError("Codex auth.json is missing or unsafe")
-        shutil.copy2(auth, codex_home / "auth.json", follow_symlinks=False)
-        (codex_home / "auth.json").chmod(0o600)
+        _copy_auth(auth, codex_home / "auth.json")
+        _assert_interpreter_baseline(interpreter, interpreter_baseline)
         skill_record = _snapshot_skill(skill_source, codex_home / "skills" / skill_name, skill_name)
-        codex = shutil.which("codex")
-        if not codex:
-            raise RunnerError("codex CLI is unavailable")
-        codex_path = Path(codex).resolve(strict=True)
-        if not codex_path.is_file() or not os.access(codex_path, os.X_OK):
-            raise RunnerError("codex CLI is unsafe")
         safe_path = f"{codex_path.parent}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         environment = {
             "HOME": str(home),
@@ -402,7 +621,7 @@ def _isolated_environment(
         }
         try:
             login_result = subprocess.run(
-                [str(codex_path), "login", "status"],
+                [*command_prefix, "login", "status"],
                 env=environment,
                 text=True,
                 capture_output=True,
@@ -411,9 +630,10 @@ def _isolated_environment(
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             raise RunnerError("Codex CLI preflight failed") from error
-        codex_record = _codex_record(codex_path, environment)
+        codex_record = _codex_record(codex_path, command_prefix, environment)
+        _assert_interpreter_baseline(interpreter, interpreter_baseline)
         _validate_login(login_result)
-        return isolation, environment, codex_path, {"skill": skill_record, "codex": codex_record}
+        return isolation, environment, codex_path, command_prefix, interpreter, interpreter_baseline, {"skill": skill_record, "codex": codex_record}
     except BaseException:
         shutil.rmtree(isolation, ignore_errors=True)
         raise
@@ -481,7 +701,7 @@ def _terminate(process: subprocess.Popen[bytes]) -> None:
 
 def _child_limits() -> None:
     os.setsid()
-    resource.setrlimit(resource.RLIMIT_FSIZE, (2 * 1024 * 1024, 2 * 1024 * 1024))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (LOG_LIMIT, LOG_LIMIT))
 
 
 def _required_open_flag(name: str) -> int:
@@ -699,6 +919,8 @@ def _run_codex(
                     break
                 time.sleep(0.1)
             exit_code = process.wait(timeout=5)
+            if exit_code == -signal.SIGXFSZ:
+                reason = "resource_quota"
         except (OSError, BrokenPipeError, subprocess.TimeoutExpired) as error:
             raise RunnerError("Codex process execution failed") from error
         finally:
@@ -871,7 +1093,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
     tool_before = _file_tool_records()
     isolation: Path | None = None
     try:
-        isolation, environment, codex, provenance = _isolated_environment(spec.skill_source, spec.skill_name)
+        isolation, environment, codex, command_prefix, interpreter, interpreter_baseline, provenance = _isolated_environment(spec.skill_source, spec.skill_name)
         installed_skill = Path(environment["CODEX_HOME"]) / "skills" / spec.skill_name
         installed_before = _tree_summary(_tree_records(installed_skill), spec.skill_name)
         _assert_skill_reference_records(provenance["skill"], skill_references)
@@ -881,7 +1103,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
         shell_path = json.dumps(environment["PATH"])
         shell_home = json.dumps(str(spec.stage))
         command = [
-            str(codex),
+            *command_prefix,
             "exec",
             "--model",
             model,
@@ -933,6 +1155,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             "--json",
             "-",
         ])
+        _assert_interpreter_baseline(interpreter, interpreter_baseline)
         exit_code, reason, progress_events, stdout_data, stderr_data = _run_codex(
             command,
             spec.prompt,
@@ -945,6 +1168,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             initial_fingerprint,
             log_parent_identities,
         )
+        _assert_interpreter_baseline(interpreter, interpreter_baseline)
         if len(stdout_data) + len(stderr_data) > LOG_LIMIT:
             raise RunnerError("generation log quota exceeded")
         observed = _validate_trace_bytes(
@@ -952,7 +1176,7 @@ def execute_isolated(spec: ExecutionSpec) -> dict[str, Any]:
             spec.stage,
             require_terminal=reason == "completed" and exit_code == 0,
         )
-        if _codex_record(codex, environment) != provenance["codex"]:
+        if _codex_record(codex, command_prefix, environment) != provenance["codex"]:
             raise RunnerError("Codex CLI provenance drifted during execution")
         source_after = _tree_summary(_tree_records(spec.skill_source), spec.skill_name)
         installed_after = _tree_summary(_tree_records(installed_skill), spec.skill_name)

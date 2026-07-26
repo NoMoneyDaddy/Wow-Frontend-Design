@@ -103,6 +103,7 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const animationFrame = pageGlobal.requestAnimationFrame;
           const performanceNow = Performance.prototype.now;
           const stringCharacter = String.prototype.charAt;
+          const stringEndsWith = String.prototype.endsWith;
           const stringIndexOf = String.prototype.indexOf;
           const stringLower = String.prototype.toLocaleLowerCase;
           const stringSlice = String.prototype.slice;
@@ -130,6 +131,9 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
           const createRange = Document.prototype.createRange;
           const createTreeWalker = Document.prototype.createTreeWalker;
           const documentQuerySelector = Document.prototype.querySelector;
+          const documentQuerySelectorAll = Document.prototype.querySelectorAll;
+          const nodeListLength = descriptor(NodeList.prototype, "length").get;
+          const nodeListItem = NodeList.prototype.item;
           const treeNext = TreeWalker.prototype.nextNode;
           const rangeSelect = Range.prototype.selectNodeContents;
           const rangeStart = Range.prototype.setStart;
@@ -248,6 +252,68 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
               if (right <= left || bottom <= top) return false;
             }
             return true;
+          };
+          const paintedColor = (value) => {
+            const normalized = apply(stringLower, apply(stringTrim, value || "", []), []);
+            if (normalized === "transparent") return false;
+            const slashAlpha = apply(regexExec, /\/\s*([0-9.]+%?)\s*\)$/, [normalized]);
+            const legacyAlpha = slashAlpha === null
+              ? apply(regexExec, /^(?:rgba|hsla)\((?:[^,]+,){3}\s*([0-9.]+)\s*\)$/, [normalized])
+              : null;
+            const alpha = slashAlpha || legacyAlpha;
+            if (alpha === null) return true;
+            const raw = alpha[1];
+            const numeric = apply(numberFunction, undefined, [
+              apply(stringEndsWith, raw, ["%"]) ? apply(stringSlice, raw, [0, -1]) : raw,
+            ]);
+            return numeric > 0;
+          };
+          const fullyClipped = (element) => {
+            for (let current = element; current; current = parentOf(current)) {
+              const computed = apply(styleFunction, pageGlobal, [current]);
+              const clip = apply(stringLower, apply(stringTrim, apply(styleValue, computed, ["clip"]), []), []);
+              const clipPath = apply(stringLower, apply(stringTrim, apply(styleValue, computed, ["clip-path"]), []), []);
+              if (apply(regexExec, /^rect\(\s*0(?:px)?\s*,\s*0(?:px)?\s*,\s*0(?:px)?\s*,\s*0(?:px)?\s*\)$/, [clip]) !== null
+                || apply(regexExec, /^inset\(\s*50%\s*\)$/, [clipPath]) !== null
+                || apply(regexExec, /^circle\(\s*0(?:px|%)?\s*(?:at\s+[^)]*)?\)$/, [clipPath]) !== null) return true;
+            }
+            return false;
+          };
+          const nonZeroLength = (value) => {
+            const match = apply(regexExec, /^\s*([0-9]+(?:\.[0-9]+)?)/, [value || ""]);
+            return match !== null && apply(numberFunction, undefined, [match[1]]) > 0;
+          };
+          const hasPaintedText = (element) => {
+            if (!element || !visible(element)) return false;
+            const walker = apply(createTreeWalker, pageDocument, [element, 4]);
+            while (true) {
+              const node = apply(treeNext, walker, []);
+              if (!node) return false;
+              const value = apply(nodeText, node, []) || "";
+              const owner = parentOf(node);
+              if (apply(stringTrim, value, []).length === 0 || !visible(owner) || fullyClipped(owner)) continue;
+              const computed = apply(styleFunction, pageGlobal, [owner]);
+              const color = apply(styleValue, computed, ["color"]);
+              const textFill = apply(styleValue, computed, ["-webkit-text-fill-color"]);
+              const backgroundImage = apply(styleValue, computed, ["background-image"]);
+              const backgroundClip = apply(styleValue, computed, ["background-clip"]);
+              const webkitBackgroundClip = apply(styleValue, computed, ["-webkit-background-clip"]);
+              const strokeWidth = apply(styleValue, computed, ["-webkit-text-stroke-width"]);
+              const strokeColor = apply(styleValue, computed, ["-webkit-text-stroke-color"]);
+              const gradientText = backgroundImage !== "none"
+                && (backgroundClip === "text" || webkitBackgroundClip === "text");
+              const strokedText = nonZeroLength(strokeWidth) && paintedColor(strokeColor);
+              if ((!paintedColor(color) || (textFill && !paintedColor(textFill)))
+                && !gradientText && !strokedText) continue;
+              const range = makeRange();
+              apply(rangeSelect, range, [node]);
+              const rects = apply(rangeRects, range, []);
+              const length = apply(rectListLength, rects, []);
+              for (let index = 0; index < length; index += 1) {
+                const rect = snapshotRect(apply(rectListItem, rects, [index]));
+                if (rect.width > 0 && rect.height > 0 && visibleRect(rect, owner)) return true;
+              }
+            }
           };
           const segmentText = (text, locale, granularity = "grapheme") => {
             let segmenter;
@@ -494,6 +560,9 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             hasVisibleText(value) {
               return apply(stringTrim, value, []).length > 0;
             },
+            hasPaintedText(element) {
+              return hasPaintedText(element);
+            },
             horizontalWritingMode(value) {
               return apply(stringStartsWith, value, ["horizontal"]);
             },
@@ -526,6 +595,10 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             renderedTextIncludes(element, literal) {
               if (!apply(isPrototypeOf, htmlPrototype, [element])) return false;
               return apply(stringIndexOf, apply(htmlInnerText, element, []), [literal]) >= 0;
+            },
+            renderedText(element) {
+              if (!apply(isPrototypeOf, htmlPrototype, [element])) return "";
+              return apply(htmlInnerText, element, []);
             },
             renderedLineProfile(element) {
               return renderedLineProfile(element);
@@ -571,6 +644,28 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
             },
             segments(text, locale) {
               return segmentText(text, locale);
+            },
+            select(selector) {
+              try {
+                return apply(documentQuerySelector, pageDocument, [selector]);
+              } catch {
+                return null;
+              }
+            },
+            selectAll(selector) {
+              let list;
+              try {
+                list = apply(documentQuerySelectorAll, pageDocument, [selector]);
+              } catch {
+                return freeze([]);
+              }
+              const result = [];
+              const length = apply(nodeListLength, list, []);
+              for (let index = 0; index < length; index += 1) {
+                const element = apply(nodeListItem, list, [index]);
+                if (element) result[result.length] = element;
+              }
+              return freeze(result);
             },
             style(element, property) {
               const computed = apply(styleFunction, pageGlobal, [element]);
@@ -663,43 +758,65 @@ async function runLocalPageMatrix({ stage, pages, allowedFiles, profiles, inspec
         } catch {
           navigation = "failed";
         }
-        const visibleMain = navigation === "passed" && await page.locator("main").isVisible().catch(() => false);
-        const metrics = navigation === "passed" ? await page.evaluate(() => ({
-          visible_text: getComputedStyle(document.body).display !== "none"
-            && getComputedStyle(document.body).visibility !== "hidden"
-            && (document.body.innerText || "").trim().length > 0,
-          visible_primary_content: (() => {
-            const main = document.querySelector("main");
-            if (!main) return false;
-            const visible = (element) => {
-              const style = getComputedStyle(element);
-              const box = element.getBoundingClientRect();
-              return style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0;
-            };
-            if (!visible(main)) return false;
-            if ((main.innerText || "").trim().length > 0) return true;
-            return Array.from(main.querySelectorAll("img,svg,canvas,video,audio,input,select,textarea,button"))
-              .some(visible);
-          })(),
-          root_horizontal_overflow: (() => {
-            // CSSOM View defines scrollingElement as the element that scrolls the document.
-            const rootScroller = document.scrollingElement || document.documentElement;
-            const bodyWidth = document.body ? document.body.scrollWidth : 0;
-            return Math.max(rootScroller.scrollWidth, bodyWidth) > rootScroller.clientWidth + 1;
-          })(),
-        })).catch(() => ({ visible_text: false, visible_primary_content: false, root_horizontal_overflow: false })) : {
+        const inspection = navigation === "passed" && inspectPage
+          ? await inspectPage(page, { relativePage, profile })
+          : {};
+        const metrics = navigation === "passed" ? await page.evaluate(() => {
+          const trusted = globalThis.__wowEvaluatorRead;
+          if (!trusted) return null;
+          const visible = (element) => {
+            let current = element;
+            while (current) {
+              const display = trusted.style(current, "display");
+              const visibility = trusted.style(current, "visibility");
+              if (display === "none" || visibility === "hidden" || visibility === "collapse"
+                || trusted.zeroNumber(trusted.style(current, "opacity"))) return false;
+              current = trusted.parent(current);
+            }
+            const box = trusted.rect(element);
+            return box.width > 0 && box.height > 0;
+          };
+          const body = trusted.select("body");
+          const main = trusted.select("main");
+          const rootScroller = trusted.select("html");
+          if (!body || !rootScroller) return null;
+          let visibleControl = false;
+          const primaryControls = trusted.selectAll(
+            "main img,main svg,main canvas,main video,main audio,main input,main select,main textarea,main button",
+          );
+          for (let index = 0; index < primaryControls.length; index += 1) {
+            if (visible(primaryControls[index])) {
+              visibleControl = true;
+              break;
+            }
+          }
+          const paintedMainText = trusted.hasPaintedText(main);
+          const visibleMain = visible(main) && (paintedMainText || visibleControl);
+          const primary = visibleMain && (paintedMainText || visibleControl);
+          const rootMetrics = trusted.scrollMetrics(rootScroller);
+          const bodyMetrics = trusted.scrollMetrics(body);
+          return {
+            visible_main: visibleMain,
+            visible_text: visible(body) && trusted.hasPaintedText(body),
+            visible_primary_content: primary,
+            root_horizontal_overflow: Math.max(rootMetrics.scrollWidth, bodyMetrics.scrollWidth)
+              > rootMetrics.clientWidth + 1,
+          };
+        }).catch(() => null) || {
+          visible_main: false,
+          visible_text: false,
+          visible_primary_content: false,
+          root_horizontal_overflow: false,
+        } : {
+          visible_main: false,
           visible_text: false,
           visible_primary_content: false,
           root_horizontal_overflow: false,
         };
-        const inspection = navigation === "passed" && inspectPage
-          ? await inspectPage(page, { relativePage, profile })
-          : {};
         results.push({
           page: relativePage,
           profile: profile.name,
           navigation,
-          visible_main: visibleMain,
           ...metrics,
           counters,
           inspection,

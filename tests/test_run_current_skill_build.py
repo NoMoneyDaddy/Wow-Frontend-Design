@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -397,7 +398,7 @@ import pathlib
 import sys
 import time
 
-root = pathlib.Path(__file__).resolve().parent.parent
+root = pathlib.Path({str(root)!r})
 capture = root / "capture"
 mode = (capture / "mode.txt").read_text(encoding="utf-8")
 if sys.argv[1:] == ["--version"]:
@@ -495,11 +496,113 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             {
                 "PATH": f"{bin_dir}{os.pathsep}{environment.get('PATH', '')}",
                 "CODEX_HOME": str(codex_home),
+                "WOW_CODEX_EXECUTABLE": str(fake_codex),
                 "OPENAI_API_KEY": "must-not-reach-child",
                 "DATABASE_URL": "must-not-reach-child",
             }
         )
         return brief, target, capture, environment
+
+    def test_isolated_environment_rejects_path_only_codex_before_auth_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, _, _, environment = self.fixture(root)
+            environment.pop("WOW_CODEX_EXECUTABLE")
+            with (
+                mock.patch.dict(os.environ, environment, clear=True),
+                mock.patch.object(core, "_copy_auth", wraps=core._copy_auth) as copy_auth,
+                self.assertRaisesRegex(core.RunnerError, "trusted absolute"),
+            ):
+                core._isolated_environment(ROOT / "wow-frontend-design", "wow-frontend-design")
+            copy_auth.assert_not_called()
+
+    def test_trusted_codex_executable_accepts_explicit_absolute_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            _, _, _, environment = self.fixture(root)
+            executable = Path(environment["WOW_CODEX_EXECUTABLE"])
+            alias = root / "codex"
+            alias.symlink_to(executable)
+            environment["WOW_CODEX_EXECUTABLE"] = str(alias)
+            with mock.patch.dict(os.environ, environment, clear=True):
+                self.assertEqual(executable, core._trusted_codex_executable())
+
+    def test_script_codex_rejects_path_resolved_interpreter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory).resolve() / "codex"
+            executable.write_text("#!/usr/bin/env python3\nprint('unsafe')\n", encoding="utf-8")
+            executable.chmod(0o755)
+            with self.assertRaisesRegex(core.RunnerError, "interpreter"):
+                core._copy_private_executable(executable, Path(directory).resolve() / "snapshot")
+
+    def test_private_executable_snapshot_rejects_writable_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory).resolve() / "codex"
+            source.write_text(f"#!{sys.executable}\nprint('unsafe')\n", encoding="utf-8")
+            source.chmod(0o777)
+            with self.assertRaisesRegex(core.RunnerError, "unsafe"):
+                core._copy_private_executable(source, Path(directory).resolve() / "snapshot")
+
+    def test_self_contained_absolute_shebang_script_is_snapshotted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source = root / "codex"
+            source.write_text(f"#!{sys.executable}\nprint('ok')\n", encoding="utf-8")
+            source.chmod(0o755)
+            snapshot = root / "snapshot"
+            _, interpreter = core._copy_private_executable(source, snapshot)
+            self.assertIsNotNone(interpreter)
+            self.assertEqual(source.read_bytes(), snapshot.read_bytes())
+            self.assertEqual(0o700, stat.S_IMODE(snapshot.stat().st_mode))
+
+    def test_interpreter_provenance_drift_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            interpreter = Path(directory).resolve() / "interpreter"
+            interpreter.write_bytes(b"\xcf\xfa\xed\xfe")
+            with mock.patch.object(core, "_executable_fingerprint", return_value=(2,)):
+                with self.assertRaisesRegex(core.RunnerError, "interpreter provenance drifted"):
+                    core._assert_interpreter_baseline(interpreter, (1,))
+
+    def test_private_executable_snapshot_is_unchanged_after_source_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source = root / "codex"
+            source.write_bytes(b"\xcf\xfa\xed\xfeoriginal")
+            source.chmod(0o755)
+            destination = root / "fixed-codex"
+            source_record, interpreter = core._copy_private_executable(source, destination)
+            self.assertIsNone(interpreter)
+            replacement = root / "replacement"
+            replacement.write_bytes(b"\xcf\xfa\xed\xfereplaced")
+            replacement.chmod(0o755)
+            os.replace(replacement, source)
+            self.assertEqual(source_record[-1], hashlib.sha256(destination.read_bytes()).hexdigest())
+            self.assertNotEqual(source.read_bytes(), destination.read_bytes())
+            self.assertEqual(0o700, stat.S_IMODE(destination.stat().st_mode))
+
+    def test_auth_copy_rejects_symlink_source_and_creates_private_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source = root / "source.json"
+            source.write_text("secret", encoding="utf-8")
+            symlink = root / "source-link.json"
+            symlink.symlink_to(source)
+            with self.assertRaisesRegex(core.RunnerError, "auth.json"):
+                core._copy_auth(symlink, root / "auth.json")
+            destination = root / "auth.json"
+            core._copy_auth(source, destination)
+            self.assertEqual("secret", destination.read_text(encoding="utf-8"))
+            self.assertEqual(0o600, stat.S_IMODE(destination.stat().st_mode))
+
+    def test_child_file_limit_matches_total_log_limit(self) -> None:
+        with (
+            mock.patch.object(core.os, "setsid"),
+            mock.patch.object(core.resource, "setrlimit") as set_limit,
+        ):
+            core._child_limits()
+        set_limit.assert_called_once_with(
+            core.resource.RLIMIT_FSIZE, (core.LOG_LIMIT, core.LOG_LIMIT)
+        )
 
     def reference_skill_fixture(self, root: Path) -> Path:
         skill = root / "skill-source"
@@ -2931,6 +3034,124 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(0o600, calls[0][1])
             self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
 
+    def test_receipt_write_uses_run_local_frozen_parent_and_rejects_parent_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            logs = root / "logs"
+            logs.mkdir()
+            receipt = logs / "receipt.json"
+            descriptor = policy._open_frozen_log_directory(logs)
+            try:
+                info = os.fstat(descriptor)
+                frozen_parent = (descriptor, (info.st_dev, info.st_ino))
+                record = policy._write_json_exclusive(
+                    receipt, {"status": "ok"}, frozen_parent=frozen_parent
+                )
+                self.assertEqual("receipt.json", record["path"])
+                self.assertEqual(0o600, stat.S_IMODE(receipt.stat().st_mode))
+                policy._verify_private_json_record(receipt, record, frozen_parent=frozen_parent)
+                receipt.write_text('{"status": "tampered"}\n', encoding="utf-8")
+                with self.assertRaisesRegex(policy.RunnerError, "receipt provenance drifted"):
+                    policy._verify_private_json_record(receipt, record, frozen_parent=frozen_parent)
+                saved = root / "saved-logs"
+                logs.rename(saved)
+                logs.symlink_to(root / "attacker", target_is_directory=True)
+                with self.assertRaisesRegex(policy.RunnerError, "log parent provenance drifted"):
+                    policy._write_json_exclusive(
+                        logs / "second.json", {"status": "ok"}, frozen_parent=frozen_parent
+                    )
+            finally:
+                os.close(descriptor)
+
+    def test_separate_frozen_log_parents_do_not_share_process_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            first_logs = root / "first-logs"
+            second_logs = root / "second-logs"
+            first_logs.mkdir()
+            second_logs.mkdir()
+            first_descriptor = policy._open_frozen_log_directory(first_logs)
+            second_descriptor = policy._open_frozen_log_directory(second_logs)
+            try:
+                first_info = os.fstat(first_descriptor)
+                second_info = os.fstat(second_descriptor)
+                first_parent = (first_descriptor, (first_info.st_dev, first_info.st_ino))
+                second_parent = (second_descriptor, (second_info.st_dev, second_info.st_ino))
+                first = policy._write_json_exclusive(
+                    first_logs / "receipt.json", {"run": "first"}, frozen_parent=first_parent
+                )
+                second = policy._write_json_exclusive(
+                    second_logs / "receipt.json", {"run": "second"}, frozen_parent=second_parent
+                )
+                policy._verify_private_json_record(
+                    first_logs / "receipt.json", first, frozen_parent=first_parent
+                )
+                policy._verify_private_json_record(
+                    second_logs / "receipt.json", second, frozen_parent=second_parent
+                )
+            finally:
+                os.close(first_descriptor)
+                os.close(second_descriptor)
+
+    def test_rollback_move_preserves_racer_when_target_changes_at_rename(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target = root / "target"
+            target.mkdir()
+            (target / "DESIGN.md").write_text(SAFE_DESIGN, encoding="utf-8")
+            (target / "index.html").write_text(SAFE_HTML, encoding="utf-8")
+            (target / "run-manifest.json").write_text("{}\n", encoding="utf-8")
+            expected_files = policy._validate_outputs(
+                target, ("DESIGN.md", "index.html", "run-manifest.json")
+            )
+            published_info = target.lstat()
+            published_identity = (published_info.st_dev, published_info.st_ino)
+            work_root = root / "work"
+            work_root.mkdir()
+            rollback = work_root / "rejected-publication"
+            saved_publication = root / "saved-publication"
+            parent_descriptor = policy._open_frozen_log_directory(root)
+            parent_info = os.fstat(parent_descriptor)
+            frozen_parent = (
+                parent_descriptor,
+                (parent_info.st_dev, parent_info.st_ino),
+            )
+            real_replace = os.replace
+            raced = False
+
+            def replace_after_validation(
+                source: object, destination: object, **kwargs: object
+            ) -> None:
+                nonlocal raced
+                if source == target.name and destination == rollback.name and not raced:
+                    raced = True
+                    real_replace(
+                        target.name,
+                        saved_publication.name,
+                        src_dir_fd=parent_descriptor,
+                        dst_dir_fd=parent_descriptor,
+                    )
+                    os.mkdir(target.name, 0o700, dir_fd=parent_descriptor)
+                    (target / "racer-owned.txt").write_text("preserve", encoding="utf-8")
+                real_replace(source, destination, **kwargs)
+
+            try:
+                with mock.patch.object(policy.os, "replace", side_effect=replace_after_validation):
+                    safe_to_clean = policy._rollback_published_target(
+                        target,
+                        published_identity,
+                        expected_files,
+                        [],
+                        rollback,
+                        frozen_target_parent=frozen_parent,
+                    )
+                self.assertTrue(raced)
+                self.assertFalse(safe_to_clean)
+                self.assertEqual("preserve", (rollback / "racer-owned.txt").read_text(encoding="utf-8"))
+                self.assertTrue((saved_publication / "run-manifest.json").is_file())
+            finally:
+                os.close(parent_descriptor)
+
     def test_raw_log_parent_swap_cannot_redirect_private_trace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -4631,7 +4852,9 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             real_write = policy._write_json_exclusive
             injected = b'{"status":"execution_passed","classification":"publication_pending"}\n'
 
-            def collide(path: Path, payload: dict[str, object]) -> dict[str, object]:
+            def collide(
+                path: Path, payload: dict[str, object], **kwargs: object
+            ) -> dict[str, object]:
                 if path.name == "current-skill-build.execution.json":
                     path.write_bytes(injected)
                     raise FileExistsError("receipt collision")
@@ -4651,6 +4874,45 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 hashlib.sha256(injected).hexdigest(),
                 publication["execution_receipt"]["sha256"],
             )
+
+    def test_publication_failure_receipt_rejects_path_replacement_after_pinned_read(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            receipt_path = log_dir / "execution.json"
+            descriptor = policy._open_frozen_log_directory(log_dir)
+            info = os.fstat(descriptor)
+            frozen_parent = (descriptor, (info.st_dev, info.st_ino))
+            payload = {"status": "execution_passed"}
+            expected = policy._write_json_exclusive(
+                receipt_path, payload, frozen_parent=frozen_parent
+            )
+            real_stat = os.stat
+            path_stats = 0
+
+            def replace_before_final_path_stat(path: object, **kwargs: object) -> os.stat_result:
+                nonlocal path_stats
+                if path == receipt_path.name and kwargs.get("dir_fd") == descriptor:
+                    path_stats += 1
+                    if path_stats == 2:
+                        original = receipt_path.read_bytes()
+                        receipt_path.unlink()
+                        receipt_path.write_bytes(original)
+                        receipt_path.chmod(0o600)
+                return real_stat(path, **kwargs)
+
+            try:
+                with mock.patch.object(policy.os, "stat", side_effect=replace_before_final_path_stat):
+                    publication = policy._publication_failure_receipt(
+                        receipt_path,
+                        {"bytes": expected["bytes"], "sha256": expected["sha256"]},
+                        frozen_parent=frozen_parent,
+                    )
+                self.assertEqual(2, path_stats)
+                self.assertEqual("invalid", publication["execution_receipt"]["state"])
+            finally:
+                os.close(descriptor)
 
     def test_success_receipt_write_failure_keeps_target_empty(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -4672,8 +4934,10 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             log_dir.mkdir()
             real_write = policy._write_json_exclusive
 
-            def write_then_fail(path: Path, payload: dict[str, object]) -> dict[str, object]:
-                record = real_write(path, payload)
+            def write_then_fail(
+                path: Path, payload: dict[str, object], **kwargs: object
+            ) -> dict[str, object]:
+                record = real_write(path, payload, **kwargs)
                 if path.name == "current-skill-build.execution.json":
                     raise OSError("post-fsync failure")
                 return record
@@ -4725,6 +4989,35 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("completed", manifest["status"])
             self.assertEqual(["receipt", "target_check", "replace"], events)
             self.assertFalse((log_dir / "current-skill-build.publication-failure.json").exists())
+
+    def test_receipt_replacement_after_publish_is_rejected_and_runner_output_is_rolled_back(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            real_verify = policy._verify_private_json_record
+            calls = 0
+
+            def replace_receipt_before_post_publish_verify(
+                path: Path, expected: dict[str, object], **kwargs: object
+            ) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    path.unlink()
+                    path.write_text('{"tampered":true}\n', encoding="utf-8")
+                real_verify(path, expected, **kwargs)
+
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy,
+                "_verify_private_json_record",
+                side_effect=replace_receipt_before_post_publish_verify,
+            ), self.assertRaisesRegex(policy.RunnerError, "execution_infrastructure_failure"):
+                policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual(2, calls)
+            self.assertEqual([], list(target.iterdir()))
+            self.assertTrue((log_dir / "current-skill-build.publication-failure.json").is_file())
 
     def test_public_execute_isolated_retains_caller_stage_and_returns_generic_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

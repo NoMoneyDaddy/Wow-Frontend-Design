@@ -16,6 +16,51 @@ import validate_installability
 
 
 class InstallabilityTests(unittest.TestCase):
+    def _write_skill(self, root: Path, description: str) -> Path:
+        skill = root / "sample"
+        (skill / "agents").mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            "---\nname: sample\ndescription: " + description + "\nlicense: MIT\n---\n",
+            encoding="utf-8",
+        )
+        (skill / "LICENSE").write_text("MIT", encoding="utf-8")
+        (skill / "agents" / "openai.yaml").write_text(
+            'interface:\n  short_description: "1234567890123456789012345"\n'
+            '  default_prompt: "Use $sample now."\n',
+            encoding="utf-8",
+        )
+        return skill
+
+    def test_block_scalar_description_uses_its_actual_content(self) -> None:
+        cases = (
+            (">-\n  A sufficiently explicit\n  folded sample description.", None),
+            ("|-\n  ", "frontmatter description must contain 1..1024 characters"),
+            (">-\n  " + "x" * 1025, "frontmatter description must contain 1..1024 characters"),
+            (">2-\n  " + "x" * 1025, "unsupported YAML block scalar header"),
+            ("|+\n  A sufficiently explicit sample description.", "unsupported YAML block scalar header"),
+            (
+                ">-\n    A sufficiently explicit sample description.\n  invalid dedent",
+                "invalid YAML block scalar indentation",
+            ),
+            (
+                ">-\n\tA sufficiently explicit sample description.",
+                "invalid YAML block scalar indentation",
+            ),
+        )
+        for description, error in cases:
+            with self.subTest(description=description[:20]):
+                with tempfile.TemporaryDirectory() as directory:
+                    skill = self._write_skill(Path(directory), description)
+                    if error is None:
+                        self.assertEqual(
+                            "A sufficiently explicit folded sample description.",
+                            validate_installability._frontmatter(skill / "SKILL.md")["description"],
+                        )
+                        self.assertGreaterEqual(validate_installability.validate(skill), 0)
+                    else:
+                        with self.assertRaisesRegex(validate_installability.InstallabilityError, error):
+                            validate_installability.validate(skill)
+
     def test_repository_skill_is_installable(self) -> None:
         root = Path(__file__).resolve().parents[1]
         count = validate_installability.validate(root / "wow-frontend-design", root)

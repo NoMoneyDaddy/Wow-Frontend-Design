@@ -99,14 +99,14 @@ Evidence freeze → Representation → Direction → System → Vertical slice
 
 ## 受控 evaluator
 
-`evals/` 是本專案的 release／Darwin 評測工具，不會在一般 Skill 任務中自動執行。它需要 POSIX、Python 3.9+、Node.js、authenticated Codex CLI，以及 repository-pinned Playwright Chromium／Axe／`@google/design.md`。
+`evals/` 是本專案的 release／Darwin 評測工具，不會在一般 Skill 任務中自動執行。它需要 POSIX、Python 3.9+、Node.js、authenticated Codex CLI，以及 repository-pinned Playwright Chromium／Axe／`@google/design.md`。受控 builder 不信任 `PATH`；呼叫端必須以 `WOW_CODEX_EXECUTABLE` 明示已授權的 absolute 原生 Codex binary path。Homebrew Cask symlink 會 resolve 後使用；npm 的 `#!/usr/bin/env node` wrapper 不支援。僅測試相容：single absolute、system-trusted native interpreter 的 self-contained shebang script 會固定 snapshot 後執行。
 
 ```bash
 npm ci
 python3 -m unittest discover -s tests -p 'test_*.py'
 
 mkdir -p /absolute/evaluator/run /absolute/evaluator/logs
-npm run build:current -- \
+WOW_CODEX_EXECUTABLE=/absolute/path/to/native-codex npm run build:current -- \
   --brief /absolute/evaluator/brief.md \
   --target /absolute/evaluator/run \
   --log-dir /absolute/evaluator/logs

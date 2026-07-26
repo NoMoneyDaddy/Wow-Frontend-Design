@@ -472,7 +472,14 @@ def _validate_current_capture_evidence(
     if case_schema == 2:
         state_evidence = _exact(
             receipt["state_evidence"],
-            {"contract_case_id", "page", "profile", "steps_executed", "status"},
+            {
+                "contract_case_id",
+                "page",
+                "profile",
+                "steps_executed",
+                "result_assertion_count",
+                "status",
+            },
             "capture receipt.state_evidence",
         )
         state_page = _relative(
@@ -487,6 +494,8 @@ def _validate_current_capture_evidence(
             not in {"desktop-default", "mobile-default"}
             or type(state_evidence["steps_executed"]) is not int
             or not 1 <= state_evidence["steps_executed"] <= case_contract["step_count"]
+            or type(state_evidence["result_assertion_count"]) is not int
+            or state_evidence["result_assertion_count"] < 1
             or state_evidence["status"] != "passed"
         ):
             raise CurrentCraftError("consequential state evidence is invalid")

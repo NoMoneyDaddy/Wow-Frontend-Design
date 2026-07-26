@@ -641,9 +641,19 @@ async function main() {
     allowedFiles,
     profiles,
     inspectPage: async (page, { relativePage, profile }) => {
-      const analysis = await new AxeBuilder({ page })
-        .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
-        .analyze();
+      const matchingContract = browserContract?.cases.find((item) =>
+        item.page === relativePage && item.profile === profile.name);
+      const browserContractResult = matchingContract
+        ? await runBrowserContract(page, matchingContract)
+        : null;
+      let analysis;
+      try {
+        analysis = await new AxeBuilder({ page })
+          .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
+          .analyze();
+      } catch {
+        analysis = { violations: [{ id: "axe-runtime-error", nodes: [] }] };
+      }
       const axeTargets = await summarizeAxeTargets(page, analysis.violations);
       const headingExplicitNarrowRisk = sourceLayoutRisks.heading_explicit_narrow_pages.includes(relativePage);
       const layoutHazards = await page.evaluate(({ inspectCjkHeadingWidth }) => {
@@ -767,7 +777,16 @@ async function main() {
             for (const element of main.querySelectorAll("button,input,select,textarea,a,img,svg,canvas,video")) {
               if (!fixed.contains(element) && visible(element)) contentRects.push(element.getBoundingClientRect());
             }
-            const coversMainContent = paintedRects.some((painted) => contentRects.some((content) => intersects(painted, content)));
+            let coversMainContent = false;
+            for (const painted of paintedRects) {
+              for (const content of contentRects) {
+                if (intersects(painted, content)) {
+                  coversMainContent = true;
+                  break;
+                }
+              }
+              if (coversMainContent) break;
+            }
             if (coversMainContent) fixedContentObstructions += 1;
           }
         }
@@ -788,7 +807,7 @@ async function main() {
               ancestor = ancestor.parentElement) {
               const overflowX = trusted?.style(ancestor, "overflow-x");
               const ancestorBox = trusted?.rect(ancestor);
-              if (["auto", "clip", "hidden", "scroll"].includes(overflowX)
+              if ((overflowX === "auto" || overflowX === "clip" || overflowX === "hidden" || overflowX === "scroll")
                 && ancestorBox
                 && ancestorBox.left >= -1
                 && ancestorBox.right <= viewportWidth + 1) {
@@ -836,11 +855,6 @@ async function main() {
       }, {
         inspectCjkHeadingWidth: headingExplicitNarrowRisk,
       });
-      const matchingContract = browserContract?.cases.find((item) =>
-        item.page === relativePage && item.profile === profile.name);
-      const browserContractResult = matchingContract
-        ? await runBrowserContract(page, matchingContract)
-        : null;
       const cjkTargetDescriptors = layoutHazards.cjk_heading_split_target_candidates
         .map(({ heading_index: headingIndex, path, split_ranges: splitRanges }) => {
           const uniqueRanges = new Map();

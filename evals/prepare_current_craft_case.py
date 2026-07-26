@@ -228,8 +228,13 @@ def _consequential_contract(
         or selected["profile"] not in {"desktop", "mobile"}
         or not any(
             isinstance(step, dict)
-            and step.get("action") in {"click", "fill", "press", "select"}
-            for step in selected["steps"]
+            and step.get("action") == "assert"
+            and any(
+                isinstance(previous, dict)
+                and previous.get("action") in {"click", "fill", "press", "select"}
+                for previous in selected["steps"][:index]
+            )
+            for index, step in enumerate(selected["steps"])
         )
     ):
         raise CraftCaseError("selected consequential contract case is invalid")

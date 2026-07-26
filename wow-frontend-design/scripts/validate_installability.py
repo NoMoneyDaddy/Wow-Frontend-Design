@@ -41,10 +41,52 @@ def _frontmatter(path: Path) -> dict[str, str]:
     except ValueError as error:
         raise InstallabilityError("SKILL.md frontmatter is not closed") from error
     values: dict[str, str] = {}
-    for line in lines[1:end]:
-        match = re.fullmatch(r"([a-z][a-z0-9-]*):\s*(.+)", line)
-        if match:
-            values[match.group(1)] = match.group(2).strip().strip('"\'')
+    index = 1
+    while index < end:
+        match = re.fullmatch(r"([a-z][a-z0-9-]*):\s*(.*)", lines[index])
+        if match is None:
+            index += 1
+            continue
+        key, value = match.groups()
+        block = re.fullmatch(r"([>|])-", value)
+        if block is None:
+            if value.startswith((">", "|")):
+                raise InstallabilityError(
+                    f"unsupported YAML block scalar header for frontmatter {key}"
+                )
+            values[key] = value.strip().strip('"\'')
+            index += 1
+            continue
+
+        index += 1
+        block_lines: list[str] = []
+        while index < end and (not lines[index].strip() or lines[index][0].isspace()):
+            block_lines.append(lines[index])
+            index += 1
+        for line in block_lines:
+            if not line.strip():
+                continue
+            indentation = line[: len(line) - len(line.lstrip())]
+            if any(character != " " for character in indentation):
+                raise InstallabilityError(
+                    f"invalid YAML block scalar indentation for frontmatter {key}"
+                )
+        indents = [len(line) - len(line.lstrip()) for line in block_lines if line.strip()]
+        content_indent = indents[0] if indents else 0
+        if any(indent < content_indent for indent in indents[1:]):
+            raise InstallabilityError(
+                f"invalid YAML block scalar indentation for frontmatter {key}"
+            )
+        content = [line[content_indent:] if line.strip() else "" for line in block_lines]
+        if block.group(1) == "|":
+            values[key] = "\n".join(content).strip()
+        else:
+            folded: list[str] = []
+            for line_number, line in enumerate(content):
+                if line_number:
+                    folded.append("\n" if not line or not content[line_number - 1] else " ")
+                folded.append(line)
+            values[key] = "".join(folded).strip()
     return values
 
 

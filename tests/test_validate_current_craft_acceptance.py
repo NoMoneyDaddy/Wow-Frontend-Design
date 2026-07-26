@@ -76,7 +76,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                     '<h1>Motion</h1><button id="play" onclick="'
                     "if(!matchMedia('(prefers-reduced-motion: reduce)').matches)"
                     "document.querySelector('#final').animate("
-                    "[{transform:'translateX(0px)'},{transform:'translateX(20px)'}],"
+                    "[{transform:'translateY(0px)'},{transform:'translateY(20px)'}],"
                     "{duration:700,fill:'forwards'});"
                     '">Play</button><section id="final">Final</section></main></body></html>'
                     if motion_primary
@@ -562,7 +562,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 )
 
     def test_opt_in_v2_acceptance_rejects_state_receipt_tampering(self) -> None:
-        for mode in ("witness_profile", "capture_state", "extra_state"):
+        for mode in ("witness_profile", "capture_state", "missing_result_assertion", "extra_state"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
                 fixture = self.build_fixture(
                     Path(directory),
@@ -579,6 +579,8 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                     receipt["state_evidence"]["profile"] = "mobile-default"
                 elif mode == "capture_state":
                     state_capture["context"]["state"] = "default"
+                elif mode == "missing_result_assertion":
+                    receipt["state_evidence"]["result_assertion_count"] = 0
                 else:
                     receipt["captures"].append(copy.deepcopy(state_capture))
                 receipt_path.write_text(json.dumps(receipt), encoding="utf-8")

@@ -140,7 +140,7 @@ Runner 只把 frozen `DESIGN.md` 與 base HTML 交給既有 retrofit builder，�
 選定後，把四個來源參數一起交給唯一的 `build:current`。Greenfield 使用 `select`／`BUILD`；seeded cohort 使用 `select`／`RETROFIT` 並加上完全相同的 frozen seed 與 caller-owned mutation allowlist。缺少任一來源、`revise`、`stop`、lane 不符或 seed 漂移都會在建立 target、log 或呼叫模型前拒絕：
 
 ```bash
-npm run build:current -- \
+WOW_CODEX_EXECUTABLE=/absolute/path/to/native-codex npm run build:current -- \
   --brief /absolute/evaluator-root/brief.md \
   --target /absolute/evaluator-root/production-output \
   --log-dir /absolute/evaluator-root/production-logs \
@@ -181,6 +181,8 @@ npm run build:current -- \
 ```
 
 預設 forward-test builder 是 `gpt-5.4-mini`，reasoning effort 是 `high`。可用 `--model` 與 `--reasoning-effort low|medium|high|xhigh` 明示覆寫；receipt 只記錄請求值，不把它當成服務端已履行或品質已通過的證明。
+
+`WOW_CODEX_EXECUTABLE` 是 evaluator-owned 信任輸入，必須是 absolute 原生 Codex binary path；runner 不從 `PATH` 自動挑選 binary。明示 Homebrew Cask symlink 時會 resolve 到 real binary，以 `O_NOFOLLOW` fd 驗證並快照到 isolation 私有 0700 檔案後才執行。npm 的 `#!/usr/bin/env node` wrapper 不支援。僅測試相容：single absolute、system-trusted native interpreter 的 self-contained shebang script 會固定 snapshot 後明示 interpreter 執行。不要把 repository、seed 或模型可寫位置內的 executable 傳入。
 
 一般 initial build 固定載入 `references/creative-direction.md` 與 `references/no-visual-first-pass.md`；帶有效 selected-direction handoff 時，改載入 `references/creative-direction.md` 與 `references/implementation.md` 的完整內容作為 controlled Skill context。兩者都可額外提供一次 `--skill-reference references/<safe-name>.md`，但不能重複，也不能由 brief 或 seed 內容決定。選取只接受現行 Skill source 內已驗證的 regular non-symlink、strict UTF-8 Markdown；absolute path、`..`、未知路徑、NUL、單檔超過 64 KiB 或合計超過 128 KiB 都 fail closed。這是核心 reference lifecycle 的 controlled external-evaluator 分支：builder context 原樣帶進每輪 repair，外部 evaluator 執行 quality gates 並只回傳 bounded findings，不把 gate reference 或 acceptance instructions 加入可寫模型 context。
 

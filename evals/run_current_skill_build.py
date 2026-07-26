@@ -205,6 +205,51 @@ def _json_bytes(payload: dict[str, Any]) -> bytes:
     return (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
+def _open_frozen_log_directory(path: Path) -> int:
+    directory = getattr(os, "O_DIRECTORY", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if not directory or not nofollow or not path.is_absolute():
+        raise RunnerError("frozen log parent is unavailable or unsafe")
+    flags = os.O_RDONLY | directory | nofollow | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags)
+        info = os.fstat(descriptor)
+        path_info = path.lstat()
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or not stat.S_ISDIR(path_info.st_mode)
+            or path.resolve(strict=True) != path
+            or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
+        ):
+            raise RunnerError("log parent provenance drifted")
+        return descriptor
+    except OSError as error:
+        raise RunnerError("frozen log parent is unavailable or unsafe") from error
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        raise
+
+
+def _assert_frozen_log_parent(path: Path, descriptor: int, identity: tuple[int, int]) -> None:
+    try:
+        descriptor_info = os.fstat(descriptor)
+        path_info = path.lstat()
+        canonical = path.resolve(strict=True)
+    except OSError as error:
+        raise RunnerError("log parent provenance drifted") from error
+    if (
+        not stat.S_ISDIR(descriptor_info.st_mode)
+        or not stat.S_ISDIR(path_info.st_mode)
+        or canonical != path
+        or (descriptor_info.st_dev, descriptor_info.st_ino) != identity
+        or (path_info.st_dev, path_info.st_ino) != identity
+    ):
+        raise RunnerError("log parent provenance drifted")
+
+
 def _regular_absolute_file(path: Path, label: str, maximum: int) -> Path:
     if not path.is_absolute():
         raise RunnerError(f"{label} must be an absolute path")
@@ -1661,6 +1706,100 @@ def _target_unchanged(target: Path, identity: tuple[int, int]) -> None:
         raise RunnerError("target changed before publish")
 
 
+def _rollback_published_target(
+    target: Path,
+    published_identity: tuple[int, int],
+    expected_files: list[dict[str, Any]],
+    expected_directories: list[dict[str, Any]],
+    rollback: Path,
+    *,
+    frozen_target_parent: tuple[int, tuple[int, int]],
+) -> bool:
+    """Remove only an unchanged runner-owned publication after receipt verification fails."""
+    target_parent_descriptor, target_parent_identity = frozen_target_parent
+    rollback_parent_descriptor: int | None = None
+    moved = False
+    try:
+        rollback_parent_descriptor = _open_frozen_log_directory(rollback.parent)
+        rollback_parent_info = os.fstat(rollback_parent_descriptor)
+        rollback_parent_identity = (
+            rollback_parent_info.st_dev,
+            rollback_parent_info.st_ino,
+        )
+        _assert_frozen_log_parent(
+            target.parent, target_parent_descriptor, target_parent_identity
+        )
+        info = os.stat(
+            target.name,
+            dir_fd=target_parent_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or (info.st_dev, info.st_ino) != published_identity
+            or _validate_outputs(
+                target,
+                tuple(record["path"] for record in expected_files),
+                tuple(record["path"] for record in expected_directories),
+            ) != expected_files
+            or _directory_records(target) != expected_directories
+        ):
+            return True
+        _assert_frozen_log_parent(
+            target.parent, target_parent_descriptor, target_parent_identity
+        )
+        before_move = os.stat(
+            target.name,
+            dir_fd=target_parent_descriptor,
+            follow_symlinks=False,
+        )
+        if (before_move.st_dev, before_move.st_ino) != published_identity:
+            return True
+        os.replace(
+            target.name,
+            rollback.name,
+            src_dir_fd=target_parent_descriptor,
+            dst_dir_fd=rollback_parent_descriptor,
+        )
+        moved = True
+        moved_info = os.stat(
+            rollback.name,
+            dir_fd=rollback_parent_descriptor,
+            follow_symlinks=False,
+        )
+        _assert_frozen_log_parent(
+            rollback.parent, rollback_parent_descriptor, rollback_parent_identity
+        )
+        if (moved_info.st_dev, moved_info.st_ino) != published_identity:
+            return False
+        if (
+            _validate_outputs(
+                rollback,
+                tuple(record["path"] for record in expected_files),
+                tuple(record["path"] for record in expected_directories),
+            ) != expected_files
+            or _directory_records(rollback) != expected_directories
+        ):
+            return False
+        after_validation = os.stat(
+            rollback.name,
+            dir_fd=rollback_parent_descriptor,
+            follow_symlinks=False,
+        )
+        if (after_validation.st_dev, after_validation.st_ino) != published_identity:
+            return False
+        try:
+            os.mkdir(target.name, 0o700, dir_fd=target_parent_descriptor)
+        except FileExistsError:
+            pass
+        return True
+    except (OSError, RunnerError):
+        return not moved
+    finally:
+        if rollback_parent_descriptor is not None:
+            os.close(rollback_parent_descriptor)
+
+
 def _log_paths(
     log_dir: Path, target: Path
 ) -> tuple[Path, Path, Path, Path, Path, Path, Path, tuple[tuple[Path, Path], ...]]:
@@ -2467,43 +2606,182 @@ def _receipt(
     return payload
 
 
-def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+def _write_json_exclusive(
+    path: Path,
+    payload: dict[str, Any],
+    *,
+    frozen_parent: tuple[int, tuple[int, int]] | None = None,
+) -> dict[str, Any]:
     encoded = _json_bytes(payload)
-    with path.open("xb") as handle:
-        path.chmod(0o600)
-        handle.write(encoded)
-        handle.flush()
-        os.fsync(handle.fileno())
+    local_descriptor = frozen_parent is None
+    if frozen_parent is None:
+        parent_descriptor = _open_frozen_log_directory(path.parent)
+        parent_identity = (os.fstat(parent_descriptor).st_dev, os.fstat(parent_descriptor).st_ino)
+    else:
+        parent_descriptor, parent_identity = frozen_parent
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    if not getattr(os, "O_NOFOLLOW", 0):
+        if local_descriptor:
+            os.close(parent_descriptor)
+        raise RunnerError("O_NOFOLLOW is required for private receipts")
+    flags |= os.O_NOFOLLOW
+    try:
+        _assert_frozen_log_parent(path.parent, parent_descriptor, parent_identity)
+        descriptor = os.open(path.name, flags, 0o600, dir_fd=parent_descriptor)
+        try:
+            os.fchmod(descriptor, 0o600)
+            offset = 0
+            while offset < len(encoded):
+                written = os.write(descriptor, encoded[offset:])
+                if written <= 0:
+                    raise OSError("receipt write did not advance")
+                offset += written
+            os.fsync(descriptor)
+            descriptor_info = os.fstat(descriptor)
+            path_info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+            _assert_frozen_log_parent(path.parent, parent_descriptor, parent_identity)
+            if (
+                not stat.S_ISREG(descriptor_info.st_mode)
+                or stat.S_IMODE(descriptor_info.st_mode) != 0o600
+                or descriptor_info.st_nlink != 1
+                or descriptor_info.st_size != len(encoded)
+                or (descriptor_info.st_dev, descriptor_info.st_ino)
+                != (path_info.st_dev, path_info.st_ino)
+            ):
+                raise RunnerError("receipt provenance drifted")
+        finally:
+            os.close(descriptor)
+    finally:
+        if local_descriptor:
+            os.close(parent_descriptor)
     return {"path": path.name, "bytes": len(encoded), "sha256": _digest_bytes(encoded)}
+
+
+def _verify_private_json_record(
+    path: Path,
+    expected: dict[str, Any],
+    *,
+    frozen_parent: tuple[int, tuple[int, int]],
+) -> None:
+    parent_descriptor, parent_identity = frozen_parent
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if not getattr(os, "O_NOFOLLOW", 0):
+        raise RunnerError("O_NOFOLLOW is required for private receipts")
+    try:
+        _assert_frozen_log_parent(path.parent, parent_descriptor, parent_identity)
+        descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
+        try:
+            before = os.fstat(descriptor)
+            if not stat.S_ISREG(before.st_mode) or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1:
+                raise RunnerError("receipt provenance drifted")
+            chunks: list[bytes] = []
+            remaining = before.st_size + 1
+            while remaining:
+                chunk = os.read(descriptor, remaining)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            payload = b"".join(chunks)
+            after = os.fstat(descriptor)
+            path_info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+            _assert_frozen_log_parent(path.parent, parent_descriptor, parent_identity)
+            if (
+                len(payload) != before.st_size
+                or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+                or (after.st_dev, after.st_ino) != (path_info.st_dev, path_info.st_ino)
+                or {"path": path.name, "bytes": len(payload), "sha256": _digest_bytes(payload)} != expected
+            ):
+                raise RunnerError("receipt provenance drifted")
+        finally:
+            os.close(descriptor)
+    except OSError as error:
+        raise RunnerError("receipt provenance drifted") from error
 
 
 def _publication_failure_receipt(
     execution_receipt: Path, expected_receipt: dict[str, Any],
     decision_lineage: dict[str, Any] | None = None,
+    *,
+    frozen_parent: tuple[int, tuple[int, int]] | None = None,
 ) -> dict[str, Any]:
     receipt_record: dict[str, Any] = {"path": execution_receipt.name, "state": "missing"}
     descriptor: int | None = None
     try:
-        descriptor = os.open(
-            execution_receipt,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
-        )
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        if frozen_parent is None:
+            descriptor = os.open(execution_receipt, flags)
+        else:
+            parent_descriptor, parent_identity = frozen_parent
+            _assert_frozen_log_parent(execution_receipt.parent, parent_descriptor, parent_identity)
+            descriptor = os.open(execution_receipt.name, flags, dir_fd=parent_descriptor)
         receipt_record["state"] = "invalid"
-        info = os.fstat(descriptor)
-        if stat.S_ISREG(info.st_mode):
-            receipt_record["bytes"] = info.st_size
-            if info.st_size <= expected_receipt["bytes"]:
+        before = os.fstat(descriptor)
+        if (
+            stat.S_ISREG(before.st_mode)
+            and before.st_size <= expected_receipt["bytes"]
+        ):
+            trusted_metadata = (
+                stat.S_IMODE(before.st_mode) == 0o600
+                and before.st_nlink == 1
+            )
+            if frozen_parent is None:
+                path_info = execution_receipt.lstat()
+            else:
+                path_info = os.stat(
+                    execution_receipt.name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            if (before.st_dev, before.st_ino) == (path_info.st_dev, path_info.st_ino):
                 with os.fdopen(descriptor, "rb", closefd=False) as handle:
                     observed = handle.read(expected_receipt["bytes"] + 1)
-                observed_hash = _digest_bytes(observed)
-                receipt_record["bytes"] = len(observed)
-                receipt_record["sha256"] = observed_hash
-                if (
-                    len(observed) == expected_receipt["bytes"]
-                    and observed_hash == expected_receipt["sha256"]
-                ):
+                after = os.fstat(descriptor)
+                if frozen_parent is None:
+                    final_path_info = execution_receipt.lstat()
+                else:
+                    final_path_info = os.stat(
+                        execution_receipt.name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                    _assert_frozen_log_parent(
+                        execution_receipt.parent, parent_descriptor, parent_identity
+                    )
+                stable = (
+                    (
+                        before.st_dev,
+                        before.st_ino,
+                        before.st_mode,
+                        before.st_nlink,
+                        before.st_size,
+                        before.st_mtime_ns,
+                        before.st_ctime_ns,
+                    )
+                    == (
+                        after.st_dev,
+                        after.st_ino,
+                        after.st_mode,
+                        after.st_nlink,
+                        after.st_size,
+                        after.st_mtime_ns,
+                        after.st_ctime_ns,
+                    )
+                    and (after.st_dev, after.st_ino)
+                    == (final_path_info.st_dev, final_path_info.st_ino)
+                    and len(observed) == before.st_size
+                )
+                if stable:
+                    observed_hash = _digest_bytes(observed)
                     receipt_record["bytes"] = len(observed)
-                    receipt_record["state"] = "publication_pending"
+                    receipt_record["sha256"] = observed_hash
+                    if (
+                        trusted_metadata
+                        and len(observed) == expected_receipt["bytes"]
+                        and observed_hash == expected_receipt["sha256"]
+                    ):
+                        receipt_record["state"] = "publication_pending"
     except FileNotFoundError:
         pass
     except OSError:
@@ -2788,7 +3066,23 @@ def run(
     wrapper_tools = _wrapper_tool_records()
     work_root = Path(tempfile.mkdtemp(prefix="wow-current-build-")).resolve()
     publish: Path | None = None
+    log_parent_descriptor: int | None = None
+    target_parent_descriptor: int | None = None
+    frozen_log_parent: tuple[int, tuple[int, int]] | None = None
+    frozen_target_parent: tuple[int, tuple[int, int]] | None = None
     try:
+        log_parent_descriptor = _open_frozen_log_directory(log_dir)
+        log_parent_info = os.fstat(log_parent_descriptor)
+        frozen_log_parent = (
+            log_parent_descriptor,
+            (log_parent_info.st_dev, log_parent_info.st_ino),
+        )
+        target_parent_descriptor = _open_frozen_log_directory(target.parent)
+        target_parent_info = os.fstat(target_parent_descriptor)
+        frozen_target_parent = (
+            target_parent_descriptor,
+            (target_parent_info.st_dev, target_parent_info.st_ino),
+        )
         stage = work_root / "stage"
         stage.mkdir(mode=0o700)
         if seed_root is not None:
@@ -2822,11 +3116,17 @@ def run(
         )
         publish = Path(tempfile.mkdtemp(prefix=f".{target.name}.publish-", dir=target.parent))
     except BaseException:
+        if log_parent_descriptor is not None:
+            os.close(log_parent_descriptor)
+        if target_parent_descriptor is not None:
+            os.close(target_parent_descriptor)
         shutil.rmtree(work_root, ignore_errors=True)
         if publish is not None:
             shutil.rmtree(publish, ignore_errors=True)
         raise
     assert publish is not None
+    assert frozen_log_parent is not None
+    assert frozen_target_parent is not None
     execution: dict[str, Any] | None = None
     initial_execution: dict[str, Any] | None = None
     design_rejection: dict[str, Any] | None = None
@@ -2842,6 +3142,7 @@ def run(
     active_stderr_log = stderr_log
     active_prompt = prompt
     work_root_cleaned = False
+    preserve_work_root = False
     committed = False
     publication_prepared = False
     expected_execution_receipt: dict[str, Any] | None = None
@@ -3030,7 +3331,9 @@ def run(
                     repair_stop_reason = stop_reason
                 else:
                     repair_stop_reason = "round_limit"
-                gate_record = _write_json_exclusive(design_gate_path, design_gate)
+                gate_record = _write_json_exclusive(
+                    design_gate_path, design_gate, frozen_parent=frozen_log_parent
+                )
                 quarantine_record = _quarantine_outputs(
                     log_dir,
                     quarantine_path,
@@ -3092,7 +3395,9 @@ def run(
                     repair_stop_reason = stop_reason
                 else:
                     repair_stop_reason = "round_limit"
-                gate_record = _write_json_exclusive(html_smoke_path, html_smoke_gate)
+                gate_record = _write_json_exclusive(
+                    html_smoke_path, html_smoke_gate, frozen_parent=frozen_log_parent
+                )
                 quarantine_record = _quarantine_outputs(
                     log_dir,
                     quarantine_path,
@@ -3177,6 +3482,13 @@ def run(
         (publish / "run-manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
+        published_expected_files = _validate_outputs(
+            publish,
+            (*output_names, "run-manifest.json"),
+            tuple(record["path"] for record in published_directories),
+        )
+        published_identity_info = publish.lstat()
+        published_identity = (published_identity_info.st_dev, published_identity_info.st_ino)
         success = _receipt(
             status="execution_passed",
             classification="publication_pending",
@@ -3201,11 +3513,36 @@ def run(
             "sha256": _digest_bytes(encoded_success),
         }
         publication_prepared = True
-        _write_json_exclusive(receipt_path, success)
-        shutil.rmtree(work_root, ignore_errors=True)
-        work_root_cleaned = True
+        receipt_record = _write_json_exclusive(
+            receipt_path, success, frozen_parent=frozen_log_parent
+        )
+        if receipt_record != {"path": receipt_path.name, **expected_execution_receipt}:
+            raise RunnerError("receipt provenance drifted")
+        _verify_private_json_record(
+            receipt_path,
+            {"path": receipt_path.name, **expected_execution_receipt},
+            frozen_parent=frozen_log_parent,
+        )
         _target_unchanged(target, target_identity)
         os.replace(publish, target)
+        try:
+            _verify_private_json_record(
+                receipt_path,
+                {"path": receipt_path.name, **expected_execution_receipt},
+                frozen_parent=frozen_log_parent,
+            )
+        except BaseException:
+            preserve_work_root = not _rollback_published_target(
+                target,
+                published_identity,
+                published_expected_files,
+                published_directories,
+                work_root / "rejected-publication",
+                frozen_target_parent=frozen_target_parent,
+            )
+            raise
+        shutil.rmtree(work_root, ignore_errors=True)
+        work_root_cleaned = True
         committed = True
         return manifest
     except BaseException as error:
@@ -3267,8 +3604,12 @@ def run(
                 _write_json_exclusive(
                     publication_failure_path,
                     _publication_failure_receipt(
-                        receipt_path, expected_execution_receipt, trusted_decision_lineage
+                        receipt_path,
+                        expected_execution_receipt,
+                        trusted_decision_lineage,
+                        frozen_parent=frozen_log_parent,
                     ),
+                    frozen_parent=frozen_log_parent,
                 )
             except OSError:
                 pass
@@ -3315,14 +3656,24 @@ def run(
                 decision_lineage=trusted_decision_lineage,
             )
             try:
-                _write_json_exclusive(receipt_path, failure)
+                _write_json_exclusive(receipt_path, failure, frozen_parent=frozen_log_parent)
             except OSError:
                 pass
         raise RunnerError(
             f"{classification}; logs={active_stdout_log.name},{active_stderr_log.name},{receipt_path.name}"
         ) from error
     finally:
-        if not work_root_cleaned:
+        if log_parent_descriptor is not None:
+            try:
+                os.close(log_parent_descriptor)
+            except OSError:
+                pass
+        if target_parent_descriptor is not None:
+            try:
+                os.close(target_parent_descriptor)
+            except OSError:
+                pass
+        if not work_root_cleaned and not preserve_work_root:
             shutil.rmtree(work_root, ignore_errors=True)
         if not committed and publish.exists():
             shutil.rmtree(publish, ignore_errors=True)

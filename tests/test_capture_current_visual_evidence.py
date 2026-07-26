@@ -273,7 +273,7 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 root,
                 html=(
                     '<!doctype html><html><head><style>'
-                    '#final{opacity:.2} @media(prefers-reduced-motion:reduce){#final{opacity:1}}'
+                    '#final{display:inline-block;opacity:.2} @media(prefers-reduced-motion:reduce){#final{opacity:1}}'
                     '</style></head><body><main><h1>Motion</h1>'
                     '<button id="play" onclick="'
                     "if(!matchMedia('(prefers-reduced-motion: reduce)').matches)"
@@ -418,6 +418,37 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
 
                 self.assertEqual(1, completed.returncode)
                 self.assertFalse(evidence.exists())
+
+    def test_opt_in_v2_rejects_action_only_consequential_contract_case(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(root)
+            contract = self.consequential_contract(root, target, case)
+            payload = json.loads(contract.read_text(encoding="utf-8"))
+            payload["cases"][0]["steps"] = [
+                {"id": "open-details", "action": "click", "selector": "#open"},
+            ]
+            contract.write_text(json.dumps(payload), encoding="utf-8")
+            record = {
+                "schema_version": 2,
+                "bytes": contract.stat().st_size,
+                "sha256": digest(contract),
+                "case_count": 1,
+                "step_count": 1,
+            }
+            case["browser_contract"] = record
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+            manifest_path = target / "run-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["browser_contract"] = record
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("consequential state browser contract case is invalid", completed.stderr)
+            self.assertFalse(evidence.exists())
 
     def test_opt_in_v2_rejects_a_contract_action_that_navigates_away(self) -> None:
         for destination in ("/outside.html", "?state=changed", "#changed"):
