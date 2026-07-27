@@ -141,6 +141,8 @@ Use GSAP only after the runtime ladder selects it. The official GSAP Skills are 
 
 For a ScrollTrigger product section, keep the product name, evidence and CTA in normal semantic DOM. Pin only when holding one stable product view while a small set of features changes is the clearest causal model. Define every scene's `trigger/start/end`, whether it is discrete or scrubbed, pin owner/spacing, refresh inputs, interruption, reduced static state and terminal document state. If removing ScrollTrigger makes the content order incoherent, repair the document before animating.
 
+For any continuous scroll-linked scene, appoint one progress owner. After fonts, media, and layout settle, map named start/end geometry to one clamped normalized value; line fill, active step, frame index, transforms, and DOM/Canvas/WebGL renderers derive from that same value instead of maintaining local thresholds. Keep semantic beats and endpoints outside the renderer so a renderer swap, resize, reverse scroll, or reduced static result preserves the same content states. Use one dominant renderer lane per scene and a bounded beat ledger; do not mix several visual modes merely to add spectacle.
+
 ## 3. Build lifecycle and interruption
 
 - Start from static, usable markup. Enhance after capability and preference checks.

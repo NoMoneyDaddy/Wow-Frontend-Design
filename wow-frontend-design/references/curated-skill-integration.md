@@ -21,6 +21,8 @@ Before reusing a rule, record repository, full content-addressed commit, path, r
 
 The lock's `review` object is the machine-readable source-level decision. `integrated` means only that a bounded portable method was adopted by the named owner reference; it does not mean wholesale copying, endorsement, installation, compatibility, or runtime support. `no_integration` means the pinned source was read but added no distinct portable rule or failed an adoption boundary. `reviewed_revision` must equal the pin, so updating a source without re-review fails validation. Qualitative research files may explain the decision but must not override the lock.
 
+For a catalogue repository, a source-level decision does not prove that every child Skill was read. An exhaustive-review claim requires an exact observed tree count at the pinned revision plus one schema-closed receipt per child path: name, category, disposition, owner when adopted/covered, and bounded rationale. Reconcile README counts against the tree, fail on missing/duplicate paths, and keep style recipes, out-of-scope workflows, and rejected risks visible rather than collapsing them into “integrated.” [mengto-skills-audit.json](mengto-skills-audit.json) is one validated example, not a second active Skill.
+
 - Never fetch mutable `main`, `@latest`, floating actions, CDN scripts, or reusable workflows during an ordinary project run.
 - Prefer installed package types/docs and the project's lockfile for framework behavior. A pinned research Skill does not override the installed version.
 - Re-audit when the pinned commit disappears, the content hash changes, the license changes, or the source redirects.

@@ -100,6 +100,10 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn("rendered geometry/computed styles, and a stable semantic locator", self.visual)
         self.assertIn("capture settled viewport slices in document order", self.visual)
         self.assertIn("bounded full-document composition evidence only", self.visual)
+        self.assertIn("one clamped normalized value", (ROOT / "motion-system.md").read_text())
+        patterns = (ROOT / "pattern-catalog.md").read_text()
+        self.assertIn("included quantity, limits/overage, eligibility", patterns)
+        self.assertIn("Product Demos, Samples, AI Workflow Proof", patterns)
 
     def test_exploration_supports_fast_multi_direction_style_calibration(self) -> None:
         for phrase in (

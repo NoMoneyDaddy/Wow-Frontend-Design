@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tempfile
@@ -98,6 +99,123 @@ class SourceLockTests(unittest.TestCase):
         self.assertIn("`ThepExcel/agent-skills` was unavailable", integration)
         self.assertIn("`sickn33/antigravity-awesome-skills` redirected", integration)
         self.assertIn("`skillcreatorai/ai-agent-skills` redirected", integration)
+
+    def test_mengto_subskills_have_complete_review_receipts(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        references = root / "wow-frontend-design" / "references"
+        audit = json.loads(
+            (references / "mengto-skills-audit.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            set(audit),
+            {
+                "schema_version",
+                "repository",
+                "revision",
+                "reviewed_at",
+                "inventory",
+                "skills",
+            },
+        )
+        self.assertEqual(audit["schema_version"], 1)
+        self.assertEqual(audit["repository"], "MengTo/Skills")
+        self.assertEqual(
+            audit["inventory"],
+            {
+                "readme_claimed_skill_count": 118,
+                "observed_skill_count": 121,
+                "skill_paths_sha256": "7ec5c3e9aad104800b616ee6a4a3743242e04e9846d1086cffe7ac4241c8f183",
+                "category_counts": {
+                    "codex": 18,
+                    "customer-support": 2,
+                    "game-development": 19,
+                    "media": 2,
+                    "ui": 1,
+                    "web-design": 79,
+                },
+            },
+        )
+        skills = audit["skills"]
+        self.assertEqual(len(skills), 121)
+        paths = [item["path"] for item in skills]
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertEqual(121, len({item["name"] for item in skills}))
+        path_receipt = hashlib.sha256(
+            ("\n".join(sorted(paths)) + "\n").encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(
+            "7ec5c3e9aad104800b616ee6a4a3743242e04e9846d1086cffe7ac4241c8f183",
+            path_receipt,
+        )
+        category_counts = {
+            category: sum(item["category"] == category for item in skills)
+            for category in audit["inventory"]["category_counts"]
+        }
+        self.assertEqual(audit["inventory"]["category_counts"], category_counts)
+        allowed_dispositions = {
+            "integrated",
+            "covered",
+            "style_reference_only",
+            "out_of_scope",
+            "rejected",
+        }
+        for item in skills:
+            self.assertEqual(
+                set(item),
+                {
+                    "path",
+                    "name",
+                    "category",
+                    "disposition",
+                    "owner_reference",
+                    "rationale",
+                },
+            )
+            self.assertTrue(item["path"].startswith(f"agent-skills/{item['category']}/"))
+            self.assertTrue(item["path"].endswith("/SKILL.md"))
+            self.assertNotIn("..", Path(item["path"]).parts)
+            self.assertIn(item["disposition"], allowed_dispositions)
+            self.assertTrue(20 <= len(item["rationale"]) <= 240)
+            owner = item["owner_reference"]
+            if item["disposition"] in {"integrated", "covered"}:
+                self.assertIsInstance(owner, str)
+                self.assertTrue((references / owner).is_file())
+            else:
+                self.assertIsNone(owner)
+
+        lock = validate_external_sources.load(
+            references / "external-sources.lock.json"
+        )
+        source = next(
+            item for item in lock["sources"] if item["repository"] == "MengTo/Skills"
+        )
+        self.assertEqual(audit["revision"], source["revision"])
+        self.assertEqual(
+            source["review"]["owner_reference"], "curated-skill-integration.md"
+        )
+        locked_skill_paths = {
+            path
+            for path in source["paths"]
+            if path.startswith("agent-skills/") and path.endswith("/SKILL.md")
+        }
+        self.assertEqual(set(paths), locked_skill_paths)
+        self.assertEqual(
+            {
+                item["path"]: item["owner_reference"]
+                for item in skills
+                if item["disposition"] == "integrated"
+            },
+            {
+                "agent-skills/codex/stitched-full-page-capture/SKILL.md": "visual-regression-evidence.md",
+                "agent-skills/web-design/landing-page/SKILL.md": "pattern-catalog.md",
+                "agent-skills/web-design/operational-enterprise-ai/SKILL.md": "pattern-catalog.md",
+                "agent-skills/web-design/pricing-page/SKILL.md": "pattern-catalog.md",
+                "agent-skills/web-design/product-proof-saas/SKILL.md": "pattern-catalog.md",
+                "agent-skills/web-design/scroll-progress-timeline/SKILL.md": "motion-system.md",
+                "agent-skills/web-design/scroll-scrubbed-visual-sequence/SKILL.md": "motion-system.md",
+                "agent-skills/web-design/scroll-world-storytelling/SKILL.md": "motion-system.md",
+            },
+        )
 
     def test_short_revision_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

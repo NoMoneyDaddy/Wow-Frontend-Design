@@ -118,6 +118,10 @@ Adopt the stronger method:
 - independent browser evidence and human review for subjective craft;
 - report ties, failures, infrastructure blocks, and sample size—not only wins.
 
+## MengTo/Skills exhaustive subskill review
+
+The pinned [MengTo/Skills@21b278c](https://github.com/MengTo/Skills/tree/21b278c62f49f3ce3d8c8ecbcc84cbcd534f3e49) README says 118 Skills, while the same revision contains 121 `agent-skills/**/SKILL.md` files. [The machine-readable audit](mengto-skills-audit.json) records all 121 paths and a per-child disposition. Adopted methods are limited to reliable stitched full-page evidence, truthful commercial offer/pricing/product-workflow proof, and one normalized progress owner for scroll-linked scenes. Fixed palettes, glass/laser/grid/shader recipes remain style references; game mechanics, customer-support mutations, social-account operations, named-voice imitation, hard-coded assets, and vendor-specific effects are covered, out of scope, or rejected rather than merged.
+
 ## WebGL and Three.js skill review
 
 These are research coordinates, not vendored dependencies. README license claims do not replace a repository `LICENSE`; no-license material is studied and independently paraphrased only.
