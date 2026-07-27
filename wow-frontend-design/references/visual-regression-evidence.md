@@ -54,6 +54,8 @@ A pixel threshold is a noise tolerance, not an acceptance score. Prefer focused 
 
 Distinguish a viewport capture from a full-page document capture. Full-page stitching can paint fixed, sticky, or transformed off-canvas UI at a document boundary where a user would not see it in the named viewport. Use an exact viewport capture for first-screen and closed-overlay claims; keep full-page captures separately labelled, and verify suspicious fixed-position artifacts in the live viewport before reporting a UI defect.
 
+When a native full-page capture is blank, sparse, misses lazy/reveal content, or conflicts with a freshly replayed scroll journey, treat it as a rejected candidate rather than proof. With the project-pinned Playwright runtime, warm the page through the named journey, return to the top, then capture settled viewport slices in document order with deterministic waits and enough overlap to verify continuity. Record slice geometry and hashes before stitching; reject missing bands, duplicated fixed/sticky UI, inconsistent canvas/media state, or disagreement with exact-viewport witnesses. The stitched result is bounded full-document composition evidence only—it never replaces fresh viewport, interaction, semantic, or performance evidence.
+
 ## Freshness and repository claims
 
 If README or documentation says an image comes from a specific implementation, store a small manifest binding screenshot hash to source/build hash, capture command, viewport, state, and environment. CI can detect staleness; it cannot approve a new visual direction.
