@@ -23,6 +23,7 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         cls.discovery = (ROOT / "product-discovery-usability.md").read_text(encoding="utf-8")
         cls.tokens = (ROOT / "design-token-portability.md").read_text(encoding="utf-8")
         cls.visual = (ROOT / "visual-regression-evidence.md").read_text(encoding="utf-8")
+        cls.motion = (ROOT / "motion-system.md").read_text(encoding="utf-8")
 
     def test_references_keep_bounded_responsibility_sections(self) -> None:
         for heading in (
@@ -51,6 +52,7 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             "every action control that remains available must name the actual next or return outcome",
             self.components,
         )
+        self.assertIn("Re-check every surviving action label against the current state", self.motion)
 
     def test_creative_direction_has_no_style_catalogue_or_numeric_taste_score(self) -> None:
         for stale_section in (
