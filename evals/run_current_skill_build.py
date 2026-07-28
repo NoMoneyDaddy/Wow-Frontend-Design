@@ -2246,10 +2246,10 @@ def _valid_configured_isolation_summary(value: Any) -> bool:
         "apps_plugins_mcp": False,
         "browser_computer_image": False,
         "subagents": False,
-        "shell_tool_available": True,
+        "shell_tool_available": False,
         "shell_commands_allowed_by_contract": False,
-        "shell_command_prevention": False,
-        "shell_command_acceptance": "inert_noop_only_other_commands_post_trace_rejection",
+        "shell_command_prevention": True,
+        "shell_command_acceptance": "none",
         "filesystem_profile": "minimal-read-workspace-write",
         "process_environment_inheritance": "none",
     }

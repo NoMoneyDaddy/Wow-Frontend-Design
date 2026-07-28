@@ -1344,6 +1344,27 @@ main { min-width: 360px; }
                 next(item for item in receipt["profiles"] if item["name"] == "narrow"),
             )
 
+    def test_scroll_width_overflow_fallback_locates_pseudo_element_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Pseudo overflow</title><style>
+html, body { margin: 0; overflow-x: clip; }
+main { position: relative; }
+main::after { content: ""; position: absolute; left: 0; top: 0; width: 420px; height: 1px; }
+</style></head><body><main><h1>Pseudo overflow</h1></main></body></html>''',
+                encoding="utf-8",
+            )
+
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+
+            results = {item["profile"]: item for item in receipt["results"]}
+            self.assertTrue(results["narrow"]["root_horizontal_overflow"])
+            target = results["narrow"]["inspection"]["root_overflow_target"]
+            self.assertIsNotNone(target)
+            self.assertEqual(["main", 1], target["path"][-1])
+            self.assertGreater(target["overflow_right_px"], 0)
+
     def test_runtime_accessibility_overflow_and_external_failures_are_observed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

@@ -839,6 +839,52 @@ async function main() {
               overflow_right_px: rootOverflowRightPx,
             };
           }
+          if (!rootOverflowTargetCandidate) {
+            let fallbackElement = null;
+            let fallbackOverflowPx = 0;
+            for (const element of [
+              ...Array.from(document.querySelectorAll("body *")),
+              document.body,
+              document.documentElement,
+            ]) {
+              if (!element || !visible(element)) continue;
+              const box = trusted?.rect(element);
+              if (!box) continue;
+              let locallyContained = false;
+              for (let ancestor = element.parentElement;
+                ancestor && ancestor !== document.body;
+                ancestor = ancestor.parentElement) {
+                const overflowX = trusted?.style(ancestor, "overflow-x");
+                const ancestorBox = trusted?.rect(ancestor);
+                if ((overflowX === "auto" || overflowX === "clip" || overflowX === "hidden" || overflowX === "scroll")
+                  && ancestorBox
+                  && ancestorBox.left >= -1
+                  && ancestorBox.right <= viewportWidth + 1) {
+                  locallyContained = true;
+                  break;
+                }
+              }
+              if (locallyContained) continue;
+              const overflowPx = Math.min(100000, Math.ceil(Math.max(
+                0,
+                element.scrollWidth - Math.max(1, element.clientWidth) - 1,
+              )));
+              if (overflowPx > fallbackOverflowPx) {
+                fallbackElement = element;
+                fallbackOverflowPx = overflowPx;
+              }
+            }
+            const fallbackPath = fallbackElement
+              ? trusted?.structuralPath(fallbackElement)
+              : null;
+            if (fallbackPath && fallbackOverflowPx > 0) {
+              rootOverflowTargetCandidate = {
+                path: fallbackPath,
+                overflow_left_px: 0,
+                overflow_right_px: fallbackOverflowPx,
+              };
+            }
+          }
         }
         return {
           hidden_attribute_visible_count: hiddenAttributeVisible,

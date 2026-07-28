@@ -70,10 +70,10 @@ def attempt_execution_projection() -> dict[str, object]:
             "apps_plugins_mcp": False,
             "browser_computer_image": False,
             "subagents": False,
-            "shell_tool_available": True,
+            "shell_tool_available": False,
             "shell_commands_allowed_by_contract": False,
-            "shell_command_prevention": False,
-            "shell_command_acceptance": "inert_noop_only_other_commands_post_trace_rejection",
+            "shell_command_prevention": True,
+            "shell_command_acceptance": "none",
             "filesystem_profile": "minimal-read-workspace-write",
             "process_environment_inheritance": "none",
         },
@@ -2356,6 +2356,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "skill_mcp_dependency_install",
                     "tool_call_mcp_elicitation",
                     "tool_suggest",
+                    "shell_tool",
                 ],
                 disabled,
             )
@@ -5049,11 +5050,11 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual(3, receipt["execution"]["inactivity_timeout_seconds"])
             self.assertTrue(receipt["trace_observed"]["successful_terminal_event"])
             self.assertFalse(receipt["configured_isolation"]["sandbox_network"])
-            self.assertTrue(receipt["configured_isolation"]["shell_tool_available"])
+            self.assertFalse(receipt["configured_isolation"]["shell_tool_available"])
             self.assertFalse(receipt["configured_isolation"]["shell_commands_allowed_by_contract"])
-            self.assertFalse(receipt["configured_isolation"]["shell_command_prevention"])
+            self.assertTrue(receipt["configured_isolation"]["shell_command_prevention"])
             self.assertEqual(
-                "inert_noop_only_other_commands_post_trace_rejection",
+                "none",
                 receipt["configured_isolation"]["shell_command_acceptance"],
             )
             self.assertEqual(0, receipt["trace_observed"]["command_event_count"])
