@@ -259,6 +259,32 @@ h1 span { display: block; }
             self.assertEqual("passed", mobile["status"], mobile)
             self.assertEqual(3, mobile["inspection"]["browser_contract"]["steps_executed"])
 
+    def test_browser_contract_rejects_a_stale_visible_state_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Inbox review</title></head><body>
+<main><p id="status">Unread</p><p id="summary">Unread messages: 1</p><button id="review">Mark reviewed</button></main>
+<script>document.querySelector('#review').onclick = () => { document.querySelector('#status').textContent = 'Reviewed'; };</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-inbox-summary", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "review", "action": "click", "selector": "#review"},
+                        {"id": "status-updated", "action": "assert", "selector": "#status", "expect": "text-includes", "value": "Reviewed"},
+                        {"id": "summary-updated", "action": "assert", "selector": "#summary", "expect": "rendered-text-excludes", "value": "Unread messages: 1"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("rejected", mobile["status"], mobile)
+            self.assertEqual(["contract-mobile-inbox-summary-summary-updated"], mobile["inspection"]["browser_contract"]["finding_ids"])
+
     def test_browser_contract_keeps_wrapper_hook_separate_from_radio_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
