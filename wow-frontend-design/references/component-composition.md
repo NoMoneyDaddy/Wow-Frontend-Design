@@ -71,6 +71,7 @@ rest + hover + focus-visible + active + selected/current + disabled/read-only
 - Keep visible label, accessible name, validation, count, price, status, and pressed/expanded/selected state synchronized.
 - Define content limits by graceful behavior. Test empty, one, many, long `zh-Hant`, mixed scripts, user content, and missing or unknown media.
 - Bind record-scoped title, metadata, controls, progress, evidence, and async results to one stable record key. Selection or navigation changes must not leave another region or delayed result bound to the prior record.
+- When repeated record controls share one visible verb, keep that verb in each accessible name and append the same record's stable, human-readable identity. The identity must remain visible in that active composition; never substitute array position, transient sort order, or hidden duplicate controls. Each required role/name action must resolve to exactly one live control.
 - Freeze form label/group semantics, hint/error linkage, validation timing, retained input after failure, paste/autofill/password-manager/IME behavior, and focus destination. Never block paste or silently discard invalid input.
 - Prefer native HTML, then a mature project primitive. A custom combobox, date picker, tree, grid, or editor needs a product constraint and target browser/assistive-technology verification.
 

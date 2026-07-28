@@ -233,6 +233,35 @@ h1 span { display: block; }
             self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
             self.assertNotIn("label-content-name-mismatch", mobile["inspection"]["axe_rule_ids"])
 
+    def test_browser_contract_targets_one_repeated_record_action_by_visible_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>審計紀錄</title></head><body>
+<main><h1>審計紀錄</h1><table><caption>最近活動</caption><tbody>
+<tr><td>2026-07-28 14:32</td><td><button aria-label="檢視紀錄 2026-07-28 14:32" data-record="first">檢視紀錄</button></td></tr>
+<tr><td>2026-07-28 14:36</td><td><button aria-label="檢視紀錄 2026-07-28 14:36" data-record="second">檢視紀錄</button></td></tr>
+</tbody></table><p id="result" data-record-result="none">尚未選取</p></main>
+<script>document.querySelectorAll('[data-record]').forEach((button) => { button.onclick = () => { document.querySelector('#result').dataset.recordResult = button.dataset.record; document.querySelector('#result').textContent = button.dataset.record; }; });</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-record-action", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "open-first", "action": "click", "role": "button", "name": "檢視紀錄 2026-07-28 14:32"},
+                        {"id": "only-first-changed", "action": "assert", "selector": "#result", "expect": "attribute-equals", "attribute": "data-record-result", "value": "first"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["status"], mobile)
+            self.assertEqual(2, mobile["inspection"]["browser_contract"]["steps_executed"])
+            self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
+
     def test_rendered_text_assertions_exclude_hidden_descendants_and_ignore_poisoned_getter(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

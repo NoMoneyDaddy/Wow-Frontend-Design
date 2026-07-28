@@ -41,6 +41,11 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             self.assertIn(heading, self.components)
         self.assertIn("# Product-specific post-render review", self.review)
 
+    def test_repeated_record_actions_keep_unique_visible_semantics(self) -> None:
+        phrase = "stable, human-readable identity"
+        self.assertIn(phrase, self.components)
+        self.assertIn("exactly one live control", self.components)
+
     def test_creative_direction_has_no_style_catalogue_or_numeric_taste_score(self) -> None:
         for stale_section in (
             "## 4. Define the visual grammar",
