@@ -227,14 +227,26 @@ class PrepareCurrentCraftCaseTests(unittest.TestCase):
             completed = self.invoke(
                 workspace, output, "--browser-contract", str(contract),
                 "--contract-case-id", "open-detail", "--destination-page", "detail.html",
+                "--destination-query", "?filter=field-notes&q=Tide%20star*%7E",
             )
             self.assertEqual(0, completed.returncode, completed.stderr)
             case = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(4, case["schema_version"])
+            self.assertEqual(5, case["schema_version"])
             self.assertEqual(
-                {"contract_case_id": "open-detail", "destination_page": "detail.html"},
+                {
+                    "contract_case_id": "open-detail",
+                    "destination_page": "detail.html",
+                    "destination_query": "?filter=field-notes&q=Tide%20star*%7E",
+                },
                 case["capture_plan"]["consequential_navigation"],
             )
+            invalid = self.invoke(
+                workspace, root / "invalid-case.json", "--browser-contract", str(contract),
+                "--contract-case-id", "open-detail", "--destination-page", "detail.html",
+                "--destination-query", "?filter=field-notes&q=Tide+Notes",
+            )
+            self.assertNotEqual(0, invalid.returncode)
+            self.assertIn("destination_query must be a non-empty canonical query", invalid.stderr)
 
     def test_rejects_action_only_consequential_state_case(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

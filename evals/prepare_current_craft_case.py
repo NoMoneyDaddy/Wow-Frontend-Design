@@ -10,6 +10,7 @@ import os
 import re
 import stat
 import sys
+from urllib.parse import parse_qsl, quote
 from pathlib import Path
 from typing import Any
 
@@ -127,6 +128,31 @@ def _relative_path(value: object, label: str) -> str:
     ):
         raise CraftCaseError(f"{label} must be a normalized relative path")
     return value
+
+
+def _canonical_destination_query(value: object) -> str:
+    if not isinstance(value, str) or not value.startswith("?") or len(value) < 2:
+        raise CraftCaseError("destination_query must be a non-empty canonical query")
+    raw = value[1:]
+    if "#" in raw or "+" in raw or any(ord(char) < 0x20 or ord(char) == 0x7F for char in raw):
+        raise CraftCaseError("destination_query must be a non-empty canonical query")
+    try:
+        pairs = parse_qsl(raw, keep_blank_values=True, strict_parsing=True)
+    except ValueError as error:
+        raise CraftCaseError("destination_query must be a non-empty canonical query") from error
+    if (
+        not pairs
+        or any(not key or any(ord(char) < 0x20 or ord(char) == 0x7F for char in key + item) for key, item in pairs)
+        or len({key for key, _ in pairs}) != len(pairs)
+    ):
+        raise CraftCaseError("destination_query must be a non-empty canonical query")
+    canonical = "?" + "&".join(
+        f"{quote(key, safe='*-._').replace('~', '%7E')}={quote(item, safe='*-._').replace('~', '%7E')}"
+        for key, item in pairs
+    )
+    if value != canonical:
+        raise CraftCaseError("destination_query must be a non-empty canonical query")
+    return canonical
 
 
 def _manifest_payload(raw: bytes) -> dict[str, Any]:
@@ -564,6 +590,7 @@ def prepare_case(
     browser_contract: Path | None = None,
     contract_case_id: str | None = None,
     destination_page: str | None = None,
+    destination_query: str | None = None,
     motion_contract_case_id: str | None = None,
     reduced_motion_contract_case_id: str | None = None,
     motion_offsets_ms: list[int] | None = None,
@@ -608,6 +635,10 @@ def prepare_case(
         output_pages = {record["path"] for record in manifest["outputs"] if record["path"].endswith(".html")}
         if motion_requested or contract_case_id is None or destination_page not in output_pages:
             raise CraftCaseError("destination_page must be a manifest HTML output for a consequential contract")
+    if destination_query is not None:
+        if destination_page is None:
+            raise CraftCaseError("destination_query requires destination_page")
+        destination_query = _canonical_destination_query(destination_query)
     contract_record = None
     motion_page = None
     if browser_contract is not None:
@@ -639,7 +670,7 @@ def prepare_case(
             )
 
     case = {
-        "schema_version": 3 if motion_requested else 4 if destination_page else 2 if contract_record else 1,
+        "schema_version": 3 if motion_requested else 5 if destination_query else 4 if destination_page else 2 if contract_record else 1,
         "case_id": case_id,
         "run_id": f"current-{hashlib.sha256(raw_manifest).hexdigest()}",
         "partition": partition,
@@ -667,10 +698,13 @@ def prepare_case(
                 "offsets_ms": motion_offsets_ms,
             }
         elif destination_page:
-            case["capture_plan"]["consequential_navigation"] = {
+            navigation = {
                 "contract_case_id": contract_case_id,
                 "destination_page": destination_page,
             }
+            if destination_query:
+                navigation["destination_query"] = destination_query
+            case["capture_plan"]["consequential_navigation"] = navigation
         else:
             case["capture_plan"]["consequential_state"] = {
                 "contract_case_id": contract_case_id,
@@ -698,6 +732,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--browser-contract", type=Path)
     parser.add_argument("--contract-case-id")
     parser.add_argument("--destination-page")
+    parser.add_argument("--destination-query")
     parser.add_argument("--motion-contract-case-id")
     parser.add_argument("--reduced-motion-contract-case-id")
     parser.add_argument("--motion-offsets-ms", nargs=3, type=int)
@@ -712,6 +747,7 @@ def main(argv: list[str] | None = None) -> int:
             browser_contract=args.browser_contract,
             contract_case_id=args.contract_case_id,
             destination_page=args.destination_page,
+            destination_query=args.destination_query,
             motion_contract_case_id=args.motion_contract_case_id,
             reduced_motion_contract_case_id=args.reduced_motion_contract_case_id,
             motion_offsets_ms=args.motion_offsets_ms,

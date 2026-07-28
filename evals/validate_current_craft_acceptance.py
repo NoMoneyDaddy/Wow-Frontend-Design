@@ -12,6 +12,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, quote
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,6 +131,31 @@ def _relative(value: object, label: str) -> str:
     return value
 
 
+def _canonical_destination_query(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value.startswith("?") or len(value) < 2:
+        raise CurrentCraftError(f"{label} must be a non-empty canonical query")
+    raw = value[1:]
+    if "#" in raw or "+" in raw or any(ord(char) < 0x20 or ord(char) == 0x7F for char in raw):
+        raise CurrentCraftError(f"{label} must be a non-empty canonical query")
+    try:
+        pairs = parse_qsl(raw, keep_blank_values=True, strict_parsing=True)
+    except ValueError as error:
+        raise CurrentCraftError(f"{label} must be a non-empty canonical query") from error
+    if (
+        not pairs
+        or any(not key or any(ord(char) < 0x20 or ord(char) == 0x7F for char in key + item) for key, item in pairs)
+        or len({key for key, _ in pairs}) != len(pairs)
+    ):
+        raise CurrentCraftError(f"{label} must be a non-empty canonical query")
+    canonical = "?" + "&".join(
+        f"{quote(key, safe='*-._').replace('~', '%7E')}={quote(item, safe='*-._').replace('~', '%7E')}"
+        for key, item in pairs
+    )
+    if value != canonical:
+        raise CurrentCraftError(f"{label} must be a non-empty canonical query")
+    return canonical
+
+
 def _png_dimensions(path: Path) -> tuple[int, int]:
     with path.open("rb") as handle:
         header = handle.read(24)
@@ -201,12 +227,12 @@ def _validate_current_capture_evidence(
 
     case_value = _load_json(case_file, "case")
     case_schema = case_value.get("schema_version")
-    case_keys = CASE_KEYS | ({"browser_contract"} if case_schema in {2, 3} else set())
+    case_keys = CASE_KEYS | ({"browser_contract"} if case_schema in {2, 3, 4, 5} else set())
     case = _exact(case_value, case_keys, "case")
     receipt_value = _load_json(receipt_file, "capture receipt")
     receipt_schema = receipt_value.get("schema_version")
     receipt_keys = RECEIPT_KEYS.copy()
-    if receipt_schema == 2:
+    if receipt_schema in {2, 4, 5}:
         receipt_keys |= {"state_evidence"}
     elif receipt_schema == 3:
         receipt_keys |= {"motion_evidence"}
@@ -215,7 +241,7 @@ def _validate_current_capture_evidence(
 
     if (
         type(case["schema_version"]) is not int
-        or case["schema_version"] not in {1, 2, 3}
+        or case["schema_version"] not in {1, 2, 3, 4, 5}
         or not isinstance(case["case_id"], str)
         or not case["case_id"].strip()
     ):
@@ -247,6 +273,8 @@ def _validate_current_capture_evidence(
         capture_plan_keys.add("consequential_state")
     elif case_schema == 3:
         capture_plan_keys.add("motion_sequence")
+    elif case_schema in {4, 5}:
+        capture_plan_keys.add("consequential_navigation")
     capture_plan = _exact(
         case["capture_plan"],
         capture_plan_keys,
@@ -293,6 +321,7 @@ def _validate_current_capture_evidence(
     ):
         raise CurrentCraftError("case capture plan is not the current standard")
     consequential_state: dict[str, Any] | None = None
+    consequential_navigation: dict[str, Any] | None = None
     motion_sequence: dict[str, Any] | None = None
     case_contract: dict[str, Any] | None = None
     if case_schema == 2:
@@ -311,6 +340,39 @@ def _validate_current_capture_evidence(
             or re.fullmatch(r"[a-z][a-z0-9-]{0,47}", contract_case_id) is None
         ):
             raise CurrentCraftError("case consequential state is invalid")
+        case_contract = _browser_contract_record(
+            case["browser_contract"],
+            "case.browser_contract",
+        )
+    elif case_schema in {4, 5}:
+        if explicit_pages is not None:
+            raise CurrentCraftError(
+                "consequential navigation evidence is unavailable for draft calibration"
+            )
+        navigation_keys = {"contract_case_id", "destination_page"}
+        if case_schema == 5:
+            navigation_keys.add("destination_query")
+        consequential_navigation = _exact(
+            capture_plan["consequential_navigation"],
+            navigation_keys,
+            "case.capture_plan.consequential_navigation",
+        )
+        destination_page = _relative(
+            consequential_navigation["destination_page"],
+            "case.capture_plan.consequential_navigation.destination_page",
+        )
+        contract_case_id = consequential_navigation["contract_case_id"]
+        if (
+            not destination_page.lower().endswith(".html")
+            or not isinstance(contract_case_id, str)
+            or re.fullmatch(r"[a-z][a-z0-9-]{0,47}", contract_case_id) is None
+        ):
+            raise CurrentCraftError("case consequential navigation is invalid")
+        if case_schema == 5:
+            _canonical_destination_query(
+                consequential_navigation["destination_query"],
+                "case.capture_plan.consequential_navigation.destination_query",
+            )
         case_contract = _browser_contract_record(
             case["browser_contract"],
             "case.browser_contract",
@@ -443,7 +505,7 @@ def _validate_current_capture_evidence(
                 "draft capture subset is not bound to a seeded RETROFIT manifest"
             )
     source_keys = {"run_manifest_sha256", "brief", "skill_tree_sha256", "outputs"}
-    if case_schema in {2, 3}:
+    if case_schema in {2, 3, 4, 5}:
         source_keys.add("browser_contract")
     source = _exact(receipt["source"], source_keys, "capture receipt.source")
     if source["run_manifest_sha256"] != _sha256(manifest_file):
@@ -456,7 +518,7 @@ def _validate_current_capture_evidence(
         raise CurrentCraftError("output provenance disagrees with the current build")
     state_evidence: dict[str, Any] | None = None
     motion_evidence: dict[str, Any] | None = None
-    if case_schema in {2, 3}:
+    if case_schema in {2, 3, 4, 5}:
         manifest_contract = _browser_contract_record(
             manifest.get("browser_contract"),
             "manifest.browser_contract",
@@ -469,17 +531,20 @@ def _validate_current_capture_evidence(
             raise CurrentCraftError(
                 "browser contract provenance disagrees across case, capture, and current build"
             )
-    if case_schema == 2:
+    if case_schema in {2, 4, 5}:
+        state_keys = {
+            "contract_case_id",
+            "page",
+            "profile",
+            "steps_executed",
+            "result_assertion_count",
+            "status",
+        }
+        if case_schema == 5:
+            state_keys.add("destination_query")
         state_evidence = _exact(
             receipt["state_evidence"],
-            {
-                "contract_case_id",
-                "page",
-                "profile",
-                "steps_executed",
-                "result_assertion_count",
-                "status",
-            },
+            state_keys,
             "capture receipt.state_evidence",
         )
         state_page = _relative(
@@ -488,8 +553,10 @@ def _validate_current_capture_evidence(
         )
         if (
             state_evidence["contract_case_id"]
-            != consequential_state["contract_case_id"]
+            != (consequential_navigation or consequential_state)["contract_case_id"]
             or not state_page.lower().endswith(".html")
+            or (consequential_navigation is not None and state_page != consequential_navigation["destination_page"])
+            or (case_schema == 5 and state_evidence["destination_query"] != consequential_navigation["destination_query"])
             or state_evidence["profile"]
             not in {"desktop-default", "mobile-default"}
             or type(state_evidence["steps_executed"]) is not int
@@ -696,9 +763,12 @@ def _validate_current_capture_evidence(
             captured_at = datetime.fromisoformat(capture["captured_at"].replace("Z", "+00:00"))
         except (AttributeError, ValueError) as error:
             raise CurrentCraftError("capture timestamp is invalid") from error
-        if context["route"] != f"/{capture['page']}":
-            raise CurrentCraftError("capture route does not match its declared page")
         is_state_capture = context["state"] != capture_plan["state"]
+        expected_route = f"/{capture['page']}"
+        if is_state_capture and case_schema == 5:
+            expected_route += state_evidence["destination_query"]
+        if context["route"] != expected_route:
+            raise CurrentCraftError("capture route does not match its declared page")
         expected_state = (
             f"contract:{state_evidence['contract_case_id']}"
             if state_evidence

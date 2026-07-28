@@ -57,6 +57,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
         explicit_pages: list[str] | None = None,
         include_legacy_html: bool = False,
         consequential_state: bool = False,
+        consequential_navigation_query: str | None = None,
         motion_primary: bool = False,
     ) -> tuple[Path, Path, Path, Path, Path, Path, Path]:
         root = root.resolve()
@@ -85,6 +86,18 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        if consequential_navigation_query is not None:
+            (workspace / "index.html").write_text(
+                '<!doctype html><html lang="zh-Hant"><head><title>Current</title></head><body><main>'
+                '<h1>現行輸出</h1><a id="open" href="detail.html'
+                f'{consequential_navigation_query}">Open</a></main></body></html>',
+                encoding="utf-8",
+            )
+            (workspace / "detail.html").write_text(
+                '<!doctype html><html lang="zh-Hant"><head><title>Detail</title></head><body><main>'
+                '<h1>詳細內容</h1><section id="details">Details</section></main></body></html>',
+                encoding="utf-8",
+            )
         if include_legacy_html:
             (workspace / "legacy.html").write_text(
                 '<!doctype html><html lang="zh-Hant"><body><main><h1>Legacy</h1></main></body></html>',
@@ -99,6 +112,8 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             )
         outputs = []
         output_names = ["DESIGN.md", "index.html"]
+        if consequential_navigation_query is not None:
+            output_names.append("detail.html")
         if include_legacy_html:
             output_names.append("legacy.html")
         output_names.extend(explicit_pages or [])
@@ -165,7 +180,7 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             },
         }
         browser_contract: Path | None = None
-        if consequential_state:
+        if consequential_state or consequential_navigation_query is not None:
             contract_payload = {
                 "schema_version": 2,
                 "cases": [{
@@ -190,9 +205,16 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             }
             manifest["browser_contract"] = contract_record
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            case["schema_version"] = 2
+            case["schema_version"] = 5 if consequential_navigation_query is not None else 2
             case["browser_contract"] = contract_record
-            case["capture_plan"]["consequential_state"] = {"contract_case_id": "open-details"}
+            if consequential_navigation_query is not None:
+                case["capture_plan"]["consequential_navigation"] = {
+                    "contract_case_id": "open-details",
+                    "destination_page": "detail.html",
+                    "destination_query": consequential_navigation_query,
+                }
+            else:
+                case["capture_plan"]["consequential_state"] = {"contract_case_id": "open-details"}
         elif motion_primary:
             contract_payload = {
                 "schema_version": 2,
@@ -652,6 +674,63 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(validate_current_craft_acceptance.CurrentCraftError, "paths must be unique"):
                 validate_current_craft_acceptance.validate_current_capture_evidence(
                     workspace, case_path, receipt_path, manifest_path
+                )
+
+    def test_opt_in_v5_acceptance_binds_declared_destination_query(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self.build_fixture(
+                Path(directory),
+                consequential_navigation_query="?filter=field-notes&q=Tide",
+            )
+            _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+            observed = validate_current_craft_acceptance.validate_current_capture_evidence(
+                workspace,
+                case_path,
+                receipt_path,
+                manifest_path,
+            )
+            self.assertEqual(5, observed["receipt"]["schema_version"])
+            state_capture = next(
+                capture
+                for capture in observed["receipt"]["captures"]
+                if capture["context"]["state"] != "default"
+            )
+            self.assertEqual(
+                "/detail.html?filter=field-notes&q=Tide",
+                state_capture["context"]["route"],
+            )
+
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            state_capture = next(
+                capture
+                for capture in receipt["captures"]
+                if capture["context"]["state"] != "default"
+            )
+            state_capture["context"]["route"] = "/detail.html"
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "route does not match",
+            ):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace,
+                    case_path,
+                    receipt_path,
+                    manifest_path,
+                )
+
+            receipt["state_evidence"]["destination_query"] = "?filter=field-notes&q=Drift"
+            state_capture["context"]["route"] = "/detail.html?filter=field-notes&q=Tide"
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(
+                validate_current_craft_acceptance.CurrentCraftError,
+                "consequential state evidence is invalid",
+            ):
+                validate_current_craft_acceptance.validate_current_capture_evidence(
+                    workspace,
+                    case_path,
+                    receipt_path,
+                    manifest_path,
                 )
 
     def test_capture_runtime_must_match_the_repository_playwright_pin(self) -> None:
