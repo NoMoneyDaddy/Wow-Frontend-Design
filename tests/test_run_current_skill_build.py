@@ -1664,6 +1664,18 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         self.assertIn('[["html",1],["body",1],["main",1],["h1",1]]', prompt)
         self.assertIn('"split_ranges":[{"end":2,"start":0}]', prompt)
         self.assertNotIn("PRIVATE-CANDIDATE-DOM", prompt)
+        explicit_narrow_prompt = policy.build_repair_prompt(
+            ("index.html",),
+            {
+                "schema_version": 1,
+                "gate": "html",
+                "finding_ids": ["cjk-heading-explicit-narrow"],
+                "counts": {"cjk-heading-explicit-narrow": 1},
+                "truncated": False,
+                "signature": "0" * 64,
+            },
+        )
+        self.assertIn("Latin `ch` or arbitrary fractional caps", explicit_narrow_prompt)
 
     def test_cjk_table_caption_feedback_preserves_bounded_structure(self) -> None:
         path = [["html", 1], ["body", 1], ["main", 1], ["table", 1], ["caption", 1]]

@@ -1020,7 +1020,8 @@ def build_repair_prompt(
     editable = outputs if case_mode == "greenfield" else allowed_changes
     editable_list = json.dumps(editable, ensure_ascii=False, separators=(",", ":"))
     heading_repair = ""
-    if "cjk-heading-split-word" in feedback.get("finding_ids", ()):
+    heading_findings = set(feedback.get("finding_ids", ()))
+    if "cjk-heading-split-word" in heading_findings:
         heading_repair = (
             "For `cjk-heading-split-word`, preserve approved copy. Do not rewrite or shorten approved "
             "product copy solely to clear `cjk-heading-split-word`, and do not paraphrase, delete, change "
@@ -1032,6 +1033,13 @@ def build_repair_prompt(
             "span with a responsive no-overflow fallback. Keep adjacent terminal punctuation with that unit. "
             "Never disable wrapping for the whole heading or use global `keep-all` or per-character spans. "
             "Verify the same copy across every declared profile.\n"
+        )
+    if "cjk-heading-explicit-narrow" in heading_findings:
+        heading_repair += (
+            "For `cjk-heading-explicit-narrow`, preserve approved copy and remove Latin `ch` or arbitrary "
+            "fractional caps from the affected CJK heading and its owning track. Give that heading its full "
+            "available track or recompose its local layout; do not move it into a narrower child solely to "
+            "manufacture a wrap. Verify the same copy across every declared profile.\n"
         )
     caption_repair = ""
     if "cjk-table-caption-fragment" in feedback.get("finding_ids", ()):
