@@ -643,6 +643,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         allow_changes: tuple[str, ...] = (),
         browser_contract: Path | None = None,
         skill_reference: str | None = None,
+        skill_references: tuple[str, ...] = (),
     ) -> subprocess.CompletedProcess[str]:
         selected_log_dir = log_dir or Path(environment["CODEX_HOME"]).parent / "logs"
         selected_log_dir.mkdir(exist_ok=True)
@@ -669,6 +670,8 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             command.extend(("--browser-contract", str(browser_contract)))
         if skill_reference is not None:
             command.extend(("--skill-reference", skill_reference))
+        for reference in skill_references:
+            command.extend(("--skill-reference", reference))
         for path in allow_changes:
             command.extend(("--allow-change", path))
         command.extend(("--hard-seconds", str(hard_seconds)))
@@ -796,6 +799,49 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertNotIn(private_reference_line, provenance)
             self.assertNotIn(private_reference_line, json.dumps(receipt, ensure_ascii=False))
+
+    def test_cli_allows_two_explicit_references_without_no_visual_default(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "page-error-repairable")
+            selected = (
+                "references/component-composition.md",
+                "references/mobile-responsive.md",
+            )
+            completed = self.invoke(
+                brief,
+                target,
+                environment,
+                skill_references=selected,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            initial = json.loads((capture / "invocation-1.json").read_text(encoding="utf-8"))["prompt"]
+            for path in ("references/creative-direction.md", *selected):
+                self.assertIn(path, initial)
+            self.assertNotIn("references/no-visual-first-pass.md", initial)
+            manifest = json.loads((target / "run-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                ["references/creative-direction.md", *selected],
+                [record["path"] for record in manifest["skill_references"]["files"]],
+            )
+
+    def test_cli_rejects_a_third_explicit_skill_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, _, environment = self.fixture(root)
+            completed = self.invoke(
+                brief,
+                target,
+                environment,
+                skill_references=(
+                    "references/component-composition.md",
+                    "references/mobile-responsive.md",
+                    "references/interaction-audit.md",
+                ),
+            )
+            self.assertEqual(2, completed.returncode)
+            self.assertIn("may be supplied at most twice", completed.stderr)
+            self.assertEqual([], list(target.iterdir()))
 
     def test_controlled_skill_context_precedes_every_untrusted_payload(self) -> None:
         context = "--- CONTROLLED SKILL REFERENCE CONTEXT: BEGIN ---\ntrusted\n--- CONTROLLED SKILL REFERENCE CONTEXT: END ---\n"

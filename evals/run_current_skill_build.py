@@ -79,7 +79,6 @@ CURRENT_DEFAULT_REASONING_EFFORT = "high"
 DEFAULT_INACTIVITY_SECONDS = 600
 DEFAULT_SKILL_REFERENCES = (
     "references/creative-direction.md",
-    "references/no-visual-first-pass.md",
 )
 SELECTED_DIRECTION_REFERENCES = (
     "references/creative-direction.md",
@@ -2977,6 +2976,7 @@ def run(
     allow_changes: list[str] | tuple[str, ...] | None = None,
     browser_contract: Path | None = None,
     skill_reference: str | None = None,
+    skill_references: list[str] | tuple[str, ...] | None = None,
     draft_decision_receipt: Path | None = None,
     draft_decision_input: Path | None = None,
     draft_cohort_root: Path | None = None,
@@ -3021,10 +3021,17 @@ def run(
     decision_lineage = _decision_lineage(decision_source) if decision_source is not None else None
     brief = _regular_absolute_file(brief, "brief", BRIEF_LIMIT)
     target, target_identity = _fresh_target(target)
+    if skill_reference is not None and skill_references is not None:
+        raise RunnerError("use skill_reference or skill_references, not both")
+    optional_references = (
+        (skill_reference,) if skill_reference is not None else tuple(skill_references or ())
+    )
+    if not 0 <= len(optional_references) <= 2:
+        raise RunnerError("skill reference selection may contain at most two optional files")
     base_references = (
         SELECTED_DIRECTION_REFERENCES if decision_source is not None else DEFAULT_SKILL_REFERENCES
     )
-    reference_paths = base_references + ((skill_reference,) if skill_reference is not None else ())
+    reference_paths = base_references + optional_references
     selected_skill_references, skill_reference_payload = prepare_skill_reference_context(
         SKILL_SOURCE, reference_paths
     )
@@ -3778,15 +3785,15 @@ def main() -> int:
     parser.add_argument(
         "--skill-reference",
         action="append",
-        help="one optional references/<safe-name>.md from the verified current Skill source",
+        help="repeat for up to two optional references/<safe-name>.md from the verified current Skill source",
     )
     parser.add_argument("--draft-decision-receipt", type=Path)
     parser.add_argument("--draft-decision-input", type=Path)
     parser.add_argument("--draft-cohort-root", type=Path)
     parser.add_argument("--draft-cohort-log-dir", type=Path)
     args = parser.parse_args()
-    if args.skill_reference is not None and len(args.skill_reference) > 1:
-        parser.error("--skill-reference may be supplied at most once")
+    if args.skill_reference is not None and len(args.skill_reference) > 2:
+        parser.error("--skill-reference may be supplied at most twice")
     inactivity_seconds = (
         args.inactivity_seconds
         if args.inactivity_seconds is not None
@@ -3808,7 +3815,7 @@ def main() -> int:
             seed_root=args.seed_root,
             allow_changes=args.allow_change,
             browser_contract=args.browser_contract,
-            skill_reference=args.skill_reference[0] if args.skill_reference else None,
+            skill_references=tuple(args.skill_reference or ()),
             draft_decision_receipt=args.draft_decision_receipt,
             draft_decision_input=args.draft_decision_input,
             draft_cohort_root=args.draft_cohort_root,
