@@ -1910,7 +1910,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             source = draft_decision_source()
             baseline = policy._wrapper_tool_records()
             drifted = json.loads(json.dumps(baseline))
-            drifted["trace_validator"]["sha256"] = "0" * 64
+            drifted["source_layout_audit"]["sha256"] = "0" * 64
             rejected = {
                 "status": "rejected",
                 "required_result": "zero-errors-zero-warnings",
@@ -4135,6 +4135,14 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     policy.RunnerError, "receipt category summaries"
                 ):
                     policy._receipt(**common, **payload)
+
+            with self.assertRaisesRegex(policy.RunnerError, "receipt category summaries"):
+                policy._receipt(
+                    **common,
+                    classification="execution_infrastructure_failure",
+                    html_smoke_unavailable={"quarantine": quarantine},
+                    failure_artifact={"quarantine": quarantine},
+                )
 
             attempt = policy._attempt_summary(
                 0, attempt_execution_projection(), None
