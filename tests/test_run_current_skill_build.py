@@ -2012,6 +2012,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                         {"id": "heading-phrase", "action": "assert", "selector": "h1", "expect": "text-segment-on-one-line", "segment": "放行"},
                         {"id": "visible-state", "action": "assert", "selector": "main", "expect": "rendered-text-includes", "value": "Task"},
                         {"id": "stale-state-absent", "action": "assert", "selector": "main", "expect": "rendered-text-excludes", "value": "Loading"},
+                        {"id": "search-value", "action": "assert", "selector": "input[type=search]", "expect": "input-value-equals", "value": "Tide"},
                         {"id": "heading-fit", "action": "assert", "selector": "h1", "expect": "no-content-overflow"},
                         {"id": "motion-active", "action": "assert", "selector": "main", "expect": "active-animation-count-between", "min_animations": 0.0, "max_animations": 2},
                         {"id": "motion-settled", "action": "assert", "selector": "main", "expect": "animations-settled"},
@@ -2025,7 +2026,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             )
             self.assertEqual(2, normalized["schema_version"])
             self.assertEqual(2, record["schema_version"])
-            self.assertEqual(12, record["step_count"])
+            self.assertEqual(13, record["step_count"])
 
     def test_html_smoke_accepts_v2_contract_receipt_without_weakening_v1(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -2208,6 +2209,26 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "v1-cannot-use-rendered-text-excludes": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
                 "id": "stale-state", "action": "assert", "selector": "main",
                 "expect": "rendered-text-excludes", "value": "Loading",
+            }]}]},
+            "v1-cannot-use-input-value": {"schema_version": 1, "cases": [{**valid_case, "steps": [{
+                "id": "search-value", "action": "assert", "selector": "input",
+                "expect": "input-value-equals", "value": "Tide",
+            }]}]},
+            "v2-input-value-missing-value": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "search-value", "action": "assert", "selector": "input",
+                "expect": "input-value-equals",
+            }]}]},
+            "v2-input-value-empty": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "search-value", "action": "assert", "selector": "input",
+                "expect": "input-value-equals", "value": "",
+            }]}]},
+            "v2-input-value-control": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "search-value", "action": "assert", "selector": "input",
+                "expect": "input-value-equals", "value": "Tide\n",
+            }]}]},
+            "v2-input-value-oversized": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
+                "id": "search-value", "action": "assert", "selector": "input",
+                "expect": "input-value-equals", "value": "a" * 257,
             }]}]},
             "v2-empty-rendered-text": {"schema_version": 2, "cases": [{**valid_case, "steps": [{
                 "id": "visible-state", "action": "assert", "selector": "main",

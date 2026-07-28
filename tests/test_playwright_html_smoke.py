@@ -313,6 +313,29 @@ h1 span { display: block; }
             self.assertEqual("passed", mobile["status"], mobile)
             self.assertEqual(5, mobile["inspection"]["browser_contract"]["steps_executed"])
 
+    def test_browser_contract_reads_current_input_value_not_markup_attribute(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Search state</title></head><body>
+<main><h1>Search state</h1><label>Search <input data-search value="initial"></label></main>
+<script>document.querySelector('[data-search]').value = 'Current query';</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 2,
+                "cases": [{
+                    "id": "mobile-current-input-value", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "current-value", "action": "assert", "selector": "[data-search]", "expect": "input-value-equals", "value": "Current query"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["status"], mobile)
+
     def test_browser_contract_targets_one_repeated_record_action_by_visible_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

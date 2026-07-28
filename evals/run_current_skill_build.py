@@ -107,6 +107,7 @@ BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
     "animations-inactive-for",
     "animations-settled",
     "font-face-loaded",
+    "input-value-equals",
     "inline-size-ratio-between",
     "inline-start-aligned-with",
     "last-line-graphemes-at-least",
@@ -806,7 +807,7 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
             elif action == "assert":
                 expected_keys.add("expect")
                 expectation = step.get("expect")
-                if expectation in {"attribute-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"}:
+                if expectation in {"attribute-equals", "input-value-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"}:
                     expected_keys.add("value")
                 if expectation == "attribute-equals":
                     expected_keys.add("attribute")
@@ -861,7 +862,7 @@ def _load_browser_contract(path: Path, outputs: tuple[str, ...]) -> tuple[Path, 
                         raise RunnerError("browser contract attribute is invalid")
                     if not isinstance(step.get("value"), str) or len(step["value"].encode("utf-8")) > 256:
                         raise RunnerError("browser contract value is invalid")
-                elif expectation in {"rendered-text-excludes", "rendered-text-includes", "text-includes"}:
+                elif expectation in {"input-value-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"}:
                     _bounded_contract_text(step.get("value"), "value", 256)
                 elif expectation == "count-equals":
                     count = step.get("count")

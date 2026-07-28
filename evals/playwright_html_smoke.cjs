@@ -136,7 +136,7 @@ function validateBrowserContract(value, pages) {
       "active-animation-count-between", "animations-inactive-for", "animations-settled", "attribute-equals", "count-equals",
       "font-face-loaded", "fully-visible-in-viewport",
       "inline-size-ratio-between", "inline-start-aligned-with", "last-line-graphemes-at-least", "line-count-between", "no-content-overflow",
-      "rendered-text-excludes", "rendered-text-includes", "text-includes", "text-segment-on-one-line", "visible",
+      "input-value-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes", "text-segment-on-one-line", "visible",
     ];
   const ids = new Set();
   const routes = new Set();
@@ -169,7 +169,7 @@ function validateBrowserContract(value, pages) {
       if (step?.action === "press") expectedKeys.push("key");
       if (step?.action === "assert") {
         expectedKeys.push("expect");
-        if (["attribute-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"].includes(step.expect)) expectedKeys.push("value");
+        if (["attribute-equals", "input-value-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"].includes(step.expect)) expectedKeys.push("value");
         if (step.expect === "attribute-equals") expectedKeys.push("attribute");
         if (step.expect === "count-equals") expectedKeys.push("count");
         if (step.expect === "font-face-loaded") expectedKeys.push("family");
@@ -209,7 +209,7 @@ function validateBrowserContract(value, pages) {
             || typeof step.value !== "string" || Buffer.byteLength(step.value) > 256)) {
           throw new Error("invalid browser contract attribute assertion");
         }
-        if (["rendered-text-excludes", "rendered-text-includes", "text-includes"].includes(step.expect)
+        if (["input-value-equals", "rendered-text-excludes", "rendered-text-includes", "text-includes"].includes(step.expect)
           && !boundedContractText(step.value, 256)) {
           throw new Error("invalid browser contract text assertion");
         }
@@ -290,6 +290,7 @@ async function checkAssertion(page, locator, step) {
   if (count !== 1) return false;
   if (step.expect === "visible") return locator.isVisible();
   if (step.expect === "attribute-equals") return await locator.getAttribute(step.attribute) === step.value;
+  if (step.expect === "input-value-equals") return await locator.inputValue() === step.value;
   if (step.expect === "text-includes") return (await locator.textContent() || "").includes(step.value);
   if (step.expect === "inline-start-aligned-with") {
     const reference = page.locator(step.reference_selector);
