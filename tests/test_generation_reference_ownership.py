@@ -62,6 +62,12 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         )
         self.assertIn("hooks locate surfaces, not form values", self.skill)
 
+    def test_action_hooks_identify_their_own_live_control(self) -> None:
+        self.assertIn(
+            "action hook must identify the one live control that performs that action",
+            self.components,
+        )
+
     def test_creative_direction_has_no_style_catalogue_or_numeric_taste_score(self) -> None:
         for stale_section in (
             "## 4. Define the visual grammar",
