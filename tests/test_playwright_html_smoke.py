@@ -259,6 +259,34 @@ h1 span { display: block; }
             self.assertEqual("passed", mobile["status"], mobile)
             self.assertEqual(3, mobile["inspection"]["browser_contract"]["steps_executed"])
 
+    def test_browser_contract_keeps_wrapper_hook_separate_from_radio_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>選擇釉色</title></head><body>
+<main><h1>陶杯</h1><label data-variant="mist"><input type="radio" name="glaze" value="霧白釉">霧白釉</label><label data-variant="forest"><input type="radio" name="glaze" value="墨綠釉">墨綠釉</label><button data-primary-action>加入購物袋</button><p data-task-state>尚未選擇</p></main>
+<script>const state = document.querySelector('[data-task-state]'); document.querySelector('[data-primary-action]').onclick = () => { const selected = document.querySelector('input[name="glaze"]:checked'); state.textContent = selected ? `已加入購物袋：${selected.value}` : '請選擇釉色'; };</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "mobile-variant-state", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "empty-submit", "action": "click", "selector": "[data-primary-action]"},
+                        {"id": "error", "action": "assert", "selector": "[data-task-state]", "expect": "text-includes", "value": "請選擇"},
+                        {"id": "pick-wrapper", "action": "click", "selector": "[data-variant='mist']"},
+                        {"id": "submit", "action": "click", "selector": "[data-primary-action]"},
+                        {"id": "success", "action": "assert", "selector": "[data-task-state]", "expect": "text-includes", "value": "已加入購物袋：霧白釉"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["status"], mobile)
+            self.assertEqual(5, mobile["inspection"]["browser_contract"]["steps_executed"])
+
     def test_browser_contract_targets_one_repeated_record_action_by_visible_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)

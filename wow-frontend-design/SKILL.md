@@ -155,7 +155,7 @@ Skip repair when the first bounded pass is clean. A bounded run permits three to
 
 - Keep every record-scoped title, metadata, evidence, annotation, progress, action, and async result bound to one stable selected identity. On selection change, update dependent regions together or show an explicit pending/stale state for the new identity.
 - Keep every visible aggregate coherent with the mutation, version, and scope it summarizes. Verify pending, resolve, reject, and rollback; do not show an updated item beside an unlabeled pre-mutation total.
-- Treat the brief as the public automation contract. Implement named hooks exactly, but do not invent IDs, values, slots, or hidden state attributes.
+- Treat brief as automation contract. Implement hooks; hooks locate surfaces, not form values. Do not invent IDs, values, slots, or hidden state.
 - Preserve input on invalid, offline, permission, and retry paths. Prevent duplicate submit, stale success, and late async results mutating a newly selected or navigated record. Respect IME composition.
 - Use whitespace, type, color, shape, and depth to express content relationships. Repair evidenced clipping, overflow, task obstruction, or loss of meaning; do not convert aesthetic preference into a defect code.
 - Do not infer a defect from geometry alone. Unequal columns, familiar patterns, quiet composition, or the absence of motion may be correct; require task or rendered evidence before repair.

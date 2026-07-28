@@ -24,6 +24,7 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         cls.tokens = (ROOT / "design-token-portability.md").read_text(encoding="utf-8")
         cls.visual = (ROOT / "visual-regression-evidence.md").read_text(encoding="utf-8")
         cls.motion = (ROOT / "motion-system.md").read_text(encoding="utf-8")
+        cls.skill = (ROOT.parent / "SKILL.md").read_text(encoding="utf-8")
 
     def test_references_keep_bounded_responsibility_sections(self) -> None:
         for heading in (
@@ -53,6 +54,13 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             self.components,
         )
         self.assertIn("Re-check every surviving action label against the current state", self.motion)
+
+    def test_evaluator_hooks_do_not_replace_native_form_state(self) -> None:
+        self.assertIn(
+            "they never replace the native control or explicit state owner",
+            self.components,
+        )
+        self.assertIn("hooks locate surfaces, not form values", self.skill)
 
     def test_creative_direction_has_no_style_catalogue_or_numeric_taste_score(self) -> None:
         for stale_section in (
