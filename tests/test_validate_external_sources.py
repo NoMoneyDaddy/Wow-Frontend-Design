@@ -152,6 +152,15 @@ class SourceLockTests(unittest.TestCase):
             for category in audit["inventory"]["category_counts"]
         }
         self.assertEqual(audit["inventory"]["category_counts"], category_counts)
+        self.assertEqual(
+            [],
+            [
+                item["path"]
+                for item in skills
+                if item["category"] == "web-design"
+                and item["disposition"] == "out_of_scope"
+            ],
+        )
         allowed_dispositions = {
             "integrated",
             "covered",
