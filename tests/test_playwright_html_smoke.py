@@ -737,6 +737,57 @@ h1 { inline-size: 1em; }
             )
             self.assertEqual("rejected", self.invoke(stage, ["index.html"], ["index.html"])["status"])
 
+    def test_generic_smoke_rejects_mobile_cjk_table_caption_fragment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>審計表格</title><style>
+body { margin: 0; padding: 12px; } table { inline-size: 100%; } caption { inline-size: 100%; }
+@media (max-width: 600px) { table { display: block; } caption { inline-size: 60px; } }
+</style></head><body><main><h1>審計紀錄</h1><table><caption>審計示例紀錄。每筆都標示風險層級、操作者、時間與目前狀態。</caption><thead><tr><th>事件</th></tr></thead><tbody><tr><td>可追蹤內容</td></tr></tbody></table></main></body></html>''',
+                encoding="utf-8",
+            )
+            receipt = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("rejected", receipt["status"])
+            results = {item["profile"]: item for item in receipt["results"]}
+            self.assertEqual(
+                0,
+                results["desktop"]["inspection"]["layout_hazards"]
+                ["cjk_table_caption_fragment_count"],
+            )
+            for profile in ("mobile", "narrow"):
+                inspection = results[profile]["inspection"]
+                self.assertEqual(
+                    1,
+                    inspection["layout_hazards"]["cjk_table_caption_fragment_count"],
+                )
+                self.assertEqual(1, inspection["cjk_table_caption_fragment_target_count"])
+                self.assertFalse(inspection["cjk_table_caption_fragment_targets_truncated"])
+                descriptor = inspection["cjk_table_caption_fragment_target_descriptors"][0]
+                self.assertEqual(
+                    {
+                        "caption_to_table_width_x100", "line_count", "path",
+                        "split_han_word_count", "target_sha256",
+                    },
+                    set(descriptor),
+                )
+                self.assertGreaterEqual(descriptor["line_count"], 4)
+                self.assertLessEqual(descriptor["caption_to_table_width_x100"], 40)
+            self.assertNotIn("審計示例紀錄", json.dumps(receipt, ensure_ascii=False))
+
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="zh-Hant"><head><title>審計表格</title><style>
+body { margin: 0; padding: 12px; } table { inline-size: 100%; }
+</style></head><body><main><h1>審計紀錄</h1><table><caption>審計示例紀錄。每筆都標示風險層級、操作者、時間與目前狀態。</caption><thead><tr><th>事件</th></tr></thead><tbody><tr><td>可追蹤內容</td></tr></tbody></table></main></body></html>''',
+                encoding="utf-8",
+            )
+            readable = self.invoke(stage, ["index.html"], ["index.html"])
+            self.assertEqual("passed", readable["status"])
+            self.assertTrue(all(
+                result["inspection"]["layout_hazards"]["cjk_table_caption_fragment_count"] == 0
+                for result in readable["results"]
+            ))
+
     def test_heading_tail_advisory_discloses_bounded_scan_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
@@ -1639,6 +1690,7 @@ main { position: relative; min-height: 100vh; }
                         "fixed_content_obstruction_count": 0,
                         "cjk_heading_explicit_narrow_count": 0,
                         "cjk_heading_split_word_count": 0,
+                        "cjk_table_caption_fragment_count": 0,
                     },
                     item["inspection"]["layout_hazards"],
                 )

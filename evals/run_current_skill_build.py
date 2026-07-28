@@ -505,6 +505,8 @@ def _validate_axe_inspection(inspection: Any) -> None:
         "axe_targets_truncated", "axe_target_descriptors",
         "cjk_heading_split_target_count", "cjk_heading_split_target_set_sha256",
         "cjk_heading_split_targets_truncated", "cjk_heading_split_target_descriptors",
+        "cjk_table_caption_fragment_target_count", "cjk_table_caption_fragment_target_set_sha256",
+        "cjk_table_caption_fragment_targets_truncated", "cjk_table_caption_fragment_target_descriptors",
         "root_overflow_target",
         "layout_hazards", "typography_advisories",
     }
@@ -645,6 +647,52 @@ def _validate_axe_inspection(inspection: Any) -> None:
         json.dumps(cjk_identities, separators=(",", ":")).encode("utf-8")
     ).hexdigest() != cjk_target_set_sha256:
         raise RunnerError(failure)
+    caption_count = inspection.get("cjk_table_caption_fragment_target_count")
+    caption_digest = inspection.get("cjk_table_caption_fragment_target_set_sha256")
+    caption_truncated = inspection.get("cjk_table_caption_fragment_targets_truncated")
+    caption_descriptors = inspection.get("cjk_table_caption_fragment_target_descriptors")
+    if (
+        type(caption_count) is not int or not 0 <= caption_count <= 16
+        or not isinstance(caption_digest, str) or re.fullmatch(r"[0-9a-f]{64}", caption_digest) is None
+        or type(caption_truncated) is not bool
+        or not isinstance(caption_descriptors, list) or len(caption_descriptors) > 16
+        or caption_truncated != (len(caption_descriptors) != caption_count)
+    ):
+        raise RunnerError(failure)
+    caption_identities: list[str] = []
+    for descriptor in caption_descriptors:
+        if not isinstance(descriptor, dict) or set(descriptor) != {
+            "target_sha256", "path", "line_count", "split_han_word_count", "caption_to_table_width_x100",
+        }:
+            raise RunnerError(failure)
+        target_sha256 = descriptor.get("target_sha256")
+        path = descriptor.get("path")
+        if (
+            not isinstance(target_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", target_sha256) is None
+            or not isinstance(path, list) or not 1 <= len(path) <= 16
+            or type(descriptor.get("line_count")) is not int or not 4 <= descriptor["line_count"] <= 64
+            or type(descriptor.get("split_han_word_count")) is not int or not 0 <= descriptor["split_han_word_count"] <= 512
+            or type(descriptor.get("caption_to_table_width_x100")) is not int or not 0 <= descriptor["caption_to_table_width_x100"] <= 40
+        ):
+            raise RunnerError(failure)
+        normalized_path: list[list[Any]] = []
+        for segment in path:
+            if (not isinstance(segment, list) or len(segment) != 2 or not isinstance(segment[0], str)
+                or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", segment[0]) is None
+                or type(segment[1]) is not int or not 1 <= segment[1] <= 10000):
+                raise RunnerError(failure)
+            normalized_path.append(segment)
+        if normalized_path[0][0] != "html" or hashlib.sha256(
+            json.dumps(normalized_path, separators=(",", ":")).encode("utf-8")
+        ).hexdigest() != target_sha256:
+            raise RunnerError(failure)
+        caption_identities.append(target_sha256)
+    if caption_identities != sorted(set(caption_identities)):
+        raise RunnerError(failure)
+    if not caption_truncated and hashlib.sha256(
+        json.dumps(caption_identities, separators=(",", ":")).encode("utf-8")
+    ).hexdigest() != caption_digest:
+        raise RunnerError(failure)
     root_overflow_target = inspection.get("root_overflow_target")
     if root_overflow_target is not None:
         if not isinstance(root_overflow_target, dict) or set(root_overflow_target) != {
@@ -684,6 +732,7 @@ def _validate_axe_inspection(inspection: Any) -> None:
             "fixed_content_obstruction_count",
             "cjk_heading_explicit_narrow_count",
             "cjk_heading_split_word_count",
+            "cjk_table_caption_fragment_count",
         }
         or any(type(layout.get(key)) is not int or not 0 <= layout[key] <= 10000 for key in layout)
         or not isinstance(typography, dict)

@@ -60,6 +60,7 @@ def _bounded_payload(
     contract_steps: list[dict[str, Any]] | None = None,
     axe_targets: list[dict[str, Any]] | None = None,
     cjk_heading_targets: list[dict[str, Any]] | None = None,
+    cjk_table_caption_targets: list[dict[str, Any]] | None = None,
     root_overflow_targets: list[dict[str, Any]] | None = None,
     source_truncated: bool = False,
 ) -> dict[str, Any]:
@@ -90,6 +91,11 @@ def _bounded_payload(
         if "cjk-heading-split-word" in selected_ids
         else []
     )
+    eligible_caption_targets = (
+        list(cjk_table_caption_targets or ())
+        if "cjk-table-caption-fragment" in selected_ids
+        else []
+    )
     eligible_overflow_targets = (
         list(root_overflow_targets or ())
         if "root-horizontal-overflow" in selected_ids
@@ -106,6 +112,8 @@ def _bounded_payload(
         core["axe_targets"] = eligible_targets
     if eligible_cjk_targets:
         core["cjk_heading_targets"] = eligible_cjk_targets
+    if eligible_caption_targets:
+        core["cjk_table_caption_targets"] = eligible_caption_targets
     if eligible_overflow_targets:
         core["root_overflow_targets"] = eligible_overflow_targets
     payload = signed(core)
@@ -115,6 +123,7 @@ def _bounded_payload(
         not eligible_steps
         and not eligible_targets
         and not eligible_cjk_targets
+        and not eligible_caption_targets
         and not eligible_overflow_targets
     ):
         raise ValueError("repair feedback exceeded its byte quota")
@@ -123,15 +132,18 @@ def _bounded_payload(
     core.pop("contract_steps", None)
     core.pop("axe_targets", None)
     core.pop("cjk_heading_targets", None)
+    core.pop("cjk_table_caption_targets", None)
     core.pop("root_overflow_targets", None)
     included: dict[str, list[dict[str, Any]]] = {
         "cjk_heading_targets": [],
+        "cjk_table_caption_targets": [],
         "root_overflow_targets": [],
         "axe_targets": [],
         "contract_steps": [],
     }
     candidates = {
         "cjk_heading_targets": eligible_cjk_targets,
+        "cjk_table_caption_targets": eligible_caption_targets,
         "root_overflow_targets": eligible_overflow_targets,
         "axe_targets": eligible_targets,
         "contract_steps": eligible_steps,
@@ -140,6 +152,7 @@ def _bounded_payload(
     while any(active.values()):
         for key in (
             "cjk_heading_targets",
+            "cjk_table_caption_targets",
             "root_overflow_targets",
             "axe_targets",
             "contract_steps",
@@ -206,6 +219,7 @@ def _generic_html_counts(result: dict[str, Any]) -> Counter[str]:
             ("fixed_content_obstruction_count", "fixed-content-obstruction"),
             ("cjk_heading_explicit_narrow_count", "cjk-heading-explicit-narrow"),
             ("cjk_heading_split_word_count", "cjk-heading-split-word"),
+            ("cjk_table_caption_fragment_count", "cjk-table-caption-fragment"),
         ):
             value = layout_hazards.get(key)
             if type(value) is int and value > 0:
@@ -383,6 +397,55 @@ def _safe_root_overflow_target(result: dict[str, Any]) -> dict[str, Any] | None:
         "overflow_left_px": overflow_left_px,
         "overflow_right_px": overflow_right_px,
     }
+
+
+def _safe_cjk_table_caption_targets(result: dict[str, Any]) -> list[dict[str, Any]]:
+    inspection = result.get("inspection")
+    if not isinstance(inspection, dict):
+        return []
+    descriptors = inspection.get("cjk_table_caption_fragment_target_descriptors")
+    count = inspection.get("cjk_table_caption_fragment_target_count")
+    digest = inspection.get("cjk_table_caption_fragment_target_set_sha256")
+    truncated = inspection.get("cjk_table_caption_fragment_targets_truncated")
+    if (
+        not isinstance(descriptors, list) or len(descriptors) > 16
+        or type(count) is not int or not 0 <= count <= 16
+        or not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        or type(truncated) is not bool or truncated != (len(descriptors) != count)
+    ):
+        return []
+    safe: list[dict[str, Any]] = []
+    for descriptor in descriptors:
+        if not isinstance(descriptor, dict) or set(descriptor) != {
+            "target_sha256", "path", "line_count", "split_han_word_count", "caption_to_table_width_x100",
+        }:
+            return []
+        target_sha256 = descriptor.get("target_sha256")
+        path = descriptor.get("path")
+        if (
+            not isinstance(target_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", target_sha256) is None
+            or not isinstance(path, list) or not 1 <= len(path) <= 16
+            or type(descriptor.get("line_count")) is not int or not 4 <= descriptor["line_count"] <= 64
+            or type(descriptor.get("split_han_word_count")) is not int or not 0 <= descriptor["split_han_word_count"] <= 512
+            or type(descriptor.get("caption_to_table_width_x100")) is not int or not 0 <= descriptor["caption_to_table_width_x100"] <= 40
+            or any(
+                not isinstance(segment, list) or len(segment) != 2
+                or not isinstance(segment[0], str)
+                or re.fullmatch(r"[a-z][a-z0-9-]{0,63}", segment[0]) is None
+                or type(segment[1]) is not int or not 1 <= segment[1] <= 10000
+                for segment in path
+            )
+            or path[0][0] != "html"
+            or hashlib.sha256(json.dumps(path, separators=(",", ":")).encode("utf-8")).hexdigest() != target_sha256
+        ):
+            return []
+        safe.append(descriptor)
+    identities = [item["target_sha256"] for item in safe]
+    if identities != sorted(set(identities)):
+        return []
+    if not truncated and hashlib.sha256(json.dumps(identities, separators=(",", ":")).encode("utf-8")).hexdigest() != digest:
+        return []
+    return safe
 
 
 def compile_repair_state(
@@ -676,6 +739,7 @@ def compile_html_feedback(
     contract_steps: list[dict[str, Any]] = []
     axe_targets: dict[tuple[str, str, str], dict[str, Any]] = {}
     cjk_targets: dict[tuple[str, str], dict[str, Any]] = {}
+    caption_targets: dict[tuple[str, str], dict[str, Any]] = {}
     overflow_targets: dict[tuple[str, str], dict[str, Any]] = {}
     axe_source_truncated = False
     cjk_source_truncated = False
@@ -742,6 +806,20 @@ def compile_html_feedback(
                     or len(ordered_ranges) > 8
                 )
                 existing["split_ranges"] = ordered_ranges[:8]
+            if isinstance(profile, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,31}", profile):
+                existing["profiles"].append(profile)
+        for descriptor in _safe_cjk_table_caption_targets(result):
+            if not isinstance(page, str):
+                continue
+            key = (page, descriptor["target_sha256"])
+            existing = caption_targets.get(key)
+            if existing is None:
+                existing = {"page": page, **descriptor, "profiles": []}
+                caption_targets[key] = existing
+            elif descriptor["line_count"] > existing["line_count"]:
+                existing["line_count"] = descriptor["line_count"]
+                existing["split_han_word_count"] = descriptor["split_han_word_count"]
+                existing["caption_to_table_width_x100"] = descriptor["caption_to_table_width_x100"]
             if isinstance(profile, str) and re.fullmatch(r"[a-z][a-z0-9-]{0,31}", profile):
                 existing["profiles"].append(profile)
         overflow_descriptor = _safe_root_overflow_target(result)
@@ -910,12 +988,18 @@ def compile_html_feedback(
         target = overflow_targets[key]
         target["profiles"] = sorted(set(target["profiles"]))
         normalized_overflow_targets.append(target)
+    normalized_caption_targets = []
+    for key in sorted(caption_targets):
+        target = caption_targets[key]
+        target["profiles"] = sorted(set(target["profiles"]))
+        normalized_caption_targets.append(target)
     return _bounded_payload(
         "html",
         identifiers,
         contract_steps=contract_steps,
         axe_targets=normalized_targets,
         cjk_heading_targets=normalized_cjk_targets,
+        cjk_table_caption_targets=normalized_caption_targets,
         root_overflow_targets=normalized_overflow_targets,
         source_truncated=axe_source_truncated or cjk_source_truncated,
     )
@@ -948,6 +1032,15 @@ def build_repair_prompt(
             "span with a responsive no-overflow fallback. Keep adjacent terminal punctuation with that unit. "
             "Never disable wrapping for the whole heading or use global `keep-all` or per-character spans. "
             "Verify the same copy across every declared profile.\n"
+        )
+    caption_repair = ""
+    if "cjk-table-caption-fragment" in feedback.get("finding_ids", ()):
+        caption_repair = (
+            "For `cjk-table-caption-fragment`, preserve the table caption and its semantic relationship to the "
+            "same table. Restore the caption to a readable local measure in the mobile composition; do not "
+            "globally clip overflow, hide or delete the caption, or shrink text to clear the finding. A row/card "
+            "mobile transformation may retain a visually readable caption beside the same data. Verify every "
+            "declared mobile and narrow profile.\n"
         )
     overflow_repair = ""
     if "root-horizontal-overflow" in feedback.get("finding_ids", ()):
@@ -992,6 +1085,7 @@ def build_repair_prompt(
         "across every rendered state. If an exact stable name is required, keep the visible label stable and "
         "expose changing details in adjacent text. Do not remove unrelated labels.\n"
         f"{heading_repair}"
+        f"{caption_repair}"
         f"{overflow_repair}"
         f"{viewport_repair}"
         f"{skill_reference_context}"

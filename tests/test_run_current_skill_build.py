@@ -1617,6 +1617,45 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         self.assertIn('"split_ranges":[{"end":2,"start":0}]', prompt)
         self.assertNotIn("PRIVATE-CANDIDATE-DOM", prompt)
 
+    def test_cjk_table_caption_feedback_preserves_bounded_structure(self) -> None:
+        path = [["html", 1], ["body", 1], ["main", 1], ["table", 1], ["caption", 1]]
+        target = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
+        target_set = hashlib.sha256(json.dumps([target], separators=(",", ":")).encode()).hexdigest()
+
+        def result(profile: str) -> dict[str, Any]:
+            return {
+                "page": "index.html", "profile": profile, "status": "rejected",
+                "navigation": "passed", "visible_main": True, "visible_text": True,
+                "visible_primary_content": True, "root_horizontal_overflow": False,
+                "counters": {},
+                "inspection": {
+                    "axe_rule_ids": [],
+                    "layout_hazards": {"cjk_table_caption_fragment_count": 1},
+                    "cjk_table_caption_fragment_target_count": 1,
+                    "cjk_table_caption_fragment_target_set_sha256": target_set,
+                    "cjk_table_caption_fragment_targets_truncated": False,
+                    "cjk_table_caption_fragment_target_descriptors": [{
+                        "target_sha256": target, "path": path, "line_count": 15,
+                        "split_han_word_count": 5, "caption_to_table_width_x100": 16,
+                    }],
+                    "raw_diagnostics": "PRIVATE-CANDIDATE-DOM",
+                },
+            }
+
+        feedback = policy.compile_html_feedback({"status": "rejected", "results": [
+            result("mobile"), result("narrow"),
+        ]})
+        self.assertEqual(2, feedback["counts"]["cjk-table-caption-fragment"])
+        self.assertEqual(1, len(feedback["cjk_table_caption_targets"]))
+        target_payload = feedback["cjk_table_caption_targets"][0]
+        self.assertEqual(["mobile", "narrow"], target_payload["profiles"])
+        self.assertEqual(15, target_payload["line_count"])
+        self.assertEqual(16, target_payload["caption_to_table_width_x100"])
+        prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
+        self.assertIn("cjk-table-caption-fragment", prompt)
+        self.assertIn('"caption_to_table_width_x100":16', prompt)
+        self.assertNotIn("PRIVATE-CANDIDATE-DOM", prompt)
+
     def test_cjk_target_identity_prevents_false_repeated_failure(self) -> None:
         def receipt(path: list[list[Any]]) -> dict[str, Any]:
             target = hashlib.sha256(json.dumps(path, separators=(",", ":")).encode()).hexdigest()
@@ -1750,12 +1789,17 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             "cjk_heading_split_target_set_sha256": hashlib.sha256(b"[]").hexdigest(),
             "cjk_heading_split_targets_truncated": False,
             "cjk_heading_split_target_descriptors": [],
+            "cjk_table_caption_fragment_target_count": 0,
+            "cjk_table_caption_fragment_target_set_sha256": hashlib.sha256(b"[]").hexdigest(),
+            "cjk_table_caption_fragment_targets_truncated": False,
+            "cjk_table_caption_fragment_target_descriptors": [],
             "root_overflow_target": None,
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,
                 "cjk_heading_explicit_narrow_count": 0,
                 "cjk_heading_split_word_count": 0,
+                "cjk_table_caption_fragment_count": 0,
             },
             "typography_advisories": {
                 "heading_scan_count": 1,
@@ -1802,12 +1846,17 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 "split_ranges": [{"start": 0, "end": 2}],
                 "split_ranges_truncated": False,
             }],
+            "cjk_table_caption_fragment_target_count": 0,
+            "cjk_table_caption_fragment_target_set_sha256": hashlib.sha256(b"[]").hexdigest(),
+            "cjk_table_caption_fragment_targets_truncated": False,
+            "cjk_table_caption_fragment_target_descriptors": [],
             "root_overflow_target": None,
             "layout_hazards": {
                 "hidden_attribute_visible_count": 0,
                 "fixed_content_obstruction_count": 0,
                 "cjk_heading_explicit_narrow_count": 0,
                 "cjk_heading_split_word_count": 1,
+                "cjk_table_caption_fragment_count": 0,
             },
             "typography_advisories": {
                 "heading_scan_count": 1,

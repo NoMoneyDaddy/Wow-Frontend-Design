@@ -692,7 +692,7 @@ async function main() {
       }
       const axeTargets = await summarizeAxeTargets(page, analysis.violations);
       const headingExplicitNarrowRisk = sourceLayoutRisks.heading_explicit_narrow_pages.includes(relativePage);
-      const layoutHazards = await page.evaluate(({ inspectCjkHeadingWidth }) => {
+      const layoutHazards = await page.evaluate(({ inspectCjkHeadingWidth, inspectTableCaptionFragments }) => {
         const visible = (element) => {
           let current = element;
           while (current instanceof Element) {
@@ -744,6 +744,8 @@ async function main() {
         let cjkHeadingSplitTargetCount = 0;
         const cjkHeadingSplitTargetCandidates = [];
         let cjkHeadingExplicitNarrowCount = 0;
+        let cjkTableCaptionFragmentCount = 0;
+        const cjkTableCaptionFragmentCandidates = [];
         let headingScanCount = 0;
         let headingScanTruncated = false;
         let rootOverflowTargetCandidate = null;
@@ -785,6 +787,29 @@ async function main() {
             && profile.lastLineHanGraphemes === 1
             && profile.lastLineGraphemes === 1 + profile.lastLinePunctuationGraphemes) {
             singleHanLastLineHeadingCount += 1;
+          }
+        }
+        if (inspectTableCaptionFragments) {
+          const captions = Array.from(document.querySelectorAll("table > caption"));
+          for (let index = 0; index < captions.length && index < 16; index += 1) {
+            const caption = captions[index];
+            if (!visible(caption) || caption.closest("[aria-hidden='true']")) continue;
+            const table = caption.closest("table");
+            const profile = trusted?.renderedLineProfile(caption);
+            const captionBox = trusted?.rect(caption);
+            const tableBox = table ? trusted?.rect(table) : null;
+            if (!profile || !captionBox || !tableBox || profile.hanGraphemes < 6
+              || !(tableBox.width > 0) || captionBox.width / tableBox.width > 0.4
+              || (profile.lineCount < 4 && profile.splitHanWordCount === 0)) continue;
+            const path = trusted?.structuralPath(caption);
+            if (!path) continue;
+            cjkTableCaptionFragmentCount += 1;
+            cjkTableCaptionFragmentCandidates.push({
+              path,
+              line_count: profile.lineCount,
+              split_han_word_count: profile.splitHanWordCount,
+              caption_to_table_width_x100: Math.max(0, Math.min(100, Math.floor(captionBox.width / tableBox.width * 100))),
+            });
           }
         }
         const main = document.querySelector("main");
@@ -929,6 +954,8 @@ async function main() {
           cjk_heading_split_word_count: cjkHeadingSplitWordCount,
           cjk_heading_split_target_count: cjkHeadingSplitTargetCount,
           cjk_heading_split_target_candidates: cjkHeadingSplitTargetCandidates,
+          cjk_table_caption_fragment_count: cjkTableCaptionFragmentCount,
+          cjk_table_caption_fragment_candidates: cjkTableCaptionFragmentCandidates,
           root_overflow_target_candidate: rootOverflowTargetCandidate,
           heading_scan_count: headingScanCount,
           heading_scan_truncated: headingScanTruncated,
@@ -936,6 +963,7 @@ async function main() {
         };
       }, {
         inspectCjkHeadingWidth: headingExplicitNarrowRisk,
+        inspectTableCaptionFragments: profile.name === "mobile" || profile.name === "narrow",
       });
       const cjkTargetDescriptors = layoutHazards.cjk_heading_split_target_candidates
         .map(({ heading_index: headingIndex, path, split_ranges: splitRanges }) => {
@@ -953,6 +981,17 @@ async function main() {
         })
         .sort((left, right) => left.target_sha256.localeCompare(right.target_sha256));
       const cjkTargetIdentities = cjkTargetDescriptors.map(({ target_sha256: targetSha256 }) => targetSha256);
+      const tableCaptionDescriptors = layoutHazards.cjk_table_caption_fragment_candidates
+        .map(({ path, line_count: lineCount, split_han_word_count: splitHanWordCount,
+          caption_to_table_width_x100: captionToTableWidthX100 }) => ({
+          path,
+          line_count: lineCount,
+          split_han_word_count: splitHanWordCount,
+          caption_to_table_width_x100: captionToTableWidthX100,
+          target_sha256: sha256(JSON.stringify(path)),
+        }))
+        .sort((left, right) => left.target_sha256.localeCompare(right.target_sha256));
+      const tableCaptionIdentities = tableCaptionDescriptors.map(({ target_sha256: targetSha256 }) => targetSha256);
       const rootOverflowTarget = layoutHazards.root_overflow_target_candidate
         ? {
           ...layoutHazards.root_overflow_target_candidate,
@@ -968,12 +1007,18 @@ async function main() {
         cjk_heading_split_targets_truncated:
           cjkTargetDescriptors.length !== layoutHazards.cjk_heading_split_target_count,
         cjk_heading_split_target_descriptors: cjkTargetDescriptors,
+        cjk_table_caption_fragment_target_count: layoutHazards.cjk_table_caption_fragment_count,
+        cjk_table_caption_fragment_target_set_sha256: sha256(JSON.stringify(tableCaptionIdentities)),
+        cjk_table_caption_fragment_targets_truncated:
+          tableCaptionDescriptors.length !== layoutHazards.cjk_table_caption_fragment_count,
+        cjk_table_caption_fragment_target_descriptors: tableCaptionDescriptors,
         root_overflow_target: rootOverflowTarget,
         layout_hazards: {
           hidden_attribute_visible_count: layoutHazards.hidden_attribute_visible_count,
           fixed_content_obstruction_count: layoutHazards.fixed_content_obstruction_count,
           cjk_heading_explicit_narrow_count: layoutHazards.cjk_heading_explicit_narrow_count,
           cjk_heading_split_word_count: layoutHazards.cjk_heading_split_word_count,
+          cjk_table_caption_fragment_count: layoutHazards.cjk_table_caption_fragment_count,
         },
         typography_advisories: {
           heading_scan_count: layoutHazards.heading_scan_count,
@@ -997,6 +1042,7 @@ async function main() {
       && result.inspection.layout_hazards.fixed_content_obstruction_count === 0
       && result.inspection.layout_hazards.cjk_heading_explicit_narrow_count === 0
       && result.inspection.layout_hazards.cjk_heading_split_word_count === 0
+      && result.inspection.layout_hazards.cjk_table_caption_fragment_count === 0
       && (!("browser_contract" in result.inspection) || result.inspection.browser_contract.status === "passed");
     result.status = passed ? "passed" : "rejected";
   }
