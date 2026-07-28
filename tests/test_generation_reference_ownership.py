@@ -62,6 +62,13 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         )
         self.assertIn("hooks locate surfaces, not form values", self.skill)
 
+    def test_failure_states_require_a_reachable_recovery_action(self) -> None:
+        self.assertIn(
+            "visible enabled recovery/retry control that changes outcome",
+            self.skill,
+        )
+        self.assertIn("a covering browser contract asserts it", self.skill)
+
     def test_action_hooks_identify_their_own_live_control(self) -> None:
         self.assertIn(
             "action hook must identify the one live control that performs that action",

@@ -56,7 +56,7 @@ For a patch, freeze allowed files and behavior. Preserve every path outside that
 
 Use `DIRECT` when the outcome, mutation boundary, public contracts, and route inventory are known or safely inferable. Use `PLANNED` only when unresolved information architecture, authority, permissions, route ownership, or a public-contract decision prevents safe implementation; create only the artifact that resolves that blocker, then return to `DIRECT`.
 
-Follow the requested collaboration mode. `AUTOMATIC` continues safely; `CHECKPOINT-GUIDED` pauses only for a material direction or contract decision; `USER-DIRECTED` follows supplied choices. Never ask for a decision already present.
+Respect requested mode: `AUTOMATIC` continues; `CHECKPOINT-GUIDED` pauses only for material direction/contract decisions; `USER-DIRECTED` follows supplied choices. Do not repeat a supplied decision.
 
 ## Generation-first workflow
 
@@ -123,17 +123,18 @@ Then use `Overview`, `Colors`, `Typography`, `Layout`, `Elevation & Depth`, `Sha
 
 ### 5. Vertical slice
 
-Implement one runnable route or task before expanding architecture. Use real or labelled content. Together prove:
+Implement one runnable route/task before expanding architecture, with real or labelled content. Prove:
 
-- the task representation and primary content/action order;
-- the product-derived direction and system;
-- the supported viewports, including a real mobile transformation when viewport UI is in scope;
-- default plus at least one consequential pending, error, recovery, or success state when applicable;
+- task representation and primary content/action order;
+- product-derived direction/system;
+- supported viewports, including a real mobile transformation when viewport UI is in scope;
+- default plus one consequential pending, error, recovery, or success state when applicable;
+- after failure, leave a visible enabled recovery/retry control that changes outcome; a covering browser contract asserts it;
 - one coherent native role/state/keyboard model per control, keyboard and focus behavior, valid composite-ARIA ownership, a live enabled focus target after re-render, long-content resilience, and a useful static or reduced-motion result;
-- framework, route, API, state, analytics, and business-contract preservation.
-- Give CJK headings their full track. Never cap them in Latin `ch` or arbitrary fractions; preserve semantic wraps and avoid one-Han tails. Functional peers may use separate tracks.
+- preserve framework, route, API, state, analytics, and business contracts.
+- Give CJK headings their full track. Never cap them in Latin `ch` or arbitrary fractions; preserve semantic wraps and avoid one-Han tails.
 
-Expand primitives, routes, effects, or optimization only after the slice works. Prefer semantic HTML, modern CSS, and minimal JavaScript. Do not rewrite a framework for a CSS problem.
+Expand primitives, routes, effects, or optimization only after the slice works. Prefer semantic HTML, modern CSS, minimal JavaScript. Do not rewrite frameworks for CSS.
 
 ### 6. Pressure, repair, and replay
 
