@@ -476,6 +476,46 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 self.assertEqual(1, completed.returncode)
                 self.assertFalse(evidence.exists())
 
+    def test_opt_in_v4_captures_declared_same_origin_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(
+                root,
+                html=(
+                    '<!doctype html><html><body><main><h1>Index</h1>'
+                    '<a id="open" href="detail.html">Open</a></main></body></html>'
+                ),
+            )
+            detail = target / "detail.html"
+            detail.write_text(
+                '<!doctype html><html><body><main><h1>Detail</h1><section id="details">Details</section></main></body></html>',
+                encoding="utf-8",
+            )
+            manifest_path = target / "run-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            detail_raw = detail.read_bytes()
+            manifest["outputs"].append({
+                "path": "detail.html", "bytes": len(detail_raw), "mode": "0644", "sha256": digest(detail),
+            })
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            contract = self.consequential_contract(root, target, case)
+            case["schema_version"] = 4
+            case["capture_plan"].pop("consequential_state")
+            case["capture_plan"]["consequential_navigation"] = {
+                "contract_case_id": "open-details", "destination_page": "detail.html",
+            }
+            case_path.write_text(json.dumps(case), encoding="utf-8")
+            evidence = root / "evidence"
+            completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            receipt = json.loads((evidence / "capture-receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual("detail.html", receipt["state_evidence"]["page"])
+            self.assertTrue(any(
+                item["context"]["route"] == "/detail.html"
+                and item["context"]["state"] == "contract:open-details"
+                for item in receipt["captures"]
+            ))
+
     def test_explicit_page_set_excludes_other_manifest_html(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

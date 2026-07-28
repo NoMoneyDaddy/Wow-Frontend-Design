@@ -193,9 +193,9 @@ function selectedCapturePages(selection, htmlPages, manifest, hasConvergence) {
 
 function validateCase(data) {
   const caseKeys = ["schema_version", "case_id", "run_id", "partition", "brief", "capture_plan", "craft"];
-  if ([2, 3].includes(data?.schema_version)) caseKeys.push("browser_contract");
+  if ([2, 3, 4].includes(data?.schema_version)) caseKeys.push("browser_contract");
   exactKeys(data, caseKeys, "case");
-  if (![1, 2, 3].includes(data.schema_version)
+  if (![1, 2, 3, 4].includes(data.schema_version)
     || typeof data.case_id !== "string" || !ID.test(data.run_id)) {
     throw new Error("case identity is invalid");
   }
@@ -209,6 +209,7 @@ function validateCase(data) {
   const planKeys = ["locale", "state", "pages", "wait_condition", "profiles"];
   if (data.schema_version === 2) planKeys.push("consequential_state");
   if (data.schema_version === 3) planKeys.push("motion_sequence");
+  if (data.schema_version === 4) planKeys.push("consequential_navigation");
   const plan = exactKeys(data.capture_plan, planKeys, "case.capture_plan");
   if (!new Set(["zh-Hant", "en"]).has(plan.locale) || plan.state !== "default"
     || plan.wait_condition !== "load+fonts+two-raf+300ms+two-raf") {
@@ -234,6 +235,19 @@ function validateCase(data) {
     if (!DRAFT_ID.test(state.contract_case_id)
       || plan.pages !== "all_html_outputs") {
       throw new Error("case consequential state is invalid");
+    }
+    validateBrowserContractRecord(data.browser_contract, "case.browser_contract");
+  } else if (data.schema_version === 4) {
+    const navigation = exactKeys(
+      plan.consequential_navigation,
+      ["contract_case_id", "destination_page"],
+      "case.capture_plan.consequential_navigation",
+    );
+    safeRelative(navigation.destination_page, "case.capture_plan.consequential_navigation.destination_page");
+    if (!navigation.destination_page.toLowerCase().endsWith(".html")
+      || !DRAFT_ID.test(navigation.contract_case_id)
+      || plan.pages !== "all_html_outputs") {
+      throw new Error("case consequential navigation is invalid");
     }
     validateBrowserContractRecord(data.browser_contract, "case.browser_contract");
   } else if (data.schema_version === 3) {
@@ -431,7 +445,7 @@ async function main() {
   let browserContractRecord = null;
   let browserContractBytes = null;
   let browserContractFile = null;
-  if ([2, 3].includes(caseData.schema_version)) {
+  if ([2, 3, 4].includes(caseData.schema_version)) {
     if (!browserContractArg || convergenceArg) {
       throw new Error("contract-bound capture requires one browser contract");
     }
@@ -467,16 +481,24 @@ async function main() {
       throw new Error("browser contract provenance disagrees across case and manifest");
     }
     browserContract = validateBrowserContract(contractValue, before.pages);
-    if (caseData.schema_version === 2) {
+    if ([2, 4].includes(caseData.schema_version)) {
+      const selectedCaseId = caseData.schema_version === 4
+        ? caseData.capture_plan.consequential_navigation.contract_case_id
+        : caseData.capture_plan.consequential_state.contract_case_id;
       selectedContractCase = browserContract.cases.find(
-        (item) => item.id === caseData.capture_plan.consequential_state.contract_case_id,
+        (item) => item.id === selectedCaseId,
       );
       selectedContractResultAssertionCount = selectedContractCase
         ? selectedContractCase.steps.filter((step, index) => step.action === "assert"
           && selectedContractCase.steps.slice(0, index).some((previous) => previous.action !== "assert")).length
         : 0;
+      const destinationPage = caseData.schema_version === 4
+        ? caseData.capture_plan.consequential_navigation.destination_page
+        : null;
       if (!selectedContractCase
         || !["desktop", "mobile"].includes(selectedContractCase.profile)
+        || (destinationPage && (!before.pages.includes(destinationPage)
+          || destinationPage === selectedContractCase.page))
         || selectedContractResultAssertionCount < 1) {
         throw new Error("consequential state browser contract case is invalid");
       }
@@ -522,7 +544,7 @@ async function main() {
       }
     }
   } else if (browserContractArg) {
-    throw new Error("browser contract capture requires a schema v2 or v3 case");
+    throw new Error("browser contract capture requires a schema v2, v3, or v4 case");
   }
   if (JSON.stringify(caseData.brief) !== JSON.stringify(manifest.brief)) {
     throw new Error("case brief does not match the current build");
@@ -625,13 +647,23 @@ async function main() {
           const initial = new URL(page.url());
           const contractResult = await runBrowserContract(page, selectedContractCase);
           const final = new URL(page.url());
+          const destinationPage = caseData.schema_version === 4
+            ? caseData.capture_plan.consequential_navigation.destination_page
+            : null;
+          const destinationPath = destinationPage
+            ? `/${destinationPage.split("/").map(encodeURIComponent).join("/")}`
+            : null;
           if (contractResult.status !== "passed"
-            || final.href !== initial.href) {
+            || (destinationPage
+              ? final.origin !== initial.origin || final.pathname !== destinationPath
+                || final.search !== "" || final.hash !== "" || final.username !== "" || final.password !== ""
+              : final.href !== initial.href)) {
             throw new Error("consequential state contract replay failed or navigated");
           }
+          const captureMeta = destinationPage ? { ...meta, relativePage: destinationPage } : meta;
           const relative = await captureScreenshot(
             page,
-            meta,
+            captureMeta,
             `contract:${selectedContractCase.id}`,
           );
           return { capture: relative, browser_contract: contractResult };
@@ -651,7 +683,9 @@ async function main() {
       }
       stateEvidence = {
         contract_case_id: selectedContractCase.id,
-        page: selectedContractCase.page,
+        page: caseData.schema_version === 4
+          ? caseData.capture_plan.consequential_navigation.destination_page
+          : selectedContractCase.page,
         profile: mappedProfile.name,
         steps_executed: stateResult.inspection.browser_contract.steps_executed,
         result_assertion_count: selectedContractResultAssertionCount,
