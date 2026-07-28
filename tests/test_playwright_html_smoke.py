@@ -194,6 +194,11 @@ h1 span { display: block; }
                 "finding_id": "contract-mobile-primary-task-primary-in-first-viewport",
                 "reason": "assertion-not-satisfied",
             }], mobile["inspection"]["browser_contract"]["failures"])
+            diagnostic = mobile["inspection"]["browser_contract"]["viewport_diagnostics"]
+            self.assertEqual("contract-mobile-primary-task-primary-in-first-viewport", diagnostic[0]["finding_id"])
+            self.assertEqual("outside-viewport", diagnostic[0]["visibility"])
+            self.assertGreater(diagnostic[0]["overflow_bottom_px"], 0)
+            self.assertEqual(0, diagnostic[0]["overflow_left_px"])
 
     def test_browser_contract_can_target_one_named_button_among_multiple_buttons(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -328,6 +333,10 @@ Object.defineProperty(HTMLElement.prototype, 'innerText', { configurable: true, 
                 "finding_id": "contract-mobile-action-button",
                 "reason": "locator-ambiguous",
             }], mobile["inspection"]["browser_contract"]["failures"])
+            self.assertEqual(
+                [],
+                mobile["inspection"]["browser_contract"]["viewport_diagnostics"],
+            )
 
             count_contract = {
                 "schema_version": 2,
@@ -409,6 +418,14 @@ Object.defineProperty(HTMLElement.prototype, 'innerText', { configurable: true, 
                 ["contract-mobile-primary-task-primary-fully-visible"],
                 mobile["inspection"]["browser_contract"]["finding_ids"],
             )
+            self.assertEqual([{
+                "finding_id": "contract-mobile-primary-task-primary-fully-visible",
+                "visibility": "ancestor-clipped",
+                "overflow_left_px": 0,
+                "overflow_top_px": 0,
+                "overflow_right_px": 0,
+                "overflow_bottom_px": 0,
+            }], mobile["inspection"]["browser_contract"]["viewport_diagnostics"])
 
     def test_browser_contract_rejects_subpixel_ancestor_clipping(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

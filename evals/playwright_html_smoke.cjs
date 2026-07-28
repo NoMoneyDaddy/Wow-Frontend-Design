@@ -567,9 +567,40 @@ async function runBrowserContractPrefixToFirstAction(page, contractCase) {
   };
 }
 
+async function failedViewportDiagnostic(locator, step, findingId) {
+  if (step.action !== "assert" || step.expect !== "fully-visible-in-viewport") return null;
+  return locator.evaluate(async (element, identifier) => {
+    const box = element.getBoundingClientRect();
+    let current = element;
+    while (current instanceof Element) {
+      const style = getComputedStyle(current);
+      if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse"
+        || Number(style.opacity) === 0 || !(box.width > 0 && box.height > 0)) {
+        return { finding_id: identifier, visibility: "not-rendered", overflow_left_px: 0, overflow_top_px: 0, overflow_right_px: 0, overflow_bottom_px: 0 };
+      }
+      current = current.parentElement;
+    }
+    const diagnostic = {
+      finding_id: identifier,
+      visibility: "outside-viewport",
+      overflow_left_px: Math.max(0, Math.ceil(-box.left)),
+      overflow_top_px: Math.max(0, Math.ceil(-box.top)),
+      overflow_right_px: Math.max(0, Math.ceil(box.right - innerWidth)),
+      overflow_bottom_px: Math.max(0, Math.ceil(box.bottom - innerHeight)),
+    };
+    if (diagnostic.overflow_left_px || diagnostic.overflow_top_px || diagnostic.overflow_right_px || diagnostic.overflow_bottom_px) return diagnostic;
+    const ratio = await new Promise((resolve) => {
+      const observer = new IntersectionObserver(([entry]) => { observer.disconnect(); resolve(entry?.intersectionRatio || 0); }, { threshold: [1] });
+      observer.observe(element);
+    });
+    return ratio === 1 ? null : { finding_id: identifier, visibility: "ancestor-clipped", overflow_left_px: 0, overflow_top_px: 0, overflow_right_px: 0, overflow_bottom_px: 0 };
+  }, findingId);
+}
+
 async function runBrowserContract(page, contractCase) {
   const findingIds = [];
   const failures = [];
+  const viewportDiagnostics = [];
   let stepsExecuted = 0;
   let actionObserved = false;
   for (const step of contractCase.steps) {
@@ -593,6 +624,10 @@ async function runBrowserContract(page, contractCase) {
             ? "locator-ambiguous"
             : step.action === "assert" ? "assertion-not-satisfied" : "action-failed";
       failures.push({ finding_id: finding, reason });
+      if (matches === 1) {
+        const diagnostic = await failedViewportDiagnostic(locator, step, finding);
+        if (diagnostic) viewportDiagnostics.push(diagnostic);
+      }
       if (actionObserved || step.action !== "assert") break;
       continue;
     }
@@ -608,6 +643,7 @@ async function runBrowserContract(page, contractCase) {
     status: findingIds.length === 0 ? "passed" : "rejected",
     finding_ids: findingIds,
     failures,
+    viewport_diagnostics: viewportDiagnostics,
     steps_executed: stepsExecuted,
   };
 }

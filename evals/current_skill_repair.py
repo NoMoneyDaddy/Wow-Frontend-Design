@@ -776,10 +776,12 @@ def compile_html_feedback(
             contract_status = observed_contract.get("status")
             contract_ids = observed_contract.get("finding_ids")
             contract_failures = observed_contract.get("failures")
+            viewport_diagnostics = observed_contract.get("viewport_diagnostics", [])
             if (
                 contract_status not in {"passed", "rejected"}
                 or not isinstance(contract_ids, list)
                 or not isinstance(contract_failures, list)
+                or not isinstance(viewport_diagnostics, list)
                 or len(contract_ids) > 24
                 or (contract_status == "passed" and (contract_ids or contract_failures))
                 or (contract_status == "rejected" and len(contract_failures) != len(contract_ids))
@@ -799,6 +801,21 @@ def compile_html_feedback(
                 failure_reasons[failure["finding_id"]] = failure["reason"]
             if len(failure_reasons) != len(contract_ids):
                 raise ValueError("HTML browser contract findings are malformed")
+            diagnostics: dict[str, dict[str, Any]] = {}
+            for diagnostic in viewport_diagnostics:
+                offsets = ("overflow_left_px", "overflow_top_px", "overflow_right_px", "overflow_bottom_px")
+                if (
+                    not isinstance(diagnostic, dict)
+                    or set(diagnostic) != {"finding_id", "visibility", *offsets}
+                    or diagnostic.get("finding_id") not in contract_ids
+                    or diagnostic.get("visibility") not in {"outside-viewport", "ancestor-clipped", "not-rendered"}
+                    or diagnostic.get("finding_id") in diagnostics
+                    or any(type(diagnostic.get(key)) is not int or not 0 <= diagnostic[key] <= 100000 for key in offsets)
+                    or (diagnostic.get("visibility") != "outside-viewport" and any(diagnostic[key] for key in offsets))
+                    or (diagnostic.get("visibility") == "outside-viewport" and not any(diagnostic[key] for key in offsets))
+                ):
+                    raise ValueError("HTML browser contract findings are malformed")
+                diagnostics[diagnostic["finding_id"]] = diagnostic
             for identifier in contract_ids:
                 if not isinstance(identifier, str) or re.fullmatch(r"contract-[a-z][a-z0-9-]{2,103}", identifier) is None:
                     raise ValueError("HTML browser contract findings are malformed")
@@ -870,6 +887,11 @@ def compile_html_feedback(
                     ):
                         raise ValueError("HTML browser contract repair context is malformed")
                     descriptor["reason"] = reason
+                    diagnostic = diagnostics.get(expected_id)
+                    if diagnostic is not None:
+                        if failed_step.get("action") != "assert" or failed_step.get("expect") != "fully-visible-in-viewport":
+                            raise ValueError("HTML browser contract repair context is malformed")
+                        descriptor["viewport_diagnostic"] = diagnostic
                     contract_steps.append(descriptor)
     if not identifiers:
         identifiers = ["unclassified-1"]
@@ -938,6 +960,13 @@ def build_repair_prompt(
             "reported left and right overflow pixels only to compare severity across declared profiles, "
             "then verify the fresh rendered result at every profile.\n"
         )
+    viewport_repair = ""
+    if any(isinstance(step, dict) and "viewport_diagnostic" in step for step in feedback.get("contract_steps", ())):
+        viewport_repair = (
+            "For each `viewport_diagnostic`, fix that exact initial-viewport cause: recompose an outside target "
+            "into the first screen, remove ancestor clipping, or restore a rendered control. Preserve required "
+            "content and do not solve it with autoscroll, global clipping, or fixed UI that obstructs the target.\n"
+        )
     return (
         "Repair the existing controlled frontend build in place. Activate and follow $wow-frontend-design "
         "from the isolated skill snapshot. Preserve the product intent and apply the smallest complete fix "
@@ -964,6 +993,7 @@ def build_repair_prompt(
         "expose changing details in adjacent text. Do not remove unrelated labels.\n"
         f"{heading_repair}"
         f"{overflow_repair}"
+        f"{viewport_repair}"
         f"{skill_reference_context}"
         f"--- UNTRUSTED CURRENT OUTPUT JSON: BEGIN ---\n{context}\n"
         "--- UNTRUSTED CURRENT OUTPUT JSON: END ---\n"

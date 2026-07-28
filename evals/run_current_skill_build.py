@@ -1489,11 +1489,12 @@ def _run_html_smoke(
                     raise RunnerError("HTML Playwright smoke gate infrastructure failure")
                 continue
             if not isinstance(observed_case, dict) or set(observed_case) != {
-                "case_id", "failures", "finding_ids", "status", "steps_executed"
+                "case_id", "failures", "finding_ids", "status", "steps_executed", "viewport_diagnostics",
             }:
                 raise RunnerError("HTML Playwright smoke gate infrastructure failure")
             finding_ids = observed_case.get("finding_ids")
             failures = observed_case.get("failures")
+            viewport_diagnostics = observed_case.get("viewport_diagnostics")
             steps_executed = observed_case.get("steps_executed")
             contract_steps = expected_case["steps"]
             status = observed_case.get("status")
@@ -1542,6 +1543,7 @@ def _run_html_smoke(
                 or status not in {"passed", "rejected"}
                 or not isinstance(finding_ids, list)
                 or not isinstance(failures, list)
+                or not isinstance(viewport_diagnostics, list)
                 or type(steps_executed) is not int
                 or not 1 <= steps_executed <= len(contract_steps)
                 or (status == "passed" and (finding_ids or steps_executed != len(contract_steps)))
@@ -1560,6 +1562,22 @@ def _run_html_smoke(
                 or (status == "rejected" and result.get("status") != "rejected")
             ):
                 raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+            diagnostic_ids: set[str] = set()
+            for diagnostic in viewport_diagnostics:
+                offsets = ("overflow_left_px", "overflow_top_px", "overflow_right_px", "overflow_bottom_px")
+                if (
+                    not isinstance(diagnostic, dict)
+                    or set(diagnostic) != {"finding_id", "visibility", *offsets}
+                    or diagnostic.get("finding_id") not in finding_ids
+                    or expected_step_semantics.get(diagnostic.get("finding_id")) != ("assert", "fully-visible-in-viewport")
+                    or diagnostic.get("visibility") not in {"outside-viewport", "ancestor-clipped", "not-rendered"}
+                    or diagnostic.get("finding_id") in diagnostic_ids
+                    or any(type(diagnostic.get(key)) is not int or not 0 <= diagnostic[key] <= 100000 for key in offsets)
+                    or (diagnostic.get("visibility") != "outside-viewport" and any(diagnostic[key] for key in offsets))
+                    or (diagnostic.get("visibility") == "outside-viewport" and not any(diagnostic[key] for key in offsets))
+                ):
+                    raise RunnerError("HTML Playwright smoke gate infrastructure failure")
+                diagnostic_ids.add(diagnostic["finding_id"])
     tool.update(
         {
             "lockfile_sha256": _digest(lockfile),

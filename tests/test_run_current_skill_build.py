@@ -984,6 +984,30 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         receipt["results"][0]["inspection"]["browser_contract"]["failures"][0]["reason"] = "action-failed"
         with self.assertRaisesRegex(ValueError, "repair context is malformed"):
             policy.compile_html_feedback(receipt, contract)
+
+    def test_html_feedback_routes_closed_viewport_diagnostic_only_to_matching_assertion(self) -> None:
+        contract = {"schema_version": 1, "cases": [{
+            "id": "mobile-primary", "page": "index.html", "profile": "mobile", "steps": [{
+                "id": "primary-visible", "action": "assert", "selector": "#primary",
+                "expect": "fully-visible-in-viewport",
+            }],
+        }]}
+        finding_id = "contract-mobile-primary-primary-visible"
+        diagnostic = {
+            "finding_id": finding_id, "visibility": "outside-viewport",
+            "overflow_left_px": 0, "overflow_top_px": 0,
+            "overflow_right_px": 0, "overflow_bottom_px": 212,
+        }
+        receipt = {"results": [{"status": "rejected", "profile": "mobile", "inspection": {
+            "browser_contract": {
+                "case_id": "mobile-primary", "status": "rejected", "finding_ids": [finding_id],
+                "failures": [{"finding_id": finding_id, "reason": "assertion-not-satisfied"}],
+                "viewport_diagnostics": [diagnostic], "steps_executed": 1,
+            },
+        }}]}
+        feedback = policy.compile_html_feedback(receipt, contract)
+        self.assertEqual(diagnostic, feedback["contract_steps"][0]["viewport_diagnostic"])
+        self.assertIn("viewport_diagnostic", policy.build_repair_prompt(("index.html",), feedback))
         contract["cases"][0]["steps"][0].update({"expect": "count-equals", "count": 2})
         receipt["results"][0]["inspection"]["browser_contract"]["failures"][0]["reason"] = "locator-missing"
         with self.assertRaisesRegex(ValueError, "repair context is malformed"):
@@ -2258,6 +2282,34 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")
             ), self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
                 policy._run_html_smoke(root, ("DESIGN.md", "index.html"), 1, contract)
+
+    def test_browser_contract_case_requires_closed_viewport_diagnostics_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory).resolve()
+            (stage / "index.html").write_text(
+                "<!doctype html><html><head><title>Contract</title></head>"
+                "<body><main><h1>Task</h1></main></body></html>",
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "desktop-heading",
+                    "page": "index.html",
+                    "profile": "desktop",
+                    "steps": [{"id": "heading", "action": "assert", "selector": "h1", "expect": "visible"}],
+                }],
+            }
+            receipt = policy._run_html_smoke(stage, ("index.html",), 30, contract)
+            observed = next(
+                result for result in receipt["results"] if result["profile"] == "desktop"
+            )["inspection"]["browser_contract"]
+            observed.pop("viewport_diagnostics")
+            process = mock.Mock(returncode=0)
+            with mock.patch.object(policy.subprocess, "Popen", return_value=process), mock.patch.object(
+                policy, "_communicate_process_group", return_value=(json.dumps(receipt), "")
+            ), self.assertRaisesRegex(policy.RunnerError, "infrastructure failure"):
+                policy._run_html_smoke(stage, ("index.html",), 30, contract)
 
     def test_browser_contract_failure_reason_must_match_step_action(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
