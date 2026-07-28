@@ -46,6 +46,12 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn(phrase, self.components)
         self.assertIn("exactly one live control", self.components)
 
+    def test_persistent_actions_name_the_current_transition(self) -> None:
+        self.assertIn(
+            "every action control that remains available must name the actual next or return outcome",
+            self.components,
+        )
+
     def test_creative_direction_has_no_style_catalogue_or_numeric_taste_score(self) -> None:
         for stale_section in (
             "## 4. Define the visual grammar",

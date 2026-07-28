@@ -69,6 +69,7 @@ rest + hover + focus-visible + active + selected/current + disabled/read-only
 
 - Distinguish disabled, read-only, pending, permission-denied, and unavailable-with-explanation.
 - Keep visible label, accessible name, validation, count, price, status, and pressed/expanded/selected state synchronized.
+- After a state change, every action control that remains available must name the actual next or return outcome; never retain a source or destination label that described only the prior state.
 - Define content limits by graceful behavior. Test empty, one, many, long `zh-Hant`, mixed scripts, user content, and missing or unknown media.
 - Bind record-scoped title, metadata, controls, progress, evidence, and async results to one stable record key. Selection or navigation changes must not leave another region or delayed result bound to the prior record.
 - When repeated record controls share one visible verb, keep that verb in each accessible name and append the same record's stable, human-readable identity. The identity must remain visible in that active composition; never substitute array position, transient sort order, or hidden duplicate controls. Each required role/name action must resolve to exactly one live control.

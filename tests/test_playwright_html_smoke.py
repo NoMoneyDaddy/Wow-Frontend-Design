@@ -233,6 +233,32 @@ h1 span { display: block; }
             self.assertEqual([], mobile["inspection"]["browser_contract"]["failures"])
             self.assertNotIn("label-content-name-mismatch", mobile["inspection"]["axe_rule_ids"])
 
+    def test_browser_contract_proves_persistent_control_names_its_next_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            (stage / "index.html").write_text(
+                '''<!doctype html><html lang="en"><head><title>Chapter control</title></head><body>
+<main><h1 id="chapter">Tide</h1><button id="advance">Advance to Relay</button></main>
+<script>document.querySelector('#advance').onclick = () => { document.querySelector('#chapter').textContent = 'Relay'; document.querySelector('#advance').textContent = 'Advance to Horizon'; };</script>
+</body></html>''',
+                encoding="utf-8",
+            )
+            contract = {
+                "schema_version": 1,
+                "cases": [{
+                    "id": "mobile-chapter", "page": "index.html", "profile": "mobile",
+                    "steps": [
+                        {"id": "advance", "action": "click", "selector": "#advance"},
+                        {"id": "chapter-changed", "action": "assert", "selector": "#chapter", "expect": "text-includes", "value": "Relay"},
+                        {"id": "next-action-named", "action": "assert", "selector": "#advance", "expect": "text-includes", "value": "Advance to Horizon"},
+                    ],
+                }],
+            }
+            receipt = self.invoke(stage, ["index.html"], ["index.html"], contract)
+            mobile = next(item for item in receipt["results"] if item["profile"] == "mobile")
+            self.assertEqual("passed", mobile["status"], mobile)
+            self.assertEqual(3, mobile["inspection"]["browser_contract"]["steps_executed"])
+
     def test_browser_contract_targets_one_repeated_record_action_by_visible_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
