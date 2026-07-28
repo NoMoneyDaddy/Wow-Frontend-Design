@@ -261,7 +261,7 @@ class CurrentSkillBuildTests(unittest.TestCase):
                     "action": "assert",
                     "locator": {"kind": "role", "role": "button", "name": "確認時窗"},
                     "expect": "visible",
-                    "reason": "locator-missing",
+                    "reason": "locator-ambiguous",
                 }],
                 "signature": "0" * 64,
             },
@@ -272,6 +272,8 @@ class CurrentSkillBuildTests(unittest.TestCase):
         self.assertIn("keep each control's complete visible label inside its accessible name", prompt)
         self.assertIn("keep the visible label stable", prompt)
         self.assertIn("Do not remove unrelated labels", prompt)
+        self.assertIn("make its accessible name unique with that row's stable, visible identity", prompt)
+        self.assertIn("matches exactly one control", prompt)
 
     def test_repository_exposes_one_documented_current_build_entry(self) -> None:
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))

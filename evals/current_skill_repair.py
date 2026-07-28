@@ -1060,6 +1060,17 @@ def build_repair_prompt(
             "into the first screen, remove ancestor clipping, or restore a rendered control. Preserve required "
             "content and do not solve it with autoscroll, global clipping, or fixed UI that obstructs the target.\n"
         )
+    locator_uniqueness_repair = ""
+    if any(
+        isinstance(step, dict) and step.get("reason") == "locator-ambiguous"
+        for step in feedback.get("contract_steps", ())
+    ):
+        locator_uniqueness_repair = (
+            "For each `locator-ambiguous` role/name action, preserve the visible control label and make its "
+            "accessible name unique with that row's stable, visible identity. Do not remove peer controls, "
+            "append an unstable index, or change the evaluator-authored locator. Verify the named action "
+            "matches exactly one control in every declared profile.\n"
+        )
     return (
         "Repair the existing controlled frontend build in place. Activate and follow $wow-frontend-design "
         "from the isolated skill snapshot. Preserve the product intent and apply the smallest complete fix "
@@ -1088,6 +1099,7 @@ def build_repair_prompt(
         f"{caption_repair}"
         f"{overflow_repair}"
         f"{viewport_repair}"
+        f"{locator_uniqueness_repair}"
         f"{skill_reference_context}"
         f"--- UNTRUSTED CURRENT OUTPUT JSON: BEGIN ---\n{context}\n"
         "--- UNTRUSTED CURRENT OUTPUT JSON: END ---\n"
