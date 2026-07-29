@@ -1030,7 +1030,8 @@ def build_repair_prompt(
             "the existing semantic unit that crossed a line. Repair its owning inline space or type sizing "
             "first, including its container track, available measure, composition, or spacing. If a known "
             "compact semantic unit must still stay intact, wrap only that existing unit in one scoped inline "
-            "span with a responsive no-overflow fallback. Keep adjacent terminal punctuation with that unit. "
+            "span with a responsive no-overflow fallback: it must resume normal wrapping before it exceeds its parent. "
+            "Keep adjacent terminal punctuation with that unit. "
             "Never disable wrapping for the whole heading or use global `keep-all` or per-character spans. "
             "Verify the same copy across every declared profile.\n"
         )

@@ -1663,6 +1663,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
         self.assertIn('[["html",1],["body",1],["main",1],["h1",1]]', prompt)
         self.assertIn('"split_ranges":[{"end":2,"start":0}]', prompt)
+        self.assertIn("must resume normal wrapping before it exceeds its parent", prompt)
         self.assertNotIn("PRIVATE-CANDIDATE-DOM", prompt)
         explicit_narrow_prompt = policy.build_repair_prompt(
             ("index.html",),
