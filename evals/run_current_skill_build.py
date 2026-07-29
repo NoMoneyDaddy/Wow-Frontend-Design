@@ -118,6 +118,7 @@ BROWSER_ASSERTIONS_V2 = BROWSER_ASSERTIONS_V1 | {
 }
 CONTRACT_ID = re.compile(r"[a-z][a-z0-9-]{0,47}")
 DECISION_SUMMARY_ID = re.compile(r"[a-z][a-z0-9-]{0,95}")
+CAPTURE_LABEL = re.compile(r"(?:[0-9]{2}-)?[a-z][a-z0-9-]{0,95}")
 ATTRIBUTE_NAME = re.compile(r"[A-Za-z_:][A-Za-z0-9_.:-]{0,63}")
 RECEIPT_CATEGORIES = {
     "execution_passed": {"publication_pending"},
@@ -2021,7 +2022,7 @@ def _valid_decision_source(value: Any) -> bool:
         and re.fullmatch(r"[0-9a-f]{64}", value["skill_tree_sha256"]) is not None
         and isinstance(value.get("capture_labels"), list)
         and len(value["capture_labels"]) == 2
-        and all(isinstance(item, str) and DECISION_SUMMARY_ID.fullmatch(item) is not None for item in value["capture_labels"])
+        and all(isinstance(item, str) and CAPTURE_LABEL.fullmatch(item) is not None for item in value["capture_labels"])
         and len(set(value["capture_labels"])) == 2
         and value.get("draft_evidence_policy") == "style_calibration_only_not_release_evidence"
     )

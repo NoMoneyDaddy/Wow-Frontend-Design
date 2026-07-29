@@ -3718,7 +3718,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                     "changed_axes": ["composition", "typography"], "expected_benefit": "Clear priority.",
                     "risk": "Lower density.", "disqualifier": "Hidden action.",
                 },
-                "capture_labels": ["editorial-index-desktop-default", "editorial-index-mobile-default"],
+                "capture_labels": ["01-editorial-index-desktop-default", "02-editorial-index-mobile-default"],
             },
             "handoff": {
                 "production_lane": "BUILD", "next_step": "implement_selected_direction",
