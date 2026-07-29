@@ -1791,6 +1791,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
         self.assertEqual(198, target["overflow_right_px"])
         prompt = policy.build_repair_prompt(("DESIGN.md", "index.html"), feedback)
         self.assertIn('[["html",1],["body",1],["main",1],["div",1]]', prompt)
+        self.assertIn("minimums cannot exceed the post-padding available width", prompt)
         self.assertNotIn("PRIVATE-OVERFLOW-CONTENT", prompt)
 
         moved_path = [["html", 1], ["body", 1], ["main", 1], ["section", 1]]
