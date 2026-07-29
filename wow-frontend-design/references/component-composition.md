@@ -69,6 +69,7 @@ rest + hover + focus-visible + active + selected/current + disabled/read-only
 
 - Distinguish disabled, read-only, pending, permission-denied, and unavailable-with-explanation.
 - Keep visible label, accessible name, validation, count, price, status, and pressed/expanded/selected state synchronized.
+- A visible default selection must be the owning state; otherwise render a real empty/placeholder choice. Never show an already-selected native value beside a status or instruction that says the user must still choose it.
 - After a state change, every action control that remains available must name the actual next or return outcome; never retain a source or destination label that described only the prior state.
 - Define content limits by graceful behavior. Test empty, one, many, long `zh-Hant`, mixed scripts, user content, and missing or unknown media.
 - Bind record-scoped title, metadata, controls, progress, evidence, and async results to one stable record key. Selection or navigation changes must not leave another region or delayed result bound to the prior record.

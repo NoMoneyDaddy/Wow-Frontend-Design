@@ -62,6 +62,12 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         )
         self.assertIn("hooks locate surfaces, not form values", self.skill)
 
+    def test_visible_default_selection_matches_its_owned_state(self) -> None:
+        self.assertIn(
+            "A visible default selection must be the owning state",
+            self.components,
+        )
+
     def test_failure_states_require_a_reachable_recovery_action(self) -> None:
         self.assertIn(
             "visible enabled recovery/retry control that changes outcome",
