@@ -79,6 +79,8 @@ During the fast draft pass, render the shared minimum slice plus only the extra 
 
 With two or more rendered candidate directions in the same frozen comparison cohort, whether produced in one batch or isolated runs, route matched surface, viewport, and state observations through the optional `scripts/cross_output_template_audit.cjs` telemetry in [research-validation-loop.md](research-validation-loop.md). Treat its candidates as advisory prompts for product evidence and paired rendered review; never make a match a release blocker or a non-match proof of originality.
 
+When telemetry raises an advisory, compare matched captures against only each candidate's declared changed axes and the predeclared selection criteria. State whether the overlap is an intentional held constant or a named axis that did not become observable. If it is unresolved, revise one named candidate along one unobserved high-impact axis; do not add a color-only variation or borrow fragments into an unrendered composite. An advisory records a review question, not a style verdict or release gate.
+
 Only a confirmed paired-render failure excludes a candidate. Retain the unaffected candidates and replace it at most once when the explicit comparison count still matters; otherwise present fewer honest directions. If that bounded replacement also converges, stop the calibration instead of padding the set.
 
 For the selected direction, render with the same frozen conditions and cover:

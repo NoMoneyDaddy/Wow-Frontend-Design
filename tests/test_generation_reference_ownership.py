@@ -163,6 +163,8 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             "matched surface, viewport, and state",
             "paired rendered review",
             "never make a match a release blocker or a non-match proof of originality",
+            "compare matched captures against only each candidate's declared changed axes",
+            "An advisory records a review question, not a style verdict or release gate",
             "Only a confirmed paired-render failure excludes a candidate",
             "replace it at most once when the explicit comparison count still matters",
             "present fewer honest directions",
