@@ -68,6 +68,12 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             self.components,
         )
 
+    def test_selection_dependent_actions_expose_unavailable_state(self) -> None:
+        self.assertIn(
+            "actions whose prerequisite selection is empty must expose an unavailable state",
+            self.components,
+        )
+
     def test_failure_states_require_a_reachable_recovery_action(self) -> None:
         self.assertIn(
             "visible enabled recovery/retry control that changes outcome",
