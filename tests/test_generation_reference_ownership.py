@@ -139,6 +139,12 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn("included quantity, limits/overage, eligibility", patterns)
         self.assertIn("Product Demos, Samples, AI Workflow Proof", patterns)
 
+    def test_task_screen_narrow_type_requires_a_parallel_earned_track(self) -> None:
+        self.assertIn(
+            "adjacent track carries a parallel decision, proof, or task context",
+            self.creative,
+        )
+
     def test_exploration_supports_fast_multi_direction_style_calibration(self) -> None:
         for phrase in (
             "fast multi-direction draft pass",
