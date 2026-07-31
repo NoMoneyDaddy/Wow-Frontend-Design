@@ -30,6 +30,8 @@ MAX_TOTAL_CAPTURE_BYTES = 64_000_000
 HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 PACKAGE_VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$")
+AXE_RULE_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+MAX_AXE_VIOLATIONS = 1000
 CORE_CRAFT = validate_quality_result.VERIFIED_CORE_CRAFT_DIMENSIONS
 PROFILE_STANDARD = [
     {"name": "desktop-default", "viewport": {"width": 1440, "height": 1000}, "reducedMotion": "no-preference", "dpr": 1},
@@ -538,6 +540,8 @@ def _validate_current_capture_evidence(
             "profile",
             "steps_executed",
             "result_assertion_count",
+            "axe_violation_count",
+            "axe_rule_ids",
             "status",
         }
         if case_schema == 5:
@@ -563,6 +567,16 @@ def _validate_current_capture_evidence(
             or not 1 <= state_evidence["steps_executed"] <= case_contract["step_count"]
             or type(state_evidence["result_assertion_count"]) is not int
             or state_evidence["result_assertion_count"] < 1
+            or type(state_evidence["axe_violation_count"]) is not int
+            or not 0 <= state_evidence["axe_violation_count"] <= MAX_AXE_VIOLATIONS
+            or not isinstance(state_evidence["axe_rule_ids"], list)
+            or state_evidence["axe_rule_ids"] != sorted(set(state_evidence["axe_rule_ids"]))
+            or any(
+                not isinstance(rule_id, str) or AXE_RULE_ID_PATTERN.fullmatch(rule_id) is None
+                for rule_id in state_evidence["axe_rule_ids"]
+            )
+            or state_evidence["axe_violation_count"] != 0
+            or state_evidence["axe_rule_ids"] != []
             or state_evidence["status"] != "passed"
         ):
             raise CurrentCraftError("consequential state evidence is invalid")

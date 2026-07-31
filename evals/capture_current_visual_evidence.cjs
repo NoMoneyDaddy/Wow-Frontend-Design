@@ -8,6 +8,7 @@ const { runLocalPageMatrix } = require("./playwright_browser_runtime.cjs");
 const {
   runBrowserContract,
   runBrowserContractPrefixToFirstAction,
+  runAxeSummary,
   validateBrowserContract,
 } = require("./playwright_html_smoke.cjs");
 
@@ -682,6 +683,7 @@ async function main() {
               : final.href !== initial.href)) {
             throw new Error("consequential state contract replay failed or navigated");
           }
+          const axeSummary = await runAxeSummary(page);
           const captureMeta = destinationPage ? { ...meta, relativePage: destinationPage } : meta;
           const relative = await captureScreenshot(
             page,
@@ -693,7 +695,7 @@ async function main() {
                 : `/${captureMeta.relativePage}`,
             },
           );
-          return { capture: relative, browser_contract: contractResult };
+          return { capture: relative, browser_contract: contractResult, axe: axeSummary };
         },
       });
       const stateResult = stateRun.results[0];
@@ -705,7 +707,9 @@ async function main() {
         || !stateResult.visible_primary_content
         || stateResult.root_horizontal_overflow
         || Object.values(stateResult.counters).some((count) => count !== 0)
-        || stateResult.inspection.browser_contract.status !== "passed") {
+        || stateResult.inspection.browser_contract.status !== "passed"
+        || stateResult.inspection.axe.axe_violation_count !== 0
+        || stateResult.inspection.axe.axe_rule_ids.length !== 0) {
         throw new Error("consequential state browser replay did not remain clean");
       }
       stateEvidence = {
@@ -716,6 +720,8 @@ async function main() {
         profile: mappedProfile.name,
         steps_executed: stateResult.inspection.browser_contract.steps_executed,
         result_assertion_count: selectedContractResultAssertionCount,
+        axe_violation_count: stateResult.inspection.axe.axe_violation_count,
+        axe_rule_ids: stateResult.inspection.axe.axe_rule_ids,
         status: "passed",
       };
       if (caseData.schema_version === 5) {

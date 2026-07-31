@@ -243,7 +243,7 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             target, case_path, case = self.fixture(
                 root,
                 html=(
-                    '<!doctype html><html><body><main><h1>State</h1>'
+                    '<!doctype html><html lang="zh-Hant"><head><title>State</title></head><body><main><h1>State</h1>'
                     '<button id="open" onclick="document.querySelector(\'#details\').hidden=false">Open</button>'
                     '<section id="details" hidden>Details</section></main></body></html>'
                 ),
@@ -265,6 +265,31 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             self.assertEqual("desktop-default", states[0]["profile"])
             self.assertEqual("contract:open-details", states[0]["context"]["state"])
             self.assertEqual(case["browser_contract"], receipt["source"]["browser_contract"])
+            self.assertEqual(0, receipt["state_evidence"]["axe_violation_count"])
+            self.assertEqual([], receipt["state_evidence"]["axe_rule_ids"])
+
+    def test_opt_in_v2_rejects_an_a11y_violation_introduced_by_the_contract_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target, case_path, case = self.fixture(
+                root,
+                html=(
+                    '<!doctype html><html lang="zh-Hant"><head><title>State</title></head><body><main><h1>State</h1>'
+                    '<script>function openState(){const details=document.querySelector(\'#details\');'
+                    'details.hidden=false;details.innerHTML="<img src=\\"data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=\\">";}</script>'
+                    '<button id="open" onclick="openState()">Open</button><section id="details" hidden>Details</section>'
+                    '</main></body></html>'
+                ),
+            )
+            contract = self.consequential_contract(root, target, case)
+            case_path.write_text(json.dumps(case, sort_keys=True), encoding="utf-8")
+            evidence = root / "evidence"
+
+            completed = self.invoke(target, case_path, evidence, browser_contract=contract)
+
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("consequential state browser replay did not remain clean", completed.stderr)
+            self.assertFalse(evidence.exists())
 
     def test_opt_in_v3_captures_three_fresh_motion_frames_and_reduced_static(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -333,7 +358,7 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             target, case_path, case = self.fixture(
                 root,
                 html=(
-                    '<!doctype html><html><body><main><h1>Motion</h1>'
+                    '<!doctype html><html lang="zh-Hant"><head><title>Motion</title></head><body><main><h1>Motion</h1>'
                     '<button id="play" onclick="'
                     "if(!matchMedia('(prefers-reduced-motion: reduce)').matches)"
                     "document.querySelector('#final').animate("
@@ -457,7 +482,7 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 target, case_path, case = self.fixture(
                     root,
                     html=(
-                        '<!doctype html><html><body><main><h1>State</h1>'
+                        '<!doctype html><html lang="zh-Hant"><head><title>State</title></head><body><main><h1>State</h1>'
                         f'<a id="open" href="{destination}">Open</a>'
                         '<section id="details">Details</section></main></body></html>'
                     ),
@@ -482,13 +507,13 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             target, case_path, case = self.fixture(
                 root,
                 html=(
-                    '<!doctype html><html><body><main><h1>Index</h1>'
+                    '<!doctype html><html lang="zh-Hant"><head><title>Index</title></head><body><main><h1>Index</h1>'
                     '<a id="open" href="detail.html">Open</a></main></body></html>'
                 ),
             )
             detail = target / "detail.html"
             detail.write_text(
-                '<!doctype html><html><body><main><h1>Detail</h1><section id="details">Details</section></main></body></html>',
+                '<!doctype html><html lang="zh-Hant"><head><title>Detail</title></head><body><main><h1>Detail</h1><section id="details">Details</section></main></body></html>',
                 encoding="utf-8",
             )
             manifest_path = target / "run-manifest.json"
@@ -522,13 +547,13 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             target, case_path, case = self.fixture(
                 root,
                 html=(
-                    '<!doctype html><html><body><main><h1>Index</h1>'
+                    '<!doctype html><html lang="zh-Hant"><head><title>Index</title></head><body><main><h1>Index</h1>'
                     '<a id="open" href="detail.html?filter=field-notes&q=Tide%20star*%7E">Open</a></main></body></html>'
                 ),
             )
             detail = target / "detail.html"
             detail.write_text(
-                '<!doctype html><html><body><main><h1>Detail</h1><section id="details">Details</section></main></body></html>',
+                '<!doctype html><html lang="zh-Hant"><head><title>Detail</title></head><body><main><h1>Detail</h1><section id="details">Details</section></main></body></html>',
                 encoding="utf-8",
             )
             manifest_path = target / "run-manifest.json"
@@ -585,7 +610,7 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
                 artifact = target / page
                 artifact.parent.mkdir(parents=True, exist_ok=True)
                 artifact.write_text(
-                    f'<!doctype html><html><body><main><h1>{page}</h1></main></body></html>',
+                    f'<!doctype html><html lang="zh-Hant"><head><title>Page</title></head><body><main><h1>{page}</h1></main></body></html>',
                     encoding="utf-8",
                 )
                 manifest["outputs"].append({

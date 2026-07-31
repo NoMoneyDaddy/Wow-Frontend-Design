@@ -319,7 +319,7 @@ npm run capture:current -- \
   /absolute/evaluator-root/evidence-run-001
 ```
 
-Capture command 會拒絕既存 evidence directory，capture 前後重驗 `run-manifest.json` 與所有 output hashes，並在失敗時移除本輪 partial cohort。成功後只留下本次 viewport PNG 與 `capture-receipt.json`；receipt 綁定 case、brief、Skill tree、manifest、outputs、Playwright/Chromium 與每張 PNG 的 hash、尺寸、viewport、locale、state。
+Capture command 會拒絕既存 evidence directory，capture 前後重驗 `run-manifest.json` 與所有 output hashes，並在失敗時移除本輪 partial cohort。成功後只留下本次 viewport PNG 與 `capture-receipt.json`；receipt 綁定 case、brief、Skill tree、manifest、outputs、Playwright/Chromium 與每張 PNG 的 hash、尺寸、viewport、locale、state；consequential state 另綁定同次 contract replay 的 pinned Axe violation count/rule IDs。
 
 若本次視覺結論涉及一個關鍵 action 後狀態，不必手動改 JSON。Completed manifest 已含同一 browser contract provenance 時，以成對 flags 直接產生 schema v2 private case；preparer 會核對 contract bytes/hash、case、page、profile 與至少一個 action：
 

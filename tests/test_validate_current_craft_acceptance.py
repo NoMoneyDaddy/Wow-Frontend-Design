@@ -584,7 +584,14 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                 )
 
     def test_opt_in_v2_acceptance_rejects_state_receipt_tampering(self) -> None:
-        for mode in ("witness_profile", "capture_state", "missing_result_assertion", "extra_state"):
+        for mode in (
+            "witness_profile",
+            "capture_state",
+            "missing_result_assertion",
+            "axe_nonzero",
+            "axe_unsorted",
+            "extra_state",
+        ):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
                 fixture = self.build_fixture(
                     Path(directory),
@@ -603,6 +610,11 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                     state_capture["context"]["state"] = "default"
                 elif mode == "missing_result_assertion":
                     receipt["state_evidence"]["result_assertion_count"] = 0
+                elif mode == "axe_nonzero":
+                    receipt["state_evidence"]["axe_violation_count"] = 1
+                    receipt["state_evidence"]["axe_rule_ids"] = ["button-name"]
+                elif mode == "axe_unsorted":
+                    receipt["state_evidence"]["axe_rule_ids"] = ["color-contrast", "button-name"]
                 else:
                     receipt["captures"].append(copy.deepcopy(state_capture))
                 receipt_path.write_text(json.dumps(receipt), encoding="utf-8")

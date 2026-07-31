@@ -156,6 +156,8 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn("runtime/framework adapter consumes the resolved semantic", self.tokens)
         self.assertIn("fresh source-bound artifacts under neutral candidate IDs", self.visual)
         self.assertIn("rendered geometry/computed styles, and a stable semantic locator", self.visual)
+        self.assertIn("run the pinned Axe check after the result assertion in that same replay", self.visual)
+        self.assertIn("bounded Axe count/rule IDs", self.visual)
         self.assertIn("capture settled viewport slices in document order", self.visual)
         self.assertIn("bounded full-document composition evidence only", self.visual)
         self.assertIn("one clamped normalized value", (ROOT / "motion-system.md").read_text())

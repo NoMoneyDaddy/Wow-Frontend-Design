@@ -19,6 +19,25 @@ const LOCATOR_ROLES = new Set([
   "slider", "spinbutton", "switch", "tab", "table", "textbox", "treeitem",
 ]);
 const MAX_AXE_TARGET_DESCRIPTORS = 32;
+const AXE_RULE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const MAX_AXE_VIOLATIONS = 1000;
+
+async function runAxeSummary(page) {
+  let analysis;
+  try {
+    analysis = await new AxeBuilder({ page })
+      .options({ rules: { "label-content-name-mismatch": { enabled: true } } })
+      .analyze();
+  } catch {
+    return { axe_violation_count: 1, axe_rule_ids: ["axe-runtime-error"] };
+  }
+  const ruleIds = [...new Set(analysis.violations.map((violation) => violation.id))].sort();
+  if (analysis.violations.length > MAX_AXE_VIOLATIONS
+    || ruleIds.some((id) => typeof id !== "string" || !AXE_RULE_ID.test(id))) {
+    throw new Error("Axe summary exceeded the bounded receipt schema");
+  }
+  return { axe_violation_count: analysis.violations.length, axe_rule_ids: ruleIds };
+}
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -1080,5 +1099,6 @@ if (require.main === module) {
 module.exports = {
   runBrowserContract,
   runBrowserContractPrefixToFirstAction,
+  runAxeSummary,
   validateBrowserContract,
 };
