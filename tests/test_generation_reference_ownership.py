@@ -254,6 +254,23 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.review)
 
+    def test_post_render_review_tracks_mainstream_model_priors_without_banning_them(self) -> None:
+        for phrase in (
+            "Mainstream model-prior inventory",
+            "centered headline, eyebrow, two CTAs",
+            "three/four identical feature cards",
+            "sidebar + top bar + dashboard cards",
+            "Inter/Geist/Space Grotesk",
+            "hover-scale imagery, pulsing status dot, auto marquee",
+            "generic marketing cadence",
+            "approved asset provenance",
+            "The inventory is a review queue, not a style ban",
+            "productive friction before implementation",
+            "Interrogating Design Homogenization in Web Vibe Coding",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.review)
+
     def test_consumers_route_to_the_new_canonical_owners(self) -> None:
         self.assertIn("[component-composition.md](component-composition.md)", self.behavioral)
         self.assertIn("post-render product-swap and earned-region review", self.behavioral)

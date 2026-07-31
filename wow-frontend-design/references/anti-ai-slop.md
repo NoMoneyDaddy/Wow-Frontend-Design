@@ -34,6 +34,23 @@ Cross-check adjacent tells from the same family: one font used everywhere, overs
 
 Do not “fix” a confirmed candidate by swapping in a different trendy pattern or by banning a valid component. Require a product noun, verb, dataset, state transition, or content relationship for the region; then compare the fresh render against the declared alternative. A pill, card, stripe, tracking choice, or familiar font is acceptable when that job and evidence are explicit.
 
+## Mainstream model-prior inventory
+
+This is an evaluator-maintained working hypothesis about high-frequency generated frontend defaults, informed by repeated fresh outputs and public catalogs—not a claim about private model telemetry. Use it to choose what to inspect first:
+
+| Surface | Common prior | Slop risk to test | Minimum disconfirmation |
+| --- | --- | --- | --- |
+| Hero | centered headline, eyebrow, two CTAs, gradient orb, oversized metric | the product could be swapped without changing the story | one product-specific noun/verb, proof object, or task path owns the first viewport |
+| Marketing sections | three/four identical feature cards, logo strip, testimonial row, pricing cards | repeated blocks displace the decision, proof, or content hierarchy | each block has a distinct task/content role and measured scan path |
+| App shell | sidebar + top bar + dashboard cards, bento grid, nested panels | shell is a generic SaaS costume instead of the product’s information architecture | route/permission/data model explains every persistent region |
+| Type | Inter/Geist/Space Grotesk, italic serif hero, uppercase tracked kickers, gradient text | typography signals a trend while weakening hierarchy, reading, or identity | declared type role, copy length, locale, and rendered hierarchy survive fresh viewports |
+| Surface | purple/violet-to-blue gradient, cyan-on-dark, cream/beige “taste”, glass blur, neon glow | decoration supplies the concept and competes with content | named material job, contrast proof, reduced-motion/static fallback, and product evidence |
+| Motion | hover-scale imagery, pulsing status dot, auto marquee, fake terminal caret, bounce/spring entrance | attention is manufactured without a changing state or user benefit | a real state/transition owns the motion and the static/reduced-motion result remains complete |
+| Copy | “build the future”, “supercharge”, “world-class”, “enterprise-grade”, repeated em dashes, “not X, a platform” | generic marketing cadence masks an unproven claim | rewrite with the actual actor, verb, object, limit, and evidence |
+| Imagery | generic shape-built illustration, stock dashboard mockup, placeholder screenshots | visual proof is invented or interchangeable | approved asset provenance, explicit sample labeling, or remove the asset |
+
+The inventory is a review queue, not a style ban. A centered hero, familiar font, card grid, dark theme, or gradient can be the correct choice when the product evidence, system constraints, and fresh rendered proof support it. The anti-slop action is to add productive friction before implementation, not to replace one centroid with an “anti-slop” house style. See [Interrogating Design Homogenization in Web Vibe Coding](https://www.microsoft.com/en-us/research/publication/interrogating-design-homogenization-in-web-vibe-coding/) for the broader homogenization concern.
+
 ## Structural slop tells
 
 The supplied screenshot is a useful warning that AI slop is often a broken composition, not merely a fashionable palette. Review these tells from a fresh render, then route the confirmed defect to its owning layout, typography, component, or content rule:
