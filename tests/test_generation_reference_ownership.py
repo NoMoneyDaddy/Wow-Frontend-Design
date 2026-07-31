@@ -227,6 +227,19 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             with self.subTest(gate=gate):
                 self.assertIn(gate, self.review)
 
+    def test_post_render_review_catches_structural_ai_slop_without_style_bans(self) -> None:
+        for phrase in (
+            "Text/container disagreement",
+            "Decorative grid without a content model",
+            "State reduced to ornament",
+            "Viewport treated as a crop mask",
+            "Surface vocabulary outruns product vocabulary",
+            "diagnostic hypotheses, not a reverse style catalogue",
+            "fresh evidence are explicit",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.review)
+
     def test_consumers_route_to_the_new_canonical_owners(self) -> None:
         self.assertIn("[component-composition.md](component-composition.md)", self.behavioral)
         self.assertIn("post-render product-swap and earned-region review", self.behavioral)

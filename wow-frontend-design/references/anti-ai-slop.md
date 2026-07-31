@@ -21,6 +21,18 @@ Apply these checks to representative rendered routes and states:
 3. **Earned region** — For each identity-bearing or attention-dominant region, identify the product noun, verb, content relationship, dataset, authorized asset, cultural context, or verified brand invariant it expresses. A region with no product job is a finding when it competes with or distorts the task; quiet or conventional regions need no novelty justification.
 4. **Evidence ceiling** — Limit every review claim to the strongest available evidence. Source inspection cannot establish a rendered result, a screenshot cannot prove interaction, and this review cannot prove usability, accessibility conformance, brand fidelity, originality, award quality, or production readiness.
 
+## Structural slop tells
+
+The supplied screenshot is a useful warning that AI slop is often a broken composition, not merely a fashionable palette. Review these tells from a fresh render, then route the confirmed defect to its owning layout, typography, component, or content rule:
+
+1. **Text/container disagreement** — a heading, label, or value is clipped, crosses a card seam, disappears under a sibling, or is forced into extreme tracking to fit. Measure the text box against its owning container at every declared viewport and at the project’s text-spacing stress settings. Do not accept `overflow: hidden`, `nowrap`, or `text-overflow` as a repair unless truncation is an explicit product behavior with an accessible full-value path; CSS overflow can otherwise hide content, and WCAG reflow requires no loss of information or functionality at narrow widths. See [MDN text-overflow](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-overflow), [WCAG 1.4.10 Reflow](https://www.w3.org/WAI/WCAG21/Understanding/reflow.html), and [WCAG 1.4.12 Text Spacing](https://www.w3.org/WAI/WCAG22/Understanding/text-spacing).
+2. **Decorative grid without a content model** — equal cards, seams, giant empty panels, or a split frame are present without a distinct task, proof, dataset, or narrative beat for each region. Replace the shell only when the product evidence supports a clearer grouping; do not fill empty space with more cards or labels.
+3. **State reduced to ornament** — a glow, dot, pill, or animated badge implies “live”, “ready”, or “selected” without a semantic owner, readable label, update behavior, and non-motion fallback. Route the defect to component and interaction review; decoration may reinforce a state but cannot be its only evidence.
+4. **Viewport treated as a crop mask** — the desktop composition is simply enlarged, clipped, or overlaid on mobile instead of re-composed around the mobile task. Verify route, content order, focus order, and geometry at the narrowest declared profile; a screenshot that looks dramatic because it hides content is a failure, not an art direction.
+5. **Surface vocabulary outruns product vocabulary** — repeated rounded containers, gradients, noise, badges, or uppercase microcopy occupy more visual area than the nouns, verbs, evidence, and next actions that explain the product. Remove the lowest-value surface and re-measure hierarchy before adding a new effect.
+
+These are diagnostic hypotheses, not a reverse style catalogue. A deliberate overlap, dashboard grid, badge, or truncation remains valid when its product job, responsive behavior, semantic owner, and fresh evidence are explicit.
+
 ## Review result
 
 Report only confirmed findings and unresolved candidates:
