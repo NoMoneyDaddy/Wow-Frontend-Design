@@ -240,6 +240,20 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.review)
 
+    def test_post_render_review_names_the_four_panel_convergence_signals(self) -> None:
+        for phrase in (
+            "The supplied four-panel meme is a pattern collage",
+            "Side-tab accent card",
+            "Letter-spacing theatre",
+            "Pill/status reflex",
+            "Card shell repetition",
+            "one font used everywhere",
+            "motion without a task or state purpose",
+            "current [Impeccable slop catalogue](https://impeccable.style/slop/)",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.review)
+
     def test_consumers_route_to_the_new_canonical_owners(self) -> None:
         self.assertIn("[component-composition.md](component-composition.md)", self.behavioral)
         self.assertIn("post-render product-swap and earned-region review", self.behavioral)

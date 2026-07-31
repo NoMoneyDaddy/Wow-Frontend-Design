@@ -21,6 +21,19 @@ Apply these checks to representative rendered routes and states:
 3. **Earned region** — For each identity-bearing or attention-dominant region, identify the product noun, verb, content relationship, dataset, authorized asset, cultural context, or verified brand invariant it expresses. A region with no product job is a finding when it competes with or distorts the task; quiet or conventional regions need no novelty justification.
 4. **Evidence ceiling** — Limit every review claim to the strongest available evidence. Source inspection cannot establish a rendered result, a screenshot cannot prove interaction, and this review cannot prove usability, accessibility conformance, brand fidelity, originality, award quality, or production readiness.
 
+## Recognizable generated-UI defaults
+
+The supplied four-panel meme is a pattern collage, not one broken layout. Treat these as convergence signals to inspect in the rendered product, not automatic bans:
+
+- **Side-tab accent card** — a thick bright stripe attached to the edge of an otherwise generic rounded card.
+- **Letter-spacing theatre** — extreme tracking, usually on uppercase labels or display copy, used as a substitute for a typographic idea.
+- **Pill/status reflex** — a glowing dot, “Live”, eyebrow, or capsule badge added because the surface feels empty, without a real state owner or transition.
+- **Card shell repetition** — empty rounded panels, nested cards, or the same hero → metrics → features arrangement repeated regardless of the product’s information model.
+
+Cross-check adjacent tells from the same family: one font used everywhere, oversized icon tiles, decorative gradients/glows, repeated tiny uppercase kickers, low-contrast gray text, redundant labels, and motion without a task or state purpose. The current [Impeccable slop catalogue](https://impeccable.style/slop/) describes these as recurring generated-UI patterns and separates deterministic source/browser checks from broader review judgments.
+
+Do not “fix” a confirmed candidate by swapping in a different trendy pattern or by banning a valid component. Require a product noun, verb, dataset, state transition, or content relationship for the region; then compare the fresh render against the declared alternative. A pill, card, stripe, tracking choice, or familiar font is acceptable when that job and evidence are explicit.
+
 ## Structural slop tells
 
 The supplied screenshot is a useful warning that AI slop is often a broken composition, not merely a fashionable palette. Review these tells from a fresh render, then route the confirmed defect to its owning layout, typography, component, or content rule:
