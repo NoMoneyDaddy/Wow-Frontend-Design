@@ -134,6 +134,11 @@ RECEIPT_CATEGORIES = {
         "trace_policy_rejection",
     },
 }
+EXECUTION_BACKED_FAILURE_CATEGORIES = RECEIPT_CATEGORIES["failed"] - {
+    "execution_infrastructure_failure",
+    # A forbidden trace can be rejected before execute_isolated returns its summary.
+    "trace_policy_rejection",
+}
 PROJECT_SCAN_REPORT_KEYS = {
     "root", "mode_hint", "file_count", "scan_truncated", "frameworks", "styling_tools",
     "experience_runtimes", "localization_tools", "test_tools", "package_scripts",
@@ -2622,6 +2627,8 @@ def _receipt(
         failure_artifact=failure_artifact,
         decision_lineage=decision_lineage,
     )
+    if status == "failed" and classification in EXECUTION_BACKED_FAILURE_CATEGORIES and execution is None:
+        raise RunnerError("receipt classification requires execution evidence")
     logs = {}
     if execution is not None:
         logs = {

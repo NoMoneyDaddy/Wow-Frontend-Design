@@ -4149,6 +4149,19 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
                 ):
                     policy._receipt(status=status, classification=classification, **common)
 
+            for classification in sorted(
+                policy.EXECUTION_BACKED_FAILURE_CATEGORIES
+                - {"design_gate_rejection", "html_smoke_rejection"}
+            ):
+                with self.subTest(classification=classification), self.assertRaisesRegex(
+                    policy.RunnerError, "receipt classification requires execution evidence"
+                ):
+                    policy._receipt(
+                        status="failed",
+                        classification=classification,
+                        **common,
+                    )
+
     def test_receipt_category_summaries_are_schema_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
