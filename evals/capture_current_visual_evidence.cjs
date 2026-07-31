@@ -136,6 +136,23 @@ function sha256File(file) {
   return sha256Bytes(fs.readFileSync(file));
 }
 
+function commandProvenance({ hasConvergence, hasBrowserContract }) {
+  const canonicalArgv = [
+    "node",
+    "wow.capture-current",
+    "@target",
+    "@case",
+    "@evidence",
+    hasConvergence ? "--convergence-contract @convergence-contract" : "--convergence-contract <absent>",
+    hasBrowserContract ? "--browser-contract @browser-contract" : "--browser-contract <absent>",
+  ];
+  return {
+    command_id: "wow.capture-current",
+    command_version: 1,
+    argv_sha256: sha256Bytes(JSON.stringify(canonicalArgv)),
+  };
+}
+
 function safeRelative(value, label) {
   if (typeof value !== "string" || !value || value.includes("\\") || value.includes("\0")
     || path.posix.isAbsolute(value) || path.posix.normalize(value) !== value
@@ -917,6 +934,10 @@ async function main() {
         case_sha256: sha256Bytes(caseBytes),
       },
       source,
+      command_provenance: commandProvenance({
+        hasConvergence: Boolean(convergenceArg),
+        hasBrowserContract: Boolean(browserContractArg),
+      }),
       runtime: {
         package: "playwright",
         version: require("playwright/package.json").version,

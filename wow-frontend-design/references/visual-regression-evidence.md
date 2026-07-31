@@ -22,6 +22,7 @@ case/run id → commit/build hash → route + state/fixture
 → font files/hashes + load completion → network/data/time/random controls
 → wait condition + scroll/focus/overlay/caret state
 → screenshot MIME/decoded dimensions/SHA-256 + capture time
+→ fixed capture command identity/version + canonical argv SHA-256
 → diff engine/version/options/color space + mask/style policy
 ```
 

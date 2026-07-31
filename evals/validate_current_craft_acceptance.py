@@ -38,7 +38,16 @@ PROFILE_STANDARD = [
     {"name": "mobile-default", "viewport": {"width": 390, "height": 844}, "reducedMotion": "reduce", "dpr": 1},
 ]
 CASE_KEYS = {"schema_version", "case_id", "run_id", "partition", "brief", "capture_plan", "craft"}
-RECEIPT_KEYS = {"schema_version", "status", "case", "source", "runtime", "capture_standard", "captures"}
+RECEIPT_KEYS = {
+    "schema_version",
+    "status",
+    "case",
+    "source",
+    "command_provenance",
+    "runtime",
+    "capture_standard",
+    "captures",
+}
 CAPTURE_KEYS = {
     "label", "page", "profile", "path", "bytes", "sha256", "width", "height", "captured_at", "context"
 }
@@ -100,6 +109,45 @@ def _exact(value: object, keys: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != keys:
         raise CurrentCraftError(f"{label} must contain exactly {sorted(keys)}")
     return value
+
+
+def _command_provenance(value: object, *, case_schema: int, capture_plan: dict[str, Any]) -> dict[str, Any]:
+    provenance = _exact(
+        value,
+        {"command_id", "command_version", "argv_sha256"},
+        "capture receipt.command_provenance",
+    )
+    if (
+        provenance["command_id"] != "wow.capture-current"
+        or type(provenance["command_version"]) is not int
+        or provenance["command_version"] != 1
+        or not isinstance(provenance["argv_sha256"], str)
+        or HASH_PATTERN.fullmatch(provenance["argv_sha256"]) is None
+    ):
+        raise CurrentCraftError("capture command provenance is invalid")
+    canonical_argv = [
+        "node",
+        "wow.capture-current",
+        "@target",
+        "@case",
+        "@evidence",
+        (
+            "--convergence-contract @convergence-contract"
+            if capture_plan["pages"] != "all_html_outputs"
+            else "--convergence-contract <absent>"
+        ),
+        (
+            "--browser-contract @browser-contract"
+            if case_schema in {2, 3, 4, 5}
+            else "--browser-contract <absent>"
+        ),
+    ]
+    expected_hash = hashlib.sha256(
+        json.dumps(canonical_argv, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    if provenance["argv_sha256"] != expected_hash:
+        raise CurrentCraftError("capture command provenance does not match the canonical invocation")
+    return provenance
 
 
 def _browser_contract_record(value: object, label: str) -> dict[str, Any]:
@@ -435,6 +483,11 @@ def _validate_current_capture_evidence(
         or receipt["status"] != "captured"
     ):
         raise CurrentCraftError("capture receipt is not a completed current receipt")
+    _command_provenance(
+        receipt["command_provenance"],
+        case_schema=case_schema,
+        capture_plan=capture_plan,
+    )
     runtime = _exact(receipt["runtime"], {"package", "version", "browser", "browser_version", "headless"}, "capture receipt.runtime")
     if (
         runtime["package"] != "playwright"

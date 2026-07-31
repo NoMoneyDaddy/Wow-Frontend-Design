@@ -629,6 +629,32 @@ class CurrentCraftAcceptanceTests(unittest.TestCase):
                         manifest_path,
                     )
 
+    def test_capture_command_provenance_is_schema_closed_and_bound(self) -> None:
+        for mode in ("missing", "extra", "command", "version", "hash"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                fixture = self.build_fixture(Path(directory))
+                _, _, _, workspace, case_path, receipt_path, manifest_path = fixture
+                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                if mode == "missing":
+                    del receipt["command_provenance"]
+                elif mode == "extra":
+                    receipt["command_provenance"]["raw_argv"] = ["/private/user/workspace"]
+                elif mode == "command":
+                    receipt["command_provenance"]["command_id"] = "capture_current_visual_evidence"
+                elif mode == "version":
+                    receipt["command_provenance"]["command_version"] = 2
+                else:
+                    receipt["command_provenance"]["argv_sha256"] = "0" * 64
+                receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+                with self.assertRaises(validate_current_craft_acceptance.CurrentCraftError):
+                    validate_current_craft_acceptance.validate_current_capture_evidence(
+                        workspace,
+                        case_path,
+                        receipt_path,
+                        manifest_path,
+                    )
+
     def test_capture_provenance_accepts_an_explicit_manifest_page_subset(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

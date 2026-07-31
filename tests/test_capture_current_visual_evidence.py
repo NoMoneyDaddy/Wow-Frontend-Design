@@ -225,6 +225,15 @@ class CurrentVisualEvidenceTests(unittest.TestCase):
             self.assertEqual(0, completed.returncode, completed.stderr)
             receipt = json.loads((evidence / "capture-receipt.json").read_text(encoding="utf-8"))
             self.assertEqual("captured", receipt["status"])
+            provenance = receipt["command_provenance"]
+            self.assertEqual(
+                {"command_id", "command_version", "argv_sha256"},
+                set(provenance),
+            )
+            self.assertEqual("wow.capture-current", provenance["command_id"])
+            self.assertEqual(1, provenance["command_version"])
+            self.assertRegex(provenance["argv_sha256"], r"^[a-f0-9]{64}$")
+            self.assertNotIn(str(target), json.dumps(receipt))
             self.assertEqual({"desktop-default", "mobile-default"}, {item["profile"] for item in receipt["captures"]})
             self.assertEqual({"1440x1000", "390x844"}, {item["context"]["viewport"] for item in receipt["captures"]})
             self.assertEqual(2, len(list((evidence / "artifacts").glob("*.png"))))
