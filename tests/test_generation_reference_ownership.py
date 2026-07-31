@@ -24,6 +24,7 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         cls.tokens = (ROOT / "design-token-portability.md").read_text(encoding="utf-8")
         cls.visual = (ROOT / "visual-regression-evidence.md").read_text(encoding="utf-8")
         cls.motion = (ROOT / "motion-system.md").read_text(encoding="utf-8")
+        cls.typography = (ROOT / "typographic-layout.md").read_text(encoding="utf-8")
         cls.skill = (ROOT.parent / "SKILL.md").read_text(encoding="utf-8")
 
     def test_references_keep_bounded_responsibility_sections(self) -> None:
@@ -80,6 +81,17 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
             self.skill,
         )
         self.assertIn("a covering browser contract asserts it", self.skill)
+
+    def test_cjk_display_copy_preserves_semantic_wrap_units(self) -> None:
+        for phrase in (
+            "semantic wrap unit",
+            "compact lexical unit",
+            "never apply `word-break: keep-all` globally",
+            "Verify the fallback at adjacent widths",
+            "rerun the narrowest declared viewport",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.typography)
 
     def test_action_hooks_identify_their_own_live_control(self) -> None:
         self.assertIn(
