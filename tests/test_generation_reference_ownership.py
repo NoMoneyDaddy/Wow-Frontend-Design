@@ -82,6 +82,25 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         )
         self.assertIn("a covering browser contract asserts it", self.skill)
 
+    def test_vertical_slice_requires_bounded_builder_self_test(self) -> None:
+        for phrase in (
+            "Before expansion, pass the bounded self-test",
+            "quality-gates.md",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.skill)
+        for phrase in (
+            "bounded builder self-test",
+            "fresh project-pinned Playwright context",
+            "early diagnostic, not acceptance evidence",
+            "keep the affected claim `UNVERIFIED`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, (ROOT / "quality-gates.md").read_text(encoding="utf-8"))
+        self.assertIn("Vibe Code Bench", self.research)
+        self.assertIn("Pearson `r=0.72`", self.research)
+        self.assertIn("benchmark itself lists those dimensions as out of scope", self.research)
+
     def test_cjk_display_copy_preserves_semantic_wrap_units(self) -> None:
         for phrase in (
             "semantic wrap unit",

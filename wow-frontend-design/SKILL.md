@@ -134,7 +134,7 @@ Implement one runnable route/task before expanding architecture, with real or la
 - preserve framework, route, API, state, analytics, and business contracts.
 - Give CJK headings their full track. Never cap them in Latin `ch` or arbitrary fractions; preserve semantic wraps and avoid one-Han tails.
 
-Expand primitives, routes, effects, or optimization only after the slice works. Prefer semantic HTML, modern CSS, minimal JavaScript. Do not rewrite frameworks for CSS.
+Before expansion, pass the bounded self-test in [quality-gates.md](references/quality-gates.md). Prefer semantic HTML/CSS/JS; do not rewrite frameworks.
 
 ### 6. Pressure, repair, and replay
 
