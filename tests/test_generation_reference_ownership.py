@@ -101,6 +101,18 @@ class GenerationReferenceOwnershipTests(unittest.TestCase):
         self.assertIn("Pearson `r=0.72`", self.research)
         self.assertIn("benchmark itself lists those dimensions as out of scope", self.research)
 
+    def test_quality_gates_require_semantic_html_validation(self) -> None:
+        quality = (ROOT / "quality-gates.md").read_text(encoding="utf-8")
+        for phrase in (
+            "project-pinned semantic validator",
+            "npm run audit:html -- <html-output>",
+            "Pass only HTML paths",
+            "REPAIR REQUIRED",
+            "Playwright behavior and Axe results cannot substitute for valid HTML semantics",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, quality)
+
     def test_cjk_display_copy_preserves_semantic_wrap_units(self) -> None:
         for phrase in (
             "semantic wrap unit",
