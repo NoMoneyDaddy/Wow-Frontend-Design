@@ -52,6 +52,7 @@ from current_skill_repair import (
     repair_state_strictly_progressed,
     repair_state_stop_reason,
 )
+from html_semantic_gate import run_html_semantic_gate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +61,8 @@ EXECUTION_CORE = ROOT / "evals" / "codex_isolated_build_core.py"
 TRACE_VALIDATOR = ROOT / "evals" / "validate_codex_log_policy.py"
 DESIGN_VALIDATOR = ROOT / "evals" / "validate_design_md_clean.py"
 HTML_SMOKE_VALIDATOR = ROOT / "evals" / "playwright_html_smoke.cjs"
+HTML_SEMANTIC_VALIDATOR = ROOT / "evals" / "html_semantic_gate.py"
+VNU_RUNNER = ROOT / "evals" / "run_vnu.cjs"
 BROWSER_RUNTIME = ROOT / "evals" / "playwright_browser_runtime.cjs"
 REPAIR_POLICY = ROOT / "evals" / "current_skill_repair.py"
 DECISION_RECORDER = ROOT / "evals" / "record_current_draft_decision.py"
@@ -128,6 +131,7 @@ RECEIPT_CATEGORIES = {
         "generation_exit_nonzero",
         "hard_timeout",
         "html_smoke_rejection",
+        "html_semantic_rejection",
         "inactivity_timeout",
         "output_contract_rejection",
         "resource_quota",
@@ -1646,6 +1650,81 @@ def _run_html_smoke(
     return receipt
 
 
+def _run_html_semantic(
+    stage: Path,
+    outputs: tuple[str, ...],
+    timeout: int,
+    verification_pages: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    html_outputs = tuple(
+        verification_pages
+        if verification_pages is not None
+        else (name for name in outputs if name.casefold().endswith((".html", ".htm")))
+    )
+    try:
+        receipt = run_html_semantic_gate(stage, html_outputs, timeout)
+    except ValueError as error:
+        raise RunnerError("semantic HTML gate infrastructure failure") from error
+    if not isinstance(receipt, dict):
+        raise RunnerError("semantic HTML gate infrastructure failure")
+    status = receipt.get("status")
+    if status == "unavailable":
+        if set(receipt) != {
+            "schema_version", "status", "claim_boundary", "tool", "outputs",
+            "finding_count", "unavailable_reason",
+        }:
+            raise RunnerError("semantic HTML gate infrastructure failure")
+        return receipt
+    if set(receipt) != {
+        "schema_version", "status", "claim_boundary", "tool", "outputs", "finding_count",
+    }:
+        raise RunnerError("semantic HTML gate infrastructure failure")
+    if (
+        receipt.get("schema_version") != 1
+        or receipt.get("claim_boundary") != "semantic-html"
+        or status not in {"passed", "rejected"}
+        or not isinstance(receipt.get("tool"), dict)
+        or receipt["tool"].get("package") != "vnu-jar"
+        or not isinstance(receipt.get("outputs"), list)
+        or receipt.get("finding_count") != sum(
+            item.get("finding_count", -1)
+            for item in receipt["outputs"]
+            if isinstance(item, dict)
+        )
+    ):
+        raise RunnerError("semantic HTML gate infrastructure failure")
+    observed = []
+    for item in receipt["outputs"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"path", "status", "finding_count", "findings"}
+            or item.get("path") not in html_outputs
+            or item.get("status") not in {"passed", "rejected"}
+            or not isinstance(item.get("findings"), list)
+            or item.get("finding_count") != len(item["findings"])
+        ):
+            raise RunnerError("semantic HTML gate infrastructure failure")
+        for finding in item["findings"]:
+            if (
+                not isinstance(finding, dict)
+                or set(finding) != {"path", "line", "column", "level", "message"}
+                or finding.get("path") != item["path"]
+                or type(finding.get("line")) is not int
+                or finding["line"] < 1
+                or type(finding.get("column")) is not int
+                or finding["column"] < 1
+                or finding.get("level") not in {"error", "warning"}
+                or not isinstance(finding.get("message"), str)
+            ):
+                raise RunnerError("semantic HTML gate infrastructure failure")
+        observed.append(item["path"])
+    if observed != list(html_outputs) or status != (
+        "passed" if receipt["finding_count"] == 0 else "rejected"
+    ):
+        raise RunnerError("semantic HTML gate infrastructure failure")
+    return receipt
+
+
 def _heading_explicit_narrow_pages(
     stage: Path,
     outputs: tuple[str, ...],
@@ -1740,6 +1819,8 @@ def _wrapper_tool_records() -> dict[str, Any]:
         ("trace_validator", TRACE_VALIDATOR),
         ("design_validator", DESIGN_VALIDATOR),
         ("html_smoke_validator", HTML_SMOKE_VALIDATOR),
+        ("html_semantic_validator", HTML_SEMANTIC_VALIDATOR),
+        ("vnu_runner", VNU_RUNNER),
         ("browser_runtime", BROWSER_RUNTIME),
         ("repair_policy", REPAIR_POLICY),
         ("draft_decision_policy", DECISION_RECORDER),
@@ -1896,6 +1977,7 @@ def _log_paths(
         log_dir / f"{LOG_STEM}.publication-failure.json",
         log_dir / f"{LOG_STEM}.design-gate.json",
         log_dir / f"{LOG_STEM}.html-smoke.json",
+        log_dir / f"{LOG_STEM}.html-semantic.json",
         log_dir / f"{LOG_STEM}.quarantine",
     )
     repair_paths = tuple(
@@ -1926,6 +2008,8 @@ def _classification(error: BaseException, execution: dict[str, Any] | None) -> s
         return "execution_infrastructure_failure"
     if "HTML Playwright smoke gate rejected" in message:
         return "html_smoke_rejection"
+    if "semantic HTML gate rejected output" in message:
+        return "html_semantic_rejection"
     if "DESIGN.md clean gate rejected output" in message:
         return "design_gate_rejection"
     if "DESIGN.md clean gate returned an invalid status" in message:
@@ -2492,6 +2576,8 @@ def _validate_receipt_category_summaries(
     design_rejection: Any,
     html_smoke_rejection: Any,
     html_smoke_unavailable: Any,
+    html_semantic_rejection: Any,
+    html_semantic_unavailable: Any,
     repair: Any,
     repair_failure: Any,
     failure_artifact: Any,
@@ -2503,6 +2589,7 @@ def _validate_receipt_category_summaries(
     for summary, expected_classification in (
         (design_rejection, "design_gate_rejection"),
         (html_smoke_rejection, "html_smoke_rejection"),
+        (html_semantic_rejection, "html_semantic_rejection"),
     ):
         if summary is None:
             valid = valid and classification != expected_classification
@@ -2516,6 +2603,7 @@ def _validate_receipt_category_summaries(
         )
     for summary, allowed_classifications in (
         (html_smoke_unavailable, {"execution_infrastructure_failure"}),
+        (html_semantic_unavailable, {"execution_infrastructure_failure"}),
         (failure_artifact, {"execution_infrastructure_failure", "output_contract_rejection"}),
     ):
         if summary is not None:
@@ -2576,12 +2664,14 @@ def _validate_receipt_category_summaries(
         summary is not None
         for summary in (
             design_rejection, html_smoke_rejection, html_smoke_unavailable,
+            html_semantic_rejection, html_semantic_unavailable,
             repair_failure, failure_artifact,
         )
         ):
         valid = False
     terminal_summaries = (
         design_rejection, html_smoke_rejection, html_smoke_unavailable,
+        html_semantic_rejection, html_semantic_unavailable,
         repair_failure, failure_artifact,
     )
     if sum(summary is not None for summary in terminal_summaries) > 1:
@@ -2606,6 +2696,8 @@ def _receipt(
     design_rejection: dict[str, Any] | None = None,
     html_smoke_rejection: dict[str, Any] | None = None,
     html_smoke_unavailable: dict[str, Any] | None = None,
+    html_semantic_rejection: dict[str, Any] | None = None,
+    html_semantic_unavailable: dict[str, Any] | None = None,
     repair: dict[str, Any] | None = None,
     repair_failure: dict[str, Any] | None = None,
     failure_artifact: dict[str, Any] | None = None,
@@ -2622,6 +2714,8 @@ def _receipt(
         design_rejection=design_rejection,
         html_smoke_rejection=html_smoke_rejection,
         html_smoke_unavailable=html_smoke_unavailable,
+        html_semantic_rejection=html_semantic_rejection,
+        html_semantic_unavailable=html_semantic_unavailable,
         repair=repair,
         repair_failure=repair_failure,
         failure_artifact=failure_artifact,
@@ -2666,6 +2760,10 @@ def _receipt(
         payload["html_smoke_rejection"] = html_smoke_rejection
     if html_smoke_unavailable is not None:
         payload["html_smoke_unavailable"] = html_smoke_unavailable
+    if html_semantic_rejection is not None:
+        payload["html_semantic_rejection"] = html_semantic_rejection
+    if html_semantic_unavailable is not None:
+        payload["html_semantic_unavailable"] = html_semantic_unavailable
     if repair is not None:
         payload["repair"] = repair
     if repair_failure is not None:
@@ -3111,6 +3209,7 @@ def run(
         publication_failure_path,
         design_gate_path,
         html_smoke_path,
+        html_semantic_path,
         quarantine_path,
         repair_log_paths,
     ) = _log_paths(log_dir, target)
@@ -3215,6 +3314,8 @@ def run(
     design_rejection: dict[str, Any] | None = None
     html_smoke_rejection: dict[str, Any] | None = None
     html_smoke_unavailable: dict[str, Any] | None = None
+    html_semantic_rejection: dict[str, Any] | None = None
+    html_semantic_unavailable: dict[str, Any] | None = None
     repair_failure: dict[str, Any] | None = None
     failure_artifact: dict[str, Any] | None = None
     attempts: list[dict[str, Any]] = []
@@ -3493,6 +3594,69 @@ def run(
                 raise RunnerError("HTML Playwright smoke gate rejected output")
             if html_smoke_gate.get("status") != "passed":
                 raise RunnerError("HTML Playwright smoke gate returned an invalid status")
+            try:
+                html_semantic_gate = _run_html_semantic(
+                    stage,
+                    output_names,
+                    min(120, max(15, hard_seconds)),
+                    verification_pages,
+                )
+            except RunnerError:
+                html_semantic_unavailable = {
+                    "quarantine": _quarantine_outputs(
+                        log_dir,
+                        quarantine_path,
+                        stage,
+                        output_names,
+                        output_records,
+                        _directory_records(stage),
+                    )
+                }
+                raise
+            if html_semantic_gate.get("status") == "unavailable":
+                html_semantic_unavailable = {
+                    "quarantine": _quarantine_outputs(
+                        log_dir,
+                        quarantine_path,
+                        stage,
+                        output_names,
+                        output_records,
+                        _directory_records(stage),
+                    )
+                }
+                raise RunnerError("semantic HTML gate infrastructure failure")
+            if validate_candidate() != output_records:
+                raise RunnerError("output content or mode drifted during semantic HTML validation")
+            if html_semantic_gate.get("status") == "rejected":
+                if repair_rounds < max_repair_rounds:
+                    try:
+                        feedback = compile_html_feedback(html_semantic_gate, browser_contract_data)
+                        repair_state = compile_repair_state("html", html_semantic_gate, browser_contract_data)
+                    except ValueError as error:
+                        raise RunnerError("semantic HTML repair feedback infrastructure failure") from error
+                    stop_reason = repair_state_stop_reason(repair_state_history, repair_state, repair_rounds)
+                    if stop_reason is None:
+                        repair_state_history.append(repair_state)
+                        output_records = perform_repair(feedback, output_records)
+                        continue
+                    repair_stop_reason = stop_reason
+                else:
+                    repair_stop_reason = "round_limit"
+                gate_record = _write_json_exclusive(
+                    html_semantic_path, html_semantic_gate, frozen_parent=frozen_log_parent
+                )
+                quarantine_record = _quarantine_outputs(
+                    log_dir,
+                    quarantine_path,
+                    stage,
+                    output_names,
+                    output_records,
+                    _directory_records(stage),
+                )
+                html_semantic_rejection = {"gate_receipt": gate_record, "quarantine": quarantine_record}
+                raise RunnerError("semantic HTML gate rejected output")
+            if html_semantic_gate.get("status") != "passed":
+                raise RunnerError("semantic HTML gate returned an invalid status")
             break
         assert_decision_source()
         _assert_wrapper_tool_records(wrapper_tools)
@@ -3532,6 +3696,7 @@ def run(
             "execution": execution["execution"],
             "design_md_gate": design_gate,
             "html_smoke_gate": html_smoke_gate,
+            "html_semantic_gate": html_semantic_gate,
             "tools": {**execution["tools"], **wrapper_tools},
             "outputs": output_records,
         }
@@ -3648,6 +3813,8 @@ def run(
             design_rejection = None
             html_smoke_rejection = None
             html_smoke_unavailable = None
+            html_semantic_rejection = None
+            html_semantic_unavailable = None
             repair_failure = None
             failure_artifact = None
         if (
@@ -3712,6 +3879,8 @@ def run(
                 design_rejection=design_rejection,
                 html_smoke_rejection=html_smoke_rejection,
                 html_smoke_unavailable=html_smoke_unavailable,
+                html_semantic_rejection=html_semantic_rejection,
+                html_semantic_unavailable=html_semantic_unavailable,
                 repair=(
                     repair_summary(
                         include_decision_lineage=(
@@ -3834,7 +4003,7 @@ def main() -> int:
         if not re.match(
             r"^(?:completed|generation_exit_nonzero|hard_timeout|inactivity_timeout|resource_quota|"
             r"trace_policy_rejection|design_gate_rejection|output_contract_rejection|"
-            r"html_smoke_rejection|"
+            r"html_smoke_rejection|html_semantic_rejection|"
             r"execution_infrastructure_failure);",
             message,
         ):

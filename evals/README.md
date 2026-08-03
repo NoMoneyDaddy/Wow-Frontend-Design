@@ -288,13 +288,13 @@ Runner 會：
 2. 要求 Codex 只產生 caller 明列的相對輸出。
 3. 以 process group、預設 30 分鐘 hard deadline、`min(10 分鐘, hard deadline)` inactivity deadline、輸出 byte budget 與 exact-output inventory 約束執行；兩個 deadline 都可由 CLI 明示覆寫，且 inactivity 不得超過 hard。
 4. 驗證 Codex log policy、輸出路徑與 `DESIGN.md` clean contract。
-5. 對 HTML 以 fresh Playwright Chromium context 執行可見內容、console、resource、網路邊界、root overflow 與 Axe smoke。
-6. 將 deterministic failure 壓成 bounded repair packet，連同 hash-verified current output snapshot 交給同一模型與 reasoning effort 做最小修正；每輪只重驗受影響面。
+5. 對 HTML 以 fresh Playwright Chromium context 執行可見內容、console、resource、網路邊界、root overflow 與 Axe smoke，接著用 pinned VNU／Java 執行 HTML semantic gate；兩者都只接受 declared HTML output。
+6. 將 deterministic failure 壓成 bounded repair packet，連同 hash-verified current output snapshot 交給同一模型與 reasoning effort 做最小修正；semantic、Playwright 或 DESIGN failure 共用同一 repair fuse，修正後重跑完整受影響 gate 序列。
 7. 只有全部 release gates clean 時，才以原子 rename 發布 staged artifact，並寫入 runner-owned `run-manifest.json` 與 evaluator receipt。`trace_observed` 只記錄 `completed_item_counts` 與終端 token usage，不收錄模型文字或檔案內容，讓候選比較能辨識修復成本退步。若 repair fuse 觸頂，則把最後一個已驗證 checkpoint 移到 evaluator-owned quarantine、保持 target 空白並回傳失敗 receipt；quarantine 不是可發布成品。
 
 若獨立 Playwright evaluator 不可用，Skill 可以繼續交付 runnable artifact，但相關 rendered claim 必須是 `UNVERIFIED`。模型自己的截圖、分數或完成宣告不能取代 evaluator receipt。
 
-Current runner 的 `status: completed` 只表示 exact-output、`DESIGN.md` clean 與 deterministic HTML/Chromium/Axe smoke 通過；它不等於 screenshot acceptance、novel discovery、獨立 craft review、完整 release matrix 或商業上線核准。需要這些 claim 時，caller 必須提供獨立的 fresh Playwright evidence plane，否則維持 `UNVERIFIED`。
+Current runner 的 `status: completed` 只表示 exact-output、`DESIGN.md` clean、deterministic HTML/Chromium/Axe smoke 與 pinned VNU semantic gate 通過；它不等於 screenshot acceptance、novel discovery、獨立 craft review、完整 release matrix 或商業上線核准。需要這些 claim 時，caller 必須提供獨立的 fresh Playwright evidence plane，否則維持 `UNVERIFIED`。
 
 ## Fresh 視覺證據與獨立 craft acceptance
 
@@ -369,6 +369,7 @@ npm run accept:current -- \
 - `current_skill_repair.py`：finding 正規化、root-cause 去重、repair packet 與收斂判定。
 - `validate_design_md_clean.py`：pinned `@google/design.md` clean 驗證包裝。
 - `playwright_html_smoke.cjs`：fresh Chromium/Axe acceptance smoke。
+- `html_semantic_gate.py` + `run_vnu.cjs`：project-pinned VNU semantic HTML gate 與 bounded receipt。
 - `playwright_browser_runtime.cjs`：共用 Playwright network、popup、Service Worker 與 lifecycle policy。
 - `capture_current_visual_evidence.cjs`：final-only fresh 桌機／手機證據與 provenance receipt。
 - `prepare_current_craft_case.py`：從 completed manifest 原子建立 schema-closed private capture case；選用 contract case 時安全建立 v2 consequential-state case，或以雙 case 與三個 frozen offsets 建立 animation-primary v3 case。
@@ -413,4 +414,4 @@ node --check evals/capture_current_visual_evidence.cjs
 python3 -m py_compile evals/validate_current_craft_acceptance.py
 ```
 
-`npm run audit:html -- <path>` 是可選的 pinned Nu HTML Checker；它只提供 markup conformance signal，不證明視覺、互動、可及性或商業品質。
+`npm run audit:html -- <path>` 是 project-level 的 pinned Nu HTML Checker；current builder 已把同一 VNU 版本接入 release gate。它只提供 markup conformance signal，不證明視覺、互動、可及性或商業品質。

@@ -53,6 +53,18 @@ def _design_id(finding: dict[str, Any], fallback: int) -> str:
     return f"unclassified-{fallback}"
 
 
+def _semantic_id(finding: dict[str, Any], fallback: int) -> str:
+    message = finding.get("message")
+    normalized = message.casefold() if isinstance(message, str) else ""
+    if "aria-" in normalized or "accessible name" in normalized:
+        return "semantic-aria"
+    if "child of element" in normalized or "not allowed as child" in normalized:
+        return "semantic-interactive-child"
+    if "missing" in normalized or "required" in normalized:
+        return "semantic-required"
+    return f"semantic-html-{fallback}"
+
+
 def _bounded_payload(
     gate: str,
     identifiers: list[str],
@@ -62,6 +74,7 @@ def _bounded_payload(
     cjk_heading_targets: list[dict[str, Any]] | None = None,
     cjk_table_caption_targets: list[dict[str, Any]] | None = None,
     root_overflow_targets: list[dict[str, Any]] | None = None,
+    semantic_targets: list[dict[str, Any]] | None = None,
     source_truncated: bool = False,
 ) -> dict[str, Any]:
     counts = Counter(identifiers)
@@ -116,6 +129,8 @@ def _bounded_payload(
         core["cjk_table_caption_targets"] = eligible_caption_targets
     if eligible_overflow_targets:
         core["root_overflow_targets"] = eligible_overflow_targets
+    if semantic_targets:
+        core["semantic_targets"] = semantic_targets[:MAX_FINDING_IDS]
     payload = signed(core)
     if len(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")) <= MAX_FEEDBACK_BYTES:
         return payload
@@ -125,6 +140,7 @@ def _bounded_payload(
         and not eligible_cjk_targets
         and not eligible_caption_targets
         and not eligible_overflow_targets
+        and not semantic_targets
     ):
         raise ValueError("repair feedback exceeded its byte quota")
 
@@ -134,12 +150,14 @@ def _bounded_payload(
     core.pop("cjk_heading_targets", None)
     core.pop("cjk_table_caption_targets", None)
     core.pop("root_overflow_targets", None)
+    core.pop("semantic_targets", None)
     included: dict[str, list[dict[str, Any]]] = {
         "cjk_heading_targets": [],
         "cjk_table_caption_targets": [],
         "root_overflow_targets": [],
         "axe_targets": [],
         "contract_steps": [],
+        "semantic_targets": [],
     }
     candidates = {
         "cjk_heading_targets": eligible_cjk_targets,
@@ -147,6 +165,7 @@ def _bounded_payload(
         "root_overflow_targets": eligible_overflow_targets,
         "axe_targets": eligible_targets,
         "contract_steps": eligible_steps,
+        "semantic_targets": semantic_targets or [],
     }
     active = {key: True for key in included}
     while any(active.values()):
@@ -156,6 +175,7 @@ def _bounded_payload(
             "root_overflow_targets",
             "axe_targets",
             "contract_steps",
+            "semantic_targets",
         ):
             if not active[key]:
                 continue
@@ -464,6 +484,25 @@ def compile_repair_state(
             if isinstance(finding, dict)
         ] or ["unclassified-0"]
         return {"gate": gate, "counts": _canonical_counts(identifiers)}
+    if gate == "html" and receipt.get("claim_boundary") == "semantic-html":
+        outputs = receipt.get("outputs")
+        if not isinstance(outputs, list):
+            raise ValueError("semantic HTML gate outputs are malformed")
+        identifiers = [
+            _semantic_id(finding, index)
+            for output in outputs
+            if isinstance(output, dict)
+            for index, finding in enumerate(output.get("findings", []), start=1)
+            if isinstance(finding, dict)
+        ]
+        return {
+            "gate": gate,
+            "counts": _canonical_counts(identifiers or ["semantic-html-1"]),
+            "cases": {},
+            "axe_routes": {},
+            "cjk_routes": {},
+            "overflow_routes": {},
+        }
     if gate != "html":
         raise ValueError("repair state gate is invalid")
     results = receipt.get("results")
@@ -732,6 +771,29 @@ def compile_html_feedback(
     receipt: dict[str, Any],
     browser_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if receipt.get("claim_boundary") == "semantic-html":
+        outputs = receipt.get("outputs")
+        if not isinstance(outputs, list):
+            raise ValueError("semantic HTML gate outputs are malformed")
+        identifiers: list[str] = []
+        targets: list[dict[str, Any]] = []
+        for output in outputs:
+            if not isinstance(output, dict) or not isinstance(output.get("findings"), list):
+                raise ValueError("semantic HTML gate findings are malformed")
+            for index, finding in enumerate(output["findings"], start=1):
+                if not isinstance(finding, dict):
+                    raise ValueError("semantic HTML gate finding is malformed")
+                identifiers.append(_semantic_id(finding, index))
+                targets.append({
+                    "path": finding.get("path"),
+                    "line": finding.get("line"),
+                    "column": finding.get("column"),
+                    "level": finding.get("level"),
+                    "message": finding.get("message"),
+                })
+        return _bounded_payload(
+            "html", identifiers or ["semantic-html-1"], semantic_targets=targets
+        )
     results = receipt.get("results")
     if not isinstance(results, list):
         raise ValueError("HTML gate results are malformed")
@@ -1063,6 +1125,18 @@ def build_repair_prompt(
             "reported left and right overflow pixels only to compare severity across declared profiles, "
             "then verify the fresh rendered result at every profile.\n"
         )
+    semantic_repair = ""
+    if any(
+        isinstance(identifier, str) and identifier.startswith("semantic-")
+        for identifier in feedback.get("finding_ids", ())
+    ):
+        semantic_repair = (
+            "For semantic HTML findings, repair the reported file and line with the smallest semantic DOM "
+            "change. Keep interactive controls free of non-phrasing children, preserve the visible label and "
+            "accessible name, and use native elements before adding ARIA. Do not silence VNU, add a role only "
+            "to bypass the validator, hide the offending content, or rewrite unrelated copy. Re-run the fresh "
+            "semantic validator after the repair.\n"
+        )
     viewport_repair = ""
     if any(isinstance(step, dict) and "viewport_diagnostic" in step for step in feedback.get("contract_steps", ())):
         viewport_repair = (
@@ -1108,6 +1182,7 @@ def build_repair_prompt(
         f"{heading_repair}"
         f"{caption_repair}"
         f"{overflow_repair}"
+        f"{semantic_repair}"
         f"{viewport_repair}"
         f"{locator_uniqueness_repair}"
         f"{skill_reference_context}"

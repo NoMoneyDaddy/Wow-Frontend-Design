@@ -4151,7 +4151,7 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
 
             for classification in sorted(
                 policy.EXECUTION_BACKED_FAILURE_CATEGORIES
-                - {"design_gate_rejection", "html_smoke_rejection"}
+                - {"design_gate_rejection", "html_smoke_rejection", "html_semantic_rejection"}
             ):
                 with self.subTest(classification=classification), self.assertRaisesRegex(
                     policy.RunnerError, "receipt classification requires execution evidence"
@@ -4650,6 +4650,59 @@ print('{{"summary":{{"errors":0,"warnings":0,"infos":0}},"findings":[]}}')
             self.assertEqual("passed", manifest["design_md_gate"]["status"])
             self.assertEqual("passed", manifest["html_smoke_gate"]["status"])
             self.assertTrue((root / "logs" / "current-skill-build.repair-01.trace.jsonl").is_file())
+
+    def test_semantic_html_gate_repairs_then_retests_before_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            brief, target, capture, environment = self.fixture(root, "semantic-repairable")
+            log_dir = root / "logs"
+            log_dir.mkdir()
+            semantic_rejected = {
+                "schema_version": 1,
+                "status": "rejected",
+                "claim_boundary": "semantic-html",
+                "tool": {"package": "vnu-jar", "version": "26.7.16"},
+                "outputs": [{
+                    "path": "index.html",
+                    "status": "rejected",
+                    "finding_count": 1,
+                    "findings": [{
+                        "path": "index.html",
+                        "line": 12,
+                        "column": 4,
+                        "level": "error",
+                        "message": "Element div not allowed as child of element button.",
+                    }],
+                }],
+                "finding_count": 1,
+            }
+            semantic_passed = {
+                "schema_version": 1,
+                "status": "passed",
+                "claim_boundary": "semantic-html",
+                "tool": {"package": "vnu-jar", "version": "26.7.16"},
+                "outputs": [{
+                    "path": "index.html",
+                    "status": "passed",
+                    "finding_count": 0,
+                    "findings": [],
+                }],
+                "finding_count": 0,
+            }
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(
+                policy, "_run_html_semantic", side_effect=[semantic_rejected, semantic_passed]
+            ):
+                manifest = policy.run(brief, target, hard_seconds=5, log_dir=log_dir)
+            self.assertEqual("2", (capture / "invocation-count.txt").read_text(encoding="utf-8"))
+            self.assertEqual(1, manifest["repair"]["rounds_used"])
+            self.assertTrue(
+                manifest["repair"]["attempts"][1]["trigger"]["finding_ids"][0].startswith("semantic-")
+            )
+            repair_prompt = json.loads((capture / "invocation-2.json").read_text(encoding="utf-8"))["prompt"]
+            self.assertIn("For semantic HTML findings", repair_prompt)
+            self.assertNotIn(str(root), repair_prompt)
+            self.assertEqual("passed", manifest["html_semantic_gate"]["status"])
+            self.assertFalse((log_dir / "current-skill-build.html-semantic.json").exists())
 
     def test_seeded_repair_receives_current_snapshot_and_exact_mutation_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
